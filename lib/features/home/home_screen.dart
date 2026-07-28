@@ -10,6 +10,7 @@ import '../../core/widgets/glass_icon_button.dart';
 import '../attendance/attendance_barcode_overlay.dart';
 import '../messages/message_screen.dart';
 import '../notifications/notification_screen.dart';
+import '../profile/profile_screen.dart';
 
 /// 홈 화면 (디자인 시스템 데모용 샘플)
 ///
@@ -73,7 +74,15 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 10),
-                    const GlassIconButton(symbol: 'person'),
+                    GlassIconButton(
+                      symbol: 'person',
+                      onPressed: () => Navigator.push(
+                        context,
+                        CupertinoPageRoute(
+                          builder: (_) => const ProfileScreen(),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
