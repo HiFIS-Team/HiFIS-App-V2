@@ -1,10 +1,12 @@
-import 'package:cupertino_native/cupertino_native.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_shadows.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_tab_bar.dart';
+import '../../core/widgets/glass_icon_button.dart';
+import '../notifications/notification_screen.dart';
 
 /// 홈 화면 (디자인 시스템 데모용 샘플)
 ///
@@ -38,20 +40,29 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
           // 상단 고정 글래스 버튼 — 콘텐츠가 유리 뒤로 스크롤된다
-          const SafeArea(
+          SafeArea(
             bottom: false,
             child: Align(
               alignment: Alignment.topRight,
               child: Padding(
-                padding: EdgeInsets.only(top: 8, right: 16),
+                padding: const EdgeInsets.only(top: 8, right: 16),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _HeaderIconButton(symbol: 'message'),
-                    SizedBox(width: 10),
-                    _HeaderIconButton(symbol: 'bell', showBadge: true),
-                    SizedBox(width: 10),
-                    _HeaderIconButton(symbol: 'person'),
+                    const GlassIconButton(symbol: 'message'),
+                    const SizedBox(width: 10),
+                    GlassIconButton(
+                      symbol: 'bell',
+                      showBadge: true,
+                      onPressed: () => Navigator.push(
+                        context,
+                        CupertinoPageRoute(
+                          builder: (_) => const NotificationScreen(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const GlassIconButton(symbol: 'person'),
                   ],
                 ),
               ),
@@ -81,41 +92,6 @@ class _Header extends StatelessWidget {
         Text(_todayLabel, style: AppTextStyles.caption),
         const SizedBox(height: 4),
         const Text('좋은 아침이에요,\n은후님', style: AppTextStyles.title1),
-      ],
-    );
-  }
-}
-
-class _HeaderIconButton extends StatelessWidget {
-  const _HeaderIconButton({required this.symbol, this.showBadge = false});
-
-  final String symbol;
-  final bool showBadge;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        CNButton.icon(
-          icon: CNSymbol(symbol, size: 17, color: AppColors.gray700),
-          size: 40,
-          onPressed: () {},
-        ),
-        if (showBadge)
-          Positioned(
-            top: 2,
-            right: 3,
-            child: Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: AppColors.error,
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.background, width: 1.5),
-              ),
-            ),
-          ),
       ],
     );
   }
