@@ -127,9 +127,7 @@ class _MessageScreenState extends State<MessageScreen> {
               bottom: false,
               child: SizedBox(
                 height: 56,
-                child: Center(
-                  child: Text('사내톡', style: AppTextStyles.title3),
-                ),
+                child: Center(child: Text('사내톡', style: AppTextStyles.title3)),
               ),
             ),
           ),

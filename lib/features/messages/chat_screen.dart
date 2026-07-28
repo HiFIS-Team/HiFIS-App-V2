@@ -34,9 +34,7 @@ class ChatScreen extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 70, 20, 120),
               children: [
-                const Center(
-                  child: Text('오늘', style: AppTextStyles.caption),
-                ),
+                const Center(child: Text('오늘', style: AppTextStyles.caption)),
                 const SizedBox(height: 16),
                 _TheirBubble(
                   name: name,

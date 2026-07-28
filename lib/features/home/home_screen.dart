@@ -2,7 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_shadows.dart';
+import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../messages/message_screen.dart';
@@ -131,7 +131,9 @@ class _HeroStatusCard extends StatelessWidget {
     final checkOut = DateTime(now.year, now.month, now.day, _checkOutHour);
     final total = checkOut.difference(checkIn);
 
-    var elapsed = now.isBefore(checkIn) ? Duration.zero : now.difference(checkIn);
+    var elapsed = now.isBefore(checkIn)
+        ? Duration.zero
+        : now.difference(checkIn);
     if (elapsed > total) elapsed = total;
     final remaining = total - elapsed;
     final rate = elapsed.inMinutes / total.inMinutes;
@@ -151,55 +153,36 @@ class _HeroStatusCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.gradientStart, AppColors.gradientEnd],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.3),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
+      decoration: AppDecorations.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Expanded(
-                child: Text(
-                  '오늘 근무 현황',
-                  style: AppTextStyles.label.copyWith(
-                    color: Colors.white.withValues(alpha: 0.8),
-                  ),
-                ),
+              const Expanded(
+                child: Text('오늘 근무 현황', style: AppTextStyles.label),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 6,
                 ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(100),
+                decoration: const BoxDecoration(
+                  color: AppColors.primaryLight,
+                  borderRadius: BorderRadius.all(Radius.circular(100)),
                 ),
                 child: Text(
                   status,
-                  style: AppTextStyles.caption.copyWith(color: Colors.white),
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          Text(
-            headline,
-            style: AppTextStyles.title1.copyWith(color: Colors.white),
-          ),
+          Text(headline, style: AppTextStyles.title1),
           const SizedBox(height: 16),
           ClipRRect(
             borderRadius: BorderRadius.circular(100),
@@ -207,10 +190,10 @@ class _HeroStatusCard extends StatelessWidget {
               height: 8,
               child: Stack(
                 children: [
-                  Container(color: Colors.white.withValues(alpha: 0.25)),
+                  Container(color: AppColors.gray50),
                   FractionallySizedBox(
                     widthFactor: rate,
-                    child: Container(color: Colors.white),
+                    child: Container(color: AppColors.primary),
                   ),
                 ],
               ),
@@ -254,19 +237,10 @@ class _HeroStatItem extends StatelessWidget {
         children: [
           FittedBox(
             fit: BoxFit.scaleDown,
-            child: Text(
-              value,
-              maxLines: 1,
-              style: AppTextStyles.title2.copyWith(color: Colors.white),
-            ),
+            child: Text(value, maxLines: 1, style: AppTextStyles.title2),
           ),
           const SizedBox(height: 2),
-          Text(
-            label,
-            style: AppTextStyles.caption.copyWith(
-              color: Colors.white.withValues(alpha: 0.75),
-            ),
-          ),
+          Text(label, style: AppTextStyles.caption),
         ],
       ),
     );
@@ -278,11 +252,7 @@ class _HeroStatDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 1,
-      height: 32,
-      color: Colors.white.withValues(alpha: 0.2),
-    );
+    return Container(width: 1, height: 32, color: AppColors.gray100);
   }
 }
 
@@ -351,11 +321,7 @@ class _QuickMenuCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.all(Radius.circular(20)),
-        boxShadow: AppShadows.card,
-      ),
+      decoration: AppDecorations.card(radius: 20),
       child: Material(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(20),
@@ -397,11 +363,7 @@ class _RecentActivityCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.all(Radius.circular(24)),
-        boxShadow: AppShadows.card,
-      ),
+      decoration: AppDecorations.card(),
       child: const Column(
         children: [
           _ActivityTile(
@@ -465,4 +427,3 @@ class _ActivityTile extends StatelessWidget {
     );
   }
 }
-

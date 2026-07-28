@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_shadows.dart';
+import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/top_frost.dart';
@@ -106,9 +106,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
               bottom: false,
               child: SizedBox(
                 height: 56,
-                child: Center(
-                  child: Text('알림', style: AppTextStyles.title3),
-                ),
+                child: Center(child: Text('알림', style: AppTextStyles.title3)),
               ),
             ),
           ),
@@ -152,11 +150,7 @@ class _NotificationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.all(Radius.circular(24)),
-        boxShadow: AppShadows.card,
-      ),
+      decoration: AppDecorations.card(),
       child: Column(children: tiles),
     );
   }
