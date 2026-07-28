@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_shadows.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/app_header.dart';
 
 /// 홈 화면 (디자인 시스템 데모용 샘플)
 ///
@@ -14,20 +15,27 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          children: const [
-            _Header(),
-            SizedBox(height: 24),
-            _HeroStatusCard(),
-            SizedBox(height: 32),
-            _SectionTitle('빠른 메뉴'),
-            SizedBox(height: 14),
-            _QuickMenuGrid(),
-            SizedBox(height: 32),
-            _SectionTitle('최근 활동'),
-            SizedBox(height: 14),
-            _RecentActivityCard(),
+        child: Column(
+          children: [
+            const AppHeader(showNotificationBadge: true),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                children: const [
+                  _Greeting(),
+                  SizedBox(height: 24),
+                  _HeroStatusCard(),
+                  SizedBox(height: 32),
+                  _SectionTitle('빠른 메뉴'),
+                  SizedBox(height: 14),
+                  _QuickMenuGrid(),
+                  SizedBox(height: 32),
+                  _SectionTitle('최근 활동'),
+                  SizedBox(height: 14),
+                  _RecentActivityCard(),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -36,8 +44,8 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-class _Header extends StatelessWidget {
-  const _Header();
+class _Greeting extends StatelessWidget {
+  const _Greeting();
 
   String get _todayLabel {
     final now = DateTime.now();
@@ -47,37 +55,12 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(_todayLabel, style: AppTextStyles.caption),
-              const SizedBox(height: 4),
-              const Text('좋은 아침이에요,\n은후님', style: AppTextStyles.title1),
-            ],
-          ),
-        ),
-        Container(
-          width: 44,
-          height: 44,
-          decoration: const BoxDecoration(
-            color: AppColors.surface,
-            shape: BoxShape.circle,
-            boxShadow: AppShadows.card,
-          ),
-          child: IconButton(
-            onPressed: () {},
-            padding: EdgeInsets.zero,
-            icon: const Icon(
-              Icons.notifications_none_rounded,
-              color: AppColors.gray600,
-              size: 24,
-            ),
-          ),
-        ),
+        Text(_todayLabel, style: AppTextStyles.caption),
+        const SizedBox(height: 4),
+        const Text('좋은 아침이에요,\n은후님', style: AppTextStyles.title1),
       ],
     );
   }
@@ -424,10 +407,7 @@ class _BottomNav extends StatelessWidget {
         currentIndex: 0,
         onTap: (_) {},
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_rounded),
-            label: '홈',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: '홈'),
           BottomNavigationBarItem(
             icon: Icon(Icons.people_alt_outlined),
             label: '직원',
