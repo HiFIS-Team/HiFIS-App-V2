@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -20,20 +22,13 @@ class MessageScreen extends StatelessWidget {
           SafeArea(
             bottom: false,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(0, 60, 0, 40),
+              padding: const EdgeInsets.fromLTRB(0, 60, 0, 100),
               children: const [
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: 20),
                   child: Text('메시지', style: AppTextStyles.title1),
                 ),
-                SizedBox(height: 16),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20),
-                  child: _SearchBar(),
-                ),
                 SizedBox(height: 20),
-                _TeamAvatarRow(),
-                SizedBox(height: 24),
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: 20),
                   child: Row(
@@ -116,34 +111,15 @@ class MessageScreen extends StatelessWidget {
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SearchBar extends StatelessWidget {
-  const _SearchBar();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 42,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: AppColors.gray50,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: const Row(
-        children: [
-          Icon(CupertinoIcons.search, size: 18, color: AppColors.gray400),
-          SizedBox(width: 8),
-          Text(
-            '검색',
-            style: TextStyle(
-              fontFamily: AppTextStyles.fontFamily,
-              fontSize: 15,
-              color: AppColors.gray400,
+          // 하단 고정 글래스 검색바 — 키보드가 올라오면 함께 올라온다
+          const Align(
+            alignment: Alignment.bottomCenter,
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(28, 0, 28, 10),
+                child: _FloatingSearchBar(),
+              ),
             ),
           ),
         ],
@@ -152,50 +128,60 @@ class _SearchBar extends StatelessWidget {
   }
 }
 
-class _TeamAvatarRow extends StatelessWidget {
-  const _TeamAvatarRow();
+class _FloatingSearchBar extends StatelessWidget {
+  const _FloatingSearchBar();
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 88,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        children: const [
-          _TeamAvatar(name: '김민수', color: AppColors.primary, online: true),
-          _TeamAvatar(name: '박지현', color: AppColors.warning),
-          _TeamAvatar(name: '이서연', color: AppColors.success, online: true),
-          _TeamAvatar(name: '정우진', color: AppColors.gray500),
-          _TeamAvatar(name: '최수아', color: Color(0xFF7C5CFC), online: true),
-          _TeamAvatar(name: '강태오', color: Color(0xFFEC5A8B)),
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x1F101828),
+            blurRadius: 32,
+            offset: Offset(0, 10),
+          ),
         ],
       ),
-    );
-  }
-}
-
-class _TeamAvatar extends StatelessWidget {
-  const _TeamAvatar({
-    required this.name,
-    required this.color,
-    this.online = false,
-  });
-
-  final String name;
-  final Color color;
-  final bool online;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 16),
-      child: Column(
-        children: [
-          _Avatar(name: name, color: color, size: 60, online: online),
-          const SizedBox(height: 6),
-          Text(name, style: AppTextStyles.caption),
-        ],
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+          child: Container(
+            height: 52,
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.72),
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  CupertinoIcons.search,
+                  size: 20,
+                  color: AppColors.gray500,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    style: AppTextStyles.body2,
+                    cursorColor: AppColors.primary,
+                    decoration: InputDecoration(
+                      hintText: '검색',
+                      hintStyle: AppTextStyles.body2.copyWith(
+                        color: AppColors.gray400,
+                      ),
+                      border: InputBorder.none,
+                      isCollapsed: true,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -264,17 +250,11 @@ class _ConversationTile extends StatelessWidget {
               Container(
                 width: 8,
                 height: 8,
-                margin: const EdgeInsets.only(right: 12),
                 decoration: const BoxDecoration(
                   color: AppColors.primary,
                   shape: BoxShape.circle,
                 ),
               ),
-            const Icon(
-              CupertinoIcons.camera,
-              size: 22,
-              color: AppColors.gray300,
-            ),
           ],
         ),
       ),
