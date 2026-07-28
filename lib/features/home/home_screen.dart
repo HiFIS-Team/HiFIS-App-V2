@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -5,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/glass_icon_button.dart';
+import '../attendance/attendance_barcode_overlay.dart';
 import '../messages/message_screen.dart';
 import '../notifications/notification_screen.dart';
 
@@ -22,10 +25,10 @@ class HomeScreen extends StatelessWidget {
           SafeArea(
             bottom: false,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 110),
+              padding: const EdgeInsets.fromLTRB(20, 64, 20, 110),
               children: const [
-                _Header(),
-                SizedBox(height: 24),
+                _GreetingCard(),
+                SizedBox(height: 16),
                 _HeroStatusCard(),
                 SizedBox(height: 32),
                 _SectionTitle('빠른 메뉴'),
@@ -48,6 +51,11 @@ class HomeScreen extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    GlassIconButton(
+                      symbol: 'barcode.viewfinder',
+                      onPressed: () => showAttendanceBarcode(context),
+                    ),
+                    const SizedBox(width: 10),
                     GlassIconButton(
                       symbol: 'message',
                       onPressed: () => Navigator.push(
@@ -81,8 +89,8 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-class _Header extends StatelessWidget {
-  const _Header();
+class _GreetingCard extends StatelessWidget {
+  const _GreetingCard();
 
   String get _todayLabel {
     final now = DateTime.now();
@@ -92,13 +100,18 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(_todayLabel, style: AppTextStyles.caption),
-        const SizedBox(height: 4),
-        const Text('좋은 아침이에요,\n은후님', style: AppTextStyles.title1),
-      ],
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: AppDecorations.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(_todayLabel, style: AppTextStyles.caption),
+          const SizedBox(height: 4),
+          const Text('좋은 아침이에요,\n은후님', style: AppTextStyles.title1),
+        ],
+      ),
     );
   }
 }
@@ -117,12 +130,32 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-class _HeroStatusCard extends StatelessWidget {
+class _HeroStatusCard extends StatefulWidget {
   const _HeroStatusCard();
 
+  @override
+  State<_HeroStatusCard> createState() => _HeroStatusCardState();
+}
+
+class _HeroStatusCardState extends State<_HeroStatusCard> {
   // 목업 근무 시간 (근태 기능 연동 시 실제 출퇴근 기록으로 교체)
   static const _checkInHour = 9;
   static const _checkOutHour = 18;
+
+  late final Timer _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    // 실시간 시계 갱신
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -136,26 +169,29 @@ class _HeroStatusCard extends StatelessWidget {
         : now.difference(checkIn);
     if (elapsed > total) elapsed = total;
     final remaining = total - elapsed;
-    final rate = elapsed.inMinutes / total.inMinutes;
 
-    final String headline;
+    // 상태 3종: 출근(초록) / 휴게(주황) / 퇴근(회색)
+    // 목업 기준 — 근무 09~18시, 휴게 12~13시. 근태 연동 시 실제 상태로 교체.
     final String status;
-    if (elapsed == Duration.zero) {
-      headline = '아직 출근 전이에요';
-      status = '출근 전';
-    } else if (remaining == Duration.zero) {
-      headline = '오늘 근무 완료!';
-      status = '퇴근 완료';
+    final Color statusColor;
+    if (now.isBefore(checkIn) || !now.isBefore(checkOut)) {
+      status = '퇴근';
+      statusColor = AppColors.gray500;
+    } else if (now.hour == 12) {
+      status = '휴게';
+      statusColor = AppColors.warning;
     } else {
-      headline = '${_format(elapsed)}째 근무 중';
-      status = '근무 중';
+      status = '출근';
+      statusColor = AppColors.success;
     }
+
+    final timeText =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
 
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: AppDecorations.card(),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
@@ -167,46 +203,40 @@ class _HeroStatusCard extends StatelessWidget {
                   horizontal: 12,
                   vertical: 6,
                 ),
-                decoration: const BoxDecoration(
-                  color: AppColors.primaryLight,
-                  borderRadius: BorderRadius.all(Radius.circular(100)),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.12),
+                  borderRadius: const BorderRadius.all(Radius.circular(100)),
                 ),
                 child: Text(
                   status,
                   style: AppTextStyles.caption.copyWith(
-                    color: AppColors.primary,
+                    color: statusColor,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(headline, style: AppTextStyles.title1),
-          const SizedBox(height: 16),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(100),
-            child: SizedBox(
-              height: 8,
-              child: Stack(
-                children: [
-                  Container(color: AppColors.gray50),
-                  FractionallySizedBox(
-                    widthFactor: rate,
-                    child: Container(color: AppColors.primary),
-                  ),
-                ],
-              ),
+          const SizedBox(height: 20),
+          Text(
+            timeText,
+            style: const TextStyle(
+              fontFamily: AppTextStyles.fontFamily,
+              fontSize: 44,
+              fontWeight: FontWeight.w700,
+              height: 1.1,
+              color: AppColors.textPrimary,
+              fontFeatures: [FontFeature.tabularFigures()],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           Row(
             children: [
-              const _HeroStatItem(value: '09:00', label: '출근'),
-              const _HeroStatDivider(),
-              const _HeroStatItem(value: '18:00', label: '퇴근 예정'),
-              const _HeroStatDivider(),
-              _HeroStatItem(value: _format(remaining), label: '남은 시간'),
+              const _HeroStat(label: '출근', value: '09:00'),
+              const _StatDivider(),
+              const _HeroStat(label: '퇴근 예정', value: '18:00'),
+              const _StatDivider(),
+              _HeroStat(label: '남은 시간', value: _format(remaining)),
             ],
           ),
         ],
@@ -224,35 +254,39 @@ class _HeroStatusCard extends StatelessWidget {
   }
 }
 
-class _HeroStatItem extends StatelessWidget {
-  const _HeroStatItem({required this.value, required this.label});
+class _HeroStat extends StatelessWidget {
+  const _HeroStat({required this.label, required this.value});
 
-  final String value;
   final String label;
+  final String value;
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: Column(
         children: [
+          Text(label, style: AppTextStyles.caption),
+          const SizedBox(height: 4),
           FittedBox(
             fit: BoxFit.scaleDown,
-            child: Text(value, maxLines: 1, style: AppTextStyles.title2),
+            child: Text(
+              value,
+              maxLines: 1,
+              style: AppTextStyles.body1.copyWith(fontWeight: FontWeight.w600),
+            ),
           ),
-          const SizedBox(height: 2),
-          Text(label, style: AppTextStyles.caption),
         ],
       ),
     );
   }
 }
 
-class _HeroStatDivider extends StatelessWidget {
-  const _HeroStatDivider();
+class _StatDivider extends StatelessWidget {
+  const _StatDivider();
 
   @override
   Widget build(BuildContext context) {
-    return Container(width: 1, height: 32, color: AppColors.gray100);
+    return Container(width: 1, height: 30, color: AppColors.gray100);
   }
 }
 
