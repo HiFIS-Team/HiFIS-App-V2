@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/theme/theme_controller.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/top_frost.dart';
 
@@ -12,7 +13,7 @@ import '../../core/widgets/top_frost.dart';
 /// 데이터는 하드코딩된 샘플이며, 계정 기능 연동 시 실제 데이터로 교체한다.
 /// 저장/업로드/탈퇴 등 버튼 동작은 아직 비어 있다.
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  ProfileScreen({super.key});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -50,12 +51,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             bottom: false,
             child: ListView(
               controller: _scrollController,
-              padding: const EdgeInsets.fromLTRB(20, 68, 20, 40),
-              children: const [
-                Text('계정', style: AppTextStyles.caption),
-                SizedBox(height: 4),
-                Text('내 프로필', style: AppTextStyles.title1),
-                SizedBox(height: 20),
+              padding: EdgeInsets.fromLTRB(20, 68, 20, 40),
+              children: [
                 _ProfileSummaryCard(),
                 SizedBox(height: 16),
                 _BasicInfoCard(),
@@ -72,7 +69,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           TopFrost(collapse: _collapse, color: AppColors.background),
           // 상단 중앙 고정 타이틀 (터치는 아래 리스트로 통과)
-          const IgnorePointer(
+          IgnorePointer(
             child: SafeArea(
               bottom: false,
               child: SizedBox(
@@ -87,7 +84,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           SafeArea(
             bottom: false,
             child: Padding(
-              padding: const EdgeInsets.only(top: 8, left: 16),
+              padding: EdgeInsets.only(top: 8, left: 16),
               child: GlassIconButton(
                 symbol: 'chevron.backward',
                 onPressed: () => Navigator.pop(context),
@@ -105,25 +102,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
 // ---------------------------------------------------------------------------
 
 class _ProfileSummaryCard extends StatelessWidget {
-  const _ProfileSummaryCard();
+  _ProfileSummaryCard();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(24),
       decoration: AppDecorations.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const _Avatar(size: 56),
-              const SizedBox(width: 16),
+              _Avatar(size: 56),
+              SizedBox(width: 16),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('김은후', style: AppTextStyles.title2),
-                  const SizedBox(height: 2),
+                  Text('김은후', style: AppTextStyles.title2),
+                  SizedBox(height: 2),
                   Text(
                     'eunhoo@hifis.app',
                     style: AppTextStyles.caption.copyWith(
@@ -134,11 +131,11 @@ class _ProfileSummaryCard extends StatelessWidget {
               ),
             ],
           ),
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(vertical: 18),
             child: Divider(),
           ),
-          const Row(
+          Row(
             children: [
               Expanded(
                 child: _SummaryField(label: '사번', value: 'FS-0903'),
@@ -148,8 +145,8 @@ class _ProfileSummaryCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          const Row(
+          SizedBox(height: 16),
+          Row(
             children: [
               Expanded(
                 child: _SummaryField(label: '팀', value: 'PT팀'),
@@ -166,7 +163,7 @@ class _ProfileSummaryCard extends StatelessWidget {
 }
 
 class _SummaryField extends StatelessWidget {
-  const _SummaryField({required this.label, required this.value});
+  _SummaryField({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -177,7 +174,7 @@ class _SummaryField extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: AppTextStyles.caption),
-        const SizedBox(height: 4),
+        SizedBox(height: 4),
         Text(
           value,
           style: AppTextStyles.body1.copyWith(fontWeight: FontWeight.w600),
@@ -188,7 +185,7 @@ class _SummaryField extends StatelessWidget {
 }
 
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.size, this.color = AppColors.primary});
+  _Avatar({required this.size, this.color = AppColors.primary});
 
   final double size;
   final Color color;
@@ -218,7 +215,7 @@ class _Avatar extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _BasicInfoCard extends StatefulWidget {
-  const _BasicInfoCard();
+  _BasicInfoCard();
 
   @override
   State<_BasicInfoCard> createState() => _BasicInfoCardState();
@@ -251,29 +248,29 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(24),
       decoration: AppDecorations.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('기본 정보', style: AppTextStyles.title3),
-          const SizedBox(height: 20),
-          const _FieldLabel('이름'),
-          const SizedBox(height: 8),
-          const _InputBox(initial: '김은후'),
-          const SizedBox(height: 20),
-          const _FieldLabel('프로필 이미지'),
-          const SizedBox(height: 10),
+          Text('기본 정보', style: AppTextStyles.title3),
+          SizedBox(height: 20),
+          _FieldLabel('이름'),
+          SizedBox(height: 8),
+          _InputBox(initial: '김은후'),
+          SizedBox(height: 20),
+          _FieldLabel('프로필 이미지'),
+          SizedBox(height: 10),
           Row(
             children: [
               _Avatar(size: 56, color: _avatarColors[_selectedColor]),
-              const SizedBox(width: 14),
+              SizedBox(width: 14),
               OutlinedButton(
                 onPressed: () {},
                 style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(0, 48),
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
-                  side: const BorderSide(color: AppColors.gray200),
+                  minimumSize: Size(0, 48),
+                  padding: EdgeInsets.symmetric(horizontal: 18),
+                  side: BorderSide(color: AppColors.gray200),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -288,14 +285,14 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          const Text(
+          SizedBox(height: 8),
+          Text(
             '이미지가 없을 땐 아래 아바타 색과 이름 첫 글자로 표시됩니다. (10MB 이하)',
             style: AppTextStyles.caption,
           ),
-          const SizedBox(height: 20),
-          const _FieldLabel('아바타 색'),
-          const SizedBox(height: 10),
+          SizedBox(height: 20),
+          _FieldLabel('아바타 색'),
+          SizedBox(height: 10),
           Wrap(
             spacing: 10,
             runSpacing: 10,
@@ -311,7 +308,7 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: i == _selectedColor
-                        ? const Icon(
+                        ? Icon(
                             CupertinoIcons.checkmark,
                             size: 18,
                             color: Colors.white,
@@ -321,24 +318,24 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
                 ),
             ],
           ),
-          const SizedBox(height: 20),
-          const _FieldLabel('이메일'),
-          const SizedBox(height: 8),
-          const _InputBox(
+          SizedBox(height: 20),
+          _FieldLabel('이메일'),
+          SizedBox(height: 8),
+          _InputBox(
             initial: 'eunhoo@hifis.app',
             enabled: false,
             helper: '이메일은 관리자만 변경할 수 있습니다.',
           ),
-          const SizedBox(height: 20),
-          const _FieldLabel('사번'),
-          const SizedBox(height: 8),
-          const _InputBox(
+          SizedBox(height: 20),
+          _FieldLabel('사번'),
+          SizedBox(height: 8),
+          _InputBox(
             initial: 'FS-0903',
             enabled: false,
             helper: '가입 시 자동으로 부여됩니다.',
           ),
-          const SizedBox(height: 24),
-          const Align(
+          SizedBox(height: 24),
+          Align(
             alignment: Alignment.centerRight,
             child: _SmallPrimaryButton(label: '저장'),
           ),
@@ -353,7 +350,7 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
 // ---------------------------------------------------------------------------
 
 class _WorkStatusCard extends StatefulWidget {
-  const _WorkStatusCard();
+  _WorkStatusCard();
 
   @override
   State<_WorkStatusCard> createState() => _WorkStatusCardState();
@@ -373,24 +370,24 @@ class _WorkStatusCardState extends State<_WorkStatusCard> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(24),
       decoration: AppDecorations.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('업무 상태', style: AppTextStyles.title3),
-          const SizedBox(height: 6),
-          const Text(
+          Text('업무 상태', style: AppTextStyles.title3),
+          SizedBox(height: 6),
+          Text(
             '조직도·사내톡·팀원 목록에서 다른 사람들에게 보여지는 상태입니다.',
             style: AppTextStyles.caption,
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           for (var row = 0; row < 3; row++) ...[
-            if (row > 0) const SizedBox(height: 10),
+            if (row > 0) SizedBox(height: 10),
             Row(
               children: [
                 for (var col = 0; col < 2; col++) ...[
-                  if (col > 0) const SizedBox(width: 10),
+                  if (col > 0) SizedBox(width: 10),
                   Expanded(
                     child: row * 2 + col < _statuses.length
                         ? _StatusChip(
@@ -400,24 +397,24 @@ class _WorkStatusCardState extends State<_WorkStatusCard> {
                             onTap: () =>
                                 setState(() => _selected = row * 2 + col),
                           )
-                        : const SizedBox(),
+                        : SizedBox(),
                   ),
                 ],
               ],
             ),
           ],
-          const SizedBox(height: 20),
-          const _FieldLabel('상태 메시지 (선택)'),
-          const SizedBox(height: 8),
-          const Row(
+          SizedBox(height: 20),
+          _FieldLabel('상태 메시지 (선택)'),
+          SizedBox(height: 8),
+          Row(
             children: [
               Expanded(child: _InputBox(hint: '예) 14시까지 외근')),
               SizedBox(width: 10),
               _SmallPrimaryButton(label: '저장'),
             ],
           ),
-          const SizedBox(height: 12),
-          const Text(
+          SizedBox(height: 12),
+          Text(
             '"근무중" · "오프라인" 은 자동 판정이라 여기서 선택할 수 없어요. '
             '"자동" 을 선택하면 오늘 출퇴근 여부에 따라 자동으로 표시됩니다.',
             style: AppTextStyles.caption,
@@ -429,7 +426,7 @@ class _WorkStatusCardState extends State<_WorkStatusCard> {
 }
 
 class _StatusChip extends StatelessWidget {
-  const _StatusChip({
+  _StatusChip({
     required this.emoji,
     required this.label,
     required this.selected,
@@ -455,8 +452,8 @@ class _StatusChip extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(emoji, style: const TextStyle(fontSize: 15)),
-            const SizedBox(width: 6),
+            Text(emoji, style: TextStyle(fontSize: 15)),
+            SizedBox(width: 6),
             Flexible(
               child: Text(
                 label,
@@ -480,28 +477,33 @@ class _StatusChip extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _ThemeCard extends StatefulWidget {
-  const _ThemeCard();
+  _ThemeCard();
 
   @override
   State<_ThemeCard> createState() => _ThemeCardState();
 }
 
 class _ThemeCardState extends State<_ThemeCard> {
-  // TODO: 다크 모드 테마 구현 시 실제 테마 전환 연결
-  int _selected = 0;
-
   static const _names = ['라이트', '다크', '시스템 설정'];
+
+  int get _selected => switch (ThemeController.mode) {
+    ThemeMode.light => 0,
+    ThemeMode.dark => 1,
+    ThemeMode.system => 2,
+  };
+
+  void _select(ThemeMode mode) => ThemeController.set(context, mode);
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(24),
       decoration: AppDecorations.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('화면 테마', style: AppTextStyles.title3),
-          const SizedBox(height: 4),
+          Text('화면 테마', style: AppTextStyles.title3),
+          SizedBox(height: 4),
           Text.rich(
             TextSpan(
               text: '현재 적용: ',
@@ -517,32 +519,32 @@ class _ThemeCardState extends State<_ThemeCard> {
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           _ThemeOption(
             icon: CupertinoIcons.sun_max,
             name: '라이트',
             desc: '밝은 화면',
             selected: _selected == 0,
-            onTap: () => setState(() => _selected = 0),
-            preview: const _ThemePreview(dark: false),
+            onTap: () => _select(ThemeMode.light),
+            preview: _ThemePreview(dark: false),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           _ThemeOption(
             icon: CupertinoIcons.moon,
             name: '다크',
             desc: '어두운 화면',
             selected: _selected == 1,
-            onTap: () => setState(() => _selected = 1),
-            preview: const _ThemePreview(dark: true),
+            onTap: () => _select(ThemeMode.dark),
+            preview: _ThemePreview(dark: true),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           _ThemeOption(
             icon: CupertinoIcons.desktopcomputer,
             name: '시스템 설정',
             desc: 'OS 설정을 따름',
             selected: _selected == 2,
-            onTap: () => setState(() => _selected = 2),
-            preview: const Row(
+            onTap: () => _select(ThemeMode.system),
+            preview: Row(
               children: [
                 Expanded(child: _ThemePreview(dark: false)),
                 Expanded(child: _ThemePreview(dark: true)),
@@ -556,7 +558,7 @@ class _ThemeCardState extends State<_ThemeCard> {
 }
 
 class _ThemeOption extends StatelessWidget {
-  const _ThemeOption({
+  _ThemeOption({
     required this.icon,
     required this.name,
     required this.desc,
@@ -589,9 +591,7 @@ class _ThemeOption extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(15),
-              ),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(15)),
               child: SizedBox(
                 height: 100,
                 width: double.infinity,
@@ -599,11 +599,11 @@ class _ThemeOption extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(14),
+              padding: EdgeInsets.all(14),
               child: Row(
                 children: [
                   Icon(icon, size: 18, color: AppColors.textPrimary),
-                  const SizedBox(width: 8),
+                  SizedBox(width: 8),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -613,20 +613,20 @@ class _ThemeOption extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 1),
+                      SizedBox(height: 1),
                       Text(desc, style: AppTextStyles.caption),
                     ],
                   ),
-                  const Spacer(),
+                  Spacer(),
                   if (selected)
                     Container(
                       width: 24,
                       height: 24,
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         color: AppColors.primary,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
+                      child: Icon(
                         CupertinoIcons.checkmark,
                         size: 14,
                         color: Colors.white,
@@ -643,19 +643,19 @@ class _ThemeOption extends StatelessWidget {
 }
 
 class _ThemePreview extends StatelessWidget {
-  const _ThemePreview({required this.dark});
+  _ThemePreview({required this.dark});
 
   final bool dark;
 
   @override
   Widget build(BuildContext context) {
-    final bg = dark ? const Color(0xFF0D1117) : AppColors.gray50;
-    final surface = dark ? const Color(0xFF1B222C) : Colors.white;
-    final bar = dark ? const Color(0xFF2A3441) : AppColors.gray200;
+    final bg = dark ? Color(0xFF0D1117) : AppColors.gray50;
+    final surface = dark ? Color(0xFF1B222C) : Colors.white;
+    final bar = dark ? Color(0xFF2A3441) : AppColors.gray200;
 
     return Container(
       color: bg,
-      padding: const EdgeInsets.all(14),
+      padding: EdgeInsets.all(14),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -667,7 +667,7 @@ class _ThemePreview extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
           ),
-          const SizedBox(width: 10),
+          SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -680,7 +680,7 @@ class _ThemePreview extends StatelessWidget {
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: 6),
                 FractionallySizedBox(
                   widthFactor: 0.6,
                   child: Container(
@@ -691,7 +691,7 @@ class _ThemePreview extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 10),
+                SizedBox(height: 10),
                 Expanded(
                   child: Container(
                     width: double.infinity,
@@ -715,14 +715,14 @@ class _ThemePreview extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _PasswordCard extends StatelessWidget {
-  const _PasswordCard();
+  _PasswordCard();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(24),
       decoration: AppDecorations.card(),
-      child: const Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('비밀번호 변경', style: AppTextStyles.title3),
@@ -750,12 +750,12 @@ class _PasswordCard extends StatelessWidget {
 }
 
 class _WithdrawCard extends StatelessWidget {
-  const _WithdrawCard();
+  _WithdrawCard();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(24),
@@ -768,19 +768,19 @@ class _WithdrawCard extends StatelessWidget {
             '회원 탈퇴',
             style: AppTextStyles.title3.copyWith(color: AppColors.error),
           ),
-          const SizedBox(height: 8),
-          const Text(
+          SizedBox(height: 8),
+          Text(
             '탈퇴하면 이름·연락처 등 개인 식별 정보와 로그인 수단이 삭제되고 '
             '계정이 비활성화돼요. 회사가 법적으로 보관해야 하는 근태·급여 기록은 '
             '익명 처리되어 일정 기간 보존될 수 있어요.',
             style: AppTextStyles.caption,
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           OutlinedButton(
             onPressed: () {},
             style: OutlinedButton.styleFrom(
-              minimumSize: const Size(0, 48),
-              padding: const EdgeInsets.symmetric(horizontal: 18),
+              minimumSize: Size(0, 48),
+              padding: EdgeInsets.symmetric(horizontal: 18),
               side: BorderSide(color: AppColors.error.withValues(alpha: 0.5)),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -805,7 +805,7 @@ class _WithdrawCard extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _FieldLabel extends StatelessWidget {
-  const _FieldLabel(this.text);
+  _FieldLabel(this.text);
 
   final String text;
 
@@ -822,7 +822,7 @@ class _FieldLabel extends StatelessWidget {
 }
 
 class _InputBox extends StatelessWidget {
-  const _InputBox({
+  _InputBox({
     this.initial,
     this.hint,
     this.enabled = true,
@@ -843,7 +843,7 @@ class _InputBox extends StatelessWidget {
       children: [
         Container(
           height: 52,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.symmetric(horizontal: 16),
           alignment: Alignment.centerLeft,
           decoration: BoxDecoration(
             color: AppColors.gray50,
@@ -870,7 +870,7 @@ class _InputBox extends StatelessWidget {
                 ),
         ),
         if (helper != null) ...[
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Text(helper!, style: AppTextStyles.caption),
         ],
       ],
@@ -879,7 +879,7 @@ class _InputBox extends StatelessWidget {
 }
 
 class _SmallPrimaryButton extends StatelessWidget {
-  const _SmallPrimaryButton({required this.label});
+  _SmallPrimaryButton({required this.label});
 
   final String label;
 
@@ -888,8 +888,8 @@ class _SmallPrimaryButton extends StatelessWidget {
     return ElevatedButton(
       onPressed: () {},
       style: ElevatedButton.styleFrom(
-        minimumSize: const Size(0, 48),
-        padding: const EdgeInsets.symmetric(horizontal: 22),
+        minimumSize: Size(0, 48),
+        padding: EdgeInsets.symmetric(horizontal: 22),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       child: Text(label),

@@ -4,19 +4,19 @@ import 'core/theme/app_theme.dart';
 import 'features/main/main_shell.dart';
 
 void main() {
-  runApp(const HiFISApp());
+  runApp(HiFISApp());
 }
 
 class HiFISApp extends StatelessWidget {
-  const HiFISApp({super.key});
+  HiFISApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'HiFIS',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
-      home: const MainShell(),
+      theme: AppTheme.current,
+      home: MainShell(),
     );
   }
 }

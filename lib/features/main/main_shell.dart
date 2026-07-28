@@ -11,7 +11,7 @@ import '../home/home_screen.dart';
 /// - "전체"를 누르면 서브 바로 전환: 뒤로 / 근태월차 / 급여 / 공지 / 랭킹
 /// IndexedStack을 사용해 탭 전환 시에도 각 화면의 상태가 유지된다.
 class MainShell extends StatefulWidget {
-  const MainShell({super.key});
+  MainShell({super.key});
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -35,14 +35,14 @@ class _MainShellState extends State<MainShell> {
     'trophy.fill',
   ];
 
-  static const _mainPages = [
+  static final _mainPages = [
     HomeScreen(),
     PlaceholderScreen(emoji: '💼', title: '업무'),
     PlaceholderScreen(emoji: '📁', title: '프로젝트'),
     PlaceholderScreen(emoji: '📝', title: '회의록'),
   ];
 
-  static const _subPages = [
+  static final _subPages = [
     PlaceholderScreen(emoji: '🗓️', title: '근태·월차'),
     PlaceholderScreen(emoji: '💰', title: '급여'),
     PlaceholderScreen(emoji: '📣', title: '공지'),
@@ -80,7 +80,7 @@ class _MainShellState extends State<MainShell> {
       extendBody: true,
       body: IndexedStack(
         index: _subMenu ? _mainPages.length + (_subIndex - 1) : _mainIndex,
-        children: const [..._mainPages, ..._subPages],
+        children: [..._mainPages, ..._subPages],
       ),
       bottomNavigationBar: _subMenu
           ? AppTabBar(

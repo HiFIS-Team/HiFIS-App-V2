@@ -13,7 +13,7 @@ import 'chat_screen.dart';
 ///
 /// 데이터는 하드코딩된 샘플이며, 기능 개발 시 실제 대화 데이터로 교체한다.
 class MessageScreen extends StatefulWidget {
-  const MessageScreen({super.key});
+  MessageScreen({super.key});
 
   @override
   State<MessageScreen> createState() => _MessageScreenState();
@@ -52,8 +52,8 @@ class _MessageScreenState extends State<MessageScreen> {
             bottom: false,
             child: ListView(
               controller: _scrollController,
-              padding: const EdgeInsets.fromLTRB(0, 68, 0, 100),
-              children: const [
+              padding: EdgeInsets.fromLTRB(0, 68, 0, 100),
+              children: [
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: 20),
                   child: Row(
@@ -122,7 +122,7 @@ class _MessageScreenState extends State<MessageScreen> {
           // 스크롤 시 상단 프로그레시브 블러 — 콘텐츠가 헤더 뒤로 흐려진다
           TopFrost(collapse: _collapse, color: AppColors.surface),
           // 상단 중앙 고정 타이틀 (터치는 아래 리스트로 통과)
-          const IgnorePointer(
+          IgnorePointer(
             child: SafeArea(
               bottom: false,
               child: SizedBox(
@@ -135,21 +135,21 @@ class _MessageScreenState extends State<MessageScreen> {
           SafeArea(
             bottom: false,
             child: Padding(
-              padding: const EdgeInsets.only(top: 8, left: 16, right: 16),
+              padding: EdgeInsets.only(top: 8, left: 16, right: 16),
               child: Row(
                 children: [
                   GlassIconButton(
                     symbol: 'chevron.backward',
                     onPressed: () => Navigator.pop(context),
                   ),
-                  const Spacer(),
-                  const GlassIconButton(symbol: 'line.3.horizontal.decrease'),
+                  Spacer(),
+                  GlassIconButton(symbol: 'line.3.horizontal.decrease'),
                 ],
               ),
             ),
           ),
           // 하단 고정: 새 채팅 글래스 버튼 + 글래스 검색바 (키보드와 함께 상승)
-          const Align(
+          Align(
             alignment: Alignment.bottomCenter,
             child: SafeArea(
               top: false,
@@ -172,14 +172,14 @@ class _MessageScreenState extends State<MessageScreen> {
 }
 
 class _FloatingSearchBar extends StatelessWidget {
-  const _FloatingSearchBar();
+  _FloatingSearchBar();
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
             color: Color(0x1F101828),
             blurRadius: 32,
@@ -193,7 +193,7 @@ class _FloatingSearchBar extends StatelessWidget {
           filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
           child: Container(
             height: 52,
-            padding: const EdgeInsets.symmetric(horizontal: 18),
+            padding: EdgeInsets.symmetric(horizontal: 18),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.72),
               borderRadius: BorderRadius.circular(28),
@@ -201,12 +201,8 @@ class _FloatingSearchBar extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(
-                  CupertinoIcons.search,
-                  size: 20,
-                  color: AppColors.gray500,
-                ),
-                const SizedBox(width: 10),
+                Icon(CupertinoIcons.search, size: 20, color: AppColors.gray500),
+                SizedBox(width: 10),
                 Expanded(
                   child: TextField(
                     style: AppTextStyles.body2,
@@ -231,7 +227,7 @@ class _FloatingSearchBar extends StatelessWidget {
 }
 
 class _ConversationTile extends StatelessWidget {
-  const _ConversationTile({
+  _ConversationTile({
     required this.name,
     required this.preview,
     required this.time,
@@ -259,7 +255,7 @@ class _ConversationTile extends StatelessWidget {
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         child: Row(
           children: [
             _Avatar(
@@ -269,7 +265,7 @@ class _ConversationTile extends StatelessWidget {
               online: online,
               emoji: emoji,
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -280,7 +276,7 @@ class _ConversationTile extends StatelessWidget {
                       fontWeight: unread ? FontWeight.w600 : FontWeight.w500,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  SizedBox(height: 2),
                   Text(
                     '$preview · $time',
                     maxLines: 1,
@@ -293,12 +289,12 @@ class _ConversationTile extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: 8),
             if (unread)
               Container(
                 width: 8,
                 height: 8,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: AppColors.primary,
                   shape: BoxShape.circle,
                 ),
@@ -311,7 +307,7 @@ class _ConversationTile extends StatelessWidget {
 }
 
 class _Avatar extends StatelessWidget {
-  const _Avatar({
+  _Avatar({
     required this.name,
     required this.color,
     required this.size,

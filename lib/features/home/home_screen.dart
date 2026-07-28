@@ -16,7 +16,7 @@ import '../profile/profile_screen.dart';
 ///
 /// 데이터는 전부 하드코딩된 목업이며, 기능 개발 시 실제 데이터로 교체한다.
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+  HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -26,8 +26,8 @@ class HomeScreen extends StatelessWidget {
           SafeArea(
             bottom: false,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 64, 20, 110),
-              children: const [
+              padding: EdgeInsets.fromLTRB(20, 64, 20, 110),
+              children: [
                 _GreetingCard(),
                 SizedBox(height: 16),
                 _HeroStatusCard(),
@@ -44,7 +44,7 @@ class HomeScreen extends StatelessWidget {
             child: Align(
               alignment: Alignment.topRight,
               child: Padding(
-                padding: const EdgeInsets.only(top: 8, right: 16),
+                padding: EdgeInsets.only(top: 8, right: 16),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -52,35 +52,31 @@ class HomeScreen extends StatelessWidget {
                       symbol: 'barcode.viewfinder',
                       onPressed: () => showAttendanceBarcode(context),
                     ),
-                    const SizedBox(width: 10),
+                    SizedBox(width: 10),
                     GlassIconButton(
                       symbol: 'message',
                       onPressed: () => Navigator.push(
                         context,
-                        CupertinoPageRoute(
-                          builder: (_) => const MessageScreen(),
-                        ),
+                        CupertinoPageRoute(builder: (_) => MessageScreen()),
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    SizedBox(width: 10),
                     GlassIconButton(
                       symbol: 'bell',
                       showBadge: true,
                       onPressed: () => Navigator.push(
                         context,
                         CupertinoPageRoute(
-                          builder: (_) => const NotificationScreen(),
+                          builder: (_) => NotificationScreen(),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    SizedBox(width: 10),
                     GlassIconButton(
                       symbol: 'person',
                       onPressed: () => Navigator.push(
                         context,
-                        CupertinoPageRoute(
-                          builder: (_) => const ProfileScreen(),
-                        ),
+                        CupertinoPageRoute(builder: (_) => ProfileScreen()),
                       ),
                     ),
                   ],
@@ -95,7 +91,7 @@ class HomeScreen extends StatelessWidget {
 }
 
 class _GreetingCard extends StatelessWidget {
-  const _GreetingCard();
+  _GreetingCard();
 
   String get _todayLabel {
     final now = DateTime.now();
@@ -107,21 +103,21 @@ class _GreetingCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(24),
       decoration: AppDecorations.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(_todayLabel, style: AppTextStyles.caption),
-          const SizedBox(height: 4),
-          const Text('좋은 아침이에요 👋', style: AppTextStyles.title1),
+          SizedBox(height: 4),
+          Text('좋은 아침이에요 👋', style: AppTextStyles.title1),
           // 이름에만 브랜드 그라데이션 포인트
           ShaderMask(
             blendMode: BlendMode.srcIn,
-            shaderCallback: (bounds) => const LinearGradient(
+            shaderCallback: (bounds) => LinearGradient(
               colors: [AppColors.primary, Color(0xFF7C5CFC)],
             ).createShader(bounds),
-            child: const Text('은후님', style: AppTextStyles.title1),
+            child: Text('은후님', style: AppTextStyles.title1),
           ),
         ],
       ),
@@ -130,7 +126,7 @@ class _GreetingCard extends StatelessWidget {
 }
 
 class _HeroStatusCard extends StatefulWidget {
-  const _HeroStatusCard();
+  _HeroStatusCard();
 
   @override
   State<_HeroStatusCard> createState() => _HeroStatusCardState();
@@ -147,7 +143,7 @@ class _HeroStatusCardState extends State<_HeroStatusCard> {
   void initState() {
     super.initState();
     // 실시간 시계 갱신
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
+    _timer = Timer.periodic(Duration(seconds: 1), (_) => setState(() {}));
   }
 
   @override
@@ -197,23 +193,18 @@ class _HeroStatusCardState extends State<_HeroStatusCard> {
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
 
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(24),
       decoration: AppDecorations.card(),
       child: Column(
         children: [
           Row(
             children: [
-              const Expanded(
-                child: Text('오늘 근무', style: AppTextStyles.label),
-              ),
+              Expanded(child: Text('오늘 근무', style: AppTextStyles.label)),
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.12),
-                  borderRadius: const BorderRadius.all(Radius.circular(100)),
+                  borderRadius: BorderRadius.all(Radius.circular(100)),
                 ),
                 child: Text(
                   status,
@@ -225,11 +216,11 @@ class _HeroStatusCardState extends State<_HeroStatusCard> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           Text(
             timeText,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: AppTextStyles.fontFamily,
               fontSize: 40,
               fontWeight: FontWeight.w700,
@@ -238,14 +229,14 @@ class _HeroStatusCardState extends State<_HeroStatusCard> {
               fontFeatures: [FontFeature.tabularFigures()],
             ),
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: 20),
           _WorkGauge(rate: rate),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           // 근무 시작 시간 — 진행률 — 종료 시간
           Row(
             children: [
-              const Text('09:00', style: AppTextStyles.caption),
-              const Spacer(),
+              Text('09:00', style: AppTextStyles.caption),
+              Spacer(),
               Text(
                 percentText,
                 style: AppTextStyles.label.copyWith(
@@ -253,16 +244,16 @@ class _HeroStatusCardState extends State<_HeroStatusCard> {
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              const Spacer(),
-              const Text('18:00', style: AppTextStyles.caption),
+              Spacer(),
+              Text('18:00', style: AppTextStyles.caption),
             ],
           ),
-          const SizedBox(height: 18),
+          SizedBox(height: 18),
           // 실제 출퇴근 스캔 기록
           Row(
             children: [
               _ScanRecord(label: '출근', time: checkInText),
-              const Spacer(),
+              Spacer(),
               _ScanRecord(label: '퇴근', time: checkOutText),
             ],
           ),
@@ -270,11 +261,10 @@ class _HeroStatusCardState extends State<_HeroStatusCard> {
       ),
     );
   }
-
 }
 
 class _ScanRecord extends StatelessWidget {
-  const _ScanRecord({required this.label, required this.time});
+  _ScanRecord({required this.label, required this.time});
 
   final String label;
   final String time;
@@ -285,7 +275,7 @@ class _ScanRecord extends StatelessWidget {
     return Row(
       children: [
         Text(label, style: AppTextStyles.caption),
-        const SizedBox(width: 8),
+        SizedBox(width: 8),
         Text(
           time,
           style: AppTextStyles.body1.copyWith(
@@ -299,7 +289,7 @@ class _ScanRecord extends StatelessWidget {
 }
 
 class _WorkGauge extends StatelessWidget {
-  const _WorkGauge({required this.rate});
+  _WorkGauge({required this.rate});
 
   /// 0.0(출근 전) ~ 1.0(퇴근)
   final double rate;
@@ -329,7 +319,7 @@ class _WorkGauge extends StatelessWidget {
                 child: Container(
                   height: 8,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
+                    gradient: LinearGradient(
                       colors: [AppColors.gradientStart, AppColors.gradientEnd],
                     ),
                     borderRadius: BorderRadius.circular(100),
@@ -346,7 +336,7 @@ class _WorkGauge extends StatelessWidget {
                     color: Colors.white,
                     shape: BoxShape.circle,
                     border: Border.all(color: AppColors.primary, width: 3),
-                    boxShadow: const [
+                    boxShadow: [
                       BoxShadow(
                         color: Color(0x33101828),
                         blurRadius: 6,
@@ -365,7 +355,7 @@ class _WorkGauge extends StatelessWidget {
 }
 
 class _CardHeader extends StatelessWidget {
-  const _CardHeader({required this.title, required this.count});
+  _CardHeader({required this.title, required this.count});
 
   final String title;
   final int count;
@@ -375,17 +365,17 @@ class _CardHeader extends StatelessWidget {
     return Row(
       children: [
         Text(title, style: AppTextStyles.title3),
-        const SizedBox(width: 6),
+        SizedBox(width: 6),
         Text(
           '$count',
           style: AppTextStyles.title3.copyWith(color: AppColors.gray400),
         ),
-        const Spacer(),
+        Spacer(),
         // TODO: 목록 페이지 연결
         InkWell(
           onTap: () {},
           borderRadius: BorderRadius.circular(8),
-          child: const Padding(
+          child: Padding(
             padding: EdgeInsets.all(4),
             child: Row(
               children: [
@@ -406,15 +396,15 @@ class _CardHeader extends StatelessWidget {
 }
 
 class _ProjectsCard extends StatelessWidget {
-  const _ProjectsCard();
+  _ProjectsCard();
 
   @override
   Widget build(BuildContext context) {
     // 내가 참여 중인 프로젝트만 마감 임박순 3개 (기능 연동 시 실제 데이터로 교체)
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(20),
       decoration: AppDecorations.card(),
-      child: const Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _CardHeader(title: '프로젝트', count: 3),
@@ -446,7 +436,7 @@ class _ProjectsCard extends StatelessWidget {
 }
 
 class _ProjectRow extends StatelessWidget {
-  const _ProjectRow({
+  _ProjectRow({
     required this.name,
     required this.members,
     required this.dday,
@@ -474,7 +464,7 @@ class _ProjectRow extends StatelessWidget {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -487,14 +477,14 @@ class _ProjectRow extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 2),
+                SizedBox(height: 2),
                 Text(members, style: AppTextStyles.caption),
               ],
             ),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: 8),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
@@ -514,49 +504,33 @@ class _ProjectRow extends StatelessWidget {
 }
 
 class _NoticeCard extends StatelessWidget {
-  const _NoticeCard();
+  _NoticeCard();
 
   @override
   Widget build(BuildContext context) {
     // 최신 공지 5개 (기능 연동 시 실제 데이터로 교체)
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+      padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
       decoration: AppDecorations.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _CardHeader(title: '공지', count: 5),
-          const SizedBox(height: 4),
-          const _NoticeRow(
+          _CardHeader(title: '공지', count: 5),
+          SizedBox(height: 4),
+          _NoticeRow(
             title: '8월 근무표가 확정되었습니다',
             author: '관리자',
             time: '오늘',
             pinned: true,
           ),
-          const Divider(),
-          const _NoticeRow(
-            title: '여름 휴가 신청 안내',
-            author: '박지현',
-            time: '어제',
-          ),
-          const Divider(),
-          const _NoticeRow(
-            title: '센터 청소 일정 변경',
-            author: '김민수',
-            time: '3일 전',
-          ),
-          const Divider(),
-          const _NoticeRow(
-            title: '7월 우수사원 발표',
-            author: '관리자',
-            time: '4일 전',
-          ),
-          const Divider(),
-          const _NoticeRow(
-            title: '정수기 정기 점검 안내',
-            author: '관리자',
-            time: '6일 전',
-          ),
+          Divider(),
+          _NoticeRow(title: '여름 휴가 신청 안내', author: '박지현', time: '어제'),
+          Divider(),
+          _NoticeRow(title: '센터 청소 일정 변경', author: '김민수', time: '3일 전'),
+          Divider(),
+          _NoticeRow(title: '7월 우수사원 발표', author: '관리자', time: '4일 전'),
+          Divider(),
+          _NoticeRow(title: '정수기 정기 점검 안내', author: '관리자', time: '6일 전'),
         ],
       ),
     );
@@ -564,7 +538,7 @@ class _NoticeCard extends StatelessWidget {
 }
 
 class _NoticeRow extends StatelessWidget {
-  const _NoticeRow({
+  _NoticeRow({
     required this.title,
     required this.author,
     required this.time,
@@ -582,7 +556,7 @@ class _NoticeRow extends StatelessWidget {
     return InkWell(
       onTap: () {},
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 14),
+        padding: EdgeInsets.symmetric(vertical: 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -590,10 +564,7 @@ class _NoticeRow extends StatelessWidget {
               children: [
                 if (pinned) ...[
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
+                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: AppColors.error.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(6),
@@ -607,7 +578,7 @@ class _NoticeRow extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: 8),
                 ],
                 Expanded(
                   child: Text(
@@ -621,7 +592,7 @@ class _NoticeRow extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: 4),
             Text('$author · $time', style: AppTextStyles.caption),
           ],
         ),

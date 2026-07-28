@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 /// Stack의 상단 레이어로 두고, 스크롤 오프셋에서 계산한 collapse(0~1)를
 /// 넘겨서 사용한다. color는 화면 배경색과 맞춘다.
 class TopFrost extends StatelessWidget {
-  const TopFrost({super.key, required this.collapse, required this.color});
+  TopFrost({super.key, required this.collapse, required this.color});
 
   /// 0이면 투명, 1이면 완전히 흐려진 상태.
   final double collapse;

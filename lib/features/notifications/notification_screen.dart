@@ -10,7 +10,7 @@ import '../../core/widgets/top_frost.dart';
 ///
 /// 데이터는 하드코딩된 샘플이며, 기능 개발 시 실제 알림 데이터로 교체한다.
 class NotificationScreen extends StatefulWidget {
-  const NotificationScreen({super.key});
+  NotificationScreen({super.key});
 
   @override
   State<NotificationScreen> createState() => _NotificationScreenState();
@@ -48,8 +48,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
             bottom: false,
             child: ListView(
               controller: _scrollController,
-              padding: const EdgeInsets.fromLTRB(20, 68, 20, 40),
-              children: const [
+              padding: EdgeInsets.fromLTRB(20, 68, 20, 40),
+              children: [
                 _SectionLabel('오늘'),
                 SizedBox(height: 10),
                 _NotificationCard(
@@ -101,7 +101,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
           // 스크롤 시 상단 프로그레시브 블러 — 콘텐츠가 헤더 뒤로 흐려진다
           TopFrost(collapse: _collapse, color: AppColors.background),
           // 상단 중앙 고정 타이틀 (터치는 아래 리스트로 통과)
-          const IgnorePointer(
+          IgnorePointer(
             child: SafeArea(
               bottom: false,
               child: SizedBox(
@@ -114,7 +114,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
           SafeArea(
             bottom: false,
             child: Padding(
-              padding: const EdgeInsets.only(top: 8, left: 16),
+              padding: EdgeInsets.only(top: 8, left: 16),
               child: GlassIconButton(
                 symbol: 'chevron.backward',
                 onPressed: () => Navigator.pop(context),
@@ -128,28 +128,28 @@ class _NotificationScreenState extends State<NotificationScreen> {
 }
 
 class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.label);
+  _SectionLabel(this.label);
 
   final String label;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(left: 4),
+      padding: EdgeInsets.only(left: 4),
       child: Text(label, style: AppTextStyles.label),
     );
   }
 }
 
 class _NotificationCard extends StatelessWidget {
-  const _NotificationCard({required this.tiles});
+  _NotificationCard({required this.tiles});
 
   final List<_NotificationTile> tiles;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       decoration: AppDecorations.card(),
       child: Column(children: tiles),
     );
@@ -157,7 +157,7 @@ class _NotificationCard extends StatelessWidget {
 }
 
 class _NotificationTile extends StatelessWidget {
-  const _NotificationTile({
+  _NotificationTile({
     required this.icon,
     required this.color,
     required this.title,
@@ -174,7 +174,7 @@ class _NotificationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: EdgeInsets.symmetric(vertical: 12),
       child: Row(
         children: [
           Container(
@@ -186,16 +186,16 @@ class _NotificationTile extends StatelessWidget {
             ),
             child: Icon(icon, color: color, size: 20),
           ),
-          const SizedBox(width: 14),
+          SizedBox(width: 14),
           Expanded(child: Text(title, style: AppTextStyles.body2)),
-          const SizedBox(width: 8),
+          SizedBox(width: 8),
           Text(time, style: AppTextStyles.caption),
           if (unread) ...[
-            const SizedBox(width: 6),
+            SizedBox(width: 6),
             Container(
               width: 6,
               height: 6,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 color: AppColors.primary,
                 shape: BoxShape.circle,
               ),

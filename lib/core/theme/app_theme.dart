@@ -5,21 +5,24 @@ import 'app_text_styles.dart';
 
 /// 앱 전역 테마 (토스 스타일)
 ///
-/// 흰 배경, 그림자 없는 플랫한 표면, 둥근 모서리, 리플 대신 은은한 하이라이트.
+/// 그림자 없는 플랫한 표면, 둥근 모서리, 리플 대신 은은한 하이라이트.
+/// AppColors 팔레트(라이트/다크)를 읽어서 구성된다.
 abstract final class AppTheme {
-  static ThemeData get light => ThemeData(
+  static ThemeData get current => ThemeData(
     useMaterial3: true,
+    brightness: AppColors.isDark ? Brightness.dark : Brightness.light,
     fontFamily: AppTextStyles.fontFamily,
     scaffoldBackgroundColor: AppColors.background,
     colorScheme: ColorScheme.fromSeed(
       seedColor: AppColors.primary,
+      brightness: AppColors.isDark ? Brightness.dark : Brightness.light,
       primary: AppColors.primary,
       surface: AppColors.surface,
       error: AppColors.error,
     ),
     splashFactory: NoSplash.splashFactory,
     highlightColor: AppColors.gray50,
-    appBarTheme: const AppBarTheme(
+    appBarTheme: AppBarTheme(
       backgroundColor: AppColors.background,
       foregroundColor: AppColors.textPrimary,
       elevation: 0,
@@ -27,7 +30,7 @@ abstract final class AppTheme {
       centerTitle: false,
       titleTextStyle: AppTextStyles.title3,
     ),
-    dividerTheme: const DividerThemeData(
+    dividerTheme: DividerThemeData(
       color: AppColors.divider,
       thickness: 1,
       space: 1,
@@ -38,10 +41,10 @@ abstract final class AppTheme {
         foregroundColor: Colors.white,
         disabledBackgroundColor: AppColors.gray100,
         disabledForegroundColor: AppColors.gray400,
-        minimumSize: const Size.fromHeight(56),
+        minimumSize: Size.fromHeight(56),
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        textStyle: const TextStyle(
+        textStyle: TextStyle(
           fontFamily: AppTextStyles.fontFamily,
           fontSize: 16,
           fontWeight: FontWeight.w600,
@@ -54,7 +57,7 @@ abstract final class AppTheme {
         textStyle: AppTextStyles.label,
       ),
     ),
-    bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+    bottomNavigationBarTheme: BottomNavigationBarThemeData(
       backgroundColor: AppColors.surface,
       selectedItemColor: AppColors.textPrimary,
       unselectedItemColor: AppColors.gray300,

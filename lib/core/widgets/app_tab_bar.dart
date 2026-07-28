@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 /// symbols가 바뀌면 네이티브 바의 아이템도 그대로 교체된다(2단 하단바 전환용).
 /// Scaffold에서 `extendBody: true`와 함께 사용해야 콘텐츠가 뒤로 비쳐 보인다.
 class AppTabBar extends StatelessWidget {
-  const AppTabBar({
+  AppTabBar({
     super.key,
     required this.symbols,
     this.currentIndex = 0,

@@ -16,9 +16,9 @@ Future<void> showAttendanceBarcode(BuildContext context) {
       opaque: false,
       barrierDismissible: true,
       barrierColor: Colors.black.withValues(alpha: 0.45),
-      transitionDuration: const Duration(milliseconds: 380),
-      reverseTransitionDuration: const Duration(milliseconds: 240),
-      pageBuilder: (_, _, _) => const _BarcodeOverlay(),
+      transitionDuration: Duration(milliseconds: 380),
+      reverseTransitionDuration: Duration(milliseconds: 240),
+      pageBuilder: (_, _, _) => _BarcodeOverlay(),
       transitionsBuilder: (_, animation, _, child) {
         final curved = CurvedAnimation(
           parent: animation,
@@ -29,7 +29,7 @@ Future<void> showAttendanceBarcode(BuildContext context) {
           opacity: curved,
           child: SlideTransition(
             position: Tween(
-              begin: const Offset(0, -0.35),
+              begin: Offset(0, -0.35),
               end: Offset.zero,
             ).animate(curved),
             child: ScaleTransition(
@@ -44,7 +44,7 @@ Future<void> showAttendanceBarcode(BuildContext context) {
 }
 
 class _BarcodeOverlay extends StatelessWidget {
-  const _BarcodeOverlay();
+  _BarcodeOverlay();
 
   static const _employeeNo = 'FS-0903';
 
@@ -57,8 +57,8 @@ class _BarcodeOverlay extends StatelessWidget {
         backgroundColor: Colors.transparent,
         body: Center(
           child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 40),
-            padding: const EdgeInsets.fromLTRB(28, 32, 28, 24),
+            margin: EdgeInsets.symmetric(horizontal: 40),
+            padding: EdgeInsets.fromLTRB(28, 32, 28, 24),
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(28),
@@ -73,7 +73,7 @@ class _BarcodeOverlay extends StatelessWidget {
                   drawText: false,
                   color: AppColors.gray900,
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: 14),
                 Text(
                   _employeeNo,
                   style: AppTextStyles.label.copyWith(letterSpacing: 2),

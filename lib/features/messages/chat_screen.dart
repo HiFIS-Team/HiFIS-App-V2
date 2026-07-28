@@ -12,12 +12,7 @@ import '../../core/widgets/top_frost.dart';
 ///
 /// 메시지는 하드코딩된 샘플이며, 기능 개발 시 실제 채팅 데이터로 교체한다.
 class ChatScreen extends StatelessWidget {
-  const ChatScreen({
-    super.key,
-    required this.name,
-    required this.color,
-    this.emoji,
-  });
+  ChatScreen({super.key, required this.name, required this.color, this.emoji});
 
   final String name;
   final Color color;
@@ -32,44 +27,44 @@ class ChatScreen extends StatelessWidget {
           SafeArea(
             bottom: false,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 70, 20, 120),
+              padding: EdgeInsets.fromLTRB(20, 70, 20, 120),
               children: [
-                const Center(child: Text('오늘', style: AppTextStyles.caption)),
-                const SizedBox(height: 16),
+                Center(child: Text('오늘', style: AppTextStyles.caption)),
+                SizedBox(height: 16),
                 _TheirBubble(
                   name: name,
                   color: color,
                   emoji: emoji,
                   text: '은후님 혹시 내일 오전 근무 가능하실까요?',
                 ),
-                const SizedBox(height: 8),
-                const _MyBubble(text: '네 가능합니다! 몇 시부터인가요?'),
-                const SizedBox(height: 8),
+                SizedBox(height: 8),
+                _MyBubble(text: '네 가능합니다! 몇 시부터인가요?'),
+                SizedBox(height: 8),
                 _TheirBubble(
                   name: name,
                   color: color,
                   emoji: emoji,
                   text: '9시부터 부탁드려요 🙏',
                 ),
-                const SizedBox(height: 8),
-                const _MyBubble(text: '네 알겠습니다!'),
+                SizedBox(height: 8),
+                _MyBubble(text: '네 알겠습니다!'),
               ],
             ),
           ),
           // 상단 고정 프로스트 — 대화가 헤더 뒤로 흐려진다
-          const TopFrost(collapse: 1, color: AppColors.surface),
+          TopFrost(collapse: 1, color: AppColors.surface),
           // 상단 헤더: 뒤로가기 + 아바타 + 이름 (인스타 DM 스타일 좌측 정렬)
           SafeArea(
             bottom: false,
             child: Padding(
-              padding: const EdgeInsets.only(top: 8, left: 16, right: 16),
+              padding: EdgeInsets.only(top: 8, left: 16, right: 16),
               child: Row(
                 children: [
                   GlassIconButton(
                     symbol: 'chevron.backward',
                     onPressed: () => Navigator.pop(context),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   IgnorePointer(
                     child: Row(
                       children: [
@@ -86,8 +81,8 @@ class ChatScreen extends StatelessWidget {
                           child: Text(
                             emoji ?? name.characters.first,
                             style: emoji != null
-                                ? const TextStyle(fontSize: 15)
-                                : const TextStyle(
+                                ? TextStyle(fontSize: 15)
+                                : TextStyle(
                                     fontFamily: AppTextStyles.fontFamily,
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
@@ -95,10 +90,10 @@ class ChatScreen extends StatelessWidget {
                                   ),
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        SizedBox(width: 10),
                         Text(name, style: AppTextStyles.title3),
-                        const SizedBox(width: 2),
-                        const Icon(
+                        SizedBox(width: 2),
+                        Icon(
                           CupertinoIcons.chevron_forward,
                           size: 15,
                           color: AppColors.gray400,
@@ -111,7 +106,7 @@ class ChatScreen extends StatelessWidget {
             ),
           ),
           // 하단 고정 글래스 입력바 — 키보드와 함께 상승
-          const Align(
+          Align(
             alignment: Alignment.bottomCenter,
             child: SafeArea(
               top: false,
@@ -128,7 +123,7 @@ class ChatScreen extends StatelessWidget {
 }
 
 class _MyBubble extends StatelessWidget {
-  const _MyBubble({required this.text});
+  _MyBubble({required this.text});
 
   final String text;
 
@@ -137,9 +132,9 @@ class _MyBubble extends StatelessWidget {
     return Align(
       alignment: Alignment.centerRight,
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 280),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: const BoxDecoration(
+        constraints: BoxConstraints(maxWidth: 280),
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
           color: AppColors.primary,
           borderRadius: BorderRadius.only(
             topLeft: Radius.circular(20),
@@ -158,7 +153,7 @@ class _MyBubble extends StatelessWidget {
 }
 
 class _TheirBubble extends StatelessWidget {
-  const _TheirBubble({
+  _TheirBubble({
     required this.name,
     required this.color,
     required this.text,
@@ -186,8 +181,8 @@ class _TheirBubble extends StatelessWidget {
           child: Text(
             emoji ?? name.characters.first,
             style: emoji != null
-                ? const TextStyle(fontSize: 12)
-                : const TextStyle(
+                ? TextStyle(fontSize: 12)
+                : TextStyle(
                     fontFamily: AppTextStyles.fontFamily,
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
@@ -195,12 +190,12 @@ class _TheirBubble extends StatelessWidget {
                   ),
           ),
         ),
-        const SizedBox(width: 8),
+        SizedBox(width: 8),
         Flexible(
           child: Container(
-            constraints: const BoxConstraints(maxWidth: 260),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: const BoxDecoration(
+            constraints: BoxConstraints(maxWidth: 260),
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
               color: AppColors.gray50,
               borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(20),
@@ -218,7 +213,7 @@ class _TheirBubble extends StatelessWidget {
 }
 
 class _MessageInputBar extends StatefulWidget {
-  const _MessageInputBar();
+  _MessageInputBar();
 
   @override
   State<_MessageInputBar> createState() => _MessageInputBarState();
@@ -248,7 +243,7 @@ class _MessageInputBarState extends State<_MessageInputBar> {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
             color: Color(0x1F101828),
             blurRadius: 32,
@@ -262,7 +257,7 @@ class _MessageInputBarState extends State<_MessageInputBar> {
           filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
           child: Container(
             height: 52,
-            padding: const EdgeInsets.only(left: 18, right: 8),
+            padding: EdgeInsets.only(left: 18, right: 8),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.72),
               borderRadius: BorderRadius.circular(28),
@@ -285,10 +280,10 @@ class _MessageInputBarState extends State<_MessageInputBar> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 // 입력 전에는 링크 아이콘, 입력 중에는 파란 전송(비행기) 버튼
                 AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 220),
+                  duration: Duration(milliseconds: 220),
                   switchInCurve: Curves.easeOutBack,
                   switchOutCurve: Curves.easeIn,
                   transitionBuilder: (child, animation) => ScaleTransition(
@@ -297,16 +292,16 @@ class _MessageInputBarState extends State<_MessageInputBar> {
                   ),
                   child: _hasText
                       ? GestureDetector(
-                          key: const ValueKey('send'),
+                          key: ValueKey('send'),
                           onTap: () => _controller.clear(),
                           child: Container(
                             width: 38,
                             height: 38,
-                            decoration: const BoxDecoration(
+                            decoration: BoxDecoration(
                               color: AppColors.primary,
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(
+                            child: Icon(
                               CupertinoIcons.paperplane_fill,
                               color: Colors.white,
                               size: 18,
@@ -314,14 +309,14 @@ class _MessageInputBarState extends State<_MessageInputBar> {
                           ),
                         )
                       : GestureDetector(
-                          key: const ValueKey('link'),
+                          key: ValueKey('link'),
                           onTap: () {},
                           child: Container(
                             width: 38,
                             height: 38,
                             alignment: Alignment.center,
                             color: Colors.transparent,
-                            child: const Icon(
+                            child: Icon(
                               CupertinoIcons.link,
                               color: AppColors.gray600,
                               size: 22,
