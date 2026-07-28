@@ -120,12 +120,34 @@ class _SectionTitle extends StatelessWidget {
 class _HeroStatusCard extends StatelessWidget {
   const _HeroStatusCard();
 
-  static const _total = 26;
-  static const _working = 21;
+  // 목업 근무 시간 (근태 기능 연동 시 실제 출퇴근 기록으로 교체)
+  static const _checkInHour = 9;
+  static const _checkOutHour = 18;
 
   @override
   Widget build(BuildContext context) {
-    final rate = _working / _total;
+    final now = DateTime.now();
+    final checkIn = DateTime(now.year, now.month, now.day, _checkInHour);
+    final checkOut = DateTime(now.year, now.month, now.day, _checkOutHour);
+    final total = checkOut.difference(checkIn);
+
+    var elapsed = now.isBefore(checkIn) ? Duration.zero : now.difference(checkIn);
+    if (elapsed > total) elapsed = total;
+    final remaining = total - elapsed;
+    final rate = elapsed.inMinutes / total.inMinutes;
+
+    final String headline;
+    final String status;
+    if (elapsed == Duration.zero) {
+      headline = '아직 출근 전이에요';
+      status = '출근 전';
+    } else if (remaining == Duration.zero) {
+      headline = '오늘 근무 완료!';
+      status = '퇴근 완료';
+    } else {
+      headline = '${_format(elapsed)}째 근무 중';
+      status = '근무 중';
+    }
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -167,7 +189,7 @@ class _HeroStatusCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(100),
                 ),
                 child: Text(
-                  '전체보기',
+                  status,
                   style: AppTextStyles.caption.copyWith(color: Colors.white),
                 ),
               ),
@@ -175,7 +197,7 @@ class _HeroStatusCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            '$_total명 중 $_working명 출근',
+            headline,
             style: AppTextStyles.title1.copyWith(color: Colors.white),
           ),
           const SizedBox(height: 16),
@@ -195,25 +217,34 @@ class _HeroStatusCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-          const Row(
+          Row(
             children: [
-              _HeroStatItem(count: 21, label: '출근'),
-              _HeroStatDivider(),
-              _HeroStatItem(count: 3, label: '휴가'),
-              _HeroStatDivider(),
-              _HeroStatItem(count: 2, label: '미출근'),
+              const _HeroStatItem(value: '09:00', label: '출근'),
+              const _HeroStatDivider(),
+              const _HeroStatItem(value: '18:00', label: '퇴근 예정'),
+              const _HeroStatDivider(),
+              _HeroStatItem(value: _format(remaining), label: '남은 시간'),
             ],
           ),
         ],
       ),
     );
   }
+
+  /// Duration을 '2시간 30분' 형태로 표기 (0시간이면 '30분')
+  static String _format(Duration d) {
+    final h = d.inHours;
+    final m = d.inMinutes % 60;
+    if (h == 0) return '$m분';
+    if (m == 0) return '$h시간';
+    return '$h시간 $m분';
+  }
 }
 
 class _HeroStatItem extends StatelessWidget {
-  const _HeroStatItem({required this.count, required this.label});
+  const _HeroStatItem({required this.value, required this.label});
 
-  final int count;
+  final String value;
   final String label;
 
   @override
@@ -221,9 +252,13 @@ class _HeroStatItem extends StatelessWidget {
     return Expanded(
       child: Column(
         children: [
-          Text(
-            '$count',
-            style: AppTextStyles.title2.copyWith(color: Colors.white),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              value,
+              maxLines: 1,
+              style: AppTextStyles.title2.copyWith(color: Colors.white),
+            ),
           ),
           const SizedBox(height: 2),
           Text(
