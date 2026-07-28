@@ -13,12 +13,14 @@ class AppTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 탭 순서: 홈 / 업무 / 프로젝트 / 회의록 / 전체 (라벨 없이 아이콘만 표시)
     return CNTabBar(
       items: const [
-        CNTabBarItem(label: '홈', icon: CNSymbol('house.fill')),
-        CNTabBarItem(label: '직원', icon: CNSymbol('person.2.fill')),
-        CNTabBarItem(label: '일정', icon: CNSymbol('calendar')),
-        CNTabBarItem(label: '내 정보', icon: CNSymbol('person.crop.circle.fill')),
+        CNTabBarItem(label: '', icon: CNSymbol('house.fill')),
+        CNTabBarItem(label: '', icon: CNSymbol('briefcase.fill')),
+        CNTabBarItem(label: '', icon: CNSymbol('folder.fill')),
+        CNTabBarItem(label: '', icon: CNSymbol('doc.text.fill')),
+        CNTabBarItem(label: '', icon: CNSymbol('square.grid.2x2.fill')),
       ],
       currentIndex: currentIndex,
       onTap: (i) => onTap?.call(i),
