@@ -30,14 +30,10 @@ class HomeScreen extends StatelessWidget {
                 _GreetingCard(),
                 SizedBox(height: 16),
                 _HeroStatusCard(),
-                SizedBox(height: 32),
-                _SectionTitle('빠른 메뉴'),
-                SizedBox(height: 14),
-                _QuickMenuGrid(),
-                SizedBox(height: 32),
-                _SectionTitle('최근 활동'),
-                SizedBox(height: 14),
-                _RecentActivityCard(),
+                SizedBox(height: 16),
+                _ProjectsCard(),
+                SizedBox(height: 16),
+                _NoticeCard(),
               ],
             ),
           ),
@@ -120,20 +116,6 @@ class _GreetingCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle(this.title);
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4),
-      child: Text(title, style: AppTextStyles.title2),
     );
   }
 }
@@ -373,173 +355,267 @@ class _WorkGauge extends StatelessWidget {
   }
 }
 
-class _QuickMenuGrid extends StatelessWidget {
-  const _QuickMenuGrid();
+class _CardHeader extends StatelessWidget {
+  const _CardHeader({required this.title, required this.count});
+
+  final String title;
+  final int count;
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    return Row(
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: _QuickMenuCard(
-                emoji: '⏰',
-                title: '근태 관리',
-                subtitle: '출퇴근 기록',
-              ),
-            ),
-            SizedBox(width: 12),
-            Expanded(
-              child: _QuickMenuCard(
-                emoji: '💸',
-                title: '급여 정산',
-                subtitle: '이번 달 급여',
-              ),
-            ),
-          ],
+        Text(title, style: AppTextStyles.title3),
+        const SizedBox(width: 6),
+        Text(
+          '$count',
+          style: AppTextStyles.title3.copyWith(color: AppColors.gray400),
         ),
-        SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _QuickMenuCard(
-                emoji: '👥',
-                title: '직원 목록',
-                subtitle: '전체 직원 관리',
-              ),
+        const Spacer(),
+        // TODO: 목록 페이지 연결
+        InkWell(
+          onTap: () {},
+          borderRadius: BorderRadius.circular(8),
+          child: const Padding(
+            padding: EdgeInsets.all(4),
+            child: Row(
+              children: [
+                Text('전체', style: AppTextStyles.label),
+                SizedBox(width: 2),
+                Icon(
+                  CupertinoIcons.arrow_right,
+                  size: 14,
+                  color: AppColors.gray600,
+                ),
+              ],
             ),
-            SizedBox(width: 12),
-            Expanded(
-              child: _QuickMenuCard(
-                emoji: '📅',
-                title: '일정 관리',
-                subtitle: '근무 스케줄',
-              ),
-            ),
-          ],
+          ),
         ),
       ],
     );
   }
 }
 
-class _QuickMenuCard extends StatelessWidget {
-  const _QuickMenuCard({
-    required this.emoji,
-    required this.title,
-    required this.subtitle,
-  });
-
-  final String emoji;
-  final String title;
-  final String subtitle;
+class _ProjectsCard extends StatelessWidget {
+  const _ProjectsCard();
 
   @override
   Widget build(BuildContext context) {
+    // 내가 참여 중인 프로젝트만 마감 임박순 3개 (기능 연동 시 실제 데이터로 교체)
     return Container(
-      decoration: AppDecorations.card(radius: 20),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(20),
-        child: InkWell(
-          onTap: () {},
-          borderRadius: BorderRadius.circular(20),
-          child: Padding(
-            padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(20),
+      decoration: AppDecorations.card(),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _CardHeader(title: '프로젝트', count: 3),
+          SizedBox(height: 14),
+          _ProjectRow(
+            name: '여름 회원 이벤트 프로모션',
+            members: '나 외 4명',
+            dday: 'D-2',
+            color: AppColors.error,
+          ),
+          SizedBox(height: 14),
+          _ProjectRow(
+            name: 'PT룸 장비 교체',
+            members: '나 외 2명',
+            dday: 'D-5',
+            color: AppColors.warning,
+          ),
+          SizedBox(height: 14),
+          _ProjectRow(
+            name: '신규 트레이너 온보딩',
+            members: '나 외 3명',
+            dday: 'D-12',
+            color: AppColors.primary,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProjectRow extends StatelessWidget {
+  const _ProjectRow({
+    required this.name,
+    required this.members,
+    required this.dday,
+    required this.color,
+  });
+
+  final String name;
+  final String members;
+  final String dday;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    // TODO: 프로젝트 상세 페이지 연결
+    return InkWell(
+      onTap: () {},
+      child: Row(
+        children: [
+          // 일정 카드 스타일의 세로 색 막대
+          Container(
+            width: 4,
+            height: 40,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: AppColors.gray50,
-                    borderRadius: BorderRadius.circular(14),
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.body1.copyWith(
+                    fontWeight: FontWeight.w600,
                   ),
-                  child: Text(emoji, style: const TextStyle(fontSize: 22)),
                 ),
-                const SizedBox(height: 14),
-                Text(title, style: AppTextStyles.body1),
                 const SizedBox(height: 2),
-                Text(subtitle, style: AppTextStyles.caption),
+                Text(members, style: AppTextStyles.caption),
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RecentActivityCard extends StatelessWidget {
-  const _RecentActivityCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      decoration: AppDecorations.card(),
-      child: const Column(
-        children: [
-          _ActivityTile(
-            icon: Icons.login_rounded,
-            color: AppColors.primary,
-            title: '김민수님이 출근했어요',
-            time: '오전 9:02',
-          ),
-          _ActivityTile(
-            icon: Icons.beach_access_rounded,
-            color: AppColors.warning,
-            title: '박지현님의 휴가 신청이 도착했어요',
-            time: '오전 8:40',
-          ),
-          _ActivityTile(
-            icon: Icons.logout_rounded,
-            color: AppColors.gray400,
-            title: '이서연님이 퇴근했어요',
-            time: '어제',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ActivityTile extends StatelessWidget {
-  const _ActivityTile({
-    required this.icon,
-    required this.color,
-    required this.title,
-    required this.time,
-  });
-
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String time;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        children: [
+          const SizedBox(width: 8),
           Container(
-            width: 40,
-            height: 40,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
+              borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, color: color, size: 20),
+            child: Text(
+              dday,
+              style: AppTextStyles.caption.copyWith(
+                color: color,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
-          const SizedBox(width: 14),
-          Expanded(child: Text(title, style: AppTextStyles.body2)),
-          const SizedBox(width: 8),
-          Text(time, style: AppTextStyles.caption),
         ],
+      ),
+    );
+  }
+}
+
+class _NoticeCard extends StatelessWidget {
+  const _NoticeCard();
+
+  @override
+  Widget build(BuildContext context) {
+    // 최신 공지 5개 (기능 연동 시 실제 데이터로 교체)
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+      decoration: AppDecorations.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _CardHeader(title: '공지', count: 5),
+          const SizedBox(height: 4),
+          const _NoticeRow(
+            title: '8월 근무표가 확정되었습니다',
+            author: '관리자',
+            time: '오늘',
+            pinned: true,
+          ),
+          const Divider(),
+          const _NoticeRow(
+            title: '여름 휴가 신청 안내',
+            author: '박지현',
+            time: '어제',
+          ),
+          const Divider(),
+          const _NoticeRow(
+            title: '센터 청소 일정 변경',
+            author: '김민수',
+            time: '3일 전',
+          ),
+          const Divider(),
+          const _NoticeRow(
+            title: '7월 우수사원 발표',
+            author: '관리자',
+            time: '4일 전',
+          ),
+          const Divider(),
+          const _NoticeRow(
+            title: '정수기 정기 점검 안내',
+            author: '관리자',
+            time: '6일 전',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NoticeRow extends StatelessWidget {
+  const _NoticeRow({
+    required this.title,
+    required this.author,
+    required this.time,
+    this.pinned = false,
+  });
+
+  final String title;
+  final String author;
+  final String time;
+  final bool pinned;
+
+  @override
+  Widget build(BuildContext context) {
+    // TODO: 공지 상세 페이지 연결
+    return InkWell(
+      onTap: () {},
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                if (pinned) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.error.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'PIN',
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.error,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.body1.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text('$author · $time', style: AppTextStyles.caption),
+          ],
+        ),
       ),
     );
   }

@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:hifis_app/main.dart';
@@ -7,9 +8,13 @@ void main() {
     await tester.pumpWidget(const HiFISApp());
 
     expect(find.text('오늘 근무'), findsOneWidget);
-    expect(find.text('빠른 메뉴'), findsOneWidget);
+    expect(find.text('프로젝트'), findsOneWidget);
 
-    await tester.scrollUntilVisible(find.text('최근 활동'), 200);
-    expect(find.text('최근 활동'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('공지'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('공지'), findsOneWidget);
   });
 }
