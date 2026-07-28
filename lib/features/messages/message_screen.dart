@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/top_frost.dart';
+import 'chat_screen.dart';
 
 /// 사내톡 화면 (인스타그램 DM 스타일 목업)
 ///
@@ -253,7 +254,12 @@ class _ConversationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () {},
+      onTap: () => Navigator.push(
+        context,
+        CupertinoPageRoute(
+          builder: (_) => ChatScreen(name: name, color: color, emoji: emoji),
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         child: Row(
