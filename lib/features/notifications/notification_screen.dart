@@ -100,13 +100,15 @@ class _NotificationScreenState extends State<NotificationScreen> {
           ),
           // 스크롤 시 상단 프로그레시브 블러 — 콘텐츠가 헤더 뒤로 흐려진다
           TopFrost(collapse: _collapse, color: AppColors.background),
-          // 상단 중앙 고정 타이틀
-          const SafeArea(
-            bottom: false,
-            child: SizedBox(
-              height: 56,
-              child: Center(
-                child: Text('알림', style: AppTextStyles.title3),
+          // 상단 중앙 고정 타이틀 (터치는 아래 리스트로 통과)
+          const IgnorePointer(
+            child: SafeArea(
+              bottom: false,
+              child: SizedBox(
+                height: 56,
+                child: Center(
+                  child: Text('알림', style: AppTextStyles.title3),
+                ),
               ),
             ),
           ),
