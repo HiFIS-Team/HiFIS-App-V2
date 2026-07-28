@@ -6,6 +6,7 @@ import '../../core/theme/app_shadows.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_tab_bar.dart';
 import '../../core/widgets/glass_icon_button.dart';
+import '../messages/message_screen.dart';
 import '../notifications/notification_screen.dart';
 
 /// 홈 화면 (디자인 시스템 데모용 샘플)
@@ -49,7 +50,15 @@ class HomeScreen extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const GlassIconButton(symbol: 'message'),
+                    GlassIconButton(
+                      symbol: 'message',
+                      onPressed: () => Navigator.push(
+                        context,
+                        CupertinoPageRoute(
+                          builder: (_) => const MessageScreen(),
+                        ),
+                      ),
+                    ),
                     const SizedBox(width: 10),
                     GlassIconButton(
                       symbol: 'bell',

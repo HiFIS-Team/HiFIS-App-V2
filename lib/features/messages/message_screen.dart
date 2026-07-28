@@ -1,0 +1,342 @@
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/glass_icon_button.dart';
+
+/// 사내톡 화면 (인스타그램 DM 스타일 목업)
+///
+/// 데이터는 하드코딩된 샘플이며, 기능 개발 시 실제 대화 데이터로 교체한다.
+class MessageScreen extends StatelessWidget {
+  const MessageScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      body: Stack(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(0, 60, 0, 40),
+              children: const [
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  child: Text('메시지', style: AppTextStyles.title1),
+                ),
+                SizedBox(height: 16),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  child: _SearchBar(),
+                ),
+                SizedBox(height: 20),
+                _TeamAvatarRow(),
+                SizedBox(height: 24),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text('받은 메시지', style: AppTextStyles.title3),
+                      ),
+                      Text(
+                        '요청',
+                        style: TextStyle(
+                          fontFamily: AppTextStyles.fontFamily,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 8),
+                _ConversationTile(
+                  name: '김민수',
+                  preview: '네 알겠습니다!',
+                  time: '방금 전',
+                  color: AppColors.primary,
+                  online: true,
+                  unread: true,
+                ),
+                _ConversationTile(
+                  name: '박지현',
+                  preview: '휴가 신청서 올렸어요',
+                  time: '오전 10:12',
+                  color: AppColors.warning,
+                  unread: true,
+                ),
+                _ConversationTile(
+                  name: '트레이너 단톡방',
+                  preview: '오늘 PT 일정 공유합니다',
+                  time: '오전 9:30',
+                  color: Color(0xFF7C5CFC),
+                  emoji: '💪',
+                ),
+                _ConversationTile(
+                  name: '이서연',
+                  preview: '수고하셨습니다~',
+                  time: '어제',
+                  color: AppColors.success,
+                  online: true,
+                ),
+                _ConversationTile(
+                  name: '정우진',
+                  preview: '사진을 보냈습니다',
+                  time: '어제',
+                  color: AppColors.gray500,
+                ),
+                _ConversationTile(
+                  name: '전체 공지방',
+                  preview: '8월 근무표가 확정되었습니다',
+                  time: '월요일',
+                  color: AppColors.error,
+                  emoji: '📢',
+                ),
+              ],
+            ),
+          ),
+          // 좌측 상단 뒤로가기 / 우측 상단 새 메시지 (글래스 버튼 고정)
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 8, left: 16, right: 16),
+              child: Row(
+                children: [
+                  GlassIconButton(
+                    symbol: 'chevron.backward',
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const Spacer(),
+                  const GlassIconButton(symbol: 'square.and.pencil'),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SearchBar extends StatelessWidget {
+  const _SearchBar();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 42,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: AppColors.gray50,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const Row(
+        children: [
+          Icon(CupertinoIcons.search, size: 18, color: AppColors.gray400),
+          SizedBox(width: 8),
+          Text(
+            '검색',
+            style: TextStyle(
+              fontFamily: AppTextStyles.fontFamily,
+              fontSize: 15,
+              color: AppColors.gray400,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TeamAvatarRow extends StatelessWidget {
+  const _TeamAvatarRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 88,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        children: const [
+          _TeamAvatar(name: '김민수', color: AppColors.primary, online: true),
+          _TeamAvatar(name: '박지현', color: AppColors.warning),
+          _TeamAvatar(name: '이서연', color: AppColors.success, online: true),
+          _TeamAvatar(name: '정우진', color: AppColors.gray500),
+          _TeamAvatar(name: '최수아', color: Color(0xFF7C5CFC), online: true),
+          _TeamAvatar(name: '강태오', color: Color(0xFFEC5A8B)),
+        ],
+      ),
+    );
+  }
+}
+
+class _TeamAvatar extends StatelessWidget {
+  const _TeamAvatar({
+    required this.name,
+    required this.color,
+    this.online = false,
+  });
+
+  final String name;
+  final Color color;
+  final bool online;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 16),
+      child: Column(
+        children: [
+          _Avatar(name: name, color: color, size: 60, online: online),
+          const SizedBox(height: 6),
+          Text(name, style: AppTextStyles.caption),
+        ],
+      ),
+    );
+  }
+}
+
+class _ConversationTile extends StatelessWidget {
+  const _ConversationTile({
+    required this.name,
+    required this.preview,
+    required this.time,
+    required this.color,
+    this.emoji,
+    this.online = false,
+    this.unread = false,
+  });
+
+  final String name;
+  final String preview;
+  final String time;
+  final Color color;
+  final String? emoji;
+  final bool online;
+  final bool unread;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () {},
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        child: Row(
+          children: [
+            _Avatar(
+              name: name,
+              color: color,
+              size: 54,
+              online: online,
+              emoji: emoji,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: AppTextStyles.body1.copyWith(
+                      fontWeight: unread ? FontWeight.w600 : FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$preview · $time',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.caption.copyWith(
+                      color: unread ? AppColors.gray900 : AppColors.gray400,
+                      fontWeight: unread ? FontWeight.w600 : FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (unread)
+              Container(
+                width: 8,
+                height: 8,
+                margin: const EdgeInsets.only(right: 12),
+                decoration: const BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            const Icon(
+              CupertinoIcons.camera,
+              size: 22,
+              color: AppColors.gray300,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Avatar extends StatelessWidget {
+  const _Avatar({
+    required this.name,
+    required this.color,
+    required this.size,
+    this.online = false,
+    this.emoji,
+  });
+
+  final String name;
+  final Color color;
+  final double size;
+  final bool online;
+  final String? emoji;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          width: size,
+          height: size,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: emoji != null ? 0.12 : 1),
+            shape: BoxShape.circle,
+          ),
+          child: Text(
+            emoji ?? name.characters.first,
+            style: emoji != null
+                ? TextStyle(fontSize: size * 0.42)
+                : TextStyle(
+                    fontFamily: AppTextStyles.fontFamily,
+                    fontSize: size * 0.34,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+          ),
+        ),
+        if (online)
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: Container(
+              width: size * 0.28,
+              height: size * 0.28,
+              decoration: BoxDecoration(
+                color: AppColors.success,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.surface, width: 2.5),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
