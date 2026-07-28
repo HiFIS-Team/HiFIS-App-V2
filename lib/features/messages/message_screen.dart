@@ -6,12 +6,40 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/glass_icon_button.dart';
+import '../../core/widgets/top_frost.dart';
 
 /// 사내톡 화면 (인스타그램 DM 스타일 목업)
 ///
 /// 데이터는 하드코딩된 샘플이며, 기능 개발 시 실제 대화 데이터로 교체한다.
-class MessageScreen extends StatelessWidget {
+class MessageScreen extends StatefulWidget {
   const MessageScreen({super.key});
+
+  @override
+  State<MessageScreen> createState() => _MessageScreenState();
+}
+
+class _MessageScreenState extends State<MessageScreen> {
+  final _scrollController = ScrollController();
+
+  /// 0(펼침) ~ 1(접힘). 큰 타이틀이 스크롤로 사라지는 정도.
+  double _collapse = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    final t = ((_scrollController.offset - 30) / 30).clamp(0.0, 1.0);
+    if (t != _collapse) setState(() => _collapse = t);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,13 +50,9 @@ class MessageScreen extends StatelessWidget {
           SafeArea(
             bottom: false,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(0, 60, 0, 100),
+              controller: _scrollController,
+              padding: const EdgeInsets.fromLTRB(0, 68, 0, 100),
               children: const [
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20),
-                  child: Text('메시지', style: AppTextStyles.title1),
-                ),
-                SizedBox(height: 20),
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: 20),
                   child: Row(
@@ -92,6 +116,18 @@ class MessageScreen extends StatelessWidget {
                   emoji: '📢',
                 ),
               ],
+            ),
+          ),
+          // 스크롤 시 상단 프로그레시브 블러 — 콘텐츠가 헤더 뒤로 흐려진다
+          TopFrost(collapse: _collapse, color: AppColors.surface),
+          // 상단 중앙 고정 타이틀
+          const SafeArea(
+            bottom: false,
+            child: SizedBox(
+              height: 56,
+              child: Center(
+                child: Text('메시지', style: AppTextStyles.title3),
+              ),
             ),
           ),
           // 좌측 상단 뒤로가기 / 우측 상단 새 메시지 (글래스 버튼 고정)

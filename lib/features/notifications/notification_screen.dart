@@ -4,12 +4,40 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_shadows.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/glass_icon_button.dart';
+import '../../core/widgets/top_frost.dart';
 
 /// 알림 화면 (목업)
 ///
 /// 데이터는 하드코딩된 샘플이며, 기능 개발 시 실제 알림 데이터로 교체한다.
-class NotificationScreen extends StatelessWidget {
+class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
+
+  @override
+  State<NotificationScreen> createState() => _NotificationScreenState();
+}
+
+class _NotificationScreenState extends State<NotificationScreen> {
+  final _scrollController = ScrollController();
+
+  /// 0(펼침) ~ 1(접힘). 스크롤에 따른 상단 블러 강도.
+  double _collapse = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    final t = ((_scrollController.offset - 30) / 30).clamp(0.0, 1.0);
+    if (t != _collapse) setState(() => _collapse = t);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,10 +47,9 @@ class NotificationScreen extends StatelessWidget {
           SafeArea(
             bottom: false,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 60, 20, 40),
+              controller: _scrollController,
+              padding: const EdgeInsets.fromLTRB(20, 68, 20, 40),
               children: const [
-                Text('알림', style: AppTextStyles.title1),
-                SizedBox(height: 20),
                 _SectionLabel('오늘'),
                 SizedBox(height: 10),
                 _NotificationCard(
@@ -69,6 +96,18 @@ class NotificationScreen extends StatelessWidget {
                   ],
                 ),
               ],
+            ),
+          ),
+          // 스크롤 시 상단 프로그레시브 블러 — 콘텐츠가 헤더 뒤로 흐려진다
+          TopFrost(collapse: _collapse, color: AppColors.background),
+          // 상단 중앙 고정 타이틀
+          const SafeArea(
+            bottom: false,
+            child: SizedBox(
+              height: 56,
+              child: Center(
+                child: Text('알림', style: AppTextStyles.title3),
+              ),
             ),
           ),
           // 좌측 상단 고정 뒤로가기 글래스 버튼
