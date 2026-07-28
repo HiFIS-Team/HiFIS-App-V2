@@ -1,9 +1,9 @@
+import 'package:cupertino_native/cupertino_native.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_shadows.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/app_header.dart';
 import '../../core/widgets/app_tab_bar.dart';
 
 /// 홈 화면 (디자인 시스템 데모용 샘플)
@@ -16,39 +16,56 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       extendBody: true,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            const AppHeader(showNotificationBadge: true),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 110),
-                children: const [
-                  _Greeting(),
-                  SizedBox(height: 24),
-                  _HeroStatusCard(),
-                  SizedBox(height: 32),
-                  _SectionTitle('빠른 메뉴'),
-                  SizedBox(height: 14),
-                  _QuickMenuGrid(),
-                  SizedBox(height: 32),
-                  _SectionTitle('최근 활동'),
-                  SizedBox(height: 14),
-                  _RecentActivityCard(),
-                ],
+      body: Stack(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 110),
+              children: const [
+                _Header(),
+                SizedBox(height: 24),
+                _HeroStatusCard(),
+                SizedBox(height: 32),
+                _SectionTitle('빠른 메뉴'),
+                SizedBox(height: 14),
+                _QuickMenuGrid(),
+                SizedBox(height: 32),
+                _SectionTitle('최근 활동'),
+                SizedBox(height: 14),
+                _RecentActivityCard(),
+              ],
+            ),
+          ),
+          // 상단 고정 글래스 버튼 — 콘텐츠가 유리 뒤로 스크롤된다
+          const SafeArea(
+            bottom: false,
+            child: Align(
+              alignment: Alignment.topRight,
+              child: Padding(
+                padding: EdgeInsets.only(top: 8, right: 16),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _HeaderIconButton(symbol: 'message'),
+                    SizedBox(width: 10),
+                    _HeaderIconButton(symbol: 'bell', showBadge: true),
+                    SizedBox(width: 10),
+                    _HeaderIconButton(symbol: 'person'),
+                  ],
+                ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
       bottomNavigationBar: const AppTabBar(),
     );
   }
 }
 
-class _Greeting extends StatelessWidget {
-  const _Greeting();
+class _Header extends StatelessWidget {
+  const _Header();
 
   String get _todayLabel {
     final now = DateTime.now();
@@ -64,6 +81,41 @@ class _Greeting extends StatelessWidget {
         Text(_todayLabel, style: AppTextStyles.caption),
         const SizedBox(height: 4),
         const Text('좋은 아침이에요,\n은후님', style: AppTextStyles.title1),
+      ],
+    );
+  }
+}
+
+class _HeaderIconButton extends StatelessWidget {
+  const _HeaderIconButton({required this.symbol, this.showBadge = false});
+
+  final String symbol;
+  final bool showBadge;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        CNButton.icon(
+          icon: CNSymbol(symbol, size: 17, color: AppColors.gray700),
+          size: 40,
+          onPressed: () {},
+        ),
+        if (showBadge)
+          Positioned(
+            top: 2,
+            right: 3,
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: AppColors.error,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.background, width: 1.5),
+              ),
+            ),
+          ),
       ],
     );
   }
