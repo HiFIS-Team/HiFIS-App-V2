@@ -177,12 +177,16 @@ class _HeroStatusCardState extends State<_HeroStatusCard> {
         : now.difference(checkIn);
     if (elapsed > total) elapsed = total;
     final remaining = total - elapsed;
+    final rate = elapsed.inMinutes / total.inMinutes;
 
-    // 상태 3종: 출근(초록) / 휴게(주황) / 퇴근(회색)
+    // 상태 4종: 미출근/퇴근(회색), 출근(초록), 휴게(주황)
     // 목업 기준 — 근무 09~18시, 휴게 12~13시. 근태 연동 시 실제 상태로 교체.
     final String status;
     final Color statusColor;
-    if (now.isBefore(checkIn) || !now.isBefore(checkOut)) {
+    if (now.isBefore(checkIn)) {
+      status = '미출근';
+      statusColor = AppColors.gray500;
+    } else if (!now.isBefore(checkOut)) {
       status = '퇴근';
       statusColor = AppColors.gray500;
     } else if (now.hour == 12) {
@@ -193,8 +197,13 @@ class _HeroStatusCardState extends State<_HeroStatusCard> {
       statusColor = AppColors.success;
     }
 
+    // 실제 출퇴근 스캔 기록 자리 (바코드 스캔 연동 시 스캔 시각으로 교체)
+    final checkInText = elapsed > Duration.zero ? '09:00' : '--:--';
+    final checkOutText = remaining == Duration.zero ? '18:00' : '--:--';
+    final percentText = '${(rate * 100).round()}%';
+
     final timeText =
-        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -204,7 +213,7 @@ class _HeroStatusCardState extends State<_HeroStatusCard> {
           Row(
             children: [
               const Expanded(
-                child: Text('오늘 근무 현황', style: AppTextStyles.label),
+                child: Text('오늘 근무', style: AppTextStyles.label),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(
@@ -225,26 +234,45 @@ class _HeroStatusCardState extends State<_HeroStatusCard> {
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           Text(
             timeText,
+            textAlign: TextAlign.center,
             style: const TextStyle(
               fontFamily: AppTextStyles.fontFamily,
-              fontSize: 44,
+              fontSize: 40,
               fontWeight: FontWeight.w700,
               height: 1.1,
               color: AppColors.textPrimary,
               fontFeatures: [FontFeature.tabularFigures()],
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
+          _WorkGauge(rate: rate),
+          const SizedBox(height: 10),
+          // 근무 시작 시간 — 진행률 — 종료 시간
           Row(
             children: [
-              const _HeroStat(label: '출근', value: '09:00'),
-              const _StatDivider(),
-              const _HeroStat(label: '퇴근 예정', value: '18:00'),
-              const _StatDivider(),
-              _HeroStat(label: '남은 시간', value: _format(remaining)),
+              const Text('09:00', style: AppTextStyles.caption),
+              const Spacer(),
+              Text(
+                percentText,
+                style: AppTextStyles.label.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const Spacer(),
+              const Text('18:00', style: AppTextStyles.caption),
+            ],
+          ),
+          const SizedBox(height: 18),
+          // 실제 출퇴근 스캔 기록
+          Row(
+            children: [
+              _ScanRecord(label: '출근', time: checkInText),
+              const Spacer(),
+              _ScanRecord(label: '퇴근', time: checkOutText),
             ],
           ),
         ],
@@ -252,49 +280,96 @@ class _HeroStatusCardState extends State<_HeroStatusCard> {
     );
   }
 
-  /// Duration을 '2시간 30분' 형태로 표기 (0시간이면 '30분')
-  static String _format(Duration d) {
-    final h = d.inHours;
-    final m = d.inMinutes % 60;
-    if (h == 0) return '$m분';
-    if (m == 0) return '$h시간';
-    return '$h시간 $m분';
-  }
 }
 
-class _HeroStat extends StatelessWidget {
-  const _HeroStat({required this.label, required this.value});
+class _ScanRecord extends StatelessWidget {
+  const _ScanRecord({required this.label, required this.time});
 
   final String label;
-  final String value;
+  final String time;
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
-        children: [
-          Text(label, style: AppTextStyles.caption),
-          const SizedBox(height: 4),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              value,
-              maxLines: 1,
-              style: AppTextStyles.body1.copyWith(fontWeight: FontWeight.w600),
-            ),
+    final recorded = time != '--:--';
+    return Row(
+      children: [
+        Text(label, style: AppTextStyles.caption),
+        const SizedBox(width: 8),
+        Text(
+          time,
+          style: AppTextStyles.body1.copyWith(
+            fontWeight: FontWeight.w600,
+            color: recorded ? AppColors.textPrimary : AppColors.gray300,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
 
-class _StatDivider extends StatelessWidget {
-  const _StatDivider();
+class _WorkGauge extends StatelessWidget {
+  const _WorkGauge({required this.rate});
+
+  /// 0.0(출근 전) ~ 1.0(퇴근)
+  final double rate;
 
   @override
   Widget build(BuildContext context) {
-    return Container(width: 1, height: 30, color: AppColors.gray100);
+    return SizedBox(
+      height: 18,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final thumbX = (constraints.maxWidth - 14) * rate;
+          return Stack(
+            alignment: Alignment.centerLeft,
+            clipBehavior: Clip.none,
+            children: [
+              // 트랙
+              Container(
+                height: 8,
+                decoration: BoxDecoration(
+                  color: AppColors.gray50,
+                  borderRadius: BorderRadius.circular(100),
+                ),
+              ),
+              // 채워진 게이지
+              FractionallySizedBox(
+                widthFactor: rate,
+                child: Container(
+                  height: 8,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppColors.gradientStart, AppColors.gradientEnd],
+                    ),
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                ),
+              ),
+              // 현재 위치 썸
+              Positioned(
+                left: thumbX,
+                child: Container(
+                  width: 14,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.primary, width: 3),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x33101828),
+                        blurRadius: 6,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 }
 
