@@ -1,3 +1,12 @@
+# Claude Code
+.claude/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
 # Miscellaneous
 *.class
 *.lock
