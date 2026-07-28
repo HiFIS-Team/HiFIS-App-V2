@@ -4,6 +4,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_shadows.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_header.dart';
+import '../../core/widgets/app_tab_bar.dart';
 
 /// 홈 화면 (디자인 시스템 데모용 샘플)
 ///
@@ -14,13 +15,15 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBody: true,
       body: SafeArea(
+        bottom: false,
         child: Column(
           children: [
             const AppHeader(showNotificationBadge: true),
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 110),
                 children: const [
                   _Greeting(),
                   SizedBox(height: 24),
@@ -39,7 +42,7 @@ class HomeScreen extends StatelessWidget {
           ],
         ),
       ),
-      bottomNavigationBar: const _BottomNav(),
+      bottomNavigationBar: const AppTabBar(),
     );
   }
 }
@@ -394,34 +397,3 @@ class _ActivityTile extends StatelessWidget {
   }
 }
 
-class _BottomNav extends StatelessWidget {
-  const _BottomNav();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: AppColors.divider)),
-      ),
-      child: BottomNavigationBar(
-        currentIndex: 0,
-        onTap: (_) {},
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: '홈'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.people_alt_outlined),
-            label: '직원',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_today_outlined),
-            label: '일정',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline_rounded),
-            label: '내 정보',
-          ),
-        ],
-      ),
-    );
-  }
-}
