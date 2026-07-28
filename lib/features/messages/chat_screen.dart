@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -61,26 +62,55 @@ class ChatScreen extends StatelessWidget {
           ),
           // 상단 고정 프로스트 — 대화가 헤더 뒤로 흐려진다
           const TopFrost(collapse: 1, color: AppColors.surface),
-          // 상단 중앙 상대 이름 (터치는 아래로 통과)
-          IgnorePointer(
-            child: SafeArea(
-              bottom: false,
-              child: SizedBox(
-                height: 56,
-                child: Center(
-                  child: Text(name, style: AppTextStyles.title3),
-                ),
-              ),
-            ),
-          ),
-          // 좌측 상단 뒤로가기 글래스 버튼
+          // 상단 헤더: 뒤로가기 + 아바타 + 이름 (인스타 DM 스타일 좌측 정렬)
           SafeArea(
             bottom: false,
             child: Padding(
-              padding: const EdgeInsets.only(top: 8, left: 16),
-              child: GlassIconButton(
-                symbol: 'chevron.backward',
-                onPressed: () => Navigator.pop(context),
+              padding: const EdgeInsets.only(top: 8, left: 16, right: 16),
+              child: Row(
+                children: [
+                  GlassIconButton(
+                    symbol: 'chevron.backward',
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const SizedBox(width: 12),
+                  IgnorePointer(
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: color.withValues(
+                              alpha: emoji != null ? 0.12 : 1,
+                            ),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            emoji ?? name.characters.first,
+                            style: emoji != null
+                                ? const TextStyle(fontSize: 15)
+                                : const TextStyle(
+                                    fontFamily: AppTextStyles.fontFamily,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(name, style: AppTextStyles.title3),
+                        const SizedBox(width: 2),
+                        const Icon(
+                          CupertinoIcons.chevron_forward,
+                          size: 15,
+                          color: AppColors.gray400,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -191,8 +221,31 @@ class _TheirBubble extends StatelessWidget {
   }
 }
 
-class _MessageInputBar extends StatelessWidget {
+class _MessageInputBar extends StatefulWidget {
   const _MessageInputBar();
+
+  @override
+  State<_MessageInputBar> createState() => _MessageInputBarState();
+}
+
+class _MessageInputBarState extends State<_MessageInputBar> {
+  final _controller = TextEditingController();
+  bool _hasText = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(() {
+      final hasText = _controller.text.trim().isNotEmpty;
+      if (hasText != _hasText) setState(() => _hasText = hasText);
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -223,6 +276,7 @@ class _MessageInputBar extends StatelessWidget {
               children: [
                 Expanded(
                   child: TextField(
+                    controller: _controller,
                     style: AppTextStyles.body2,
                     cursorColor: AppColors.primary,
                     decoration: InputDecoration(
@@ -236,19 +290,33 @@ class _MessageInputBar extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: const BoxDecoration(
-                    color: AppColors.primary,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.arrow_upward_rounded,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
+                // 입력 전에는 이미지 아이콘, 입력 중에는 파란 전송(비행기) 버튼
+                _hasText
+                    ? GestureDetector(
+                        onTap: () => _controller.clear(),
+                        child: Container(
+                          width: 38,
+                          height: 38,
+                          decoration: const BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            CupertinoIcons.paperplane_fill,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                        ),
+                      )
+                    : IconButton(
+                        onPressed: () {},
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(
+                          CupertinoIcons.photo,
+                          color: AppColors.gray600,
+                          size: 24,
+                        ),
+                      ),
               ],
             ),
           ),
