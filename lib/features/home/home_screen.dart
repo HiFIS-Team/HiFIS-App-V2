@@ -109,7 +109,15 @@ class _GreetingCard extends StatelessWidget {
         children: [
           Text(_todayLabel, style: AppTextStyles.caption),
           const SizedBox(height: 4),
-          const Text('좋은 아침이에요,\n은후님', style: AppTextStyles.title1),
+          const Text('좋은 아침이에요 👋', style: AppTextStyles.title1),
+          // 이름에만 브랜드 그라데이션 포인트
+          ShaderMask(
+            blendMode: BlendMode.srcIn,
+            shaderCallback: (bounds) => const LinearGradient(
+              colors: [AppColors.primary, Color(0xFF7C5CFC)],
+            ).createShader(bounds),
+            child: const Text('은후님', style: AppTextStyles.title1),
+          ),
         ],
       ),
     );
