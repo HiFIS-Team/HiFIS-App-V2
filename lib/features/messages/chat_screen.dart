@@ -32,17 +32,17 @@ class ChatScreen extends StatelessWidget {
           SafeArea(
             bottom: false,
             child: ListView(
-              reverse: true,
-              padding: const EdgeInsets.fromLTRB(20, 70, 20, 84),
+              padding: const EdgeInsets.fromLTRB(20, 70, 20, 120),
               children: [
-                // reverse ListView라 최신 메시지가 먼저 온다
-                const _MyBubble(text: '네 알겠습니다!'),
-                const SizedBox(height: 8),
+                const Center(
+                  child: Text('오늘', style: AppTextStyles.caption),
+                ),
+                const SizedBox(height: 16),
                 _TheirBubble(
                   name: name,
                   color: color,
                   emoji: emoji,
-                  text: '9시부터 부탁드려요 🙏',
+                  text: '은후님 혹시 내일 오전 근무 가능하실까요?',
                 ),
                 const SizedBox(height: 8),
                 const _MyBubble(text: '네 가능합니다! 몇 시부터인가요?'),
@@ -51,12 +51,10 @@ class ChatScreen extends StatelessWidget {
                   name: name,
                   color: color,
                   emoji: emoji,
-                  text: '은후님 혹시 내일 오전 근무 가능하실까요?',
+                  text: '9시부터 부탁드려요 🙏',
                 ),
-                const SizedBox(height: 16),
-                const Center(
-                  child: Text('오늘', style: AppTextStyles.caption),
-                ),
+                const SizedBox(height: 8),
+                const _MyBubble(text: '네 알겠습니다!'),
               ],
             ),
           ),
@@ -290,33 +288,49 @@ class _MessageInputBarState extends State<_MessageInputBar> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                // 입력 전에는 이미지 아이콘, 입력 중에는 파란 전송(비행기) 버튼
-                _hasText
-                    ? GestureDetector(
-                        onTap: () => _controller.clear(),
-                        child: Container(
-                          width: 38,
-                          height: 38,
-                          decoration: const BoxDecoration(
-                            color: AppColors.primary,
-                            shape: BoxShape.circle,
+                // 입력 전에는 링크 아이콘, 입력 중에는 파란 전송(비행기) 버튼
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  switchInCurve: Curves.easeOutBack,
+                  switchOutCurve: Curves.easeIn,
+                  transitionBuilder: (child, animation) => ScaleTransition(
+                    scale: animation,
+                    child: FadeTransition(opacity: animation, child: child),
+                  ),
+                  child: _hasText
+                      ? GestureDetector(
+                          key: const ValueKey('send'),
+                          onTap: () => _controller.clear(),
+                          child: Container(
+                            width: 38,
+                            height: 38,
+                            decoration: const BoxDecoration(
+                              color: AppColors.primary,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              CupertinoIcons.paperplane_fill,
+                              color: Colors.white,
+                              size: 18,
+                            ),
                           ),
-                          child: const Icon(
-                            CupertinoIcons.paperplane_fill,
-                            color: Colors.white,
-                            size: 18,
+                        )
+                      : GestureDetector(
+                          key: const ValueKey('link'),
+                          onTap: () {},
+                          child: Container(
+                            width: 38,
+                            height: 38,
+                            alignment: Alignment.center,
+                            color: Colors.transparent,
+                            child: const Icon(
+                              CupertinoIcons.link,
+                              color: AppColors.gray600,
+                              size: 22,
+                            ),
                           ),
                         ),
-                      )
-                    : IconButton(
-                        onPressed: () {},
-                        padding: EdgeInsets.zero,
-                        icon: const Icon(
-                          CupertinoIcons.photo,
-                          color: AppColors.gray600,
-                          size: 24,
-                        ),
-                      ),
+                ),
               ],
             ),
           ),
