@@ -7,7 +7,7 @@ import '../theme/app_colors.dart';
 ///
 /// symbol은 SF Symbol 이름을 사용한다. (예: 'bell', 'chevron.backward')
 class GlassIconButton extends StatelessWidget {
-  const GlassIconButton({
+  GlassIconButton({
     super.key,
     required this.symbol,
     this.onPressed,
@@ -28,6 +28,9 @@ class GlassIconButton extends StatelessWidget {
       clipBehavior: Clip.none,
       children: [
         CNButton.icon(
+          // 패키지의 setBrightness가 아이콘 설정을 유실하는 버그가 있어,
+          // 테마가 바뀌면 네이티브 버튼을 새로 생성한다.
+          key: ValueKey('glass-$symbol-${AppColors.isDark}'),
           icon: CNSymbol(symbol, size: size * 0.42, color: AppColors.gray700),
           size: size,
           onPressed: onPressed ?? () {},
