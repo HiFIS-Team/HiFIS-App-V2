@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_shadows.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/app_tab_bar.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../messages/message_screen.dart';
 import '../notifications/notification_screen.dart';
@@ -18,7 +17,6 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBody: true,
       body: Stack(
         children: [
           SafeArea(
@@ -79,7 +77,6 @@ class HomeScreen extends StatelessWidget {
           ),
         ],
       ),
-      bottomNavigationBar: const AppTabBar(),
     );
   }
 }
