@@ -127,7 +127,7 @@ class _MessageScreenState extends State<MessageScreen> {
               child: SizedBox(
                 height: 56,
                 child: Center(
-                  child: Text('메시지', style: AppTextStyles.title3),
+                  child: Text('사내톡', style: AppTextStyles.title3),
                 ),
               ),
             ),
@@ -144,19 +144,25 @@ class _MessageScreenState extends State<MessageScreen> {
                     onPressed: () => Navigator.pop(context),
                   ),
                   const Spacer(),
-                  const GlassIconButton(symbol: 'square.and.pencil'),
+                  const GlassIconButton(symbol: 'line.3.horizontal.decrease'),
                 ],
               ),
             ),
           ),
-          // 하단 고정 글래스 검색바 — 키보드가 올라오면 함께 올라온다
+          // 하단 고정: 새 채팅 글래스 버튼 + 글래스 검색바 (키보드와 함께 상승)
           const Align(
             alignment: Alignment.bottomCenter,
             child: SafeArea(
               top: false,
               child: Padding(
-                padding: EdgeInsets.fromLTRB(28, 0, 28, 10),
-                child: _FloatingSearchBar(),
+                padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
+                child: Row(
+                  children: [
+                    GlassIconButton(symbol: 'square.and.pencil', size: 52),
+                    SizedBox(width: 10),
+                    Expanded(child: _FloatingSearchBar()),
+                  ],
+                ),
               ),
             ),
           ),

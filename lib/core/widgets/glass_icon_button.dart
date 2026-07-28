@@ -12,11 +12,15 @@ class GlassIconButton extends StatelessWidget {
     required this.symbol,
     this.onPressed,
     this.showBadge = false,
+    this.size = 40,
   });
 
   final String symbol;
   final VoidCallback? onPressed;
   final bool showBadge;
+
+  /// 버튼 지름. 심볼 크기는 비율에 맞춰 함께 커진다.
+  final double size;
 
   @override
   Widget build(BuildContext context) {
@@ -24,8 +28,8 @@ class GlassIconButton extends StatelessWidget {
       clipBehavior: Clip.none,
       children: [
         CNButton.icon(
-          icon: CNSymbol(symbol, size: 17, color: AppColors.gray700),
-          size: 40,
+          icon: CNSymbol(symbol, size: size * 0.42, color: AppColors.gray700),
+          size: size,
           onPressed: onPressed ?? () {},
         ),
         if (showBadge)
