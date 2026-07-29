@@ -32,10 +32,34 @@ const _palette = [
 
 /// 등록된 회원 목록 (목업 초기값). 탭을 오가도 유지되도록 모듈 전역으로 둔다.
 final _members = <_LessonMember>[
-  _LessonMember(name: '박서연', color: _palette[0], total: 20, done: 12),
-  _LessonMember(name: '최준영', color: _palette[1], total: 30, done: 8),
-  _LessonMember(name: '한지우', color: _palette[2], total: 10, done: 9),
+  _LessonMember(
+    name: '박서연',
+    color: _palette[0],
+    total: 20,
+    done: 12,
+    price: 50000,
+  ),
+  _LessonMember(
+    name: '최준영',
+    color: _palette[1],
+    total: 30,
+    done: 8,
+    price: 55000,
+  ),
+  _LessonMember(
+    name: '한지우',
+    color: _palette[2],
+    total: 10,
+    done: 9,
+    price: 45000,
+  ),
 ];
+
+/// 1,000 단위 콤마 표기
+String _comma(int n) => n.toString().replaceAllMapped(
+  RegExp(r'(\d)(?=(\d{3})+$)'),
+  (m) => '${m[1]},',
+);
 
 /// 받은 싸인 내역 (표시할 때 최신순 정렬)
 final _signs = <_LessonSign>[..._seedSigns()];
@@ -77,10 +101,12 @@ String _formatTime(DateTime time) {
 }
 
 class _LessonSectionState extends State<LessonSection> {
-  /// 회원 이름을 입력받아 목록에 추가한다
+  /// 이름·총 횟수·진행 회차·세션 단가를 입력받아 회원을 추가한다
   Future<void> _register() async {
     final nameController = TextEditingController();
     final countController = TextEditingController(text: '20');
+    final roundController = TextEditingController(text: '0');
+    final priceController = TextEditingController(text: '50000');
     final ok = await showCupertinoDialog<bool>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
@@ -97,6 +123,18 @@ class _LessonSectionState extends State<LessonSection> {
             CupertinoTextField(
               controller: countController,
               placeholder: '총 수업 횟수',
+              keyboardType: TextInputType.number,
+            ),
+            SizedBox(height: 8),
+            CupertinoTextField(
+              controller: roundController,
+              placeholder: '진행 회차 (이미 한 횟수)',
+              keyboardType: TextInputType.number,
+            ),
+            SizedBox(height: 8),
+            CupertinoTextField(
+              controller: priceController,
+              placeholder: '세션 단가 (원)',
               keyboardType: TextInputType.number,
             ),
           ],
@@ -116,8 +154,12 @@ class _LessonSectionState extends State<LessonSection> {
     );
     final name = nameController.text.trim();
     final total = int.tryParse(countController.text.trim()) ?? 20;
+    final round = int.tryParse(roundController.text.trim()) ?? 0;
+    final price = int.tryParse(priceController.text.trim()) ?? 50000;
     nameController.dispose();
     countController.dispose();
+    roundController.dispose();
+    priceController.dispose();
     if (ok != true || name.isEmpty || !mounted) return;
     setState(() {
       _members.add(
@@ -125,6 +167,8 @@ class _LessonSectionState extends State<LessonSection> {
           name: name,
           color: _palette[_members.length % _palette.length],
           total: total,
+          done: round.clamp(0, total),
+          price: price,
         ),
       );
     });
@@ -259,6 +303,7 @@ class _LessonMember {
     required this.name,
     required this.color,
     required this.total,
+    required this.price,
     this.done = 0,
   });
 
@@ -268,7 +313,10 @@ class _LessonMember {
   /// 등록한 총 수업 횟수
   final int total;
 
-  /// 싸인으로 확인된 진행 횟수
+  /// 세션(1회) 단가, 원
+  final int price;
+
+  /// 싸인으로 확인된 진행 회차 — 싸인 한 번에 1회차씩 올라간다
   int done;
 }
 
@@ -339,7 +387,7 @@ class _MemberRow extends StatelessWidget {
                 ),
                 SizedBox(height: 2),
                 Text(
-                  'PT ${member.total}회 중 ${member.done}회 진행',
+                  'PT ${member.total}회 중 ${member.done}회 · 회당 ${_comma(member.price)}원',
                   style: AppTextStyles.caption.copyWith(
                     fontSize: 11,
                     color: AppColors.textTertiary,
