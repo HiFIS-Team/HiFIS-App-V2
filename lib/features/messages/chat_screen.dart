@@ -256,11 +256,10 @@ class _ChatScreenState extends State<ChatScreen> {
                     symbol: 'chevron.backward',
                     onPressed: () => Navigator.pop(context),
                   ),
-                  SizedBox(width: 12),
+                  SizedBox(width: 4),
                   // 이름 영역 탭 → 채팅방 상세로 이동
-                  GestureDetector(
+                  _PressableHeader(
                     onTap: _openDetail,
-                    behavior: HitTestBehavior.opaque,
                     child: Row(
                       children: [
                         Container(
@@ -349,6 +348,51 @@ class _ChatMessage {
 
   /// 전송 취소로 사라지는 중인지 여부 (애니메이션 후 리스트에서 제거)
   bool removing = false;
+}
+
+/// 헤더 이름 영역의 눌림 피드백 — 누르면 회색 배경과 함께 살짝 줄어들었다
+/// 떼면 원래 크기로 돌아온다.
+class _PressableHeader extends StatefulWidget {
+  _PressableHeader({required this.onTap, required this.child});
+
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  State<_PressableHeader> createState() => _PressableHeaderState();
+}
+
+class _PressableHeaderState extends State<_PressableHeader> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed != value) setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => _setPressed(true),
+      onTapUp: (_) => _setPressed(false),
+      onTapCancel: () => _setPressed(false),
+      onTap: widget.onTap,
+      child: AnimatedScale(
+        scale: _pressed ? 0.94 : 1.0,
+        duration: Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+        child: AnimatedContainer(
+          duration: Duration(milliseconds: 120),
+          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+          decoration: BoxDecoration(
+            color: _pressed ? AppColors.gray100 : Colors.transparent,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: widget.child,
+        ),
+      ),
+    );
+  }
 }
 
 /// 전송 취소 시 말풍선이 줄어들고 흐려지며 사라지는 애니메이션 래퍼
