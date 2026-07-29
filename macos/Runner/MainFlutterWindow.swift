@@ -11,6 +11,11 @@ class MainFlutterWindow: NSWindow {
     self.setFrame(windowFrame, display: true)
     self.minSize = NSSize(width: 360, height: 640)
 
+    // 타이틀바를 앱 배경(흰색)과 한 몸처럼 보이게 한다
+    self.titlebarAppearsTransparent = true
+    self.titleVisibility = .hidden
+    self.backgroundColor = NSColor.white
+
     RegisterGeneratedPlugins(registry: flutterViewController)
 
     super.awakeFromNib()

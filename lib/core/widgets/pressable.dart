@@ -38,26 +38,30 @@ class _PressableState extends State<Pressable> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => _setPressed(true),
-      onTapUp: (_) => _setPressed(false),
-      onTapCancel: () => _setPressed(false),
-      onTap: widget.onTap,
-      child: AnimatedScale(
-        scale: _pressed ? widget.scale : 1.0,
-        duration: Duration(milliseconds: 120),
-        curve: Curves.easeOut,
-        child: AnimatedContainer(
+    return MouseRegion(
+      // 데스크톱(macOS)에서 눌 수 있는 요소임을 커서로 알려준다
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => _setPressed(true),
+        onTapUp: (_) => _setPressed(false),
+        onTapCancel: () => _setPressed(false),
+        onTap: widget.onTap,
+        child: AnimatedScale(
+          scale: _pressed ? widget.scale : 1.0,
           duration: Duration(milliseconds: 120),
-          padding: widget.padding,
-          decoration: BoxDecoration(
-            color: _pressed
-                ? (widget.pressedColor ?? Colors.transparent)
-                : Colors.transparent,
-            borderRadius: widget.borderRadius,
+          curve: Curves.easeOut,
+          child: AnimatedContainer(
+            duration: Duration(milliseconds: 120),
+            padding: widget.padding,
+            decoration: BoxDecoration(
+              color: _pressed
+                  ? (widget.pressedColor ?? Colors.transparent)
+                  : Colors.transparent,
+              borderRadius: widget.borderRadius,
+            ),
+            child: widget.child,
           ),
-          child: widget.child,
         ),
       ),
     );
