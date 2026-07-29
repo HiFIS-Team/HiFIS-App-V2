@@ -56,19 +56,23 @@ class _AppLoadingState extends State<AppLoading>
     // 들어올리는 최대 높이
     final lift = widget.size * 0.55;
 
+    // 레이아웃 박스는 정지 상태의 마크 크기와 같다 — Center에 두면
+    // 정지한 마크가 런치 스크린의 마크와 같은 자리에 온다.
+    // 들어올리는 동작과 그림자는 박스 밖으로 그려진다.
     return SizedBox(
       width: widget.size * 1.6,
-      height: widget.size + lift + 18,
+      height: widget.size,
       child: AnimatedBuilder(
         animation: _controller,
         builder: (context, child) {
           final t = _height.value;
           return Stack(
+            clipBehavior: Clip.none,
             alignment: Alignment.bottomCenter,
             children: [
               // 바닥 그림자 — 마크가 올라갈수록 작아지고 옅어진다
               Positioned(
-                bottom: 2,
+                bottom: -8,
                 child: Container(
                   width: widget.size * (0.66 - 0.22 * t),
                   height: widget.size * 0.09,
@@ -88,7 +92,7 @@ class _AppLoadingState extends State<AppLoading>
               // 마크 — 들려 있는 동안 손잡이를 잡은 듯 살짝 기운다.
               // 낙하 구간에서는 t가 튕기며 0으로 돌아와 기울기도 함께 털린다.
               Positioned(
-                bottom: 12 + t * lift,
+                bottom: t * lift,
                 child: Transform.rotate(angle: t * 0.09, child: child),
               ),
             ],

@@ -59,8 +59,9 @@ class _HiFISAppState extends State<HiFISApp> with WidgetsBindingObserver {
                 alignment: Alignment.center,
                 child: Image.asset(
                   'assets/images/hifis_mark.png',
-                  height: 96,
-                  cacheHeight: 288,
+                  // 런치 스크린 마크와 같은 크기
+                  height: 110,
+                  cacheHeight: 330,
                 ),
               ),
             ),
@@ -99,7 +100,8 @@ class _SplashGateState extends State<_SplashGate> {
           : Scaffold(
               key: ValueKey('splash'),
               backgroundColor: AppColors.surface,
-              body: Center(child: AppLoading(size: 84)),
+              // 런치 스크린 마크(110pt)와 같은 크기·위치에서 이어지도록
+              body: Center(child: AppLoading(size: 110)),
             ),
     );
   }
