@@ -99,9 +99,17 @@ class _ToastViewState extends State<_ToastView>
                 child: Container(
                   padding: EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                   decoration: BoxDecoration(
-                    // 배경 반전: 라이트에선 짙은 캡슐, 다크에선 밝은 캡슐
-                    color: AppColors.gray900.withValues(alpha: 0.94),
+                    // 카드 톤과 맞춘 흰 캡슐 — 구분은 헤어라인과 그림자로
+                    color: AppColors.surface,
                     borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.gray100),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Color(0x24101828),
+                        blurRadius: 24,
+                        offset: Offset(0, 8),
+                      ),
+                    ],
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -116,7 +124,7 @@ class _ToastViewState extends State<_ToastView>
                         child: Text(
                           widget.message,
                           style: AppTextStyles.body2.copyWith(
-                            color: AppColors.surface,
+                            color: AppColors.textPrimary,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
