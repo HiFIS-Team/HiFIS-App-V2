@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -84,40 +85,44 @@ class _ToastViewState extends State<_ToastView>
       // 하단 탭바 바로 위
       bottom: 104,
       child: IgnorePointer(
-        child: FadeTransition(
-          opacity: curved,
-          child: SlideTransition(
-            position: Tween(
-              begin: Offset(0, 0.4),
-              end: Offset.zero,
-            ).animate(curved),
-            child: Center(
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                decoration: BoxDecoration(
-                  // 배경 반전: 라이트에선 짙은 캡슐, 다크에선 밝은 캡슐
-                  color: AppColors.gray900.withValues(alpha: 0.94),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      CupertinoIcons.checkmark_circle_fill,
-                      size: 16,
-                      color: AppColors.success,
-                    ),
-                    SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        widget.message,
-                        style: AppTextStyles.body2.copyWith(
-                          color: AppColors.surface,
-                          fontWeight: FontWeight.w600,
+        // Material 바깥(Overlay)에서 텍스트에 노란 밑줄이 생기는 것을 막는다
+        child: Material(
+          type: MaterialType.transparency,
+          child: FadeTransition(
+            opacity: curved,
+            child: SlideTransition(
+              position: Tween(
+                begin: Offset(0, 0.4),
+                end: Offset.zero,
+              ).animate(curved),
+              child: Center(
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  decoration: BoxDecoration(
+                    // 배경 반전: 라이트에선 짙은 캡슐, 다크에선 밝은 캡슐
+                    color: AppColors.gray900.withValues(alpha: 0.94),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        CupertinoIcons.checkmark_circle_fill,
+                        size: 16,
+                        color: AppColors.success,
+                      ),
+                      SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          widget.message,
+                          style: AppTextStyles.body2.copyWith(
+                            color: AppColors.surface,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
