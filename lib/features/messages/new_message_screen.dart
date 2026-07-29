@@ -1,5 +1,4 @@
-import 'dart:ui';
-
+import 'package:cupertino_native/cupertino_native.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -69,6 +68,19 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
     setState(() {
       if (!_selected.remove(member.name)) _selected.add(member.name);
     });
+  }
+
+  /// 선택 인원에 따라 문구가 바뀐다: 미선택 → 1:1/초대 → 그룹
+  String get _ctaLabel {
+    final count = _selected.length;
+    if (widget.inviteMode) {
+      return count == 0 ? '멤버 선택' : '초대하기 ($count)';
+    }
+    return switch (count) {
+      0 => '멤버 선택',
+      1 => '대화하기',
+      _ => '그룹 만들기 ($count)',
+    };
   }
 
   /// 선택된 멤버로 대화를 시작한다. TODO: 실제 대화방 생성 API 연동
@@ -224,7 +236,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
               ),
             ),
           ),
-          // 하단 고정: 취소 글래스 캡슐 + 멤버 선택 CTA (키보드와 함께 상승)
+          // 하단 고정: 네이티브 리퀴드 글래스 버튼 (키보드와 함께 상승)
           Align(
             alignment: Alignment.bottomCenter,
             child: SafeArea(
@@ -233,16 +245,28 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
                 padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
                 child: Row(
                   children: [
-                    _GlassPillButton(
+                    CNButton(
+                      // 테마 전환 시 설정 유실 버그 회피용 재생성 키
+                      key: ValueKey('nm-cancel-${AppColors.isDark}'),
                       label: '취소',
-                      onTap: () => Navigator.pop(context),
+                      style: CNButtonStyle.glass,
+                      height: 56,
+                      shrinkWrap: true,
+                      onPressed: () => Navigator.pop(context),
                     ),
                     SizedBox(width: 10),
                     Expanded(
-                      child: _ConfirmButton(
-                        count: _selected.length,
-                        invite: widget.inviteMode,
-                        onTap: _confirm,
+                      child: CNButton(
+                        key: ValueKey('nm-cta-${AppColors.isDark}'),
+                        label: _ctaLabel,
+                        // 선택 전에는 글래스, 선택되면 파란 프로미넌트 글래스
+                        style: _selected.isEmpty
+                            ? CNButtonStyle.glass
+                            : CNButtonStyle.prominentGlass,
+                        tint: AppColors.primary,
+                        enabled: _selected.isNotEmpty,
+                        height: 56,
+                        onPressed: _confirm,
                       ),
                     ),
                   ],
@@ -385,122 +409,6 @@ class _MemberTile extends StatelessWidget {
                   : null,
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-/// 하단 취소 버튼 — 리스트가 뒤로 비치는 글래스 캡슐
-class _GlassPillButton extends StatelessWidget {
-  _GlassPillButton({required this.label, required this.onTap});
-
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: [
-            BoxShadow(
-              color: Color(0x1F101828),
-              blurRadius: 32,
-              offset: Offset(0, 10),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(28),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-            child: Container(
-              height: 56,
-              padding: EdgeInsets.symmetric(horizontal: 26),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppColors.surface.withValues(alpha: 0.72),
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(color: AppColors.gray100),
-              ),
-              child: Text(
-                label,
-                style: AppTextStyles.body1.copyWith(color: AppColors.gray600),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// 멤버 선택 CTA — 선택 전에는 글래스, 선택되면 파란 버튼으로 차오른다
-class _ConfirmButton extends StatelessWidget {
-  _ConfirmButton({
-    required this.count,
-    this.invite = false,
-    required this.onTap,
-  });
-
-  final int count;
-  final bool invite;
-  final VoidCallback onTap;
-
-  bool get _enabled => count > 0;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: _enabled ? onTap : null,
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: [
-            BoxShadow(
-              color: Color(0x1F101828),
-              blurRadius: 32,
-              offset: Offset(0, 10),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(28),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-            child: AnimatedContainer(
-              duration: Duration(milliseconds: 200),
-              curve: Curves.easeOut,
-              height: 56,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: _enabled
-                    ? AppColors.primary
-                    : AppColors.surface.withValues(alpha: 0.72),
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(
-                  color: _enabled ? Colors.transparent : AppColors.gray100,
-                ),
-              ),
-              child: Text(
-                // 선택 인원에 따라 문구가 바뀐다: 미선택 → 1:1/초대 → 그룹
-                invite
-                    ? (count == 0 ? '멤버 선택' : '초대하기 ($count)')
-                    : switch (count) {
-                        0 => '멤버 선택',
-                        1 => '대화하기',
-                        _ => '그룹 만들기 ($count)',
-                      },
-                style: AppTextStyles.body1.copyWith(
-                  color: _enabled ? Colors.white : AppColors.gray400,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
         ),
       ),
     );
