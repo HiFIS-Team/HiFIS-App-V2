@@ -170,53 +170,63 @@ class _WorkScreenState extends State<WorkScreen> {
     return Scaffold(
       body: SafeArea(
         bottom: false,
-        child: ListView(
-          padding: EdgeInsets.fromLTRB(0, 64, 0, 110),
+        child: Column(
           children: [
+            // 상단 글래스 헤더 버튼 영역만큼 비워둔다
+            SizedBox(height: 64),
             // 항목 탭 — 사내톡 상세 '공유된 콘텐츠' 탭과 같은 밑줄 스타일.
-            // 5개가 화면 폭에 딱 맞게 균등 분할된다.
-            Row(
-              children: [
-                for (var i = 0; i < _items.length; i++)
-                  Expanded(
-                    child: _WorkTab(
-                      label: _items[i].label,
-                      selected: _tab == i,
-                      onTap: () => setState(() => _tab = i),
+            // 스크롤과 무관하게 고정되고, 좌우 여백으로 가장자리와 띄운다.
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 10),
+              child: Row(
+                children: [
+                  for (var i = 0; i < _items.length; i++)
+                    Expanded(
+                      child: _WorkTab(
+                        label: _items[i].label,
+                        selected: _tab == i,
+                        onTap: () => setState(() => _tab = i),
+                      ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
             Container(height: 1, color: AppColors.gray100),
-            SizedBox(height: 20),
-            // 탭 전환 시 콘텐츠 페이드.
-            // 체크리스트 탭(환경정비)은 점수 카드 없이 리스트만 보여준다.
-            AnimatedSwitcher(
-              duration: Duration(milliseconds: 200),
-              child: Column(
-                key: ValueKey(_tab),
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.fromLTRB(0, 20, 0, 110),
                 children: [
-                  if (item.checklist != null)
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 20),
-                      child: _ChecklistCard(
-                        items: item.checklist!,
-                        counts: _counts,
-                        onAdjust: _adjust,
-                        onShowHistory: _showHistory,
-                      ),
-                    )
-                  else ...[
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 20),
-                      child: _ScoreCard(item: item),
+                  // 탭 전환 시 콘텐츠 페이드.
+                  // 체크리스트 탭(환경정비)은 점수 카드 없이 리스트만 보여준다.
+                  AnimatedSwitcher(
+                    duration: Duration(milliseconds: 200),
+                    child: Column(
+                      key: ValueKey(_tab),
+                      children: [
+                        if (item.checklist != null)
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 20),
+                            child: _ChecklistCard(
+                              items: item.checklist!,
+                              counts: _counts,
+                              onAdjust: _adjust,
+                              onShowHistory: _showHistory,
+                            ),
+                          )
+                        else ...[
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 20),
+                            child: _ScoreCard(item: item),
+                          ),
+                          SizedBox(height: 16),
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 20),
+                            child: _DetailCard(item: item),
+                          ),
+                        ],
+                      ],
                     ),
-                    SizedBox(height: 16),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 20),
-                      child: _DetailCard(item: item),
-                    ),
-                  ],
+                  ),
                 ],
               ),
             ),
@@ -283,14 +293,17 @@ class _WorkTab extends StatelessWidget {
           ),
         ),
         child: Center(
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.visible,
-            style: AppTextStyles.body2.copyWith(
-              fontSize: 14,
-              color: selected ? AppColors.textPrimary : AppColors.gray500,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          // 칸보다 긴 라벨은 살짝 줄여서 옆 칸·가장자리를 침범하지 않게 한다
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              maxLines: 1,
+              style: AppTextStyles.body2.copyWith(
+                fontSize: 14,
+                color: selected ? AppColors.textPrimary : AppColors.gray500,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              ),
             ),
           ),
         ),
