@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/pressable.dart';
 
 /// 업무 탭 화면 (목업)
@@ -32,6 +33,14 @@ class _WorkScreenState extends State<WorkScreen> {
         _counts[task] = next;
       }
     });
+    if (delta > 0) AppToast.show(context, '${_withJosa(task)} 완료했습니다');
+  }
+
+  /// 받침 유무에 따라 을/를을 붙인다 (한글이 아니면 을(를))
+  String _withJosa(String word) {
+    final code = word.codeUnits.last;
+    if (code < 0xAC00 || code > 0xD7A3) return '$word을(를)';
+    return (code - 0xAC00) % 28 != 0 ? '$word을' : '$word를';
   }
 
   static const _items = [
