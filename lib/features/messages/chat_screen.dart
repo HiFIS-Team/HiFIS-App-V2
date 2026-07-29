@@ -272,7 +272,7 @@ class _MyBubble extends StatelessWidget {
           ),
           if (reaction != null)
             Positioned(
-              bottom: -11,
+              bottom: -14,
               right: 10,
               child: _ReactionPill(emoji: reaction!, onTap: onLongPress),
             ),
@@ -351,7 +351,7 @@ class _TheirBubble extends StatelessWidget {
               ),
               if (reaction != null)
                 Positioned(
-                  bottom: -11,
+                  bottom: -14,
                   left: 10,
                   child: _ReactionPill(emoji: reaction!, onTap: onLongPress),
                 ),
@@ -375,7 +375,9 @@ class _ReactionPill extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        height: 24,
+        padding: EdgeInsets.symmetric(horizontal: 8),
+        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(999),
@@ -388,7 +390,8 @@ class _ReactionPill extends StatelessWidget {
             ),
           ],
         ),
-        child: Text(emoji, style: TextStyle(fontSize: 13)),
+        // 이모지 글리프 여백 때문에 치우쳐 보이지 않게 높이 1로 중앙 정렬
+        child: Text(emoji, style: TextStyle(fontSize: 13, height: 1)),
       ),
     );
   }
@@ -425,14 +428,20 @@ class _ReactionPicker extends StatelessWidget {
                     GestureDetector(
                       onTap: () => Navigator.pop(context, emoji),
                       child: Container(
-                        padding: EdgeInsets.all(8),
+                        width: 44,
+                        height: 44,
+                        alignment: Alignment.center,
                         decoration: BoxDecoration(
                           color: emoji == selected
                               ? AppColors.gray100
                               : Colors.transparent,
                           shape: BoxShape.circle,
                         ),
-                        child: Text(emoji, style: TextStyle(fontSize: 26)),
+                        child: Text(
+                          emoji,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 24, height: 1),
+                        ),
                       ),
                     ),
                 ],
