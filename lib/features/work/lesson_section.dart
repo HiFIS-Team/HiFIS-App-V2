@@ -365,14 +365,14 @@ class _LessonMember {
   final String name;
   final Color color;
 
-  /// 등록한 총 수업 횟수
-  final int total;
+  /// 등록한 총 수업 횟수 — 재등록하면 새 등록권으로 바뀐다
+  int total;
 
   /// 세션(1회) 단가, 원 — 결제액을 회차로 나눈 값
-  final int price;
+  int price;
 
-  /// 신규 회원 여부 (아니면 재등록)
-  final bool isNew;
+  /// 신규 회원 여부 (재등록하면 false로 바뀐다)
+  bool isNew;
 
   /// 연락처·소개한 회원 (등록 폼 입력, 아직 화면 표시는 없음)
   final String phone;
@@ -503,13 +503,16 @@ class _RegisterScreenState extends State<_RegisterScreen> {
   final _referrer = TextEditingController();
   final _rounds = TextEditingController();
   final _payment = TextEditingController();
-  final _progress = TextEditingController();
+  final _search = TextEditingController();
+
+  /// 재등록 모드에서 선택된 기존 회원
+  _LessonMember? _selected;
 
   @override
   void initState() {
     super.initState();
-    // 입력에 따라 등록 버튼과 회당 단가가 실시간 갱신되도록 한다
-    for (final controller in [_name, _rounds, _payment, _progress]) {
+    // 입력에 따라 등록 버튼·회당 단가·검색 결과가 실시간 갱신되도록 한다
+    for (final controller in [_name, _rounds, _payment, _search]) {
       controller.addListener(() => setState(() {}));
     }
   }
@@ -522,7 +525,7 @@ class _RegisterScreenState extends State<_RegisterScreen> {
       _referrer,
       _rounds,
       _payment,
-      _progress,
+      _search,
     ]) {
       controller.dispose();
     }
@@ -531,36 +534,56 @@ class _RegisterScreenState extends State<_RegisterScreen> {
 
   int get _roundCount => int.tryParse(_rounds.text.trim()) ?? 0;
   int get _paymentWon => int.tryParse(_payment.text.trim()) ?? 0;
-  int get _progressCount => int.tryParse(_progress.text.trim()) ?? 0;
 
   /// 회당 단가 — 결제액 ÷ 회차
   int get _unitPrice => _roundCount > 0 && _paymentWon > 0
       ? (_paymentWon / _roundCount).round()
       : 0;
 
+  /// 검색어로 걸러진 기존 회원 목록
+  List<_LessonMember> get _filtered {
+    final query = _search.text.trim();
+    if (query.isEmpty) return _members;
+    return _members.where((m) => m.name.contains(query)).toList();
+  }
+
   bool get _complete =>
-      _name.text.trim().isNotEmpty && _roundCount > 0 && _paymentWon > 0;
+      (_renew ? _selected != null : _name.text.trim().isNotEmpty) &&
+      _roundCount > 0 &&
+      _paymentWon > 0;
 
   void _submit() {
     if (!_complete) {
-      AppToast.show(context, '성함과 등록권 정보를 입력해주세요');
+      AppToast.show(
+        context,
+        _renew ? '재등록할 회원과 등록권 정보를 입력해주세요' : '성함과 등록권 정보를 입력해주세요',
+      );
       return;
     }
     FocusScope.of(context).unfocus();
-    final name = _name.text.trim();
-    _members.add(
-      _LessonMember(
-        name: name,
-        color: _palette[_members.length % _palette.length],
-        total: _roundCount,
-        price: _unitPrice,
-        done: _renew ? _progressCount.clamp(0, _roundCount) : 0,
-        isNew: !_renew,
-        phone: _phone.text.trim(),
-        referrer: _referrer.text.trim(),
-      ),
-    );
-    AppToast.show(context, '$name님이 등록되었습니다');
+    if (_renew) {
+      // 기존 회원에게 새 등록권을 부여한다
+      final member = _selected!;
+      member.total = _roundCount;
+      member.price = _unitPrice;
+      member.done = 0;
+      member.isNew = false;
+      AppToast.show(context, '${member.name}님이 재등록되었습니다');
+    } else {
+      final name = _name.text.trim();
+      _members.add(
+        _LessonMember(
+          name: name,
+          color: _palette[_members.length % _palette.length],
+          total: _roundCount,
+          price: _unitPrice,
+          isNew: true,
+          phone: _phone.text.trim(),
+          referrer: _referrer.text.trim(),
+        ),
+      );
+      AppToast.show(context, '$name님이 등록되었습니다');
+    }
     Navigator.pop(context, true);
   }
 
@@ -590,21 +613,52 @@ class _RegisterScreenState extends State<_RegisterScreen> {
                         onChanged: (v) => setState(() => _renew = v),
                       ),
                       SizedBox(height: 24),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 4),
-                        child: Text('회원 정보', style: AppTextStyles.label),
-                      ),
-                      SizedBox(height: 8),
-                      _FormField(controller: _name, hint: '성함'),
-                      SizedBox(height: 8),
-                      _FormField(
-                        controller: _phone,
-                        hint: '연락처 (010-0000-0000)',
-                        keyboardType: TextInputType.phone,
-                      ),
-                      SizedBox(height: 8),
-                      _FormField(controller: _referrer, hint: '소개한 회원 (선택)'),
-                      SizedBox(height: 24),
+                      if (_renew) ...[
+                        // 재등록: 기존 회원을 검색해 선택한다
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 4),
+                          child: Text('재등록할 회원', style: AppTextStyles.label),
+                        ),
+                        SizedBox(height: 8),
+                        _FormField(controller: _search, hint: '회원 이름 검색'),
+                        SizedBox(height: 8),
+                        if (_filtered.isEmpty)
+                          Padding(
+                            padding: EdgeInsets.fromLTRB(4, 10, 4, 10),
+                            child: Text(
+                              '검색 결과가 없어요',
+                              style: AppTextStyles.body2.copyWith(
+                                color: AppColors.textTertiary,
+                              ),
+                            ),
+                          )
+                        else
+                          for (final member in _filtered) ...[
+                            _RenewPickRow(
+                              member: member,
+                              selected: _selected == member,
+                              onTap: () => setState(() => _selected = member),
+                            ),
+                            SizedBox(height: 8),
+                          ],
+                        SizedBox(height: 16),
+                      ] else ...[
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 4),
+                          child: Text('회원 정보', style: AppTextStyles.label),
+                        ),
+                        SizedBox(height: 8),
+                        _FormField(controller: _name, hint: '성함'),
+                        SizedBox(height: 8),
+                        _FormField(
+                          controller: _phone,
+                          hint: '연락처 (010-0000-0000)',
+                          keyboardType: TextInputType.phone,
+                        ),
+                        SizedBox(height: 8),
+                        _FormField(controller: _referrer, hint: '소개한 회원 (선택)'),
+                        SizedBox(height: 24),
+                      ],
                       Padding(
                         padding: EdgeInsets.symmetric(horizontal: 4),
                         child: Text('등록권', style: AppTextStyles.label),
@@ -621,14 +675,6 @@ class _RegisterScreenState extends State<_RegisterScreen> {
                         hint: '결제액 (원)',
                         keyboardType: TextInputType.number,
                       ),
-                      if (_renew) ...[
-                        SizedBox(height: 8),
-                        _FormField(
-                          controller: _progress,
-                          hint: '진행 회차 (이미 한 횟수)',
-                          keyboardType: TextInputType.number,
-                        ),
-                      ],
                       SizedBox(height: 14),
                       // 결제액 ÷ 회차로 자동 계산되는 단가
                       Padding(
@@ -714,6 +760,83 @@ class _RegisterScreenState extends State<_RegisterScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 재등록할 회원 선택 줄 — 선택되면 파란 배경과 체크로 표시
+class _RenewPickRow extends StatelessWidget {
+  _RenewPickRow({
+    required this.member,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _LessonMember member;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      scale: 0.97,
+      child: AnimatedContainer(
+        duration: Duration(milliseconds: 150),
+        padding: EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primaryLight : AppColors.gray50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected
+                ? AppColors.primary.withValues(alpha: 0.25)
+                : Colors.transparent,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: member.color,
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                member.name.characters.first,
+                style: TextStyle(
+                  fontFamily: AppTextStyles.fontFamily,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                member.name,
+                style: AppTextStyles.body2.copyWith(
+                  color: selected ? AppColors.primary : AppColors.textPrimary,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                ),
+              ),
+            ),
+            if (selected)
+              Icon(
+                CupertinoIcons.checkmark_circle_fill,
+                size: 18,
+                color: AppColors.primary,
+              )
+            else
+              Text(
+                '내 담당',
+                style: AppTextStyles.caption.copyWith(color: AppColors.gray400),
+              ),
+          ],
+        ),
       ),
     );
   }
