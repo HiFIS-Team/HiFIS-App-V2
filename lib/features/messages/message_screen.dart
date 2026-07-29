@@ -206,9 +206,11 @@ class _FloatingSearchBar extends StatelessWidget {
             height: 52,
             padding: EdgeInsets.symmetric(horizontal: 18),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.72),
+              color: AppColors.surface.withValues(alpha: 0.72),
               borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
+              border: Border.all(
+                color: AppColors.surface.withValues(alpha: 0.7),
+              ),
             ),
             child: Row(
               children: [

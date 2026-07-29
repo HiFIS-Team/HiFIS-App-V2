@@ -12,10 +12,26 @@ import '../../core/widgets/top_frost.dart';
 /// 리액션으로 고를 수 있는 이모지 목록
 const _reactionEmojis = ['❤️', '😂', '👍', '😮', '😢', '🔥'];
 
-/// 이모지 전용 텍스트 스타일 — 본문 폰트(Pretendard) 폴백을 거치며 생기는
-/// 글리프 치우침을 막기 위해 iOS 이모지 폰트를 직접 지정한다.
-TextStyle _emojiStyle(double size) =>
-    TextStyle(fontSize: size, height: 1, fontFamily: 'Apple Color Emoji');
+/// 이모지 텍스트 — 애플 이모지 글리프가 자기 폭 안에서 왼쪽으로 치우쳐
+/// 그려지므로(시뮬레이터 픽셀 측정 결과 폰트 크기의 약 10%) 오른쪽으로 보정한다.
+class _EmojiText extends StatelessWidget {
+  _EmojiText(this.emoji, {required this.size});
+
+  final String emoji;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Transform.translate(
+      offset: Offset(size * 0.10, 0),
+      child: Text(
+        emoji,
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: size, height: 1),
+      ),
+    );
+  }
+}
 
 /// 채팅방 화면 (인스타그램 DM 스타일 목업)
 ///
@@ -416,7 +432,7 @@ class _ReactionPill extends StatelessWidget {
               ),
             ],
           ),
-          child: Text(emoji, style: _emojiStyle(13)),
+          child: _EmojiText(emoji, size: 13),
         ),
       ),
     );
@@ -463,11 +479,7 @@ class _ReactionPicker extends StatelessWidget {
                               : Colors.transparent,
                           shape: BoxShape.circle,
                         ),
-                        child: Text(
-                          emoji,
-                          textAlign: TextAlign.center,
-                          style: _emojiStyle(24),
-                        ),
+                        child: _EmojiText(emoji, size: 24),
                       ),
                     ),
                 ],
@@ -536,9 +548,11 @@ class _MessageInputBarState extends State<_MessageInputBar> {
             height: 52,
             padding: EdgeInsets.only(left: 18, right: 8),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.72),
+              color: AppColors.surface.withValues(alpha: 0.72),
               borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
+              border: Border.all(
+                color: AppColors.surface.withValues(alpha: 0.7),
+              ),
             ),
             child: Row(
               children: [
