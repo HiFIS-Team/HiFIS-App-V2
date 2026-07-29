@@ -127,7 +127,11 @@ class _ChatScreenState extends State<ChatScreen> {
         setState(() => _replyTarget = message);
         _inputFocus.requestFocus();
       case _MessageMenu.unsend:
-        setState(() => _messages.remove(message));
+        // 줄어드는 애니메이션이 끝난 뒤 실제로 제거한다
+        setState(() => message.removing = true);
+        Timer(Duration(milliseconds: 260), () {
+          if (mounted) setState(() => _messages.remove(message));
+        });
       default:
         // 이미 달린 이모지를 다시 고르면 리액션을 제거한다
         setState(
@@ -150,32 +154,41 @@ class _ChatScreenState extends State<ChatScreen> {
               children: [
                 Center(child: Text('오늘', style: AppTextStyles.caption)),
                 SizedBox(height: 16),
-                for (final message in _messages) ...[
-                  message.mine
-                      ? _MyBubble(
-                          text: message.text,
-                          replyTo: message.replyTo,
-                          reaction: message.reaction,
-                          onDoubleTap: () => _toggleHeart(message),
-                          onLongPress: () => _openMessageMenu(message),
-                        )
-                      : _TheirBubble(
-                          name: widget.name,
-                          color: widget.color,
-                          emoji: widget.emoji,
-                          text: message.text,
-                          replyTo: message.replyTo,
-                          reaction: message.reaction,
-                          onDoubleTap: () => _toggleHeart(message),
-                          onLongPress: () => _openMessageMenu(message),
+                for (final message in _messages)
+                  _RemovableMessage(
+                    key: ObjectKey(message),
+                    removing: message.removing,
+                    mine: message.mine,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        message.mine
+                            ? _MyBubble(
+                                text: message.text,
+                                replyTo: message.replyTo,
+                                reaction: message.reaction,
+                                onDoubleTap: () => _toggleHeart(message),
+                                onLongPress: () => _openMessageMenu(message),
+                              )
+                            : _TheirBubble(
+                                name: widget.name,
+                                color: widget.color,
+                                emoji: widget.emoji,
+                                text: message.text,
+                                replyTo: message.replyTo,
+                                reaction: message.reaction,
+                                onDoubleTap: () => _toggleHeart(message),
+                                onLongPress: () => _openMessageMenu(message),
+                              ),
+                        // 리액션 알약이 말풍선 아래로 삐져나오는 만큼 간격을 더 준다
+                        AnimatedContainer(
+                          duration: Duration(milliseconds: 200),
+                          curve: Curves.easeOut,
+                          height: message.reaction != null ? 22 : 8,
                         ),
-                  // 리액션 알약이 말풍선 아래로 삐져나오는 만큼 간격을 더 준다
-                  AnimatedContainer(
-                    duration: Duration(milliseconds: 200),
-                    curve: Curves.easeOut,
-                    height: message.reaction != null ? 22 : 8,
+                      ],
+                    ),
                   ),
-                ],
                 if (_messages.isNotEmpty &&
                     _messages.last.mine &&
                     _messages.last.read)
@@ -288,6 +301,47 @@ class _ChatMessage {
 
   /// 상대가 읽었는지 여부 (내 메시지에만 의미 있음)
   bool read;
+
+  /// 전송 취소로 사라지는 중인지 여부 (애니메이션 후 리스트에서 제거)
+  bool removing = false;
+}
+
+/// 전송 취소 시 말풍선이 줄어들고 흐려지며 사라지는 애니메이션 래퍼
+class _RemovableMessage extends StatelessWidget {
+  _RemovableMessage({
+    super.key,
+    required this.removing,
+    required this.mine,
+    required this.child,
+  });
+
+  final bool removing;
+  final bool mine;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 1.0, end: removing ? 0.0 : 1.0),
+      duration: Duration(milliseconds: 240),
+      curve: Curves.easeInOut,
+      builder: (context, t, child) => ClipRect(
+        child: Opacity(
+          opacity: t.clamp(0.0, 1.0),
+          child: Align(
+            alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+            heightFactor: t,
+            child: Transform.scale(
+              scale: 0.85 + 0.15 * t,
+              alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+              child: child,
+            ),
+          ),
+        ),
+      ),
+      child: child,
+    );
+  }
 }
 
 class _MyBubble extends StatelessWidget {
