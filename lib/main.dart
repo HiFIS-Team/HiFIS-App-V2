@@ -51,7 +51,15 @@ class _HiFISAppState extends State<HiFISApp> with WidgetsBindingObserver {
       child: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: 560),
-          child: ClipRect(child: child),
+          child: Container(
+            // 회색 여백과 콘텐츠의 경계를 헤어라인으로 살짝 구분한다
+            decoration: BoxDecoration(
+              border: Border.symmetric(
+                vertical: BorderSide(color: AppColors.gray100),
+              ),
+            ),
+            child: ClipRect(child: child),
+          ),
         ),
       ),
     );
