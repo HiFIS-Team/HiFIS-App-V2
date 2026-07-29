@@ -50,6 +50,10 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final _scrollController = ScrollController();
+  final _inputFocus = FocusNode();
+
+  /// 답글 작성 대상 메시지 (없으면 일반 전송)
+  _ChatMessage? _replyTarget;
 
   final List<_ChatMessage> _messages = [
     _ChatMessage(text: '은후님 혹시 내일 오전 근무 가능하실까요?', mine: false),
@@ -61,12 +65,20 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _inputFocus.dispose();
     super.dispose();
   }
 
   void _send(String text) {
-    final sent = _ChatMessage(text: text, mine: true);
-    setState(() => _messages.add(sent));
+    final sent = _ChatMessage(
+      text: text,
+      mine: true,
+      replyTo: _replyTarget?.text,
+    );
+    setState(() {
+      _messages.add(sent);
+      _replyTarget = null;
+    });
     // 목업: 잠시 후 상대가 읽은 것으로 처리해 읽음 표시를 보여준다.
     // TODO: 실제 채팅 연동 시 읽음 이벤트로 교체
     Timer(Duration(milliseconds: 1500), () {
@@ -87,15 +99,16 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() => message.reaction = message.reaction == '❤️' ? null : '❤️');
   }
 
-  Future<void> _pickReaction(_ChatMessage message) async {
-    final emoji = await showGeneralDialog<String>(
+  /// 말풍선 길게 누르기 메뉴: 위 이모지 피커 + 아래 답글/전송 취소
+  Future<void> _openMessageMenu(_ChatMessage message) async {
+    final result = await showGeneralDialog<String>(
       context: context,
       barrierDismissible: true,
-      barrierLabel: '리액션 선택',
+      barrierLabel: '메시지 메뉴',
       barrierColor: Colors.black.withValues(alpha: 0.2),
       transitionDuration: Duration(milliseconds: 200),
       pageBuilder: (context, animation, secondaryAnimation) =>
-          _ReactionPicker(selected: message.reaction),
+          _MessageMenu(selected: message.reaction, mine: message.mine),
       transitionBuilder: (context, animation, secondaryAnimation, child) =>
           FadeTransition(
             opacity: animation,
@@ -108,9 +121,19 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
     );
-    if (emoji == null || !mounted) return;
-    // 이미 달린 이모지를 다시 고르면 리액션을 제거한다
-    setState(() => message.reaction = emoji == message.reaction ? null : emoji);
+    if (result == null || !mounted) return;
+    switch (result) {
+      case _MessageMenu.reply:
+        setState(() => _replyTarget = message);
+        _inputFocus.requestFocus();
+      case _MessageMenu.unsend:
+        setState(() => _messages.remove(message));
+      default:
+        // 이미 달린 이모지를 다시 고르면 리액션을 제거한다
+        setState(
+          () => message.reaction = result == message.reaction ? null : result,
+        );
+    }
   }
 
   @override
@@ -131,18 +154,20 @@ class _ChatScreenState extends State<ChatScreen> {
                   message.mine
                       ? _MyBubble(
                           text: message.text,
+                          replyTo: message.replyTo,
                           reaction: message.reaction,
                           onDoubleTap: () => _toggleHeart(message),
-                          onLongPress: () => _pickReaction(message),
+                          onLongPress: () => _openMessageMenu(message),
                         )
                       : _TheirBubble(
                           name: widget.name,
                           color: widget.color,
                           emoji: widget.emoji,
                           text: message.text,
+                          replyTo: message.replyTo,
                           reaction: message.reaction,
                           onDoubleTap: () => _toggleHeart(message),
-                          onLongPress: () => _pickReaction(message),
+                          onLongPress: () => _openMessageMenu(message),
                         ),
                   // 리액션 알약이 말풍선 아래로 삐져나오는 만큼 간격을 더 준다
                   AnimatedContainer(
@@ -151,7 +176,9 @@ class _ChatScreenState extends State<ChatScreen> {
                     height: message.reaction != null ? 22 : 8,
                   ),
                 ],
-                if (_messages.last.mine && _messages.last.read)
+                if (_messages.isNotEmpty &&
+                    _messages.last.mine &&
+                    _messages.last.read)
                   Align(
                     alignment: Alignment.centerRight,
                     child: Padding(
@@ -226,7 +253,12 @@ class _ChatScreenState extends State<ChatScreen> {
               top: false,
               child: Padding(
                 padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
-                child: _MessageInputBar(onSend: _send),
+                child: _MessageInputBar(
+                  onSend: _send,
+                  focusNode: _inputFocus,
+                  replyLabel: _replyTarget?.text,
+                  onCancelReply: () => setState(() => _replyTarget = null),
+                ),
               ),
             ),
           ),
@@ -242,10 +274,14 @@ class _ChatMessage {
     required this.mine,
     this.reaction,
     this.read = false,
+    this.replyTo,
   });
 
   final String text;
   final bool mine;
+
+  /// 답글 대상 메시지의 원문 (답글이 아니면 null)
+  final String? replyTo;
 
   /// 말풍선에 달린 리액션 이모지 (없으면 null)
   String? reaction;
@@ -257,12 +293,14 @@ class _ChatMessage {
 class _MyBubble extends StatelessWidget {
   _MyBubble({
     required this.text,
+    this.replyTo,
     this.reaction,
     this.onDoubleTap,
     this.onLongPress,
   });
 
   final String text;
+  final String? replyTo;
   final String? reaction;
   final VoidCallback? onDoubleTap;
   final VoidCallback? onLongPress;
@@ -289,9 +327,35 @@ class _MyBubble extends StatelessWidget {
                   bottomRight: Radius.circular(6),
                 ),
               ),
-              child: Text(
-                text,
-                style: AppTextStyles.body2.copyWith(color: Colors.white),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (replyTo != null)
+                    Container(
+                      margin: EdgeInsets.only(bottom: 6),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        replyTo!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.caption.copyWith(
+                          color: Colors.white.withValues(alpha: 0.85),
+                        ),
+                      ),
+                    ),
+                  Text(
+                    text,
+                    style: AppTextStyles.body2.copyWith(color: Colors.white),
+                  ),
+                ],
               ),
             ),
           ),
@@ -317,6 +381,7 @@ class _TheirBubble extends StatelessWidget {
     required this.color,
     required this.text,
     this.emoji,
+    this.replyTo,
     this.reaction,
     this.onDoubleTap,
     this.onLongPress,
@@ -326,6 +391,7 @@ class _TheirBubble extends StatelessWidget {
   final Color color;
   final String? emoji;
   final String text;
+  final String? replyTo;
   final String? reaction;
   final VoidCallback? onDoubleTap;
   final VoidCallback? onLongPress;
@@ -375,7 +441,31 @@ class _TheirBubble extends StatelessWidget {
                       bottomRight: Radius.circular(20),
                     ),
                   ),
-                  child: Text(text, style: AppTextStyles.body2),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (replyTo != null)
+                        Container(
+                          margin: EdgeInsets.only(bottom: 6),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.gray100,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            replyTo!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.caption,
+                          ),
+                        ),
+                      Text(text, style: AppTextStyles.body2),
+                    ],
+                  ),
                 ),
               ),
               if (reaction != null)
@@ -439,53 +529,139 @@ class _ReactionPill extends StatelessWidget {
   }
 }
 
-/// 길게 누르면 뜨는 이모지 피커 — 화면 중앙 글래스 캡슐
-class _ReactionPicker extends StatelessWidget {
-  _ReactionPicker({this.selected});
+/// 길게 누르면 뜨는 메시지 메뉴 — 위에는 이모지 피커, 아래에는 액션 목록.
+/// 이모지 문자열 또는 [reply]/[unsend] 액션 값으로 pop된다.
+class _MessageMenu extends StatelessWidget {
+  _MessageMenu({this.selected, required this.mine});
+
+  static const reply = 'menu:reply';
+  static const unsend = 'menu:unsend';
 
   final String? selected;
+
+  /// 내 메시지 여부. 전송 취소는 내 메시지에서만 보여준다.
+  final bool mine;
 
   @override
   Widget build(BuildContext context) {
     return Center(
       child: Material(
         type: MaterialType.transparency,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(32),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppColors.surface.withValues(alpha: 0.8),
-                borderRadius: BorderRadius.circular(32),
-                border: Border.all(
-                  color: AppColors.surface.withValues(alpha: 0.7),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 이모지 피커 글래스 캡슐
+            ClipRRect(
+              borderRadius: BorderRadius.circular(32),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface.withValues(alpha: 0.8),
+                    borderRadius: BorderRadius.circular(32),
+                    border: Border.all(color: AppColors.gray100),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (final emoji in _reactionEmojis)
+                        GestureDetector(
+                          onTap: () => Navigator.pop(context, emoji),
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: emoji == selected
+                                  ? AppColors.gray100
+                                  : Colors.transparent,
+                              shape: BoxShape.circle,
+                            ),
+                            child: _EmojiText(emoji, size: 24),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
-              child: Row(
+            ),
+            SizedBox(height: 12),
+            // 액션 메뉴 카드
+            Container(
+              width: 250,
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppColors.gray100),
+                boxShadow: [
+                  BoxShadow(
+                    color: Color(0x1F101828),
+                    blurRadius: 32,
+                    offset: Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  for (final emoji in _reactionEmojis)
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context, emoji),
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: emoji == selected
-                              ? AppColors.gray100
-                              : Colors.transparent,
-                          shape: BoxShape.circle,
-                        ),
-                        child: _EmojiText(emoji, size: 24),
-                      ),
+                  _MenuRow(
+                    label: '답글 달기',
+                    icon: CupertinoIcons.arrowshape_turn_up_left,
+                    onTap: () => Navigator.pop(context, reply),
+                  ),
+                  if (mine) ...[
+                    Container(height: 1, color: AppColors.gray100),
+                    _MenuRow(
+                      label: '전송 취소',
+                      icon: CupertinoIcons.trash,
+                      color: AppColors.error,
+                      onTap: () => Navigator.pop(context, unsend),
                     ),
+                  ],
                 ],
               ),
             ),
-          ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MenuRow extends StatelessWidget {
+  _MenuRow({
+    required this.label,
+    required this.icon,
+    this.color,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color? color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: AppTextStyles.body2.copyWith(
+                  color: color ?? AppColors.textPrimary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            Icon(icon, size: 18, color: color ?? AppColors.gray600),
+          ],
         ),
       ),
     );
@@ -493,9 +669,19 @@ class _ReactionPicker extends StatelessWidget {
 }
 
 class _MessageInputBar extends StatefulWidget {
-  _MessageInputBar({required this.onSend});
+  _MessageInputBar({
+    required this.onSend,
+    this.focusNode,
+    this.replyLabel,
+    this.onCancelReply,
+  });
 
   final ValueChanged<String> onSend;
+  final FocusNode? focusNode;
+
+  /// 답글 대상 원문. 있으면 입력바 위에 인용 줄이 표시된다.
+  final String? replyLabel;
+  final VoidCallback? onCancelReply;
 
   @override
   State<_MessageInputBar> createState() => _MessageInputBarState();
@@ -545,7 +731,6 @@ class _MessageInputBarState extends State<_MessageInputBar> {
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
           child: Container(
-            height: 52,
             padding: EdgeInsets.only(left: 18, right: 8),
             decoration: BoxDecoration(
               color: AppColors.surface.withValues(alpha: 0.72),
@@ -553,68 +738,112 @@ class _MessageInputBarState extends State<_MessageInputBar> {
               // 네이티브 글래스의 림처럼 보이는 헤어라인 — 흰 배경에서도 구분되게
               border: Border.all(color: AppColors.gray100),
             ),
-            child: Row(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    style: AppTextStyles.body2,
-                    cursorColor: AppColors.primary,
-                    textInputAction: TextInputAction.send,
-                    onSubmitted: (_) => _submit(),
-                    decoration: InputDecoration(
-                      hintText: '메시지 보내기',
-                      hintStyle: AppTextStyles.body2.copyWith(
-                        color: AppColors.gray400,
-                      ),
-                      border: InputBorder.none,
-                      isCollapsed: true,
-                    ),
-                  ),
-                ),
-                SizedBox(width: 8),
-                // 입력 전에는 링크 아이콘, 입력 중에는 파란 전송(비행기) 버튼
-                AnimatedSwitcher(
-                  duration: Duration(milliseconds: 220),
-                  switchInCurve: Curves.easeOutBack,
-                  switchOutCurve: Curves.easeIn,
-                  transitionBuilder: (child, animation) => ScaleTransition(
-                    scale: animation,
-                    child: FadeTransition(opacity: animation, child: child),
-                  ),
-                  child: _hasText
-                      ? GestureDetector(
-                          key: ValueKey('send'),
-                          onTap: _submit,
-                          child: Container(
-                            width: 38,
-                            height: 38,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              CupertinoIcons.paperplane_fill,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                          ),
-                        )
-                      : GestureDetector(
-                          key: ValueKey('link'),
-                          onTap: () {},
-                          child: Container(
-                            width: 38,
-                            height: 38,
-                            alignment: Alignment.center,
-                            color: Colors.transparent,
-                            child: Icon(
-                              CupertinoIcons.link,
-                              color: AppColors.gray600,
-                              size: 22,
-                            ),
+                // 답글 인용 줄
+                if (widget.replyLabel != null)
+                  Padding(
+                    padding: EdgeInsets.only(top: 12, right: 10),
+                    child: Row(
+                      children: [
+                        Icon(
+                          CupertinoIcons.arrowshape_turn_up_left,
+                          size: 14,
+                          color: AppColors.gray500,
+                        ),
+                        SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            widget.replyLabel!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.caption,
                           ),
                         ),
+                        GestureDetector(
+                          onTap: widget.onCancelReply,
+                          child: Icon(
+                            CupertinoIcons.xmark_circle_fill,
+                            size: 16,
+                            color: AppColors.gray400,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                SizedBox(
+                  height: 52,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _controller,
+                          focusNode: widget.focusNode,
+                          style: AppTextStyles.body2,
+                          cursorColor: AppColors.primary,
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: (_) => _submit(),
+                          decoration: InputDecoration(
+                            hintText: '메시지 보내기',
+                            hintStyle: AppTextStyles.body2.copyWith(
+                              color: AppColors.gray400,
+                            ),
+                            border: InputBorder.none,
+                            isCollapsed: true,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      // 입력 전에는 링크 아이콘, 입력 중에는 파란 전송(비행기) 버튼
+                      AnimatedSwitcher(
+                        duration: Duration(milliseconds: 220),
+                        switchInCurve: Curves.easeOutBack,
+                        switchOutCurve: Curves.easeIn,
+                        transitionBuilder: (child, animation) =>
+                            ScaleTransition(
+                              scale: animation,
+                              child: FadeTransition(
+                                opacity: animation,
+                                child: child,
+                              ),
+                            ),
+                        child: _hasText
+                            ? GestureDetector(
+                                key: ValueKey('send'),
+                                onTap: _submit,
+                                child: Container(
+                                  width: 38,
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    CupertinoIcons.paperplane_fill,
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
+                                ),
+                              )
+                            : GestureDetector(
+                                key: ValueKey('link'),
+                                onTap: () {},
+                                child: Container(
+                                  width: 38,
+                                  height: 38,
+                                  alignment: Alignment.center,
+                                  color: Colors.transparent,
+                                  child: Icon(
+                                    CupertinoIcons.link,
+                                    color: AppColors.gray600,
+                                    size: 22,
+                                  ),
+                                ),
+                              ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
