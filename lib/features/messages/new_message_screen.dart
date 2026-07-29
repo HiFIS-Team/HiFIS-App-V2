@@ -259,12 +259,13 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
                       child: CNButton(
                         key: ValueKey('nm-cta-${AppColors.isDark}'),
                         label: _ctaLabel,
-                        // 선택 전에는 글래스, 선택되면 파란 프로미넌트 글래스
+                        // 선택 전에는 글래스, 선택되면 파란 프로미넌트 글래스.
+                        // 비활성화하면 iOS가 글래스 재질을 빼버려서 항상 활성으로
+                        // 두고, 미선택 시 동작은 _confirm에서 무시한다.
                         style: _selected.isEmpty
                             ? CNButtonStyle.glass
                             : CNButtonStyle.prominentGlass,
                         tint: AppColors.primary,
-                        enabled: _selected.isNotEmpty,
                         height: 56,
                         onPressed: _confirm,
                       ),
