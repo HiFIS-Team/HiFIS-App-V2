@@ -237,8 +237,8 @@ class _ChatDock extends StatefulWidget {
 class _ChatDockState extends State<_ChatDock> {
   bool _open = false;
 
-  /// 펼친 필의 전체 폭 — 접힘(X 버튼) 폭은 높이와 같은 52
-  static const double _pillWidth = 184;
+  /// 펼친 필의 전체 폭 — 접힘(X 버튼) 폭은 높이와 같은 44
+  static const double _pillWidth = 158;
 
   @override
   Widget build(BuildContext context) {
@@ -299,7 +299,7 @@ class _ChatDockState extends State<_ChatDock> {
       onTap: () => setState(() => _open = !_open),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(26),
+          borderRadius: BorderRadius.circular(22),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.10),
@@ -309,17 +309,17 @@ class _ChatDockState extends State<_ChatDock> {
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(26),
+          borderRadius: BorderRadius.circular(22),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
             child: AnimatedContainer(
               duration: Duration(milliseconds: 250),
               curve: Curves.easeOutCubic,
-              width: _open ? 52 : _pillWidth,
-              height: 52,
+              width: _open ? 44 : _pillWidth,
+              height: 44,
               decoration: BoxDecoration(
                 color: AppColors.surface.withValues(alpha: 0.72),
-                borderRadius: BorderRadius.circular(26),
+                borderRadius: BorderRadius.circular(22),
                 border: Border.all(color: AppColors.gray100),
               ),
               // 폭이 줄어드는 동안 안쪽 내용은 원래 크기를 유지한 채
@@ -327,21 +327,23 @@ class _ChatDockState extends State<_ChatDock> {
               child: OverflowBox(
                 minWidth: 0,
                 maxWidth: _pillWidth,
-                minHeight: 50,
-                maxHeight: 50,
+                minHeight: 42,
+                maxHeight: 42,
                 alignment: Alignment.centerRight,
                 child: SizedBox(
                   width: _pillWidth,
-                  height: 50,
+                  height: 42,
                   child: Stack(
                     children: [
-                      // 펼침: 아이콘 + 사내톡 + 아바타
-                      AnimatedOpacity(
-                        duration: Duration(milliseconds: 150),
-                        opacity: _open ? 0 : 1,
-                        child: Padding(
-                          padding: EdgeInsets.fromLTRB(18, 0, 12, 0),
-                          child: _pillContent(),
+                      // 펼침: 아이콘 + 사내톡 + 아바타 (세로 가운데 정렬)
+                      Positioned.fill(
+                        child: AnimatedOpacity(
+                          duration: Duration(milliseconds: 150),
+                          opacity: _open ? 0 : 1,
+                          child: Padding(
+                            padding: EdgeInsets.fromLTRB(14, 0, 10, 0),
+                            child: _pillContent(),
+                          ),
                         ),
                       ),
                       // 접힘: X (필의 오른쪽 끝 원 안에 자리한다)
@@ -349,14 +351,14 @@ class _ChatDockState extends State<_ChatDock> {
                         right: 0,
                         top: 0,
                         bottom: 0,
-                        width: 50,
+                        width: 42,
                         child: AnimatedOpacity(
                           duration: Duration(milliseconds: 150),
                           opacity: _open ? 1 : 0,
                           child: Center(
                             child: Icon(
                               Icons.close_rounded,
-                              size: 22,
+                              size: 20,
                               color: AppColors.gray700,
                             ),
                           ),
@@ -385,14 +387,14 @@ class _ChatDockState extends State<_ChatDock> {
       children: [
         Icon(
           Icons.chat_bubble_outline_rounded,
-          size: 19,
+          size: 17,
           color: AppColors.gray700,
         ),
-        SizedBox(width: 8),
+        SizedBox(width: 7),
         Text(
           '사내톡',
           style: AppTextStyles.label.copyWith(
-            fontSize: 15,
+            fontSize: 14,
             fontWeight: FontWeight.w600,
             color: AppColors.textPrimary,
           ),
@@ -400,16 +402,16 @@ class _ChatDockState extends State<_ChatDock> {
         Spacer(),
         // 최근 대화 상대 아바타 겹침 스택
         SizedBox(
-          width: 28.0 + 18 * (people.length - 1),
-          height: 28,
+          width: 24.0 + 16 * (people.length - 1),
+          height: 24,
           child: Stack(
             children: [
               for (var i = 0; i < people.length; i++)
                 Positioned(
-                  left: i * 18.0,
+                  left: i * 16.0,
                   child: Container(
-                    width: 28,
-                    height: 28,
+                    width: 24,
+                    height: 24,
                     decoration: BoxDecoration(
                       color: people[i].$2,
                       shape: BoxShape.circle,
@@ -420,7 +422,7 @@ class _ChatDockState extends State<_ChatDock> {
                         people[i].$1,
                         style: TextStyle(
                           fontFamily: AppTextStyles.fontFamily,
-                          fontSize: 11,
+                          fontSize: 10,
                           fontWeight: FontWeight.w700,
                           color: Colors.white,
                         ),
@@ -470,16 +472,17 @@ class _HeaderButtonsState extends State<_HeaderButtons> {
             onPressed: _openBarcode,
           ),
           SizedBox(width: 10),
-        ],
-        GlassIconButton(
-          symbol: 'message',
-          enabled: !_overlayOpen,
-          onPressed: () => Navigator.push(
-            context,
-            CupertinoPageRoute(builder: (_) => MessageScreen()),
+          // 데스크톱은 우하단 사내톡 필이 있어 헤더 메시지 버튼을 뺀다
+          GlassIconButton(
+            symbol: 'message',
+            enabled: !_overlayOpen,
+            onPressed: () => Navigator.push(
+              context,
+              CupertinoPageRoute(builder: (_) => MessageScreen()),
+            ),
           ),
-        ),
-        SizedBox(width: 10),
+          SizedBox(width: 10),
+        ],
         GlassIconButton(
           symbol: 'bell',
           showBadge: true,
