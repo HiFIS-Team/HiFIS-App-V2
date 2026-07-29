@@ -73,26 +73,19 @@ class _WorkScreenState extends State<WorkScreen> {
         child: ListView(
           padding: EdgeInsets.fromLTRB(0, 64, 0, 110),
           children: [
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Text('업무', style: AppTextStyles.title1),
-            ),
-            SizedBox(height: 12),
-            // 항목 탭 — 사내톡 상세 '공유된 콘텐츠' 탭과 같은 밑줄 스타일
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.symmetric(horizontal: 12),
-              child: Row(
-                children: [
-                  for (var i = 0; i < _items.length; i++)
-                    _WorkTab(
+            // 항목 탭 — 사내톡 상세 '공유된 콘텐츠' 탭과 같은 밑줄 스타일.
+            // 5개가 화면 폭에 딱 맞게 균등 분할된다.
+            Row(
+              children: [
+                for (var i = 0; i < _items.length; i++)
+                  Expanded(
+                    child: _WorkTab(
                       label: _items[i].label,
-                      score: _items[i].score,
                       selected: _tab == i,
                       onTap: () => setState(() => _tab = i),
                     ),
-                ],
-              ),
+                  ),
+              ],
             ),
             Container(height: 1, color: AppColors.gray100),
             SizedBox(height: 20),
@@ -142,15 +135,9 @@ class _WorkItem {
 }
 
 class _WorkTab extends StatelessWidget {
-  _WorkTab({
-    required this.label,
-    required this.score,
-    required this.selected,
-    required this.onTap,
-  });
+  _WorkTab({required this.label, required this.selected, required this.onTap});
 
   final String label;
-  final int score;
   final bool selected;
   final VoidCallback onTap;
 
@@ -160,7 +147,7 @@ class _WorkTab extends StatelessWidget {
       onTap: onTap,
       scale: 0.94,
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+        padding: EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(
@@ -169,23 +156,17 @@ class _WorkTab extends StatelessWidget {
             ),
           ),
         ),
-        child: Row(
-          children: [
-            Text(
-              label,
-              style: AppTextStyles.body2.copyWith(
-                color: selected ? AppColors.textPrimary : AppColors.gray500,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              ),
+        child: Center(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.visible,
+            style: AppTextStyles.body2.copyWith(
+              fontSize: 14,
+              color: selected ? AppColors.textPrimary : AppColors.gray500,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
             ),
-            SizedBox(width: 4),
-            Text(
-              '$score',
-              style: AppTextStyles.caption.copyWith(
-                color: selected ? AppColors.primary : AppColors.gray400,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
