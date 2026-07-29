@@ -12,6 +12,11 @@ import '../../core/widgets/top_frost.dart';
 /// 리액션으로 고를 수 있는 이모지 목록
 const _reactionEmojis = ['❤️', '😂', '👍', '😮', '😢', '🔥'];
 
+/// 이모지 전용 텍스트 스타일 — 본문 폰트(Pretendard) 폴백을 거치며 생기는
+/// 글리프 치우침을 막기 위해 iOS 이모지 폰트를 직접 지정한다.
+TextStyle _emojiStyle(double size) =>
+    TextStyle(fontSize: size, height: 1, fontFamily: 'Apple Color Emoji');
+
 /// 채팅방 화면 (인스타그램 DM 스타일 목업)
 ///
 /// 메시지는 하드코딩된 샘플이며, 기능 개발 시 실제 채팅 데이터로 교체한다.
@@ -124,7 +129,11 @@ class _ChatScreenState extends State<ChatScreen> {
                           onLongPress: () => _pickReaction(message),
                         ),
                   // 리액션 알약이 말풍선 아래로 삐져나오는 만큼 간격을 더 준다
-                  SizedBox(height: message.reaction != null ? 22 : 8),
+                  AnimatedContainer(
+                    duration: Duration(milliseconds: 200),
+                    curve: Curves.easeOut,
+                    height: message.reaction != null ? 22 : 8,
+                  ),
                 ],
                 if (_messages.last.mine && _messages.last.read)
                   Align(
@@ -274,7 +283,11 @@ class _MyBubble extends StatelessWidget {
             Positioned(
               bottom: -14,
               right: 10,
-              child: _ReactionPill(emoji: reaction!, onTap: onLongPress),
+              child: _ReactionPill(
+                key: ValueKey(reaction!),
+                emoji: reaction!,
+                onTap: onLongPress,
+              ),
             ),
         ],
       ),
@@ -353,7 +366,11 @@ class _TheirBubble extends StatelessWidget {
                 Positioned(
                   bottom: -14,
                   left: 10,
-                  child: _ReactionPill(emoji: reaction!, onTap: onLongPress),
+                  child: _ReactionPill(
+                    key: ValueKey(reaction!),
+                    emoji: reaction!,
+                    onTap: onLongPress,
+                  ),
                 ),
             ],
           ),
@@ -364,34 +381,43 @@ class _TheirBubble extends StatelessWidget {
 }
 
 /// 말풍선 모서리에 겹쳐 붙는 리액션 알약. 탭하면 피커가 다시 열린다.
+/// key가 이모지 값이라, 리액션이 새로 달리거나 바뀔 때마다 팝 애니메이션이 재생된다.
 class _ReactionPill extends StatelessWidget {
-  _ReactionPill({required this.emoji, this.onTap});
+  _ReactionPill({super.key, required this.emoji, this.onTap});
 
   final String emoji;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 24,
-        padding: EdgeInsets.symmetric(horizontal: 8),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: AppColors.gray100),
-          boxShadow: [
-            BoxShadow(
-              color: Color(0x14101828),
-              blurRadius: 8,
-              offset: Offset(0, 2),
-            ),
-          ],
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 280),
+      curve: Curves.easeOutBack,
+      builder: (context, t, child) => Transform.scale(
+        scale: t,
+        child: Opacity(opacity: t.clamp(0.0, 1.0), child: child),
+      ),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          height: 24,
+          padding: EdgeInsets.symmetric(horizontal: 8),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: AppColors.gray100),
+            boxShadow: [
+              BoxShadow(
+                color: Color(0x14101828),
+                blurRadius: 8,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Text(emoji, style: _emojiStyle(13)),
         ),
-        // 이모지 글리프 여백 때문에 치우쳐 보이지 않게 높이 1로 중앙 정렬
-        child: Text(emoji, style: TextStyle(fontSize: 13, height: 1)),
       ),
     );
   }
@@ -440,7 +466,7 @@ class _ReactionPicker extends StatelessWidget {
                         child: Text(
                           emoji,
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 24, height: 1),
+                          style: _emojiStyle(24),
                         ),
                       ),
                     ),
