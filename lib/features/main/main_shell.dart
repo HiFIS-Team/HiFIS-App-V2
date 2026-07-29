@@ -6,6 +6,7 @@ import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/placeholder_screen.dart';
 import '../attendance/attendance_barcode_overlay.dart';
 import '../home/home_screen.dart';
+import '../work/work_screen.dart';
 import '../messages/message_screen.dart';
 import '../notifications/notification_screen.dart';
 import '../profile/profile_screen.dart';
@@ -43,7 +44,7 @@ class _MainShellState extends State<MainShell> {
 
   static final _mainPages = [
     HomeScreen(),
-    PlaceholderScreen(emoji: '💼', title: '업무'),
+    WorkScreen(),
     PlaceholderScreen(emoji: '📁', title: '프로젝트'),
     PlaceholderScreen(emoji: '📝', title: '회의록'),
   ];
