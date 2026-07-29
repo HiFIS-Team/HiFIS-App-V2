@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -53,6 +55,9 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final _scrollController = ScrollController();
   final _inputFocus = FocusNode();
+
+  /// PC에서 커서가 올라가 있는 말풍선 (호버 액션 아이콘 표시용)
+  _ChatMessage? _hovered;
 
   /// 채팅방 이름 (상세 화면에서 변경 가능)
   late String _title = widget.name;
@@ -161,14 +166,9 @@ class _ChatScreenState extends State<ChatScreen> {
     if (result == null || !mounted) return;
     switch (result) {
       case _MessageMenu.reply:
-        setState(() => _replyTarget = message);
-        _inputFocus.requestFocus();
+        _replyTo(message);
       case _MessageMenu.unsend:
-        // 줄어드는 애니메이션이 끝난 뒤 실제로 제거한다
-        setState(() => message.removing = true);
-        Timer(Duration(milliseconds: 260), () {
-          if (mounted) setState(() => _messages.remove(message));
-        });
+        _unsend(message);
       default:
         // 이미 달린 이모지를 다시 고르면 리액션을 제거한다
         setState(
@@ -177,8 +177,101 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  void _replyTo(_ChatMessage message) {
+    setState(() => _replyTarget = message);
+    _inputFocus.requestFocus();
+  }
+
+  void _unsend(_ChatMessage message) {
+    // 줄어드는 애니메이션이 끝난 뒤 실제로 제거한다
+    setState(() => message.removing = true);
+    Timer(Duration(milliseconds: 260), () {
+      if (mounted) setState(() => _messages.remove(message));
+    });
+  }
+
+  /// 호버 아이콘의 이모지 버튼 — 액션 목록 없이 이모지 피커만 띄운다
+  Future<void> _openEmojiPicker(_ChatMessage message) async {
+    final result = await showGeneralDialog<String>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '이모지 피커',
+      barrierColor: Colors.black.withValues(alpha: 0.2),
+      transitionDuration: Duration(milliseconds: 200),
+      pageBuilder: (context, animation, secondaryAnimation) => _MessageMenu(
+        selected: message.reaction,
+        mine: message.mine,
+        emojiOnly: true,
+      ),
+      transitionBuilder: (context, animation, secondaryAnimation, child) =>
+          FadeTransition(
+            opacity: animation,
+            child: ScaleTransition(
+              scale: CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutBack,
+              ),
+              child: child,
+            ),
+          ),
+    );
+    if (result == null || !mounted) return;
+    setState(
+      () => message.reaction = result == message.reaction ? null : result,
+    );
+  }
+
+  /// PC: 말풍선에 커서를 올리면 옆에 뜨는 작은 액션 아이콘들 (삭제·답글·이모지)
+  Widget _hoverActions(_ChatMessage message) {
+    final visible = _hovered == message;
+    return AnimatedOpacity(
+      duration: Duration(milliseconds: 120),
+      opacity: visible ? 1 : 0,
+      child: IgnorePointer(
+        ignoring: !visible,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: message.mine
+              // 말풍선 왼쪽에 붙으므로 바깥부터 삭제 → 답글 → 이모지 순
+              ? [
+                  _hoverIcon(
+                    Icons.delete_outline_rounded,
+                    () => _unsend(message),
+                  ),
+                  _hoverIcon(Icons.reply_rounded, () => _replyTo(message)),
+                  _hoverIcon(
+                    Icons.mood_rounded,
+                    () => _openEmojiPicker(message),
+                  ),
+                ]
+              // 상대 말풍선은 오른쪽에 붙는다 (전송 취소는 내 메시지 전용)
+              : [
+                  _hoverIcon(
+                    Icons.mood_rounded,
+                    () => _openEmojiPicker(message),
+                  ),
+                  _hoverIcon(Icons.reply_rounded, () => _replyTo(message)),
+                ],
+        ),
+      ),
+    );
+  }
+
+  Widget _hoverIcon(IconData icon, VoidCallback onTap) {
+    return Pressable(
+      scale: 0.9,
+      onTap: onTap,
+      child: Padding(
+        padding: EdgeInsets.all(4),
+        child: Icon(icon, size: 16, color: AppColors.gray500),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // PC에서만 말풍선 호버 액션 아이콘을 보여준다
+    final desktop = defaultTargetPlatform == TargetPlatform.macOS;
     return Scaffold(
       backgroundColor: AppColors.surface,
       body: Stack(
@@ -211,34 +304,48 @@ class _ChatScreenState extends State<ChatScreen> {
                       key: ObjectKey(message),
                       removing: message.removing,
                       mine: message.mine,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          message.mine
-                              ? _MyBubble(
-                                  text: message.text,
-                                  replyTo: message.replyTo,
-                                  reaction: message.reaction,
-                                  onDoubleTap: () => _toggleHeart(message),
-                                  onLongPress: () => _openMessageMenu(message),
-                                )
-                              : _TheirBubble(
-                                  name: _title,
-                                  color: widget.color,
-                                  emoji: widget.emoji,
-                                  text: message.text,
-                                  replyTo: message.replyTo,
-                                  reaction: message.reaction,
-                                  onDoubleTap: () => _toggleHeart(message),
-                                  onLongPress: () => _openMessageMenu(message),
-                                ),
-                          // 리액션 알약이 말풍선 아래로 삐져나오는 만큼 간격을 더 준다
-                          AnimatedContainer(
-                            duration: Duration(milliseconds: 200),
-                            curve: Curves.easeOut,
-                            height: message.reaction != null ? 22 : 8,
-                          ),
-                        ],
+                      child: MouseRegion(
+                        onEnter: (_) => setState(() => _hovered = message),
+                        onExit: (_) => setState(() {
+                          if (_hovered == message) _hovered = null;
+                        }),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            message.mine
+                                ? _MyBubble(
+                                    text: message.text,
+                                    replyTo: message.replyTo,
+                                    reaction: message.reaction,
+                                    onDoubleTap: () => _toggleHeart(message),
+                                    onLongPress: () =>
+                                        _openMessageMenu(message),
+                                    actions: desktop
+                                        ? _hoverActions(message)
+                                        : null,
+                                  )
+                                : _TheirBubble(
+                                    name: _title,
+                                    color: widget.color,
+                                    emoji: widget.emoji,
+                                    text: message.text,
+                                    replyTo: message.replyTo,
+                                    reaction: message.reaction,
+                                    onDoubleTap: () => _toggleHeart(message),
+                                    onLongPress: () =>
+                                        _openMessageMenu(message),
+                                    actions: desktop
+                                        ? _hoverActions(message)
+                                        : null,
+                                  ),
+                            // 리액션 알약이 말풍선 아래로 삐져나오는 만큼 간격을 더 준다
+                            AnimatedContainer(
+                              duration: Duration(milliseconds: 200),
+                              curve: Curves.easeOut,
+                              height: message.reaction != null ? 22 : 8,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                 if (_messages.isNotEmpty &&
@@ -413,6 +520,7 @@ class _MyBubble extends StatelessWidget {
     this.reaction,
     this.onDoubleTap,
     this.onLongPress,
+    this.actions,
   });
 
   final String text;
@@ -421,72 +529,82 @@ class _MyBubble extends StatelessWidget {
   final VoidCallback? onDoubleTap;
   final VoidCallback? onLongPress;
 
+  /// PC 호버 액션 아이콘 (말풍선 왼쪽에 붙는다)
+  final Widget? actions;
+
   @override
   Widget build(BuildContext context) {
     return Align(
       alignment: Alignment.centerRight,
-      child: Stack(
-        clipBehavior: Clip.none,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          GestureDetector(
-            onDoubleTap: onDoubleTap,
-            onLongPress: onLongPress,
-            child: Container(
-              constraints: BoxConstraints(maxWidth: 280),
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(20),
-                  topRight: Radius.circular(20),
-                  bottomLeft: Radius.circular(20),
-                  bottomRight: Radius.circular(6),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (replyTo != null)
-                    Container(
-                      margin: EdgeInsets.only(bottom: 6),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        replyTo!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTextStyles.caption.copyWith(
-                          color: Colors.white.withValues(alpha: 0.85),
-                        ),
-                      ),
-                    ),
-                  Text(
-                    text,
-                    style: AppTextStyles.body2.copyWith(color: Colors.white),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (reaction != null)
-            Positioned(
-              bottom: -14,
-              right: 10,
-              child: _ReactionPill(
-                key: ValueKey(reaction!),
-                emoji: reaction!,
-                onTap: onLongPress,
-              ),
-            ),
+          if (actions != null) ...[actions!, SizedBox(width: 4)],
+          Flexible(child: _bubble()),
         ],
       ),
+    );
+  }
+
+  Widget _bubble() {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        GestureDetector(
+          onDoubleTap: onDoubleTap,
+          onLongPress: onLongPress,
+          child: Container(
+            constraints: BoxConstraints(maxWidth: 280),
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+                bottomLeft: Radius.circular(20),
+                bottomRight: Radius.circular(6),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (replyTo != null)
+                  Container(
+                    margin: EdgeInsets.only(bottom: 6),
+                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      replyTo!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.caption.copyWith(
+                        color: Colors.white.withValues(alpha: 0.85),
+                      ),
+                    ),
+                  ),
+                Text(
+                  text,
+                  style: AppTextStyles.body2.copyWith(color: Colors.white),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (reaction != null)
+          Positioned(
+            bottom: -14,
+            right: 10,
+            child: _ReactionPill(
+              key: ValueKey(reaction!),
+              emoji: reaction!,
+              onTap: onLongPress,
+            ),
+          ),
+      ],
     );
   }
 }
@@ -501,6 +619,7 @@ class _TheirBubble extends StatelessWidget {
     this.reaction,
     this.onDoubleTap,
     this.onLongPress,
+    this.actions,
   });
 
   final String name;
@@ -512,10 +631,14 @@ class _TheirBubble extends StatelessWidget {
   final VoidCallback? onDoubleTap;
   final VoidCallback? onLongPress;
 
+  /// PC 호버 액션 아이콘 (말풍선 오른쪽에 붙는다)
+  final Widget? actions;
+
   @override
   Widget build(BuildContext context) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
           width: 28,
@@ -597,6 +720,7 @@ class _TheirBubble extends StatelessWidget {
             ],
           ),
         ),
+        if (actions != null) ...[SizedBox(width: 4), actions!],
       ],
     );
   }
@@ -648,7 +772,7 @@ class _ReactionPill extends StatelessWidget {
 /// 길게 누르면 뜨는 메시지 메뉴 — 위에는 이모지 피커, 아래에는 액션 목록.
 /// 이모지 문자열 또는 [reply]/[unsend] 액션 값으로 pop된다.
 class _MessageMenu extends StatelessWidget {
-  _MessageMenu({this.selected, required this.mine});
+  _MessageMenu({this.selected, required this.mine, this.emojiOnly = false});
 
   static const reply = 'menu:reply';
   static const unsend = 'menu:unsend';
@@ -657,6 +781,9 @@ class _MessageMenu extends StatelessWidget {
 
   /// 내 메시지 여부. 전송 취소는 내 메시지에서만 보여준다.
   final bool mine;
+
+  /// true면 아래 액션 목록 없이 이모지 피커만 보여준다 (PC 호버 아이콘용)
+  final bool emojiOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -702,44 +829,50 @@ class _MessageMenu extends StatelessWidget {
                 ),
               ),
             ),
-            SizedBox(height: 12),
-            // 액션 메뉴 카드
-            Container(
-              width: 250,
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: AppColors.gray100),
-                boxShadow: [
-                  BoxShadow(
-                    color: Color(0x1F101828),
-                    blurRadius: 32,
-                    offset: Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _MenuRow(
-                    label: '답글 달기',
-                    icon: CupertinoIcons.arrowshape_turn_up_left,
-                    onTap: () => Navigator.pop(context, reply),
-                  ),
-                  if (mine) ...[
-                    Container(height: 1, color: AppColors.gray100),
-                    _MenuRow(
-                      label: '전송 취소',
-                      icon: CupertinoIcons.trash,
-                      color: AppColors.error,
-                      onTap: () => Navigator.pop(context, unsend),
-                    ),
-                  ],
-                ],
-              ),
-            ),
+            if (!emojiOnly) ...[
+              SizedBox(height: 12),
+              // 액션 메뉴 카드
+              _actionCard(context),
+            ],
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _actionCard(BuildContext context) {
+    return Container(
+      width: 250,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.gray100),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x1F101828),
+            blurRadius: 32,
+            offset: Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _MenuRow(
+            label: '답글 달기',
+            icon: CupertinoIcons.arrowshape_turn_up_left,
+            onTap: () => Navigator.pop(context, reply),
+          ),
+          if (mine) ...[
+            Container(height: 1, color: AppColors.gray100),
+            _MenuRow(
+              label: '전송 취소',
+              icon: CupertinoIcons.trash,
+              color: AppColors.error,
+              onTap: () => Navigator.pop(context, unsend),
+            ),
+          ],
+        ],
       ),
     );
   }
