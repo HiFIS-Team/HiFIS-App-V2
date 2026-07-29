@@ -1,3 +1,4 @@
+import 'package:cupertino_native/cupertino_native.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -268,7 +269,8 @@ class _PeerReviewFormScreenState extends State<_PeerReviewFormScreen> {
                       24,
                       16,
                       24,
-                      MediaQuery.paddingOf(context).bottom + 24,
+                      // 하단 글래스 제출 버튼에 가리지 않도록 여유를 둔다
+                      MediaQuery.paddingOf(context).bottom + 96,
                     ),
                     children: [
                       for (final category in _categories) ...[
@@ -308,27 +310,6 @@ class _PeerReviewFormScreenState extends State<_PeerReviewFormScreen> {
                         ),
                         SizedBox(height: 16),
                       ],
-                      SizedBox(height: 4),
-                      Pressable(
-                        onTap: _submit,
-                        scale: 0.97,
-                        child: Container(
-                          width: double.infinity,
-                          height: 52,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Text(
-                            '평가 제출',
-                            style: AppTextStyles.body1.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -358,6 +339,36 @@ class _PeerReviewFormScreenState extends State<_PeerReviewFormScreen> {
               child: GlassIconButton(
                 symbol: 'chevron.backward',
                 onPressed: () => Navigator.pop(context),
+              ),
+            ),
+          ),
+          // 하단 고정: 네이티브 리퀴드 글래스 제출 버튼 (키보드와 함께 상승)
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: CNButton(
+                        // 테마 전환 시 설정 유실 버그 회피용 재생성 키
+                        key: ValueKey('pr-submit-${AppColors.isDark}'),
+                        label: '평가 제출',
+                        // 점수 입력 전에는 글래스, 입력되면 파란 프로미넌트 글래스.
+                        // 비활성화하면 iOS가 글래스 재질을 빼버려서 항상 활성으로
+                        // 두고, 미입력 시 동작은 _submit에서 무시한다.
+                        style: _total == 0
+                            ? CNButtonStyle.glass
+                            : CNButtonStyle.prominentGlass,
+                        tint: AppColors.primary,
+                        height: 56,
+                        onPressed: _submit,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
