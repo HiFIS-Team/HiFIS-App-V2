@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:cupertino_native/cupertino_native.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +7,7 @@ import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/glass_icon_button.dart';
+import '../../core/widgets/glass_search_bar.dart';
 import '../../core/widgets/pressable.dart';
 
 /// 수업 개수 탭 콘텐츠 (목업)
@@ -724,7 +723,7 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen> {
             ),
           ),
           // 하단 고정: 플로팅 글래스 검색 바 (키보드와 함께 상승)
-          _GlassSearchBar(controller: _search, hint: '회원 이름 검색'),
+          GlassSearchBar(controller: _search, hint: '회원 이름 검색'),
         ],
       ),
     );
@@ -1371,82 +1370,8 @@ class _PickMemberScreenState extends State<_PickMemberScreen> {
             ),
           ),
           // 하단 고정: 플로팅 글래스 검색 바 (키보드와 함께 상승)
-          _GlassSearchBar(controller: _search, hint: '회원 이름 검색'),
+          GlassSearchBar(controller: _search, hint: '회원 이름 검색'),
         ],
-      ),
-    );
-  }
-}
-
-/// 하단 고정 플로팅 글래스 검색 바 — 화면 Stack 안에서 쓰며 키보드와 함께 상승한다
-class _GlassSearchBar extends StatelessWidget {
-  _GlassSearchBar({required this.controller, required this.hint});
-
-  final TextEditingController controller;
-  final String hint;
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(28),
-              boxShadow: [
-                BoxShadow(
-                  color: Color(0x1F101828),
-                  blurRadius: 32,
-                  offset: Offset(0, 10),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(28),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-                child: Container(
-                  height: 52,
-                  padding: EdgeInsets.symmetric(horizontal: 18),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface.withValues(alpha: 0.72),
-                    borderRadius: BorderRadius.circular(28),
-                    // 네이티브 글래스의 림처럼 보이는 헤어라인
-                    border: Border.all(color: AppColors.gray100),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        CupertinoIcons.search,
-                        size: 20,
-                        color: AppColors.gray500,
-                      ),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: TextField(
-                          controller: controller,
-                          style: AppTextStyles.body2,
-                          cursorColor: AppColors.primary,
-                          decoration: InputDecoration(
-                            hintText: hint,
-                            hintStyle: AppTextStyles.body2.copyWith(
-                              color: AppColors.gray400,
-                            ),
-                            border: InputBorder.none,
-                            isCollapsed: true,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
       ),
     );
   }

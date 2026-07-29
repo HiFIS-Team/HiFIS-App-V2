@@ -9,6 +9,7 @@ import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/pressable.dart';
 import 'lesson_section.dart';
 import 'peer_review_section.dart';
+import 'praise_section.dart';
 
 /// 업무 탭 화면 (목업)
 ///
@@ -230,6 +231,11 @@ class _WorkScreenState extends State<WorkScreen> {
                           Padding(
                             padding: EdgeInsets.symmetric(horizontal: 20),
                             child: LessonSection(),
+                          )
+                        else if (item.label == '회원 친절도')
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 20),
+                            child: PraiseSection(),
                           )
                         else ...[
                           Padding(
