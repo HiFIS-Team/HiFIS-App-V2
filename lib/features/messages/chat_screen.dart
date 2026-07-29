@@ -89,6 +89,8 @@ class _ChatScreenState extends State<ChatScreen> {
     Timer(Duration(milliseconds: 1500), () {
       if (!mounted) return;
       setState(() => sent.read = true);
+      // 읽음 줄이 생기며 늘어난 높이만큼 더 내려서 입력바에 가려지지 않게 한다
+      _scrollToBottom();
     });
     _scrollToBottom();
   }
