@@ -84,8 +84,9 @@ final _signs = <_LessonSign>[..._seedSigns()];
 
 List<_LessonSign> _seedSigns() {
   final now = DateTime.now();
-  DateTime at(int hour, int minute) =>
-      DateTime(now.year, now.month, now.day, hour, minute);
+  // daysAgo일 전의 시각 — DateTime이 월 경계를 알아서 넘겨준다
+  DateTime at(int daysAgo, int hour, int minute) =>
+      DateTime(now.year, now.month, now.day - daysAgo, hour, minute);
   const padSize = Size(300, 160);
   return [
     _LessonSign(
@@ -93,7 +94,7 @@ List<_LessonSign> _seedSigns() {
       round: 12,
       total: 20,
       isNew: false,
-      time: at(9, 30),
+      time: at(0, 9, 30),
       padSize: padSize,
       strokes: [
         [Offset(50, 100), Offset(80, 50), Offset(110, 105), Offset(140, 60)],
@@ -105,11 +106,35 @@ List<_LessonSign> _seedSigns() {
       round: 9,
       total: 10,
       isNew: false,
-      time: at(11, 0),
+      time: at(0, 11, 0),
       padSize: padSize,
       strokes: [
         [Offset(60, 60), Offset(90, 100), Offset(120, 55), Offset(150, 95)],
         [Offset(175, 75), Offset(205, 75), Offset(240, 100)],
+      ],
+    ),
+    _LessonSign(
+      member: '한지우',
+      round: 8,
+      total: 10,
+      isNew: false,
+      time: at(1, 18, 20),
+      padSize: padSize,
+      strokes: [
+        [Offset(55, 95), Offset(95, 55), Offset(135, 100), Offset(175, 60)],
+        [Offset(200, 80), Offset(240, 80)],
+      ],
+    ),
+    _LessonSign(
+      member: '박서연',
+      round: 11,
+      total: 20,
+      isNew: false,
+      time: at(2, 20, 5),
+      padSize: padSize,
+      strokes: [
+        [Offset(60, 70), Offset(100, 105), Offset(140, 55), Offset(180, 95)],
+        [Offset(205, 60), Offset(235, 95), Offset(255, 70)],
       ],
     ),
   ];
@@ -127,6 +152,73 @@ String _formatStamp(DateTime time) {
   final hour = time.hour % 12 == 0 ? 12 : time.hour % 12;
   final minute = time.minute.toString().padLeft(2, '0');
   return '${time.month}.${time.day} $period $hour:$minute';
+}
+
+/// 기록 줄을 누르면 서명을 크게 보여준다
+void _showSignDetail(BuildContext context, _LessonSign sign) {
+  showGeneralDialog(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: '싸인 크게 보기',
+    barrierColor: Colors.black.withValues(alpha: 0.45),
+    transitionDuration: Duration(milliseconds: 200),
+    pageBuilder: (context, animation, secondaryAnimation) => Center(
+      child: Material(
+        type: MaterialType.transparency,
+        child: Container(
+          width: 300,
+          padding: EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: double.infinity,
+                height: 150,
+                decoration: BoxDecoration(
+                  color: AppColors.gray50,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: CustomPaint(
+                  painter: _SignPainter(
+                    strokes: sign.strokes,
+                    sourceSize: sign.padSize,
+                    color: AppColors.textPrimary,
+                    strokeWidth: 2.4,
+                  ),
+                ),
+              ),
+              SizedBox(height: 14),
+              Text(
+                '${sign.member} · ${sign.round}/${sign.total}회차',
+                style: AppTextStyles.body1.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              SizedBox(height: 4),
+              Text(_formatStamp(sign.time), style: AppTextStyles.caption),
+            ],
+          ),
+        ),
+      ),
+    ),
+    transitionBuilder: (context, animation, secondaryAnimation, child) {
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+      );
+      return FadeTransition(
+        opacity: curved,
+        child: ScaleTransition(
+          scale: Tween(begin: 0.92, end: 1.0).animate(curved),
+          child: child,
+        ),
+      );
+    },
+  );
 }
 
 class _LessonSectionState extends State<LessonSection> {
@@ -149,70 +241,11 @@ class _LessonSectionState extends State<LessonSection> {
     if (mounted) setState(() {});
   }
 
-  /// 기록 줄을 누르면 서명을 크게 보여준다
-  void _showDetail(_LessonSign sign) {
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: '싸인 크게 보기',
-      barrierColor: Colors.black.withValues(alpha: 0.45),
-      transitionDuration: Duration(milliseconds: 200),
-      pageBuilder: (context, animation, secondaryAnimation) => Center(
-        child: Material(
-          type: MaterialType.transparency,
-          child: Container(
-            width: 300,
-            padding: EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: double.infinity,
-                  height: 150,
-                  decoration: BoxDecoration(
-                    color: AppColors.gray50,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: CustomPaint(
-                    painter: _SignPainter(
-                      strokes: sign.strokes,
-                      sourceSize: sign.padSize,
-                      color: AppColors.textPrimary,
-                      strokeWidth: 2.4,
-                    ),
-                  ),
-                ),
-                SizedBox(height: 14),
-                Text(
-                  '${sign.member} · ${sign.round}/${sign.total}회차',
-                  style: AppTextStyles.body1.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(_formatStamp(sign.time), style: AppTextStyles.caption),
-              ],
-            ),
-          ),
-        ),
-      ),
-      transitionBuilder: (context, animation, secondaryAnimation, child) {
-        final curved = CurvedAnimation(
-          parent: animation,
-          curve: Curves.easeOutCubic,
-        );
-        return FadeTransition(
-          opacity: curved,
-          child: ScaleTransition(
-            scale: Tween(begin: 0.92, end: 1.0).animate(curved),
-            child: child,
-          ),
-        );
-      },
+  /// 세션 기록 전체 화면을 연다
+  void _openHistory() {
+    Navigator.push(
+      context,
+      CupertinoPageRoute(builder: (_) => _SignHistoryScreen()),
     );
   }
 
@@ -249,6 +282,8 @@ class _LessonSectionState extends State<LessonSection> {
 
   Widget _buildRecordCard() {
     final sorted = List.of(_signs)..sort((a, b) => b.time.compareTo(a.time));
+    // 카드에는 최근 5건만 — 나머지는 전체 보기 화면에서
+    final recent = sorted.take(5).toList();
 
     return Container(
       width: double.infinity,
@@ -260,14 +295,40 @@ class _LessonSectionState extends State<LessonSection> {
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 4),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text('세션 기록', style: AppTextStyles.label),
                 SizedBox(width: 6),
-                Text(
-                  '${_signs.length}',
-                  style: AppTextStyles.label.copyWith(
-                    color: AppColors.textTertiary,
+                Expanded(
+                  child: Text(
+                    '${_signs.length}',
+                    style: AppTextStyles.label.copyWith(
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                ),
+                Pressable(
+                  onTap: _openHistory,
+                  scale: 0.92,
+                  pressedColor: AppColors.gray100,
+                  borderRadius: BorderRadius.circular(100),
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '전체 보기',
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(width: 2),
+                      Icon(
+                        CupertinoIcons.chevron_right,
+                        size: 11,
+                        color: AppColors.primary,
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -285,9 +346,12 @@ class _LessonSectionState extends State<LessonSection> {
               ),
             )
           else
-            for (var i = 0; i < sorted.length; i++) ...[
+            for (var i = 0; i < recent.length; i++) ...[
               if (i > 0) Divider(height: 1, color: AppColors.divider),
-              _SignRow(sign: sorted[i], onTap: () => _showDetail(sorted[i])),
+              _SignRow(
+                sign: recent[i],
+                onTap: () => _showSignDetail(context, recent[i]),
+              ),
             ],
         ],
       ),
@@ -508,6 +572,133 @@ class _SignRow extends StatelessWidget {
             CupertinoIcons.chevron_right,
             size: 14,
             color: AppColors.gray300,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 세션 기록 전체 화면 — 옆에서 슬라이드되어 열리고 날짜별로 묶어 보여준다
+class _SignHistoryScreen extends StatelessWidget {
+  /// 오늘/어제/그 외 날짜 라벨
+  String _dayLabel(DateTime time) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(time.year, time.month, time.day);
+    final diff = today.difference(day).inDays;
+    if (diff == 0) return '오늘';
+    if (diff == 1) return '어제';
+    return '${time.month}.${time.day}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sorted = List.of(_signs)..sort((a, b) => b.time.compareTo(a.time));
+
+    // 날짜가 바뀌는 지점마다 그룹 헤더를 끼워 넣는다
+    final children = <Widget>[];
+    String? label;
+    for (final sign in sorted) {
+      final dayLabel = _dayLabel(sign.time);
+      if (dayLabel != label) {
+        children.add(
+          Padding(
+            padding: EdgeInsets.fromLTRB(4, label == null ? 4 : 22, 4, 4),
+            child: Text(
+              dayLabel,
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        );
+        label = dayLabel;
+      } else {
+        children.add(Divider(height: 1, color: AppColors.divider));
+      }
+      children.add(
+        _SignRow(sign: sign, onTap: () => _showSignDetail(context, sign)),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      body: Stack(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 상단 고정 타이틀 영역만큼 비워둔다
+                SizedBox(height: 56),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(24, 12, 24, 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text('받은 싸인 기록', style: AppTextStyles.caption),
+                      ),
+                      Text(
+                        '총 ${_signs.length}건',
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(height: 1, color: AppColors.gray100),
+                if (sorted.isEmpty)
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(24, 32, 24, 44),
+                    child: Text(
+                      '아직 받은 싸인이 없어요',
+                      style: AppTextStyles.body2.copyWith(
+                        color: AppColors.textTertiary,
+                      ),
+                    ),
+                  )
+                else
+                  Expanded(
+                    child: ListView(
+                      padding: EdgeInsets.fromLTRB(
+                        20,
+                        8,
+                        20,
+                        MediaQuery.paddingOf(context).bottom + 24,
+                      ),
+                      children: children,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          // 상단 중앙 고정 타이틀 (터치는 아래로 통과)
+          IgnorePointer(
+            child: SafeArea(
+              bottom: false,
+              child: SizedBox(
+                height: 56,
+                child: Center(
+                  child: Text('세션 기록', style: AppTextStyles.title3),
+                ),
+              ),
+            ),
+          ),
+          // 좌측 상단 고정 뒤로가기 글래스 버튼
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: EdgeInsets.only(top: 8, left: 16),
+              child: GlassIconButton(
+                symbol: 'chevron.backward',
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
           ),
         ],
       ),
