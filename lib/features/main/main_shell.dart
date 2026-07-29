@@ -1,7 +1,11 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 
+import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_tab_bar.dart';
+import 'desktop_sidebar.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/placeholder_screen.dart';
 import '../attendance/attendance_barcode_overlay.dart';
@@ -83,8 +87,81 @@ class _MainShellState extends State<MainShell> {
     }
   }
 
+  // ── macOS 데스크톱 셸 ──
+
+  /// 사이드바 선택 인덱스 (0~3 메인 탭, 4~7 서브 탭 페이지)
+  final _paneIndex = ValueNotifier<int>(0);
+
+  /// 콘텐츠 영역 전용 내비게이터.
+  /// 슬라이드인 화면이 사이드바를 덮지 않고 콘텐츠 안에서만 전환되게 한다.
+  final _paneNavKey = GlobalKey<NavigatorState>();
+
+  /// 데스크톱: 좌측 사이드바 + 넓은 콘텐츠 영역 (ChatGPT 데스크톱 패턴)
+  Widget _buildDesktop() {
+    return Scaffold(
+      body: Row(
+        children: [
+          ValueListenableBuilder<int>(
+            valueListenable: _paneIndex,
+            builder: (context, index, child) => DesktopSidebar(
+              selectedIndex: index,
+              onSelect: (i) {
+                // 열려 있는 슬라이드인 화면을 닫고 탭을 바꾼다
+                _paneNavKey.currentState?.popUntil((r) => r.isFirst);
+                _paneIndex.value = i;
+              },
+            ),
+          ),
+          Expanded(
+            child: ColoredBox(
+              color: AppColors.surface,
+              child: Center(
+                child: ConstrainedBox(
+                  // 폰 레이아웃이 지나치게 늘어지지 않는 선에서 넓게 쓴다
+                  constraints: BoxConstraints(maxWidth: 860),
+                  child: ClipRect(
+                    child: Navigator(
+                      key: _paneNavKey,
+                      onGenerateRoute: (settings) => MaterialPageRoute(
+                        settings: settings,
+                        builder: (context) => ValueListenableBuilder<int>(
+                          valueListenable: _paneIndex,
+                          builder: (context, index, child) => Stack(
+                            children: [
+                              IndexedStack(
+                                index: index,
+                                children: [..._mainPages, ..._subPages],
+                              ),
+                              SafeArea(
+                                bottom: false,
+                                child: Align(
+                                  alignment: Alignment.topRight,
+                                  child: Padding(
+                                    padding: EdgeInsets.only(top: 8, right: 16),
+                                    child: _HeaderButtons(),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (defaultTargetPlatform == TargetPlatform.macOS) {
+      return _buildDesktop();
+    }
     return Scaffold(
       extendBody: true,
       body: Stack(
