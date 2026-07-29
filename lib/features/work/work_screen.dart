@@ -50,12 +50,12 @@ class _WorkScreenState extends State<WorkScreen> {
     DateTime at(int hour, int minute) =>
         DateTime(now.year, now.month, now.day, hour, minute);
     return [
-      _WorkLog(name: '이앨리스', task: '구역청소', time: at(8, 20)),
-      _WorkLog(name: '오민준', task: '기구관리', time: at(8, 55)),
-      _WorkLog(name: '신유나', task: '게시물', time: at(9, 40)),
-      _WorkLog(name: '권지호', task: '화장실청소', time: at(10, 25)),
-      _WorkLog(name: '이앨리스', task: '세탁', time: at(10, 50)),
-      _WorkLog(name: '오민준', task: '클레임해결', time: at(11, 45)),
+      _WorkLog(name: '민중기', task: '구역청소', time: at(8, 20)),
+      _WorkLog(name: '박준현', task: '기구관리', time: at(8, 55)),
+      _WorkLog(name: '유찬빈', task: '게시물', time: at(9, 40)),
+      _WorkLog(name: '전상현', task: '화장실청소', time: at(10, 25)),
+      _WorkLog(name: '민중기', task: '세탁', time: at(10, 50)),
+      _WorkLog(name: '박준현', task: '클레임해결', time: at(11, 45)),
     ];
   }
 

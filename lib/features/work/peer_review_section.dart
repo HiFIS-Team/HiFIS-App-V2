@@ -62,10 +62,12 @@ const _me = '김은후';
 /// 평가 대상 목록 — 본인이 맨 앞. 아바타 색은 사내톡 멤버 목록과 동일.
 const _persons = [
   _Person(_me, '본인 평가', AppColors.primary, isSelf: true),
-  _Person('이앨리스', '디자인팀 · 리드', AppColors.success),
-  _Person('오민준', '개발팀 · 대리', Color(0xFF00A8B5)),
-  _Person('신유나', '디자인팀 · 대리', Color(0xFF7C5CFC)),
-  _Person('권지호', '영업팀 · 사원', Color(0xFFE0447C)),
+  _Person('이준승', '대표', Color(0xFF7C5CFC)),
+  _Person('김피스', '개발', Color(0xFF00A8B5)),
+  _Person('민중기', '점장', AppColors.success),
+  _Person('박준현', '트레이너', AppColors.warning),
+  _Person('유찬빈', '트레이너', Color(0xFF5C7CFA)),
+  _Person('전상현', 'FC', Color(0xFFE0447C)),
 ];
 
 /// 평가 대상 한 명

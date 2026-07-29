@@ -34,16 +34,12 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
   final Set<String> _selected = {};
 
   static final List<_Member> _members = [
-    _Member('이앨리스', '디자인팀', '리드', AppColors.success),
-    _Member('한이브', '운영팀', '팀장', Color(0xFF7C5CFC)),
-    _Member('박그레이스', '개발팀', '팀장', Color(0xFFE0447C)),
-    _Member('최마틴', '마케팅팀', '팀장', AppColors.warning),
-    _Member('강레오', '영업팀', '팀장', AppColors.primary),
-    _Member('윤소피아', '인사팀', '팀장', AppColors.error),
-    _Member('임도훈', '재무팀', '이사', Color(0xFF00A8B5)),
-    _Member('오민준', '개발팀', '대리', AppColors.success),
-    _Member('신유나', '디자인팀', '대리', Color(0xFF7C5CFC)),
-    _Member('권지호', '영업팀', '사원', Color(0xFFE0447C)),
+    _Member('이준승', '센터', '대표', Color(0xFF7C5CFC)),
+    _Member('김피스', '센터', '개발', Color(0xFF00A8B5)),
+    _Member('민중기', '센터', '점장', AppColors.success),
+    _Member('박준현', '센터', '트레이너', AppColors.warning),
+    _Member('유찬빈', '센터', '트레이너', AppColors.primary),
+    _Member('전상현', '센터', 'FC', Color(0xFFE0447C)),
   ];
 
   @override

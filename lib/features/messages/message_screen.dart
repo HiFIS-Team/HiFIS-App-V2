@@ -93,7 +93,7 @@ class _MessageScreenState extends State<MessageScreen> {
                 SizedBox(height: 8),
                 _ConversationTile(
                   onOpen: widget.onOpenChat,
-                  name: '김민수',
+                  name: '민중기',
                   preview: '네 알겠습니다!',
                   time: '방금 전',
                   color: AppColors.primary,
@@ -102,7 +102,7 @@ class _MessageScreenState extends State<MessageScreen> {
                 ),
                 _ConversationTile(
                   onOpen: widget.onOpenChat,
-                  name: '박지현',
+                  name: '김피스',
                   preview: '휴가 신청서 올렸어요',
                   time: '오전 10:12',
                   color: AppColors.warning,
@@ -118,7 +118,7 @@ class _MessageScreenState extends State<MessageScreen> {
                 ),
                 _ConversationTile(
                   onOpen: widget.onOpenChat,
-                  name: '이서연',
+                  name: '유찬빈',
                   preview: '수고하셨습니다~',
                   time: '어제',
                   color: AppColors.success,
@@ -126,7 +126,7 @@ class _MessageScreenState extends State<MessageScreen> {
                 ),
                 _ConversationTile(
                   onOpen: widget.onOpenChat,
-                  name: '정우진',
+                  name: '박준현',
                   preview: '사진을 보냈습니다',
                   time: '어제',
                   color: AppColors.gray500,

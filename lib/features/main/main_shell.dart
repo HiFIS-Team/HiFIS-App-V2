@@ -395,9 +395,9 @@ class _ChatDockState extends State<_ChatDock> {
   Widget _pillContent() {
     // 사내톡 목업의 최근 대화 상대 3명 (기능 연동 시 실제 데이터로 교체)
     final people = [
-      ('김', AppColors.primary),
-      ('박', AppColors.warning),
-      ('이', AppColors.success),
+      ('민', AppColors.primary),
+      ('김', AppColors.warning),
+      ('유', AppColors.success),
     ];
 
     return Row(

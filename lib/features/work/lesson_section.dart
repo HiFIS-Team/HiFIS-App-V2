@@ -67,7 +67,7 @@ final _otherMembers = <_LessonMember>[
     done: 3,
     price: 50000,
     isNew: true,
-    owner: '이앨리스',
+    owner: '박준현',
   ),
   _LessonMember(
     name: '윤태호',
@@ -75,7 +75,7 @@ final _otherMembers = <_LessonMember>[
     total: 30,
     done: 21,
     price: 60000,
-    owner: '오민준',
+    owner: '유찬빈',
   ),
 ];
 

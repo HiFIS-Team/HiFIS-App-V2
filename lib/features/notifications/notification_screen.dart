@@ -57,14 +57,14 @@ class _NotificationScreenState extends State<NotificationScreen> {
                     _NotificationTile(
                       icon: Icons.beach_access_rounded,
                       color: AppColors.warning,
-                      title: '박지현님이 휴가를 신청했어요',
+                      title: '김피스님이 휴가를 신청했어요',
                       time: '방금 전',
                       unread: true,
                     ),
                     _NotificationTile(
                       icon: Icons.login_rounded,
                       color: AppColors.primary,
-                      title: '김민수님이 출근했어요',
+                      title: '박준현님이 출근했어요',
                       time: '오전 9:02',
                       unread: true,
                     ),
@@ -90,7 +90,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                     _NotificationTile(
                       icon: Icons.logout_rounded,
                       color: AppColors.gray400,
-                      title: '이서연님이 퇴근했어요',
+                      title: '유찬빈님이 퇴근했어요',
                       time: '어제',
                     ),
                   ],
