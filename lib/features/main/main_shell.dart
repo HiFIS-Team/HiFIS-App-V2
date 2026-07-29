@@ -38,13 +38,14 @@ class _MainShellState extends State<MainShell> {
     'square.grid.2x2.fill',
   ];
 
-  // 서브 바의 0번은 메인 바로 돌아가는 뒤로가기
+  // 서브 바의 0번은 메인 바로 돌아가는 뒤로가기.
+  // 데스크톱 사이드바와 같은 모양 계열로 맞춘다 (급여=지폐, 랭킹=트로피)
   static const _subSymbols = [
     'chevron.backward',
     'clock.fill',
-    'wonsign.circle.fill',
+    'banknote.fill',
     'megaphone.fill',
-    'chart.bar.fill',
+    'trophy.fill',
   ];
 
   // static으로 두면 핫 리로드 시 페이지 교체가 반영되지 않아 getter로 만든다.

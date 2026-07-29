@@ -45,7 +45,7 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
         (Icons.work_rounded, '업무'),
         (Icons.folder_rounded, '프로젝트'),
         (Icons.calendar_today_rounded, '일정'),
-        (Icons.description_rounded, '회의록'),
+        (Icons.insert_drive_file_rounded, '회의록'),
       ],
     ),
     ('문서', [(Icons.inbox_rounded, '문서함'), (Icons.approval_rounded, '전자결재')]),
@@ -57,7 +57,10 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
         (Icons.payments_rounded, '급여'),
       ],
     ),
-    ('소식', [(Icons.campaign_rounded, '공지'), (Icons.leaderboard_rounded, '랭킹')]),
+    (
+      '소식',
+      [(Icons.campaign_rounded, '공지'), (Icons.emoji_events_rounded, '랭킹')],
+    ),
   ];
 
   /// 펼쳐질 때만 보이는 요소 (메뉴 제목, 섹션 캡션, 워드마크)
