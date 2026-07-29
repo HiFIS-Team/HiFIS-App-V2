@@ -12,9 +12,13 @@ import 'chat_screen.dart';
 /// 새 사내톡 만들기 화면 (아래에서 올라오는 모달)
 ///
 /// 그룹 이름(선택)과 멤버를 고르면 대화가 시작된다.
+/// [inviteMode]가 true면 기존 채팅방 멤버 초대 용도로 동작해,
+/// 그룹 이름 없이 선택한 멤버 이름 목록을 pop 결과로 돌려준다.
 /// 멤버 데이터는 하드코딩된 샘플이며, 기능 개발 시 실제 직원 목록으로 교체한다.
 class NewMessageScreen extends StatefulWidget {
-  NewMessageScreen({super.key});
+  NewMessageScreen({super.key, this.inviteMode = false});
+
+  final bool inviteMode;
 
   @override
   State<NewMessageScreen> createState() => _NewMessageScreenState();
@@ -72,6 +76,12 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
     final picked = _members.where((m) => _selected.contains(m.name)).toList();
     if (picked.isEmpty) return;
 
+    // 초대 모드: 선택한 이름 목록만 돌려주고 닫는다
+    if (widget.inviteMode) {
+      Navigator.pop(context, picked.map((m) => m.name).toList());
+      return;
+    }
+
     final groupName = _groupNameController.text.trim();
     final isGroup = picked.length > 1;
     final title = groupName.isNotEmpty
@@ -113,24 +123,26 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               padding: EdgeInsets.fromLTRB(20, 76, 20, 140),
               children: [
-                _FieldLabel(title: '그룹 이름', hint: '(선택)'),
-                SizedBox(height: 8),
-                _InputBox(
-                  child: TextField(
-                    controller: _groupNameController,
-                    style: AppTextStyles.body2,
-                    cursorColor: AppColors.primary,
-                    decoration: InputDecoration(
-                      hintText: '예) 마케팅 팀',
-                      hintStyle: AppTextStyles.body2.copyWith(
-                        color: AppColors.gray400,
+                if (!widget.inviteMode) ...[
+                  _FieldLabel(title: '그룹 이름', hint: '(선택)'),
+                  SizedBox(height: 8),
+                  _InputBox(
+                    child: TextField(
+                      controller: _groupNameController,
+                      style: AppTextStyles.body2,
+                      cursorColor: AppColors.primary,
+                      decoration: InputDecoration(
+                        hintText: '예) 마케팅 팀',
+                        hintStyle: AppTextStyles.body2.copyWith(
+                          color: AppColors.gray400,
+                        ),
+                        border: InputBorder.none,
+                        isCollapsed: true,
                       ),
-                      border: InputBorder.none,
-                      isCollapsed: true,
                     ),
                   ),
-                ),
-                SizedBox(height: 24),
+                  SizedBox(height: 24),
+                ],
                 _FieldLabel(title: '멤버 추가'),
                 SizedBox(height: 8),
                 _InputBox(
@@ -193,7 +205,10 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
               child: SizedBox(
                 height: 56,
                 child: Center(
-                  child: Text('새 사내톡', style: AppTextStyles.title3),
+                  child: Text(
+                    widget.inviteMode ? '멤버 초대' : '새 사내톡',
+                    style: AppTextStyles.title3,
+                  ),
                 ),
               ),
             ),
@@ -226,6 +241,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
                     Expanded(
                       child: _ConfirmButton(
                         count: _selected.length,
+                        invite: widget.inviteMode,
                         onTap: _confirm,
                       ),
                     ),
@@ -424,9 +440,14 @@ class _GlassPillButton extends StatelessWidget {
 
 /// 멤버 선택 CTA — 선택 전에는 글래스, 선택되면 파란 버튼으로 차오른다
 class _ConfirmButton extends StatelessWidget {
-  _ConfirmButton({required this.count, required this.onTap});
+  _ConfirmButton({
+    required this.count,
+    this.invite = false,
+    required this.onTap,
+  });
 
   final int count;
+  final bool invite;
   final VoidCallback onTap;
 
   bool get _enabled => count > 0;
@@ -465,12 +486,14 @@ class _ConfirmButton extends StatelessWidget {
                 ),
               ),
               child: Text(
-                // 선택 인원에 따라 문구가 바뀐다: 미선택 → 1:1 → 그룹
-                switch (count) {
-                  0 => '멤버 선택',
-                  1 => '대화하기',
-                  _ => '그룹 만들기 ($count)',
-                },
+                // 선택 인원에 따라 문구가 바뀐다: 미선택 → 1:1/초대 → 그룹
+                invite
+                    ? (count == 0 ? '멤버 선택' : '초대하기 ($count)')
+                    : switch (count) {
+                        0 => '멤버 선택',
+                        1 => '대화하기',
+                        _ => '그룹 만들기 ($count)',
+                      },
                 style: AppTextStyles.body1.copyWith(
                   color: _enabled ? Colors.white : AppColors.gray400,
                   fontWeight: FontWeight.w600,

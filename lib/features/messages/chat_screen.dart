@@ -8,6 +8,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/top_frost.dart';
+import 'chat_detail_screen.dart';
 
 /// 리액션으로 고를 수 있는 이모지 목록
 const _reactionEmojis = ['❤️', '😂', '👍', '😮', '😢', '🔥'];
@@ -85,6 +86,10 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!mounted) return;
       setState(() => sent.read = true);
     });
+    _scrollToBottom();
+  }
+
+  void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollController.hasClients) return;
       _scrollController.animateTo(
@@ -93,6 +98,31 @@ class _ChatScreenState extends State<ChatScreen> {
         curve: Curves.easeOut,
       );
     });
+  }
+
+  void _openDetail() {
+    Navigator.push(
+      context,
+      CupertinoPageRoute(
+        builder: (_) => ChatDetailScreen(
+          name: widget.name,
+          color: widget.color,
+          emoji: widget.emoji,
+          onInvite: _onMembersInvited,
+        ),
+      ),
+    );
+  }
+
+  /// 상세 화면에서 멤버 초대가 확정되면 회색 시스템 메시지를 남긴다
+  void _onMembersInvited(List<String> names) {
+    final label = names.length == 1
+        ? '${names.first}님이 초대되었습니다'
+        : '${names.first}님 외 ${names.length - 1}명이 초대되었습니다';
+    setState(
+      () => _messages.add(_ChatMessage(text: label, mine: false, system: true)),
+    );
+    _scrollToBottom();
   }
 
   void _toggleHeart(_ChatMessage message) {
@@ -155,40 +185,48 @@ class _ChatScreenState extends State<ChatScreen> {
                 Center(child: Text('오늘', style: AppTextStyles.caption)),
                 SizedBox(height: 16),
                 for (final message in _messages)
-                  _RemovableMessage(
-                    key: ObjectKey(message),
-                    removing: message.removing,
-                    mine: message.mine,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        message.mine
-                            ? _MyBubble(
-                                text: message.text,
-                                replyTo: message.replyTo,
-                                reaction: message.reaction,
-                                onDoubleTap: () => _toggleHeart(message),
-                                onLongPress: () => _openMessageMenu(message),
-                              )
-                            : _TheirBubble(
-                                name: widget.name,
-                                color: widget.color,
-                                emoji: widget.emoji,
-                                text: message.text,
-                                replyTo: message.replyTo,
-                                reaction: message.reaction,
-                                onDoubleTap: () => _toggleHeart(message),
-                                onLongPress: () => _openMessageMenu(message),
-                              ),
-                        // 리액션 알약이 말풍선 아래로 삐져나오는 만큼 간격을 더 준다
-                        AnimatedContainer(
-                          duration: Duration(milliseconds: 200),
-                          curve: Curves.easeOut,
-                          height: message.reaction != null ? 22 : 8,
-                        ),
-                      ],
+                  if (message.system)
+                    Padding(
+                      padding: EdgeInsets.symmetric(vertical: 10),
+                      child: Center(
+                        child: Text(message.text, style: AppTextStyles.caption),
+                      ),
+                    )
+                  else
+                    _RemovableMessage(
+                      key: ObjectKey(message),
+                      removing: message.removing,
+                      mine: message.mine,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          message.mine
+                              ? _MyBubble(
+                                  text: message.text,
+                                  replyTo: message.replyTo,
+                                  reaction: message.reaction,
+                                  onDoubleTap: () => _toggleHeart(message),
+                                  onLongPress: () => _openMessageMenu(message),
+                                )
+                              : _TheirBubble(
+                                  name: widget.name,
+                                  color: widget.color,
+                                  emoji: widget.emoji,
+                                  text: message.text,
+                                  replyTo: message.replyTo,
+                                  reaction: message.reaction,
+                                  onDoubleTap: () => _toggleHeart(message),
+                                  onLongPress: () => _openMessageMenu(message),
+                                ),
+                          // 리액션 알약이 말풍선 아래로 삐져나오는 만큼 간격을 더 준다
+                          AnimatedContainer(
+                            duration: Duration(milliseconds: 200),
+                            curve: Curves.easeOut,
+                            height: message.reaction != null ? 22 : 8,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
                 if (_messages.isNotEmpty &&
                     _messages.last.mine &&
                     _messages.last.read)
@@ -219,7 +257,10 @@ class _ChatScreenState extends State<ChatScreen> {
                     onPressed: () => Navigator.pop(context),
                   ),
                   SizedBox(width: 12),
-                  IgnorePointer(
+                  // 이름 영역 탭 → 채팅방 상세로 이동
+                  GestureDetector(
+                    onTap: _openDetail,
+                    behavior: HitTestBehavior.opaque,
                     child: Row(
                       children: [
                         Container(
@@ -288,10 +329,14 @@ class _ChatMessage {
     this.reaction,
     this.read = false,
     this.replyTo,
+    this.system = false,
   });
 
   final String text;
   final bool mine;
+
+  /// 초대 안내처럼 가운데 회색으로 표시되는 시스템 메시지 여부
+  final bool system;
 
   /// 답글 대상 메시지의 원문 (답글이 아니면 null)
   final String? replyTo;

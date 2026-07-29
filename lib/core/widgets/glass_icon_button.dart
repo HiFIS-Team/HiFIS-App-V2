@@ -14,11 +14,15 @@ class GlassIconButton extends StatelessWidget {
     this.showBadge = false,
     this.size = 40,
     this.enabled = true,
+    this.symbolColor,
   });
 
   final String symbol;
   final VoidCallback? onPressed;
   final bool showBadge;
+
+  /// 심볼 색. 기본은 gray700, 파괴적 동작(나가기 등)은 error 색을 쓴다.
+  final Color? symbolColor;
 
   /// 버튼 지름. 심볼 크기는 비율에 맞춰 함께 커진다.
   final double size;
@@ -37,7 +41,11 @@ class GlassIconButton extends StatelessWidget {
           // 패키지의 setBrightness가 아이콘 설정을 유실하는 버그가 있어,
           // 테마가 바뀌면 네이티브 버튼을 새로 생성한다.
           key: ValueKey('glass-$symbol-${AppColors.isDark}'),
-          icon: CNSymbol(symbol, size: size * 0.42, color: AppColors.gray700),
+          icon: CNSymbol(
+            symbol,
+            size: size * 0.42,
+            color: symbolColor ?? AppColors.gray700,
+          ),
           size: size,
           enabled: enabled,
           onPressed: onPressed ?? () {},
