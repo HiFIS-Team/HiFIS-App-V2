@@ -842,26 +842,43 @@ class _RegisterScreenState extends State<_RegisterScreen> {
                         SizedBox(height: 8),
                         _FormField(controller: _search, hint: '회원 이름 검색'),
                         SizedBox(height: 8),
-                        if (_filtered.isEmpty)
-                          Padding(
-                            padding: EdgeInsets.fromLTRB(4, 10, 4, 10),
-                            child: Text(
-                              '검색 결과가 없어요',
-                              style: AppTextStyles.body2.copyWith(
-                                color: AppColors.textTertiary,
-                              ),
-                            ),
-                          )
-                        else
-                          for (final member in _filtered) ...[
-                            _RenewPickRow(
-                              member: member,
-                              selected: _selected == member,
-                              onTap: () => setState(() => _selected = member),
-                            ),
-                            SizedBox(height: 8),
-                          ],
-                        SizedBox(height: 16),
+                        // 신규 탭의 입력 3칸 높이에 맞춘 스크롤 영역 —
+                        // 회원이 많아져도 등록권 위치가 밀리지 않는다
+                        SizedBox(
+                          height: 108,
+                          child: _filtered.isEmpty
+                              ? Center(
+                                  child: Text(
+                                    '검색 결과가 없어요',
+                                    style: AppTextStyles.body2.copyWith(
+                                      color: AppColors.textTertiary,
+                                    ),
+                                  ),
+                                )
+                              : ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: ListView(
+                                    padding: EdgeInsets.zero,
+                                    children: [
+                                      for (
+                                        var i = 0;
+                                        i < _filtered.length;
+                                        i++
+                                      ) ...[
+                                        if (i > 0) SizedBox(height: 8),
+                                        _RenewPickRow(
+                                          member: _filtered[i],
+                                          selected: _selected == _filtered[i],
+                                          onTap: () => setState(
+                                            () => _selected = _filtered[i],
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                        ),
+                        SizedBox(height: 24),
                       ] else ...[
                         Padding(
                           padding: EdgeInsets.symmetric(horizontal: 4),
