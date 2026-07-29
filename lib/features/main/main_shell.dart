@@ -14,6 +14,7 @@ import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/placeholder_screen.dart';
 import '../attendance/attendance_barcode_overlay.dart';
 import '../home/home_screen.dart';
+import '../messages/desktop_chat_screen.dart';
 import '../work/work_screen.dart';
 import '../messages/message_screen.dart';
 import '../notifications/notification_screen.dart';
@@ -237,6 +238,15 @@ class _ChatDock extends StatefulWidget {
 class _ChatDockState extends State<_ChatDock> {
   bool _open = false;
 
+  /// 패널을 닫고 콘텐츠 영역 전체를 쓰는 전체보기로 전환한다
+  void _expand() {
+    setState(() => _open = false);
+    Navigator.push(
+      context,
+      CupertinoPageRoute(builder: (_) => DesktopChatScreen()),
+    );
+  }
+
   /// 펼친 필의 전체 폭 — 접힘(X 버튼) 폭은 높이와 같은 44
   static const double _pillWidth = 158;
 
@@ -283,7 +293,8 @@ class _ChatDockState extends State<_ChatDock> {
                       child: Navigator(
                         onGenerateRoute: (settings) => MaterialPageRoute(
                           settings: settings,
-                          builder: (_) => MessageScreen(embedded: true),
+                          builder: (_) =>
+                              MessageScreen(embedded: true, onExpand: _expand),
                         ),
                       ),
                     ),

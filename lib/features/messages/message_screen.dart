@@ -14,11 +14,23 @@ import 'new_message_screen.dart';
 ///
 /// 데이터는 하드코딩된 샘플이며, 기능 개발 시 실제 대화 데이터로 교체한다.
 class MessageScreen extends StatefulWidget {
-  MessageScreen({super.key, this.embedded = false});
+  MessageScreen({
+    super.key,
+    this.embedded = false,
+    this.onExpand,
+    this.onOpenChat,
+  });
 
   /// 데스크톱 플로팅 패널에 담길 때 true.
   /// 뒤로가기 버튼을 숨긴다 (닫기는 패널 밖 X 버튼이 담당).
   final bool embedded;
+
+  /// 데스크톱 전체보기로 전환하는 버튼 콜백 (null이면 버튼을 숨긴다)
+  final VoidCallback? onExpand;
+
+  /// 대화를 눌렀을 때 화면 전환 대신 호출할 콜백
+  /// (데스크톱 전체보기에서 오른쪽 영역에 채팅방을 띄우는 용도)
+  final void Function(String name, Color color, String? emoji)? onOpenChat;
 
   @override
   State<MessageScreen> createState() => _MessageScreenState();
@@ -80,6 +92,7 @@ class _MessageScreenState extends State<MessageScreen> {
                 ),
                 SizedBox(height: 8),
                 _ConversationTile(
+                  onOpen: widget.onOpenChat,
                   name: '김민수',
                   preview: '네 알겠습니다!',
                   time: '방금 전',
@@ -88,6 +101,7 @@ class _MessageScreenState extends State<MessageScreen> {
                   unread: true,
                 ),
                 _ConversationTile(
+                  onOpen: widget.onOpenChat,
                   name: '박지현',
                   preview: '휴가 신청서 올렸어요',
                   time: '오전 10:12',
@@ -95,6 +109,7 @@ class _MessageScreenState extends State<MessageScreen> {
                   unread: true,
                 ),
                 _ConversationTile(
+                  onOpen: widget.onOpenChat,
                   name: '트레이너 단톡방',
                   preview: '오늘 PT 일정 공유합니다',
                   time: '오전 9:30',
@@ -102,6 +117,7 @@ class _MessageScreenState extends State<MessageScreen> {
                   emoji: '💪',
                 ),
                 _ConversationTile(
+                  onOpen: widget.onOpenChat,
                   name: '이서연',
                   preview: '수고하셨습니다~',
                   time: '어제',
@@ -109,12 +125,14 @@ class _MessageScreenState extends State<MessageScreen> {
                   online: true,
                 ),
                 _ConversationTile(
+                  onOpen: widget.onOpenChat,
                   name: '정우진',
                   preview: '사진을 보냈습니다',
                   time: '어제',
                   color: AppColors.gray500,
                 ),
                 _ConversationTile(
+                  onOpen: widget.onOpenChat,
                   name: '전체 공지방',
                   preview: '8월 근무표가 확정되었습니다',
                   time: '월요일',
@@ -143,7 +161,13 @@ class _MessageScreenState extends State<MessageScreen> {
               padding: EdgeInsets.only(top: 8, left: 16, right: 16),
               child: Row(
                 children: [
-                  if (!widget.embedded)
+                  if (widget.onExpand != null)
+                    // 데스크톱 패널 → 전체보기 전환
+                    GlassIconButton(
+                      symbol: 'arrow.up.left.and.arrow.down.right',
+                      onPressed: widget.onExpand,
+                    )
+                  else if (!widget.embedded)
                     GlassIconButton(
                       symbol: 'chevron.backward',
                       onPressed: () => Navigator.pop(context),
@@ -252,6 +276,7 @@ class _ConversationTile extends StatelessWidget {
     this.emoji,
     this.online = false,
     this.unread = false,
+    this.onOpen,
   });
 
   final String name;
@@ -262,15 +287,24 @@ class _ConversationTile extends StatelessWidget {
   final bool online;
   final bool unread;
 
+  /// 있으면 화면 전환 대신 이 콜백을 부른다 (데스크톱 전체보기)
+  final void Function(String name, Color color, String? emoji)? onOpen;
+
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () => Navigator.push(
-        context,
-        CupertinoPageRoute(
-          builder: (_) => ChatScreen(name: name, color: color, emoji: emoji),
-        ),
-      ),
+      onTap: () {
+        if (onOpen != null) {
+          onOpen!(name, color, emoji);
+          return;
+        }
+        Navigator.push(
+          context,
+          CupertinoPageRoute(
+            builder: (_) => ChatScreen(name: name, color: color, emoji: emoji),
+          ),
+        );
+      },
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         child: Row(
