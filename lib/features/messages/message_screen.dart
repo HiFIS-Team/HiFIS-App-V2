@@ -8,6 +8,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/top_frost.dart';
 import 'chat_screen.dart';
+import 'new_message_screen.dart';
 
 /// 사내톡 화면 (인스타그램 DM 스타일 목업)
 ///
@@ -157,7 +158,17 @@ class _MessageScreenState extends State<MessageScreen> {
                 padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
                 child: Row(
                   children: [
-                    GlassIconButton(symbol: 'square.and.pencil', size: 52),
+                    GlassIconButton(
+                      symbol: 'square.and.pencil',
+                      size: 52,
+                      onPressed: () => Navigator.push(
+                        context,
+                        CupertinoPageRoute(
+                          fullscreenDialog: true,
+                          builder: (_) => NewMessageScreen(),
+                        ),
+                      ),
+                    ),
                     SizedBox(width: 10),
                     Expanded(child: _FloatingSearchBar()),
                   ],
