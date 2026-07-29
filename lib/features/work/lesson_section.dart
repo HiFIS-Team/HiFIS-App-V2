@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:cupertino_native/cupertino_native.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -954,19 +956,11 @@ class _Segment extends StatelessWidget {
 
 /// 회색 입력 칸
 class _FormField extends StatelessWidget {
-  _FormField({
-    required this.controller,
-    required this.hint,
-    this.keyboardType,
-    this.icon,
-  });
+  _FormField({required this.controller, required this.hint, this.keyboardType});
 
   final TextEditingController controller;
   final String hint;
   final TextInputType? keyboardType;
-
-  /// 앞에 붙는 아이콘 (검색 등)
-  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
@@ -976,29 +970,17 @@ class _FormField extends StatelessWidget {
         color: AppColors.gray50,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Row(
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 17, color: AppColors.gray400),
-            SizedBox(width: 8),
-          ],
-          Expanded(
-            child: TextField(
-              controller: controller,
-              style: AppTextStyles.body1,
-              cursorColor: AppColors.primary,
-              keyboardType: keyboardType,
-              decoration: InputDecoration(
-                hintText: hint,
-                hintStyle: AppTextStyles.body1.copyWith(
-                  color: AppColors.gray400,
-                ),
-                border: InputBorder.none,
-                isCollapsed: true,
-              ),
-            ),
-          ),
-        ],
+      child: TextField(
+        controller: controller,
+        style: AppTextStyles.body1,
+        cursorColor: AppColors.primary,
+        keyboardType: keyboardType,
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: AppTextStyles.body1.copyWith(color: AppColors.gray400),
+          border: InputBorder.none,
+          isCollapsed: true,
+        ),
       ),
     );
   }
@@ -1015,8 +997,6 @@ class _PickMemberScreenState extends State<_PickMemberScreen> {
   bool _all = false;
 
   final _search = TextEditingController();
-
-  _LessonMember? _selected;
 
   @override
   void initState() {
@@ -1037,12 +1017,8 @@ class _PickMemberScreenState extends State<_PickMemberScreen> {
     return base.where((m) => m.name.contains(query)).toList();
   }
 
-  Future<void> _proceed() async {
-    final member = _selected;
-    if (member == null) {
-      AppToast.show(context, '싸인 받을 회원을 선택해주세요');
-      return;
-    }
+  /// 회원을 누르면 바로 서명 화면으로 이동한다
+  Future<void> _open(_LessonMember member) async {
     final done = await Navigator.push<bool>(
       context,
       CupertinoPageRoute(builder: (_) => _SignScreen(member: member)),
@@ -1079,17 +1055,7 @@ class _PickMemberScreenState extends State<_PickMemberScreen> {
                         left: '내 담당 (${_members.length})',
                         right: '전체',
                         value: _all,
-                        onChanged: (v) => setState(() {
-                          _all = v;
-                          // 목록이 바뀌면 선택도 해제한다
-                          _selected = null;
-                        }),
-                      ),
-                      SizedBox(height: 12),
-                      _FormField(
-                        controller: _search,
-                        hint: '회원 이름 검색',
-                        icon: CupertinoIcons.search,
+                        onChanged: (v) => setState(() => _all = v),
                       ),
                       SizedBox(height: 12),
                       if (list.isEmpty)
@@ -1104,11 +1070,7 @@ class _PickMemberScreenState extends State<_PickMemberScreen> {
                         )
                       else
                         for (final member in list) ...[
-                          _PickRow(
-                            member: member,
-                            selected: _selected == member,
-                            onTap: () => setState(() => _selected = member),
-                          ),
+                          _PickRow(member: member, onTap: () => _open(member)),
                           SizedBox(height: 8),
                         ],
                     ],
@@ -1140,34 +1102,65 @@ class _PickMemberScreenState extends State<_PickMemberScreen> {
               ),
             ),
           ),
-          // 하단 고정: 네이티브 리퀴드 글래스 진행 버튼
+          // 하단 고정: 플로팅 글래스 검색 바 (키보드와 함께 상승)
           Align(
             alignment: Alignment.bottomCenter,
             child: SafeArea(
               top: false,
               child: Padding(
                 padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: CNButton(
-                        // 테마 전환 시 설정 유실 버그 회피용 재생성 키
-                        key: ValueKey('pick-${AppColors.isDark}'),
-                        label: _selected == null
-                            ? '회원을 선택하세요'
-                            : '${_selected!.name}님 싸인 받기',
-                        // 선택 전에는 글래스, 선택되면 파란 프로미넌트 글래스.
-                        // 비활성화하면 iOS가 글래스 재질을 빼버려서 항상 활성으로
-                        // 두고, 미선택 시 동작은 _proceed에서 무시한다.
-                        style: _selected == null
-                            ? CNButtonStyle.glass
-                            : CNButtonStyle.prominentGlass,
-                        tint: AppColors.primary,
-                        height: 56,
-                        onPressed: _proceed,
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(28),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Color(0x1F101828),
+                        blurRadius: 32,
+                        offset: Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(28),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+                      child: Container(
+                        height: 52,
+                        padding: EdgeInsets.symmetric(horizontal: 18),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface.withValues(alpha: 0.72),
+                          borderRadius: BorderRadius.circular(28),
+                          // 네이티브 글래스의 림처럼 보이는 헤어라인
+                          border: Border.all(color: AppColors.gray100),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              CupertinoIcons.search,
+                              size: 20,
+                              color: AppColors.gray500,
+                            ),
+                            SizedBox(width: 10),
+                            Expanded(
+                              child: TextField(
+                                controller: _search,
+                                style: AppTextStyles.body2,
+                                cursorColor: AppColors.primary,
+                                decoration: InputDecoration(
+                                  hintText: '회원 이름 검색',
+                                  hintStyle: AppTextStyles.body2.copyWith(
+                                    color: AppColors.gray400,
+                                  ),
+                                  border: InputBorder.none,
+                                  isCollapsed: true,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -1178,12 +1171,11 @@ class _PickMemberScreenState extends State<_PickMemberScreen> {
   }
 }
 
-/// 싸인 받을 회원 한 줄 — 선택하면 파란 배경으로 강조
+/// 싸인 받을 회원 한 줄 — 누르면 바로 서명 화면으로 이동
 class _PickRow extends StatelessWidget {
-  _PickRow({required this.member, required this.selected, required this.onTap});
+  _PickRow({required this.member, required this.onTap});
 
   final _LessonMember member;
-  final bool selected;
   final VoidCallback onTap;
 
   @override
@@ -1194,17 +1186,11 @@ class _PickRow extends StatelessWidget {
     return Pressable(
       onTap: onTap,
       scale: 0.97,
-      child: AnimatedContainer(
-        duration: Duration(milliseconds: 150),
+      child: Container(
         padding: EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primaryLight : AppColors.gray50,
+          color: AppColors.gray50,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: selected
-                ? AppColors.primary.withValues(alpha: 0.25)
-                : Colors.transparent,
-          ),
         ),
         child: Row(
           children: [
@@ -1255,18 +1241,22 @@ class _PickRow extends StatelessWidget {
             Container(
               padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: selected
-                    ? AppColors.primary.withValues(alpha: 0.12)
-                    : AppColors.gray100,
+                color: AppColors.gray100,
                 borderRadius: BorderRadius.circular(100),
               ),
               child: Text(
                 '$remain회 남음',
                 style: AppTextStyles.caption.copyWith(
-                  color: selected ? AppColors.primary : AppColors.textSecondary,
+                  color: AppColors.textSecondary,
                   fontWeight: FontWeight.w600,
                 ),
               ),
+            ),
+            SizedBox(width: 8),
+            Icon(
+              CupertinoIcons.chevron_right,
+              size: 15,
+              color: AppColors.gray300,
             ),
           ],
         ),
