@@ -45,47 +45,79 @@ class HomeScreen extends StatelessWidget {
               alignment: Alignment.topRight,
               child: Padding(
                 padding: EdgeInsets.only(top: 8, right: 16),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    GlassIconButton(
-                      symbol: 'barcode.viewfinder',
-                      onPressed: () => showAttendanceBarcode(context),
-                    ),
-                    SizedBox(width: 10),
-                    GlassIconButton(
-                      symbol: 'message',
-                      onPressed: () => Navigator.push(
-                        context,
-                        CupertinoPageRoute(builder: (_) => MessageScreen()),
-                      ),
-                    ),
-                    SizedBox(width: 10),
-                    GlassIconButton(
-                      symbol: 'bell',
-                      showBadge: true,
-                      onPressed: () => Navigator.push(
-                        context,
-                        CupertinoPageRoute(
-                          builder: (_) => NotificationScreen(),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 10),
-                    GlassIconButton(
-                      symbol: 'person',
-                      onPressed: () => Navigator.push(
-                        context,
-                        CupertinoPageRoute(builder: (_) => ProfileScreen()),
-                      ),
-                    ),
-                  ],
-                ),
+                child: _HeaderButtons(),
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// 상단 우측 글래스 버튼 묶음
+///
+/// 바코드 오버레이가 떠 있는 동안에는 네이티브 글래스 버튼이
+/// 어두운 배경 위로 눌림 효과를 그리지 않게 플러터 대체 버튼으로 바꾼다.
+class _HeaderButtons extends StatefulWidget {
+  _HeaderButtons();
+
+  @override
+  State<_HeaderButtons> createState() => _HeaderButtonsState();
+}
+
+class _HeaderButtonsState extends State<_HeaderButtons> {
+  bool _overlayOpen = false;
+
+  Future<void> _openBarcode() async {
+    setState(() => _overlayOpen = true);
+    await showAttendanceBarcode(context);
+    if (mounted) setState(() => _overlayOpen = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        GlassIconButton(
+          symbol: 'barcode.viewfinder',
+          frozen: _overlayOpen,
+          fallbackIcon: CupertinoIcons.barcode_viewfinder,
+          onPressed: _openBarcode,
+        ),
+        SizedBox(width: 10),
+        GlassIconButton(
+          symbol: 'message',
+          frozen: _overlayOpen,
+          fallbackIcon: CupertinoIcons.chat_bubble,
+          onPressed: () => Navigator.push(
+            context,
+            CupertinoPageRoute(builder: (_) => MessageScreen()),
+          ),
+        ),
+        SizedBox(width: 10),
+        GlassIconButton(
+          symbol: 'bell',
+          showBadge: true,
+          frozen: _overlayOpen,
+          fallbackIcon: CupertinoIcons.bell,
+          onPressed: () => Navigator.push(
+            context,
+            CupertinoPageRoute(builder: (_) => NotificationScreen()),
+          ),
+        ),
+        SizedBox(width: 10),
+        GlassIconButton(
+          symbol: 'person',
+          frozen: _overlayOpen,
+          fallbackIcon: CupertinoIcons.person,
+          onPressed: () => Navigator.push(
+            context,
+            CupertinoPageRoute(builder: (_) => ProfileScreen()),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -199,9 +231,14 @@ class _HeroStatusCardState extends State<_HeroStatusCard> {
         children: [
           Row(
             children: [
-              Expanded(child: Text('오늘 근무', style: AppTextStyles.label)),
+              Expanded(
+                child: Text('오늘 근무', style: AppTextStyles.label),
+              ),
               Container(
-                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.all(Radius.circular(100)),
@@ -261,6 +298,7 @@ class _HeroStatusCardState extends State<_HeroStatusCard> {
       ),
     );
   }
+
 }
 
 class _ScanRecord extends StatelessWidget {
@@ -524,13 +562,29 @@ class _NoticeCard extends StatelessWidget {
             pinned: true,
           ),
           Divider(),
-          _NoticeRow(title: '여름 휴가 신청 안내', author: '박지현', time: '어제'),
+          _NoticeRow(
+            title: '여름 휴가 신청 안내',
+            author: '박지현',
+            time: '어제',
+          ),
           Divider(),
-          _NoticeRow(title: '센터 청소 일정 변경', author: '김민수', time: '3일 전'),
+          _NoticeRow(
+            title: '센터 청소 일정 변경',
+            author: '김민수',
+            time: '3일 전',
+          ),
           Divider(),
-          _NoticeRow(title: '7월 우수사원 발표', author: '관리자', time: '4일 전'),
+          _NoticeRow(
+            title: '7월 우수사원 발표',
+            author: '관리자',
+            time: '4일 전',
+          ),
           Divider(),
-          _NoticeRow(title: '정수기 정기 점검 안내', author: '관리자', time: '6일 전'),
+          _NoticeRow(
+            title: '정수기 정기 점검 안내',
+            author: '관리자',
+            time: '6일 전',
+          ),
         ],
       ),
     );
@@ -564,7 +618,10 @@ class _NoticeRow extends StatelessWidget {
               children: [
                 if (pinned) ...[
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.error.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(6),
