@@ -56,6 +56,27 @@ final _members = <_LessonMember>[
   ),
 ];
 
+/// 다른 트레이너 담당 회원 (세션 싸인 받기의 전체 탭에서만 노출)
+final _otherMembers = <_LessonMember>[
+  _LessonMember(
+    name: '정다은',
+    color: _palette[3],
+    total: 20,
+    done: 3,
+    price: 50000,
+    isNew: true,
+    owner: '이앨리스',
+  ),
+  _LessonMember(
+    name: '윤태호',
+    color: _palette[4],
+    total: 30,
+    done: 21,
+    price: 60000,
+    owner: '오민준',
+  ),
+];
+
 /// 받은 싸인 내역 (표시할 때 최신순 정렬)
 final _signs = <_LessonSign>[..._seedSigns()];
 
@@ -360,6 +381,7 @@ class _LessonMember {
     this.isNew = false,
     this.phone = '',
     this.referrer = '',
+    this.owner = '',
   });
 
   final String name;
@@ -377,6 +399,9 @@ class _LessonMember {
   /// 연락처·소개한 회원 (등록 폼 입력, 아직 화면 표시는 없음)
   final String phone;
   final String referrer;
+
+  /// 담당 트레이너 이름 — 비어 있으면 내 담당
+  final String owner;
 
   /// 싸인으로 확인된 진행 회차 — 싸인 한 번에 1회차씩 올라간다
   int done;
@@ -609,7 +634,9 @@ class _RegisterScreenState extends State<_RegisterScreen> {
                     ),
                     children: [
                       _ModeSwitch(
-                        renew: _renew,
+                        left: '신규 회원',
+                        right: '재등록',
+                        value: _renew,
                         onChanged: (v) => setState(() => _renew = v),
                       ),
                       SizedBox(height: 24),
@@ -844,9 +871,18 @@ class _RenewPickRow extends StatelessWidget {
 
 /// 신규 회원 / 재등록 전환 세그먼트
 class _ModeSwitch extends StatelessWidget {
-  _ModeSwitch({required this.renew, required this.onChanged});
+  _ModeSwitch({
+    required this.left,
+    required this.right,
+    required this.value,
+    required this.onChanged,
+  });
 
-  final bool renew;
+  final String left;
+  final String right;
+
+  /// true면 오른쪽이 선택된 상태
+  final bool value;
   final ValueChanged<bool> onChanged;
 
   @override
@@ -862,15 +898,15 @@ class _ModeSwitch extends StatelessWidget {
         children: [
           Expanded(
             child: _Segment(
-              label: '신규 회원',
-              selected: !renew,
+              label: left,
+              selected: !value,
               onTap: () => onChanged(false),
             ),
           ),
           Expanded(
             child: _Segment(
-              label: '재등록',
-              selected: renew,
+              label: right,
+              selected: value,
               onTap: () => onChanged(true),
             ),
           ),
@@ -918,11 +954,19 @@ class _Segment extends StatelessWidget {
 
 /// 회색 입력 칸
 class _FormField extends StatelessWidget {
-  _FormField({required this.controller, required this.hint, this.keyboardType});
+  _FormField({
+    required this.controller,
+    required this.hint,
+    this.keyboardType,
+    this.icon,
+  });
 
   final TextEditingController controller;
   final String hint;
   final TextInputType? keyboardType;
+
+  /// 앞에 붙는 아이콘 (검색 등)
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
@@ -932,17 +976,29 @@ class _FormField extends StatelessWidget {
         color: AppColors.gray50,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: TextField(
-        controller: controller,
-        style: AppTextStyles.body1,
-        cursorColor: AppColors.primary,
-        keyboardType: keyboardType,
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: AppTextStyles.body1.copyWith(color: AppColors.gray400),
-          border: InputBorder.none,
-          isCollapsed: true,
-        ),
+      child: Row(
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 17, color: AppColors.gray400),
+            SizedBox(width: 8),
+          ],
+          Expanded(
+            child: TextField(
+              controller: controller,
+              style: AppTextStyles.body1,
+              cursorColor: AppColors.primary,
+              keyboardType: keyboardType,
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: AppTextStyles.body1.copyWith(
+                  color: AppColors.gray400,
+                ),
+                border: InputBorder.none,
+                isCollapsed: true,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -955,7 +1011,38 @@ class _PickMemberScreen extends StatefulWidget {
 }
 
 class _PickMemberScreenState extends State<_PickMemberScreen> {
-  Future<void> _open(_LessonMember member) async {
+  /// true면 전체(다른 담당 포함) 목록
+  bool _all = false;
+
+  final _search = TextEditingController();
+
+  _LessonMember? _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _search.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  List<_LessonMember> get _filtered {
+    final base = _all ? [..._members, ..._otherMembers] : _members;
+    final query = _search.text.trim();
+    if (query.isEmpty) return base;
+    return base.where((m) => m.name.contains(query)).toList();
+  }
+
+  Future<void> _proceed() async {
+    final member = _selected;
+    if (member == null) {
+      AppToast.show(context, '싸인 받을 회원을 선택해주세요');
+      return;
+    }
     final done = await Navigator.push<bool>(
       context,
       CupertinoPageRoute(builder: (_) => _SignScreen(member: member)),
@@ -967,6 +1054,8 @@ class _PickMemberScreenState extends State<_PickMemberScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final list = _filtered;
+
     return Scaffold(
       backgroundColor: AppColors.surface,
       body: Stack(
@@ -974,109 +1063,55 @@ class _PickMemberScreenState extends State<_PickMemberScreen> {
           SafeArea(
             bottom: false,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // 상단 고정 타이틀 영역만큼 비워둔다
                 SizedBox(height: 56),
-                Padding(
-                  padding: EdgeInsets.fromLTRB(24, 12, 24, 12),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '싸인 받을 회원을 선택하세요',
-                          style: AppTextStyles.caption,
-                        ),
-                      ),
-                      Text(
-                        '회원 ${_members.length}명',
-                        style: AppTextStyles.caption.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(height: 1, color: AppColors.gray100),
                 Expanded(
-                  child: ListView.separated(
+                  child: ListView(
                     padding: EdgeInsets.fromLTRB(
                       20,
                       8,
                       20,
-                      MediaQuery.paddingOf(context).bottom + 24,
+                      MediaQuery.paddingOf(context).bottom + 96,
                     ),
-                    itemCount: _members.length,
-                    separatorBuilder: (_, _) =>
-                        Divider(height: 1, color: AppColors.divider),
-                    itemBuilder: (_, index) {
-                      final member = _members[index];
-                      return Pressable(
-                        onTap: () => _open(member),
-                        scale: 0.98,
-                        pressedColor: AppColors.gray50,
-                        borderRadius: BorderRadius.circular(12),
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 4,
-                          vertical: 12,
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 38,
-                              height: 38,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: member.color,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Text(
-                                member.name.characters.first,
-                                style: TextStyle(
-                                  fontFamily: AppTextStyles.fontFamily,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                ),
-                              ),
+                    children: [
+                      _ModeSwitch(
+                        left: '내 담당 (${_members.length})',
+                        right: '전체',
+                        value: _all,
+                        onChanged: (v) => setState(() {
+                          _all = v;
+                          // 목록이 바뀌면 선택도 해제한다
+                          _selected = null;
+                        }),
+                      ),
+                      SizedBox(height: 12),
+                      _FormField(
+                        controller: _search,
+                        hint: '회원 이름 검색',
+                        icon: CupertinoIcons.search,
+                      ),
+                      SizedBox(height: 12),
+                      if (list.isEmpty)
+                        Padding(
+                          padding: EdgeInsets.fromLTRB(4, 10, 4, 10),
+                          child: Text(
+                            '검색 결과가 없어요',
+                            style: AppTextStyles.body2.copyWith(
+                              color: AppColors.textTertiary,
                             ),
-                            SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Text(
-                                        member.name,
-                                        style: AppTextStyles.body2.copyWith(
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      SizedBox(width: 6),
-                                      _MemberBadge(isNew: member.isNew),
-                                    ],
-                                  ),
-                                  SizedBox(height: 2),
-                                  Text(
-                                    '${member.done}/${member.total}회차 · 회당 ${_comma(member.price)}원',
-                                    style: AppTextStyles.caption.copyWith(
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Icon(
-                              CupertinoIcons.chevron_right,
-                              size: 16,
-                              color: AppColors.gray300,
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+                          ),
+                        )
+                      else
+                        for (final member in list) ...[
+                          _PickRow(
+                            member: member,
+                            selected: _selected == member,
+                            onTap: () => setState(() => _selected = member),
+                          ),
+                          SizedBox(height: 8),
+                        ],
+                    ],
                   ),
                 ),
               ],
@@ -1105,7 +1140,136 @@ class _PickMemberScreenState extends State<_PickMemberScreen> {
               ),
             ),
           ),
+          // 하단 고정: 네이티브 리퀴드 글래스 진행 버튼
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: CNButton(
+                        // 테마 전환 시 설정 유실 버그 회피용 재생성 키
+                        key: ValueKey('pick-${AppColors.isDark}'),
+                        label: _selected == null
+                            ? '회원을 선택하세요'
+                            : '${_selected!.name}님 싸인 받기',
+                        // 선택 전에는 글래스, 선택되면 파란 프로미넌트 글래스.
+                        // 비활성화하면 iOS가 글래스 재질을 빼버려서 항상 활성으로
+                        // 두고, 미선택 시 동작은 _proceed에서 무시한다.
+                        style: _selected == null
+                            ? CNButtonStyle.glass
+                            : CNButtonStyle.prominentGlass,
+                        tint: AppColors.primary,
+                        height: 56,
+                        onPressed: _proceed,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+/// 싸인 받을 회원 한 줄 — 선택하면 파란 배경으로 강조
+class _PickRow extends StatelessWidget {
+  _PickRow({required this.member, required this.selected, required this.onTap});
+
+  final _LessonMember member;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final remain = member.total - member.done;
+    final ownerLabel = member.owner.isEmpty ? '내 담당' : '${member.owner} 담당';
+
+    return Pressable(
+      onTap: onTap,
+      scale: 0.97,
+      child: AnimatedContainer(
+        duration: Duration(milliseconds: 150),
+        padding: EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primaryLight : AppColors.gray50,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected
+                ? AppColors.primary.withValues(alpha: 0.25)
+                : Colors.transparent,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: member.color,
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                member.name.characters.first,
+                style: TextStyle(
+                  fontFamily: AppTextStyles.fontFamily,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        member.name,
+                        style: AppTextStyles.body2.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(width: 6),
+                      _MemberBadge(isNew: member.isNew),
+                    ],
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    '${member.done}/${member.total}회차 사용 · $ownerLabel',
+                    style: AppTextStyles.caption.copyWith(fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+            // 남은 회차 배지
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: selected
+                    ? AppColors.primary.withValues(alpha: 0.12)
+                    : AppColors.gray100,
+                borderRadius: BorderRadius.circular(100),
+              ),
+              child: Text(
+                '$remain회 남음',
+                style: AppTextStyles.caption.copyWith(
+                  color: selected ? AppColors.primary : AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
