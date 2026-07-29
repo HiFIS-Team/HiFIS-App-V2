@@ -199,6 +199,20 @@ class _PeerReviewFormScreenState extends State<_PeerReviewFormScreen> {
 
   int get _total => _scores.values.fold(0, (sum, v) => sum + v);
 
+  /// 모든 항목에 점수와 사유가 채워져야 제출이 열린다
+  bool get _complete => _categories.every(
+    (c) => (_scores[c] ?? 0) > 0 && _reasons[c]!.text.trim().isNotEmpty,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    // 사유 입력에 따라 제출 버튼 상태가 바뀌도록 갱신한다
+    for (final controller in _reasons.values) {
+      controller.addListener(() => setState(() {}));
+    }
+  }
+
   @override
   void dispose() {
     for (final controller in _reasons.values) {
@@ -213,8 +227,8 @@ class _PeerReviewFormScreenState extends State<_PeerReviewFormScreen> {
   }
 
   void _submit() {
-    if (_total == 0) {
-      AppToast.show(context, '점수를 먼저 입력해주세요');
+    if (!_complete) {
+      AppToast.show(context, '모든 항목의 점수와 사유를 입력해주세요');
       return;
     }
     FocusScope.of(context).unfocus();
@@ -356,12 +370,13 @@ class _PeerReviewFormScreenState extends State<_PeerReviewFormScreen> {
                         // 테마 전환 시 설정 유실 버그 회피용 재생성 키
                         key: ValueKey('pr-submit-${AppColors.isDark}'),
                         label: '평가 제출',
-                        // 점수 입력 전에는 글래스, 입력되면 파란 프로미넌트 글래스.
-                        // 비활성화하면 iOS가 글래스 재질을 빼버려서 항상 활성으로
-                        // 두고, 미입력 시 동작은 _submit에서 무시한다.
-                        style: _total == 0
-                            ? CNButtonStyle.glass
-                            : CNButtonStyle.prominentGlass,
+                        // 전 항목이 채워지기 전에는 글래스, 채워지면 파란
+                        // 프로미넌트 글래스. 비활성화하면 iOS가 글래스 재질을
+                        // 빼버려서 항상 활성으로 두고, 미완성 시 동작은
+                        // _submit에서 무시한다.
+                        style: _complete
+                            ? CNButtonStyle.prominentGlass
+                            : CNButtonStyle.glass,
                         tint: AppColors.primary,
                         height: 56,
                         onPressed: _submit,
