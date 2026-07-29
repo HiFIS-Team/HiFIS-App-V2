@@ -107,80 +107,13 @@ String _formatStamp(DateTime time) {
 }
 
 class _LessonSectionState extends State<LessonSection> {
-  /// 이름·총 횟수·진행 회차·세션 단가를 입력받아 회원을 추가한다
+  /// 회원 등록 화면을 연다
   Future<void> _register() async {
-    final nameController = TextEditingController();
-    final countController = TextEditingController(text: '20');
-    final roundController = TextEditingController(text: '0');
-    final priceController = TextEditingController(text: '50000');
-    final ok = await showCupertinoDialog<bool>(
-      context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: Text('회원 등록'),
-        content: Column(
-          children: [
-            SizedBox(height: 14),
-            CupertinoTextField(
-              controller: nameController,
-              placeholder: '회원 이름',
-              autofocus: true,
-            ),
-            SizedBox(height: 8),
-            CupertinoTextField(
-              controller: countController,
-              placeholder: '총 수업 횟수',
-              keyboardType: TextInputType.number,
-            ),
-            SizedBox(height: 8),
-            CupertinoTextField(
-              controller: roundController,
-              placeholder: '진행 회차 (이미 한 횟수)',
-              keyboardType: TextInputType.number,
-            ),
-            SizedBox(height: 8),
-            CupertinoTextField(
-              controller: priceController,
-              placeholder: '세션 단가 (원)',
-              keyboardType: TextInputType.number,
-            ),
-          ],
-        ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('취소'),
-          ),
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            onPressed: () => Navigator.pop(context, true),
-            child: Text('등록'),
-          ),
-        ],
-      ),
+    final added = await Navigator.push<bool>(
+      context,
+      CupertinoPageRoute(builder: (_) => _RegisterScreen()),
     );
-    final name = nameController.text.trim();
-    final total = int.tryParse(countController.text.trim()) ?? 20;
-    final round = int.tryParse(roundController.text.trim()) ?? 0;
-    final price = int.tryParse(priceController.text.trim()) ?? 50000;
-    nameController.dispose();
-    countController.dispose();
-    roundController.dispose();
-    priceController.dispose();
-    if (ok != true || name.isEmpty || !mounted) return;
-    setState(() {
-      _members.add(
-        _LessonMember(
-          name: name,
-          color: _palette[_members.length % _palette.length],
-          total: total,
-          done: round.clamp(0, total),
-          price: price,
-          // 진행 회차 없이 시작하면 신규, 이어서 시작하면 재등록으로 본다
-          isNew: round == 0,
-        ),
-      );
-    });
-    AppToast.show(context, '$name님이 등록되었습니다');
+    if (added == true && mounted) setState(() {});
   }
 
   /// 회원을 골라 싸인을 받는다
@@ -425,6 +358,8 @@ class _LessonMember {
     required this.price,
     this.done = 0,
     this.isNew = false,
+    this.phone = '',
+    this.referrer = '',
   });
 
   final String name;
@@ -433,11 +368,15 @@ class _LessonMember {
   /// 등록한 총 수업 횟수
   final int total;
 
-  /// 세션(1회) 단가, 원
+  /// 세션(1회) 단가, 원 — 결제액을 회차로 나눈 값
   final int price;
 
   /// 신규 회원 여부 (아니면 재등록)
   final bool isNew;
+
+  /// 연락처·소개한 회원 (등록 폼 입력, 아직 화면 표시는 없음)
+  final String phone;
+  final String referrer;
 
   /// 싸인으로 확인된 진행 회차 — 싸인 한 번에 1회차씩 올라간다
   int done;
@@ -544,6 +483,343 @@ class _SignRow extends StatelessWidget {
             color: AppColors.gray300,
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 회원 등록 화면 — 신규/재등록을 전환하며 회원 정보와 등록권을 입력한다
+class _RegisterScreen extends StatefulWidget {
+  @override
+  State<_RegisterScreen> createState() => _RegisterScreenState();
+}
+
+class _RegisterScreenState extends State<_RegisterScreen> {
+  /// true면 재등록 모드
+  bool _renew = false;
+
+  final _name = TextEditingController();
+  final _phone = TextEditingController();
+  final _referrer = TextEditingController();
+  final _rounds = TextEditingController();
+  final _payment = TextEditingController();
+  final _progress = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    // 입력에 따라 등록 버튼과 회당 단가가 실시간 갱신되도록 한다
+    for (final controller in [_name, _rounds, _payment, _progress]) {
+      controller.addListener(() => setState(() {}));
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final controller in [
+      _name,
+      _phone,
+      _referrer,
+      _rounds,
+      _payment,
+      _progress,
+    ]) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  int get _roundCount => int.tryParse(_rounds.text.trim()) ?? 0;
+  int get _paymentWon => int.tryParse(_payment.text.trim()) ?? 0;
+  int get _progressCount => int.tryParse(_progress.text.trim()) ?? 0;
+
+  /// 회당 단가 — 결제액 ÷ 회차
+  int get _unitPrice => _roundCount > 0 && _paymentWon > 0
+      ? (_paymentWon / _roundCount).round()
+      : 0;
+
+  bool get _complete =>
+      _name.text.trim().isNotEmpty && _roundCount > 0 && _paymentWon > 0;
+
+  void _submit() {
+    if (!_complete) {
+      AppToast.show(context, '성함과 등록권 정보를 입력해주세요');
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    final name = _name.text.trim();
+    _members.add(
+      _LessonMember(
+        name: name,
+        color: _palette[_members.length % _palette.length],
+        total: _roundCount,
+        price: _unitPrice,
+        done: _renew ? _progressCount.clamp(0, _roundCount) : 0,
+        isNew: !_renew,
+        phone: _phone.text.trim(),
+        referrer: _referrer.text.trim(),
+      ),
+    );
+    AppToast.show(context, '$name님이 등록되었습니다');
+    Navigator.pop(context, true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      body: Stack(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                // 상단 고정 타이틀 영역만큼 비워둔다
+                SizedBox(height: 56),
+                Expanded(
+                  child: ListView(
+                    padding: EdgeInsets.fromLTRB(
+                      20,
+                      8,
+                      20,
+                      MediaQuery.paddingOf(context).bottom + 96,
+                    ),
+                    children: [
+                      _ModeSwitch(
+                        renew: _renew,
+                        onChanged: (v) => setState(() => _renew = v),
+                      ),
+                      SizedBox(height: 24),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 4),
+                        child: Text('회원 정보', style: AppTextStyles.label),
+                      ),
+                      SizedBox(height: 8),
+                      _FormField(controller: _name, hint: '성함'),
+                      SizedBox(height: 8),
+                      _FormField(
+                        controller: _phone,
+                        hint: '연락처 (010-0000-0000)',
+                        keyboardType: TextInputType.phone,
+                      ),
+                      SizedBox(height: 8),
+                      _FormField(controller: _referrer, hint: '소개한 회원 (선택)'),
+                      SizedBox(height: 24),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 4),
+                        child: Text('등록권', style: AppTextStyles.label),
+                      ),
+                      SizedBox(height: 8),
+                      _FormField(
+                        controller: _rounds,
+                        hint: '회차 (예: 30)',
+                        keyboardType: TextInputType.number,
+                      ),
+                      SizedBox(height: 8),
+                      _FormField(
+                        controller: _payment,
+                        hint: '결제액 (원)',
+                        keyboardType: TextInputType.number,
+                      ),
+                      if (_renew) ...[
+                        SizedBox(height: 8),
+                        _FormField(
+                          controller: _progress,
+                          hint: '진행 회차 (이미 한 횟수)',
+                          keyboardType: TextInputType.number,
+                        ),
+                      ],
+                      SizedBox(height: 14),
+                      // 결제액 ÷ 회차로 자동 계산되는 단가
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 4),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '회당 단가',
+                                style: AppTextStyles.body2.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              _unitPrice > 0 ? '${_comma(_unitPrice)}원' : '—',
+                              style: AppTextStyles.body2.copyWith(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // 상단 중앙 고정 타이틀 (터치는 아래로 통과)
+          IgnorePointer(
+            child: SafeArea(
+              bottom: false,
+              child: SizedBox(
+                height: 56,
+                child: Center(
+                  child: Text('회원 등록', style: AppTextStyles.title3),
+                ),
+              ),
+            ),
+          ),
+          // 좌측 상단 고정 뒤로가기 글래스 버튼
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: EdgeInsets.only(top: 8, left: 16),
+              child: GlassIconButton(
+                symbol: 'chevron.backward',
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+          ),
+          // 하단 고정: 네이티브 리퀴드 글래스 등록 버튼
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: CNButton(
+                        // 테마 전환 시 설정 유실 버그 회피용 재생성 키
+                        key: ValueKey('register-${AppColors.isDark}'),
+                        label: _renew ? '재등록' : '신규 회원 등록',
+                        // 필수 입력이 채워지기 전에는 글래스, 채워지면 파란
+                        // 프로미넌트 글래스. 비활성화하면 iOS가 글래스 재질을
+                        // 빼버려서 항상 활성으로 두고, 미완성 시 동작은
+                        // _submit에서 무시한다.
+                        style: _complete
+                            ? CNButtonStyle.prominentGlass
+                            : CNButtonStyle.glass,
+                        tint: AppColors.primary,
+                        height: 56,
+                        onPressed: _submit,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 신규 회원 / 재등록 전환 세그먼트
+class _ModeSwitch extends StatelessWidget {
+  _ModeSwitch({required this.renew, required this.onChanged});
+
+  final bool renew;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 48,
+      padding: EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.gray50,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _Segment(
+              label: '신규 회원',
+              selected: !renew,
+              onTap: () => onChanged(false),
+            ),
+          ),
+          Expanded(
+            child: _Segment(
+              label: '재등록',
+              selected: renew,
+              onTap: () => onChanged(true),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Segment extends StatelessWidget {
+  _Segment({required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      scale: 0.97,
+      child: AnimatedContainer(
+        duration: Duration(milliseconds: 150),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.surface : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected ? AppColors.gray100 : Colors.transparent,
+          ),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: AppTextStyles.body2.copyWith(
+              fontSize: 14,
+              color: selected ? AppColors.textPrimary : AppColors.gray500,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 회색 입력 칸
+class _FormField extends StatelessWidget {
+  _FormField({required this.controller, required this.hint, this.keyboardType});
+
+  final TextEditingController controller;
+  final String hint;
+  final TextInputType? keyboardType;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: AppColors.gray50,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: TextField(
+        controller: controller,
+        style: AppTextStyles.body1,
+        cursorColor: AppColors.primary,
+        keyboardType: keyboardType,
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: AppTextStyles.body1.copyWith(color: AppColors.gray400),
+          border: InputBorder.none,
+          isCollapsed: true,
+        ),
       ),
     );
   }
