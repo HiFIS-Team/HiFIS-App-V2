@@ -115,36 +115,30 @@ class _MainShellState extends State<MainShell> {
           Expanded(
             child: ColoredBox(
               color: AppColors.surface,
-              child: Center(
-                child: ConstrainedBox(
-                  // 폰 레이아웃이 지나치게 늘어지지 않는 선에서 넓게 쓴다
-                  constraints: BoxConstraints(maxWidth: 860),
-                  child: ClipRect(
-                    child: Navigator(
-                      key: _paneNavKey,
-                      onGenerateRoute: (settings) => MaterialPageRoute(
-                        settings: settings,
-                        builder: (context) => ValueListenableBuilder<int>(
-                          valueListenable: _paneIndex,
-                          builder: (context, index, child) => Stack(
-                            children: [
-                              IndexedStack(
-                                index: index,
-                                children: [..._mainPages, ..._subPages],
-                              ),
-                              SafeArea(
-                                bottom: false,
-                                child: Align(
-                                  alignment: Alignment.topRight,
-                                  child: Padding(
-                                    padding: EdgeInsets.only(top: 8, right: 16),
-                                    child: _HeaderButtons(),
-                                  ),
-                                ),
-                              ),
-                            ],
+              child: ClipRect(
+                child: Navigator(
+                  key: _paneNavKey,
+                  onGenerateRoute: (settings) => MaterialPageRoute(
+                    settings: settings,
+                    builder: (context) => ValueListenableBuilder<int>(
+                      valueListenable: _paneIndex,
+                      builder: (context, index, child) => Stack(
+                        children: [
+                          IndexedStack(
+                            index: index,
+                            children: [..._mainPages, ..._subPages],
                           ),
-                        ),
+                          SafeArea(
+                            bottom: false,
+                            child: Align(
+                              alignment: Alignment.topRight,
+                              child: Padding(
+                                padding: EdgeInsets.only(top: 8, right: 16),
+                                child: _HeaderButtons(),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),

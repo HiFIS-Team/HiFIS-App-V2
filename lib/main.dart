@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 
 import 'core/theme/app_colors.dart';
@@ -36,6 +38,9 @@ class _HiFISAppState extends State<HiFISApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // macOS에서는 창이 포커스만 잃어도 inactive가 되어 커버가 덮이므로
+    // (앱이 멈춘 것처럼 보인다) 프라이버시 커버를 모바일에서만 쓴다
+    if (defaultTargetPlatform == TargetPlatform.macOS) return;
     final obscured = state != AppLifecycleState.resumed;
     if (obscured != _obscured) setState(() => _obscured = obscured);
   }
@@ -52,7 +57,7 @@ class _HiFISAppState extends State<HiFISApp> with WidgetsBindingObserver {
       builder: (context, child) => Stack(
         children: [
           child!,
-          if (_obscured)
+          if (_obscured && defaultTargetPlatform != TargetPlatform.macOS)
             Positioned.fill(
               child: Container(
                 color: AppColors.surface,
