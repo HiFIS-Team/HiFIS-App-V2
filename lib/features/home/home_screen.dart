@@ -6,11 +6,6 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/glass_icon_button.dart';
-import '../attendance/attendance_barcode_overlay.dart';
-import '../messages/message_screen.dart';
-import '../notifications/notification_screen.dart';
-import '../profile/profile_screen.dart';
 
 /// 홈 화면 (디자인 시스템 데모용 샘플)
 ///
@@ -38,82 +33,8 @@ class HomeScreen extends StatelessWidget {
               ],
             ),
           ),
-          // 상단 고정 글래스 버튼 — 콘텐츠가 유리 뒤로 스크롤된다
-          SafeArea(
-            bottom: false,
-            child: Align(
-              alignment: Alignment.topRight,
-              child: Padding(
-                padding: EdgeInsets.only(top: 8, right: 16),
-                child: _HeaderButtons(),
-              ),
-            ),
-          ),
         ],
       ),
-    );
-  }
-}
-
-/// 상단 우측 글래스 버튼 묶음
-///
-/// 바코드 오버레이가 떠 있는 동안에는 버튼 모양은 그대로 두고
-/// 터치만 비활성화한다. 글래스 눌림 효과가 딤 위로 그려지는 것을 막기 위함.
-class _HeaderButtons extends StatefulWidget {
-  _HeaderButtons();
-
-  @override
-  State<_HeaderButtons> createState() => _HeaderButtonsState();
-}
-
-class _HeaderButtonsState extends State<_HeaderButtons> {
-  bool _overlayOpen = false;
-
-  Future<void> _openBarcode() async {
-    setState(() => _overlayOpen = true);
-    await showAttendanceBarcode(context);
-    if (mounted) setState(() => _overlayOpen = false);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        GlassIconButton(
-          symbol: 'barcode.viewfinder',
-          enabled: !_overlayOpen,
-          onPressed: _openBarcode,
-        ),
-        SizedBox(width: 10),
-        GlassIconButton(
-          symbol: 'message',
-          enabled: !_overlayOpen,
-          onPressed: () => Navigator.push(
-            context,
-            CupertinoPageRoute(builder: (_) => MessageScreen()),
-          ),
-        ),
-        SizedBox(width: 10),
-        GlassIconButton(
-          symbol: 'bell',
-          showBadge: true,
-          enabled: !_overlayOpen,
-          onPressed: () => Navigator.push(
-            context,
-            CupertinoPageRoute(builder: (_) => NotificationScreen()),
-          ),
-        ),
-        SizedBox(width: 10),
-        GlassIconButton(
-          symbol: 'person',
-          enabled: !_overlayOpen,
-          onPressed: () => Navigator.push(
-            context,
-            CupertinoPageRoute(builder: (_) => ProfileScreen()),
-          ),
-        ),
-      ],
     );
   }
 }
@@ -227,14 +148,9 @@ class _HeroStatusCardState extends State<_HeroStatusCard> {
         children: [
           Row(
             children: [
-              Expanded(
-                child: Text('오늘 근무', style: AppTextStyles.label),
-              ),
+              Expanded(child: Text('오늘 근무', style: AppTextStyles.label)),
               Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.all(Radius.circular(100)),
@@ -294,7 +210,6 @@ class _HeroStatusCardState extends State<_HeroStatusCard> {
       ),
     );
   }
-
 }
 
 class _ScanRecord extends StatelessWidget {
@@ -558,29 +473,13 @@ class _NoticeCard extends StatelessWidget {
             pinned: true,
           ),
           Divider(),
-          _NoticeRow(
-            title: '여름 휴가 신청 안내',
-            author: '박지현',
-            time: '어제',
-          ),
+          _NoticeRow(title: '여름 휴가 신청 안내', author: '박지현', time: '어제'),
           Divider(),
-          _NoticeRow(
-            title: '센터 청소 일정 변경',
-            author: '김민수',
-            time: '3일 전',
-          ),
+          _NoticeRow(title: '센터 청소 일정 변경', author: '김민수', time: '3일 전'),
           Divider(),
-          _NoticeRow(
-            title: '7월 우수사원 발표',
-            author: '관리자',
-            time: '4일 전',
-          ),
+          _NoticeRow(title: '7월 우수사원 발표', author: '관리자', time: '4일 전'),
           Divider(),
-          _NoticeRow(
-            title: '정수기 정기 점검 안내',
-            author: '관리자',
-            time: '6일 전',
-          ),
+          _NoticeRow(title: '정수기 정기 점검 안내', author: '관리자', time: '6일 전'),
         ],
       ),
     );
@@ -614,10 +513,7 @@ class _NoticeRow extends StatelessWidget {
               children: [
                 if (pinned) ...[
                   Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
+                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: AppColors.error.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(6),

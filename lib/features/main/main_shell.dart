@@ -1,8 +1,14 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/widgets/app_tab_bar.dart';
+import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/placeholder_screen.dart';
+import '../attendance/attendance_barcode_overlay.dart';
 import '../home/home_screen.dart';
+import '../messages/message_screen.dart';
+import '../notifications/notification_screen.dart';
+import '../profile/profile_screen.dart';
 
 /// 하단 탭바와 탭별 화면을 관리하는 루트 셸
 ///
@@ -78,9 +84,24 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       extendBody: true,
-      body: IndexedStack(
-        index: _subMenu ? _mainPages.length + (_subIndex - 1) : _mainIndex,
-        children: [..._mainPages, ..._subPages],
+      body: Stack(
+        children: [
+          IndexedStack(
+            index: _subMenu ? _mainPages.length + (_subIndex - 1) : _mainIndex,
+            children: [..._mainPages, ..._subPages],
+          ),
+          // 모든 탭 위에 떠 있는 공통 글래스 헤더
+          SafeArea(
+            bottom: false,
+            child: Align(
+              alignment: Alignment.topRight,
+              child: Padding(
+                padding: EdgeInsets.only(top: 8, right: 16),
+                child: _HeaderButtons(),
+              ),
+            ),
+          ),
+        ],
       ),
       bottomNavigationBar: _subMenu
           ? AppTabBar(
@@ -93,6 +114,69 @@ class _MainShellState extends State<MainShell> {
               currentIndex: _mainIndex,
               onTap: _onMainTap,
             ),
+    );
+  }
+}
+
+/// 상단 우측 글래스 버튼 묶음 (모든 탭 공통)
+///
+/// 바코드 오버레이가 떠 있는 동안에는 버튼 모양은 그대로 두고
+/// 터치만 비활성화한다. 글래스 눌림 효과가 딤 위로 그려지는 것을 막기 위함.
+class _HeaderButtons extends StatefulWidget {
+  _HeaderButtons();
+
+  @override
+  State<_HeaderButtons> createState() => _HeaderButtonsState();
+}
+
+class _HeaderButtonsState extends State<_HeaderButtons> {
+  bool _overlayOpen = false;
+
+  Future<void> _openBarcode() async {
+    setState(() => _overlayOpen = true);
+    await showAttendanceBarcode(context);
+    if (mounted) setState(() => _overlayOpen = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        GlassIconButton(
+          symbol: 'barcode.viewfinder',
+          enabled: !_overlayOpen,
+          onPressed: _openBarcode,
+        ),
+        SizedBox(width: 10),
+        GlassIconButton(
+          symbol: 'message',
+          enabled: !_overlayOpen,
+          onPressed: () => Navigator.push(
+            context,
+            CupertinoPageRoute(builder: (_) => MessageScreen()),
+          ),
+        ),
+        SizedBox(width: 10),
+        GlassIconButton(
+          symbol: 'bell',
+          showBadge: true,
+          enabled: !_overlayOpen,
+          onPressed: () => Navigator.push(
+            context,
+            CupertinoPageRoute(builder: (_) => NotificationScreen()),
+          ),
+        ),
+        SizedBox(width: 10),
+        GlassIconButton(
+          symbol: 'person',
+          enabled: !_overlayOpen,
+          onPressed: () => Navigator.push(
+            context,
+            CupertinoPageRoute(builder: (_) => ProfileScreen()),
+          ),
+        ),
+      ],
     );
   }
 }
