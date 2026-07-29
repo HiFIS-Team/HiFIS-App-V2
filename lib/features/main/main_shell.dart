@@ -42,14 +42,16 @@ class _MainShellState extends State<MainShell> {
     'trophy.fill',
   ];
 
-  static final _mainPages = [
+  // static으로 두면 핫 리로드 시 페이지 교체가 반영되지 않아 getter로 만든다.
+  // IndexedStack이 타입/위치 기준으로 상태를 유지하므로 매 빌드 생성해도 안전하다.
+  List<Widget> get _mainPages => [
     HomeScreen(),
     WorkScreen(),
     PlaceholderScreen(emoji: '📁', title: '프로젝트'),
     PlaceholderScreen(emoji: '📝', title: '회의록'),
   ];
 
-  static final _subPages = [
+  List<Widget> get _subPages => [
     PlaceholderScreen(emoji: '🗓️', title: '근태·월차'),
     PlaceholderScreen(emoji: '💰', title: '급여'),
     PlaceholderScreen(emoji: '📣', title: '공지'),
