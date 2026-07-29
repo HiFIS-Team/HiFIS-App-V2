@@ -1,10 +1,14 @@
+import 'dart:ui';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_tab_bar.dart';
+import '../../core/widgets/pressable.dart';
 import 'desktop_sidebar.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/placeholder_screen.dart';
@@ -155,6 +159,14 @@ class _MainShellState extends State<MainShell> {
                               ),
                             ),
                           ),
+                          // 우하단 사내톡 플로팅 필 (인스타그램 데스크톱 패턴)
+                          Align(
+                            alignment: Alignment.bottomRight,
+                            child: Padding(
+                              padding: EdgeInsets.only(right: 20, bottom: 20),
+                              child: _ChatPill(),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -205,6 +217,116 @@ class _MainShellState extends State<MainShell> {
               currentIndex: _mainIndex,
               onTap: _onMainTap,
             ),
+    );
+  }
+}
+
+/// 데스크톱 우하단 사내톡 플로팅 필
+///
+/// 인스타그램 데스크톱의 메시지 필과 같은 위치·역할이지만
+/// 앱의 글래스 스타일(블러 + 반투명 surface + 헤어라인)로 그린다.
+/// 누르면 사내톡 화면이 콘텐츠 영역 안에서 열린다.
+class _ChatPill extends StatelessWidget {
+  _ChatPill();
+
+  @override
+  Widget build(BuildContext context) {
+    // 사내톡 목업의 최근 대화 상대 3명 (기능 연동 시 실제 데이터로 교체)
+    final people = [
+      ('김', AppColors.primary),
+      ('박', AppColors.warning),
+      ('이', AppColors.success),
+    ];
+
+    return Pressable(
+      scale: 0.97,
+      onTap: () => Navigator.push(
+        context,
+        CupertinoPageRoute(builder: (_) => MessageScreen()),
+      ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(26),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.10),
+              blurRadius: 24,
+              offset: Offset(0, 8),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(26),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+            child: Container(
+              height: 52,
+              padding: EdgeInsets.fromLTRB(18, 0, 12, 0),
+              decoration: BoxDecoration(
+                color: AppColors.surface.withValues(alpha: 0.72),
+                borderRadius: BorderRadius.circular(26),
+                border: Border.all(color: AppColors.gray100),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.chat_bubble_outline_rounded,
+                    size: 19,
+                    color: AppColors.gray700,
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    '사내톡',
+                    style: AppTextStyles.label.copyWith(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  SizedBox(width: 14),
+                  // 최근 대화 상대 아바타 겹침 스택
+                  SizedBox(
+                    width: 28.0 + 18 * (people.length - 1),
+                    height: 28,
+                    child: Stack(
+                      children: [
+                        for (var i = 0; i < people.length; i++)
+                          Positioned(
+                            left: i * 18.0,
+                            child: Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                color: people[i].$2,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: AppColors.surface,
+                                  width: 2,
+                                ),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  people[i].$1,
+                                  style: TextStyle(
+                                    fontFamily: AppTextStyles.fontFamily,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
