@@ -106,9 +106,9 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SizedBox(height: 24),
+            SizedBox(height: 14),
             _logo(),
-            SizedBox(height: 16),
+            SizedBox(height: 10),
             // 업무 탭바처럼 섹션들을 남는 높이에 고르게 분배하고,
             // 창이 낮으면 스크롤로 전환해 잘리지 않게 한다
             Expanded(
@@ -118,18 +118,17 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
                     constraints: BoxConstraints(
                       minHeight: constraints.maxHeight,
                     ),
-                    child: Padding(
-                      padding: EdgeInsets.only(bottom: 20),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: children,
-                      ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: children,
                     ),
                   ),
                 ),
               ),
             ),
+            // 스크롤 영역 밖이라 어떤 상황에도 마지막 항목 아래 여백이 유지된다
+            SizedBox(height: 14),
           ],
         ),
       ),
@@ -174,7 +173,7 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
 
   Widget _sectionHeader(String title) {
     return SizedBox(
-      height: 34,
+      height: 30,
       child: Stack(
         children: [
           // 접힘: 짧은 구분선
