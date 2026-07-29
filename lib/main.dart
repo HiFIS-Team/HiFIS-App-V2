@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 
 import 'core/theme/app_colors.dart';
@@ -40,6 +42,21 @@ class _HiFISAppState extends State<HiFISApp> with WidgetsBindingObserver {
     if (obscured != _obscured) setState(() => _obscured = obscured);
   }
 
+  /// 데스크톱(macOS)에서는 넓은 창에서도 폰 레이아웃이 늘어지지 않게
+  /// 가운데 고정 폭으로 담고, 양옆은 옅은 회색 여백으로 채운다
+  Widget _desktopFrame(Widget child) {
+    if (defaultTargetPlatform != TargetPlatform.macOS) return child;
+    return ColoredBox(
+      color: AppColors.gray50,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: 560),
+          child: ClipRect(child: child),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -51,7 +68,7 @@ class _HiFISAppState extends State<HiFISApp> with WidgetsBindingObserver {
       // 비활성 상태에 가림막을 덮는다 (토스식 프라이버시 커버)
       builder: (context, child) => Stack(
         children: [
-          child!,
+          _desktopFrame(child!),
           if (_obscured)
             Positioned.fill(
               child: Container(
