@@ -439,7 +439,8 @@ class _CountChip extends StatelessWidget {
   }
 }
 
-class _AdjustButton extends StatelessWidget {
+/// 스테퍼 버튼 — 누르는 동안 원이 줄어들며 버튼 색으로 물든다
+class _AdjustButton extends StatefulWidget {
   _AdjustButton({required this.icon, required this.color, required this.onTap});
 
   final IconData icon;
@@ -447,24 +448,45 @@ class _AdjustButton extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
+  State<_AdjustButton> createState() => _AdjustButtonState();
+}
+
+class _AdjustButtonState extends State<_AdjustButton> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed != value) setState(() => _pressed = value);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Pressable(
-      onTap: onTap,
-      scale: 0.8,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => _setPressed(true),
+      onTapUp: (_) => _setPressed(false),
+      onTapCancel: () => _setPressed(false),
+      onTap: widget.onTap,
       child: SizedBox(
         width: 42,
         height: 48,
         child: Center(
-          // 아이콘 뒤 작은 원 — 스테퍼 버튼처럼 보이게
-          child: Container(
-            width: 26,
-            height: 26,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              shape: BoxShape.circle,
+          child: AnimatedScale(
+            scale: _pressed ? 0.82 : 1.0,
+            duration: Duration(milliseconds: 110),
+            curve: Curves.easeOut,
+            child: AnimatedContainer(
+              duration: Duration(milliseconds: 110),
+              width: 26,
+              height: 26,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: _pressed
+                    ? widget.color.withValues(alpha: 0.18)
+                    : AppColors.surface,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(widget.icon, size: 13, color: widget.color),
             ),
-            child: Icon(icon, size: 13, color: color),
           ),
         ),
       ),
