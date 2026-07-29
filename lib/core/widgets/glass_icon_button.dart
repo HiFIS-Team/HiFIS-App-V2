@@ -13,8 +13,7 @@ class GlassIconButton extends StatelessWidget {
     this.onPressed,
     this.showBadge = false,
     this.size = 40,
-    this.frozen = false,
-    this.fallbackIcon,
+    this.enabled = true,
   });
 
   final String symbol;
@@ -24,48 +23,25 @@ class GlassIconButton extends StatelessWidget {
   /// 버튼 지름. 심볼 크기는 비율에 맞춰 함께 커진다.
   final double size;
 
-  /// true면 네이티브 버튼 대신 플러터로 그린 대체 버튼을 보여준다.
-  /// 네이티브 뷰는 오버레이의 어두운 배경 위로 눌림 효과를 그려버리므로,
-  /// 오버레이가 떠 있는 동안 이 값을 켜서 네이티브 뷰를 트리에서 뺀다.
-  final bool frozen;
-
-  /// frozen 상태에서 대신 표시할 아이콘 (SF Symbol은 못 쓰므로 별도 지정)
-  final IconData? fallbackIcon;
+  /// false면 모양은 그대로 두고 네이티브 버튼이 터치만 무시한다.
+  /// 글래스 눌림 효과는 오버레이의 딤보다 위에 그려지므로,
+  /// 오버레이가 떠 있는 동안 이 값을 꺼서 눌림 자체를 막는다.
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        if (frozen)
-          Container(
-            width: size,
-            height: size,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.surface.withValues(alpha: 0.8),
-              shape: BoxShape.circle,
-              // 네이티브 글래스의 밝은 림을 흉내내는 헤어라인 테두리
-              border: Border.all(color: AppColors.gray100),
-            ),
-            child: fallbackIcon != null
-                ? Icon(
-                    // 네이티브 SF 심볼 잉크 실측(≈20pt/40pt 버튼)에 맞춘 크기
-                    fallbackIcon,
-                    size: size * 0.66,
-                    color: AppColors.gray700,
-                  )
-                : null,
-          )
-        else
-          CNButton.icon(
-            // 패키지의 setBrightness가 아이콘 설정을 유실하는 버그가 있어,
-            // 테마가 바뀌면 네이티브 버튼을 새로 생성한다.
-            key: ValueKey('glass-$symbol-${AppColors.isDark}'),
-            icon: CNSymbol(symbol, size: size * 0.42, color: AppColors.gray700),
-            size: size,
-            onPressed: onPressed ?? () {},
-          ),
+        CNButton.icon(
+          // 패키지의 setBrightness가 아이콘 설정을 유실하는 버그가 있어,
+          // 테마가 바뀌면 네이티브 버튼을 새로 생성한다.
+          key: ValueKey('glass-$symbol-${AppColors.isDark}'),
+          icon: CNSymbol(symbol, size: size * 0.42, color: AppColors.gray700),
+          size: size,
+          enabled: enabled,
+          onPressed: onPressed ?? () {},
+        ),
         if (showBadge)
           Positioned(
             top: 2,

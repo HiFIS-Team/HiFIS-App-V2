@@ -57,8 +57,8 @@ class HomeScreen extends StatelessWidget {
 
 /// 상단 우측 글래스 버튼 묶음
 ///
-/// 바코드 오버레이가 떠 있는 동안에는 네이티브 글래스 버튼이
-/// 어두운 배경 위로 눌림 효과를 그리지 않게 플러터 대체 버튼으로 바꾼다.
+/// 바코드 오버레이가 떠 있는 동안에는 버튼 모양은 그대로 두고
+/// 터치만 비활성화한다. 글래스 눌림 효과가 딤 위로 그려지는 것을 막기 위함.
 class _HeaderButtons extends StatefulWidget {
   _HeaderButtons();
 
@@ -68,17 +68,10 @@ class _HeaderButtons extends StatefulWidget {
 
 class _HeaderButtonsState extends State<_HeaderButtons> {
   bool _overlayOpen = false;
-  bool _barcodeShowing = false;
 
   Future<void> _openBarcode() async {
-    _barcodeShowing = true;
-    final closed = showAttendanceBarcode(context);
-    // 딤이 완전히 올라온 뒤(전환 380ms)에 버튼을 교체해 전환이 안 보이게 한다
-    Future.delayed(Duration(milliseconds: 400), () {
-      if (mounted && _barcodeShowing) setState(() => _overlayOpen = true);
-    });
-    await closed;
-    _barcodeShowing = false;
+    setState(() => _overlayOpen = true);
+    await showAttendanceBarcode(context);
     if (mounted) setState(() => _overlayOpen = false);
   }
 
@@ -89,15 +82,13 @@ class _HeaderButtonsState extends State<_HeaderButtons> {
       children: [
         GlassIconButton(
           symbol: 'barcode.viewfinder',
-          frozen: _overlayOpen,
-          fallbackIcon: CupertinoIcons.barcode_viewfinder,
+          enabled: !_overlayOpen,
           onPressed: _openBarcode,
         ),
         SizedBox(width: 10),
         GlassIconButton(
           symbol: 'message',
-          frozen: _overlayOpen,
-          fallbackIcon: CupertinoIcons.chat_bubble,
+          enabled: !_overlayOpen,
           onPressed: () => Navigator.push(
             context,
             CupertinoPageRoute(builder: (_) => MessageScreen()),
@@ -107,8 +98,7 @@ class _HeaderButtonsState extends State<_HeaderButtons> {
         GlassIconButton(
           symbol: 'bell',
           showBadge: true,
-          frozen: _overlayOpen,
-          fallbackIcon: CupertinoIcons.bell,
+          enabled: !_overlayOpen,
           onPressed: () => Navigator.push(
             context,
             CupertinoPageRoute(builder: (_) => NotificationScreen()),
@@ -117,8 +107,7 @@ class _HeaderButtonsState extends State<_HeaderButtons> {
         SizedBox(width: 10),
         GlassIconButton(
           symbol: 'person',
-          frozen: _overlayOpen,
-          fallbackIcon: CupertinoIcons.person,
+          enabled: !_overlayOpen,
           onPressed: () => Navigator.push(
             context,
             CupertinoPageRoute(builder: (_) => ProfileScreen()),
