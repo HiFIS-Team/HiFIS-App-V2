@@ -408,9 +408,7 @@ class _GlassPillButton extends StatelessWidget {
               decoration: BoxDecoration(
                 color: AppColors.surface.withValues(alpha: 0.72),
                 borderRadius: BorderRadius.circular(28),
-                border: Border.all(
-                  color: AppColors.surface.withValues(alpha: 0.7),
-                ),
+                border: Border.all(color: AppColors.gray100),
               ),
               child: Text(
                 label,
@@ -463,9 +461,7 @@ class _ConfirmButton extends StatelessWidget {
                     : AppColors.surface.withValues(alpha: 0.72),
                 borderRadius: BorderRadius.circular(28),
                 border: Border.all(
-                  color: _enabled
-                      ? Colors.transparent
-                      : AppColors.surface.withValues(alpha: 0.7),
+                  color: _enabled ? Colors.transparent : AppColors.gray100,
                 ),
               ),
               child: Text(

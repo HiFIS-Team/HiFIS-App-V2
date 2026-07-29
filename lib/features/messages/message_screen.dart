@@ -208,9 +208,8 @@ class _FloatingSearchBar extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppColors.surface.withValues(alpha: 0.72),
               borderRadius: BorderRadius.circular(28),
-              border: Border.all(
-                color: AppColors.surface.withValues(alpha: 0.7),
-              ),
+              // 네이티브 글래스의 림처럼 보이는 헤어라인 — 흰 배경에서도 구분되게
+              border: Border.all(color: AppColors.gray100),
             ),
             child: Row(
               children: [
