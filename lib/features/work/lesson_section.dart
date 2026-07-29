@@ -8,6 +8,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/glass_search_bar.dart';
+import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/pressable.dart';
 
 /// 수업 개수 탭 콘텐츠 (목업)
@@ -850,7 +851,7 @@ class _RegisterScreenState extends State<_RegisterScreen> {
                       MediaQuery.paddingOf(context).bottom + 96,
                     ),
                     children: [
-                      _ModeSwitch(
+                      ModeSwitch(
                         left: '신규 회원',
                         right: '재등록',
                         value: _renew,
@@ -1139,88 +1140,6 @@ class _RenewPickRow extends StatelessWidget {
 }
 
 /// 신규 회원 / 재등록 전환 세그먼트
-class _ModeSwitch extends StatelessWidget {
-  _ModeSwitch({
-    required this.left,
-    required this.right,
-    required this.value,
-    required this.onChanged,
-  });
-
-  final String left;
-  final String right;
-
-  /// true면 오른쪽이 선택된 상태
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 48,
-      padding: EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: AppColors.gray50,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _Segment(
-              label: left,
-              selected: !value,
-              onTap: () => onChanged(false),
-            ),
-          ),
-          Expanded(
-            child: _Segment(
-              label: right,
-              selected: value,
-              onTap: () => onChanged(true),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Segment extends StatelessWidget {
-  _Segment({required this.label, required this.selected, required this.onTap});
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Pressable(
-      onTap: onTap,
-      scale: 0.97,
-      child: AnimatedContainer(
-        duration: Duration(milliseconds: 150),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.surface : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: selected ? AppColors.gray100 : Colors.transparent,
-          ),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: AppTextStyles.body2.copyWith(
-              fontSize: 14,
-              color: selected ? AppColors.textPrimary : AppColors.gray500,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// 회색 입력 칸
 class _FormField extends StatelessWidget {
   _FormField({required this.controller, required this.hint, this.keyboardType});
@@ -1318,7 +1237,7 @@ class _PickMemberScreenState extends State<_PickMemberScreen> {
                       MediaQuery.paddingOf(context).bottom + 96,
                     ),
                     children: [
-                      _ModeSwitch(
+                      ModeSwitch(
                         left: '내 담당 (${_members.length})',
                         right: '전체',
                         value: _all,
