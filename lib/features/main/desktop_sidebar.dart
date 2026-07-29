@@ -33,6 +33,9 @@ class DesktopSidebar extends StatefulWidget {
 class _DesktopSidebarState extends State<DesktopSidebar> {
   bool _hovered = false;
 
+  /// 커서가 올라가 있는 항목 (인스타그램처럼 호버한 칸에만 배경색을 입힌다)
+  int? _hoverIndex;
+
   /// (섹션 제목, 메뉴 목록) — 제목이 null이면 캡션 없이 그린다
   static final List<(String?, List<(IconData, String)>)> _sections = [
     (null, [(CupertinoIcons.house_fill, '홈')]),
@@ -212,58 +215,66 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
 
   Widget _item(int index, (IconData, String) item) {
     final selected = index == widget.selectedIndex;
+    final hovered = index == _hoverIndex;
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-      child: Pressable(
-        scale: 0.97,
-        pressedColor: AppColors.gray50,
-        borderRadius: BorderRadius.circular(10),
-        onTap: () => widget.onSelect(index),
-        child: AnimatedContainer(
-          duration: Duration(milliseconds: 150),
-          height: 44,
-          // 오른쪽 경계 헤어라인(1px)이 안쪽 폭을 깎으므로 14가 아닌 13 —
-          // 14면 접힘 상태에서 아이콘이 1px 오버플로된다
-          padding: EdgeInsets.symmetric(horizontal: 13),
-          decoration: BoxDecoration(
-            color: selected ? AppColors.primaryLight : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 20,
-                child: Icon(
-                  item.$1,
-                  size: 20,
-                  color: selected ? AppColors.primary : AppColors.gray500,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hoverIndex = index),
+        onExit: (_) => setState(() {
+          if (_hoverIndex == index) _hoverIndex = null;
+        }),
+        child: Pressable(
+          scale: 0.97,
+          pressedColor: AppColors.gray100,
+          borderRadius: BorderRadius.circular(10),
+          onTap: () => widget.onSelect(index),
+          child: AnimatedContainer(
+            duration: Duration(milliseconds: 150),
+            height: 44,
+            // 오른쪽 경계 헤어라인(1px)이 안쪽 폭을 깎으므로 14가 아닌 13 —
+            // 14면 접힘 상태에서 아이콘이 1px 오버플로된다
+            padding: EdgeInsets.symmetric(horizontal: 13),
+            // 인스타그램처럼 배경색은 호버한 칸에만 — 선택 표시는 색·굵기로만
+            decoration: BoxDecoration(
+              color: hovered ? AppColors.gray50 : Colors.transparent,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  child: Icon(
+                    item.$1,
+                    size: 20,
+                    color: selected ? AppColors.primary : AppColors.gray500,
+                  ),
                 ),
-              ),
-              Expanded(
-                child: ClipRect(
-                  child: _fade(
-                    Padding(
-                      padding: EdgeInsets.only(left: 10),
-                      child: Text(
-                        item.$2,
-                        maxLines: 1,
-                        softWrap: false,
-                        overflow: TextOverflow.clip,
-                        style: AppTextStyles.label.copyWith(
-                          fontSize: 15,
-                          fontWeight: selected
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: selected
-                              ? AppColors.primary
-                              : AppColors.gray600,
+                Expanded(
+                  child: ClipRect(
+                    child: _fade(
+                      Padding(
+                        padding: EdgeInsets.only(left: 10),
+                        child: Text(
+                          item.$2,
+                          maxLines: 1,
+                          softWrap: false,
+                          overflow: TextOverflow.clip,
+                          style: AppTextStyles.label.copyWith(
+                            fontSize: 15,
+                            fontWeight: selected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: selected
+                                ? AppColors.primary
+                                : AppColors.gray600,
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
