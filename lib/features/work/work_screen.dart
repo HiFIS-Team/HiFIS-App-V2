@@ -394,6 +394,12 @@ class _CountChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: active ? AppColors.primaryLight : AppColors.gray50,
         borderRadius: BorderRadius.circular(14),
+        // 활성 칩에만 은은한 파란 테두리
+        border: Border.all(
+          color: active
+              ? AppColors.primary.withValues(alpha: 0.25)
+              : Colors.transparent,
+        ),
       ),
       child: Row(
         children: [
@@ -419,13 +425,35 @@ class _CountChip extends StatelessWidget {
                     ),
                   ),
                   if (active) ...[
-                    SizedBox(width: 5),
-                    Text(
-                      '$count',
-                      style: AppTextStyles.body2.copyWith(
-                        fontSize: 14,
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w700,
+                    SizedBox(width: 6),
+                    // 횟수 배지 — 숫자가 바뀔 때 아래에서 굴러 올라온다
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(100),
+                      ),
+                      child: AnimatedSwitcher(
+                        duration: Duration(milliseconds: 200),
+                        transitionBuilder: (child, animation) => FadeTransition(
+                          opacity: animation,
+                          child: SlideTransition(
+                            position: Tween(
+                              begin: Offset(0, 0.6),
+                              end: Offset.zero,
+                            ).animate(animation),
+                            child: child,
+                          ),
+                        ),
+                        child: Text(
+                          '$count',
+                          key: ValueKey(count),
+                          style: AppTextStyles.caption.copyWith(
+                            fontSize: 12,
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -457,9 +485,21 @@ class _AdjustButton extends StatelessWidget {
       onTap: onTap,
       scale: 0.8,
       child: SizedBox(
-        width: 38,
+        width: 42,
         height: 48,
-        child: Icon(icon, size: 15, color: color),
+        child: Center(
+          // 아이콘 뒤 작은 원 — 스테퍼 버튼처럼 보이게
+          child: Container(
+            width: 26,
+            height: 26,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 13, color: color),
+          ),
+        ),
       ),
     );
   }
