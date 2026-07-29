@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/glass_icon_button.dart';
+import '../../core/widgets/pressable.dart';
 import '../../core/widgets/top_frost.dart';
 import 'new_message_screen.dart';
 
@@ -17,6 +18,7 @@ class ChatDetailScreen extends StatefulWidget {
     required this.color,
     this.emoji,
     this.onInvite,
+    this.onRename,
   });
 
   final String name;
@@ -25,6 +27,9 @@ class ChatDetailScreen extends StatefulWidget {
 
   /// 멤버 초대가 확정되면 초대된 이름 목록과 함께 호출된다.
   final ValueChanged<List<String>>? onInvite;
+
+  /// 채팅방 이름이 변경되면 새 이름과 함께 호출된다.
+  final ValueChanged<String>? onRename;
 
   @override
   State<ChatDetailScreen> createState() => _ChatDetailScreenState();
@@ -37,6 +42,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   double _collapse = 0;
 
   int _shareTab = 0;
+
+  /// 채팅방 이름 (변경 시 갱신)
+  late String _name = widget.name;
 
   static const _shareTabs = ['사진', '영상', '파일'];
 
@@ -55,6 +63,43 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _rename() async {
+    final controller = TextEditingController(text: _name);
+    final result = await showCupertinoDialog<String>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: Text('이름 변경'),
+        content: Padding(
+          padding: EdgeInsets.only(top: 12),
+          child: CupertinoTextField(
+            controller: controller,
+            autofocus: true,
+            placeholder: '채팅방 이름',
+            onSubmitted: (value) => Navigator.pop(dialogContext, value.trim()),
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text('취소'),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () =>
+                Navigator.pop(dialogContext, controller.text.trim()),
+            child: Text('저장'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (result == null || result.isEmpty || result == _name || !mounted) {
+      return;
+    }
+    setState(() => _name = result);
+    widget.onRename?.call(result);
   }
 
   Future<void> _invite() async {
@@ -120,7 +165,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       shape: BoxShape.circle,
                     ),
                     child: Text(
-                      widget.emoji ?? widget.name.characters.first,
+                      widget.emoji ?? _name.characters.first,
                       style: widget.emoji != null
                           ? TextStyle(fontSize: 36)
                           : TextStyle(
@@ -133,7 +178,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   ),
                 ),
                 SizedBox(height: 14),
-                Center(child: Text(widget.name, style: AppTextStyles.title2)),
+                Center(child: Text(_name, style: AppTextStyles.title2)),
                 SizedBox(height: 32),
                 _SectionLabel('이름 변경'),
                 SizedBox(height: 8),
@@ -142,28 +187,31 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          widget.name,
+                          _name,
                           style: AppTextStyles.body1.copyWith(
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
-                      // TODO: 채팅방 이름 변경 기능 연동
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.gray100),
-                        ),
-                        child: Text(
-                          '변경',
-                          style: AppTextStyles.label.copyWith(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.w600,
+                      Pressable(
+                        onTap: _rename,
+                        scale: 0.9,
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.gray100),
+                          ),
+                          child: Text(
+                            '변경',
+                            style: AppTextStyles.label.copyWith(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ),
@@ -243,7 +291,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   ),
                   Spacer(),
                   GlassIconButton(
-                    symbol: 'rectangle.portrait.and.arrow.right',
+                    // 좌우 무게가 균형 잡힌 문 심볼 — 사각+화살표 심볼은
+                    // 잉크가 왼쪽으로 쏠려 보인다
+                    symbol: 'door.right.hand.open',
                     symbolColor: AppColors.error,
                     onPressed: _leave,
                   ),
@@ -281,19 +331,17 @@ class _SettingBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        height: 64,
-        padding: EdgeInsets.symmetric(horizontal: 18),
-        decoration: BoxDecoration(
-          color: AppColors.gray50,
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: child,
+    final box = Container(
+      height: 64,
+      padding: EdgeInsets.symmetric(horizontal: 18),
+      decoration: BoxDecoration(
+        color: AppColors.gray50,
+        borderRadius: BorderRadius.circular(18),
       ),
+      child: child,
     );
+    if (onTap == null) return box;
+    return Pressable(onTap: onTap!, scale: 0.98, child: box);
   }
 }
 
@@ -312,8 +360,9 @@ class _ShareTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return Pressable(
       onTap: onTap,
+      scale: 0.94,
       child: Container(
         padding: EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/glass_icon_button.dart';
+import '../../core/widgets/pressable.dart';
 import '../../core/widgets/top_frost.dart';
 import 'chat_detail_screen.dart';
 
@@ -52,6 +53,9 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final _scrollController = ScrollController();
   final _inputFocus = FocusNode();
+
+  /// 채팅방 이름 (상세 화면에서 변경 가능)
+  late String _title = widget.name;
 
   /// 답글 작성 대상 메시지 (없으면 일반 전송)
   _ChatMessage? _replyTarget;
@@ -105,10 +109,11 @@ class _ChatScreenState extends State<ChatScreen> {
       context,
       CupertinoPageRoute(
         builder: (_) => ChatDetailScreen(
-          name: widget.name,
+          name: _title,
           color: widget.color,
           emoji: widget.emoji,
           onInvite: _onMembersInvited,
+          onRename: (value) => setState(() => _title = value),
         ),
       ),
     );
@@ -209,7 +214,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                   onLongPress: () => _openMessageMenu(message),
                                 )
                               : _TheirBubble(
-                                  name: widget.name,
+                                  name: _title,
                                   color: widget.color,
                                   emoji: widget.emoji,
                                   text: message.text,
@@ -258,8 +263,12 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   SizedBox(width: 4),
                   // 이름 영역 탭 → 채팅방 상세로 이동
-                  _PressableHeader(
+                  Pressable(
                     onTap: _openDetail,
+                    scale: 0.94,
+                    pressedColor: AppColors.gray100,
+                    borderRadius: BorderRadius.circular(24),
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                     child: Row(
                       children: [
                         Container(
@@ -273,7 +282,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             shape: BoxShape.circle,
                           ),
                           child: Text(
-                            widget.emoji ?? widget.name.characters.first,
+                            widget.emoji ?? _title.characters.first,
                             style: widget.emoji != null
                                 ? TextStyle(fontSize: 15)
                                 : TextStyle(
@@ -285,7 +294,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           ),
                         ),
                         SizedBox(width: 10),
-                        Text(widget.name, style: AppTextStyles.title3),
+                        Text(_title, style: AppTextStyles.title3),
                         SizedBox(width: 2),
                         Icon(
                           CupertinoIcons.chevron_forward,
@@ -348,51 +357,6 @@ class _ChatMessage {
 
   /// 전송 취소로 사라지는 중인지 여부 (애니메이션 후 리스트에서 제거)
   bool removing = false;
-}
-
-/// 헤더 이름 영역의 눌림 피드백 — 누르면 회색 배경과 함께 살짝 줄어들었다
-/// 떼면 원래 크기로 돌아온다.
-class _PressableHeader extends StatefulWidget {
-  _PressableHeader({required this.onTap, required this.child});
-
-  final VoidCallback onTap;
-  final Widget child;
-
-  @override
-  State<_PressableHeader> createState() => _PressableHeaderState();
-}
-
-class _PressableHeaderState extends State<_PressableHeader> {
-  bool _pressed = false;
-
-  void _setPressed(bool value) {
-    if (_pressed != value) setState(() => _pressed = value);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => _setPressed(true),
-      onTapUp: (_) => _setPressed(false),
-      onTapCancel: () => _setPressed(false),
-      onTap: widget.onTap,
-      child: AnimatedScale(
-        scale: _pressed ? 0.94 : 1.0,
-        duration: Duration(milliseconds: 120),
-        curve: Curves.easeOut,
-        child: AnimatedContainer(
-          duration: Duration(milliseconds: 120),
-          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-          decoration: BoxDecoration(
-            color: _pressed ? AppColors.gray100 : Colors.transparent,
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: widget.child,
-        ),
-      ),
-    );
-  }
 }
 
 /// 전송 취소 시 말풍선이 줄어들고 흐려지며 사라지는 애니메이션 래퍼
