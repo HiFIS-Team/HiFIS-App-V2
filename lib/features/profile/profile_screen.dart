@@ -6,6 +6,7 @@ import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/theme/theme_controller.dart';
 import '../../core/widgets/glass_icon_button.dart';
+import '../../core/widgets/pressable.dart';
 import '../../core/widgets/top_frost.dart';
 
 /// 내 프로필 화면 (목업)
@@ -265,21 +266,26 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
             children: [
               _Avatar(size: 56, color: _avatarColors[_selectedColor]),
               SizedBox(width: 14),
-              OutlinedButton(
-                onPressed: () {},
-                style: OutlinedButton.styleFrom(
-                  minimumSize: Size(0, 48),
+              Pressable(
+                onTap: () {},
+                scale: 0.94,
+                child: Container(
+                  height: 48,
                   padding: EdgeInsets.symmetric(horizontal: 18),
-                  side: BorderSide(color: AppColors.gray200),
-                  shape: RoundedRectangleBorder(
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
                     borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.gray200),
                   ),
-                ),
-                child: Text(
-                  '이미지 업로드',
-                  style: AppTextStyles.label.copyWith(
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w600,
+                  child: Center(
+                    widthFactor: 1,
+                    child: Text(
+                      '이미지 업로드',
+                      style: AppTextStyles.label.copyWith(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -298,8 +304,9 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
             runSpacing: 10,
             children: [
               for (var i = 0; i < _avatarColors.length; i++)
-                GestureDetector(
+                Pressable(
                   onTap: () => setState(() => _selectedColor = i),
+                  scale: 0.88,
                   child: Container(
                     width: 40,
                     height: 40,
@@ -440,8 +447,9 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return Pressable(
       onTap: onTap,
+      scale: 0.95,
       child: Container(
         height: 52,
         alignment: Alignment.center,
@@ -576,8 +584,9 @@ class _ThemeOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return Pressable(
       onTap: onTap,
+      scale: 0.97,
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.surface,
@@ -776,21 +785,31 @@ class _WithdrawCard extends StatelessWidget {
             style: AppTextStyles.caption,
           ),
           SizedBox(height: 16),
-          OutlinedButton(
-            onPressed: () {},
-            style: OutlinedButton.styleFrom(
-              minimumSize: Size(0, 48),
-              padding: EdgeInsets.symmetric(horizontal: 18),
-              side: BorderSide(color: AppColors.error.withValues(alpha: 0.5)),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(
-              '회원 탈퇴하기',
-              style: AppTextStyles.label.copyWith(
-                color: AppColors.error,
-                fontWeight: FontWeight.w600,
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Pressable(
+              onTap: () {},
+              scale: 0.94,
+              child: Container(
+                height: 48,
+                padding: EdgeInsets.symmetric(horizontal: 18),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.error.withValues(alpha: 0.5),
+                  ),
+                ),
+                child: Center(
+                  widthFactor: 1,
+                  child: Text(
+                    '회원 탈퇴하기',
+                    style: AppTextStyles.label.copyWith(
+                      color: AppColors.error,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
@@ -885,14 +904,27 @@ class _SmallPrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ElevatedButton(
-      onPressed: () {},
-      style: ElevatedButton.styleFrom(
-        minimumSize: Size(0, 48),
+    return Pressable(
+      onTap: () {},
+      scale: 0.94,
+      child: Container(
+        height: 48,
         padding: EdgeInsets.symmetric(horizontal: 22),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        decoration: BoxDecoration(
+          color: AppColors.primary,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Center(
+          widthFactor: 1,
+          child: Text(
+            label,
+            style: AppTextStyles.label.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
       ),
-      child: Text(label),
     );
   }
 }
