@@ -29,21 +29,22 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> {
+  // 아이콘은 장식이 적은 심플한 심볼로 통일한다
   static const _mainSymbols = [
     'house.fill',
     'briefcase.fill',
     'folder.fill',
-    'doc.text.fill',
+    'doc.fill',
     'square.grid.2x2.fill',
   ];
 
   // 서브 바의 0번은 메인 바로 돌아가는 뒤로가기
   static const _subSymbols = [
     'chevron.backward',
-    'calendar.badge.clock',
+    'clock.fill',
     'wonsign.circle.fill',
     'megaphone.fill',
-    'trophy.fill',
+    'chart.bar.fill',
   ];
 
   // static으로 두면 핫 리로드 시 페이지 교체가 반영되지 않아 getter로 만든다.

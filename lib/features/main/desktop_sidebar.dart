@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -36,37 +35,29 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
   /// 커서가 올라가 있는 항목 (인스타그램처럼 호버한 칸에만 배경색을 입힌다)
   int? _hoverIndex;
 
-  /// (섹션 제목, 메뉴 목록) — 제목이 null이면 캡션 없이 그린다
+  /// (섹션 제목, 메뉴 목록) — 제목이 null이면 캡션 없이 그린다.
+  /// 아이콘은 장식이 적은 심플한 라운드 세트로 통일한다.
   static final List<(String?, List<(IconData, String)>)> _sections = [
-    (null, [(CupertinoIcons.house_fill, '홈')]),
+    (null, [(Icons.home_rounded, '홈')]),
     (
       '업무',
       [
-        (CupertinoIcons.briefcase_fill, '업무'),
-        (CupertinoIcons.folder_fill, '프로젝트'),
-        (CupertinoIcons.calendar, '일정'),
-        (CupertinoIcons.doc_text_fill, '회의록'),
+        (Icons.work_rounded, '업무'),
+        (Icons.folder_rounded, '프로젝트'),
+        (Icons.calendar_today_rounded, '일정'),
+        (Icons.description_rounded, '회의록'),
       ],
     ),
-    (
-      '문서',
-      [
-        (CupertinoIcons.tray_full_fill, '문서함'),
-        (CupertinoIcons.checkmark_seal_fill, '전자결재'),
-      ],
-    ),
+    ('문서', [(Icons.inbox_rounded, '문서함'), (Icons.approval_rounded, '전자결재')]),
     (
       '직원',
       [
-        (CupertinoIcons.person_2_fill, '직원'),
-        (CupertinoIcons.clock_fill, '근태·월차'),
-        (CupertinoIcons.money_dollar_circle_fill, '급여'),
+        (Icons.people_rounded, '직원'),
+        (Icons.schedule_rounded, '근태·월차'),
+        (Icons.payments_rounded, '급여'),
       ],
     ),
-    (
-      '소식',
-      [(Icons.campaign_rounded, '공지'), (Icons.emoji_events_rounded, '랭킹')],
-    ),
+    ('소식', [(Icons.campaign_rounded, '공지'), (Icons.leaderboard_rounded, '랭킹')]),
   ];
 
   /// 펼쳐질 때만 보이는 요소 (메뉴 제목, 섹션 캡션, 워드마크)
