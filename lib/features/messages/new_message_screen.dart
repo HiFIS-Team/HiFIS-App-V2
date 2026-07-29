@@ -469,7 +469,12 @@ class _ConfirmButton extends StatelessWidget {
                 ),
               ),
               child: Text(
-                _enabled ? '멤버 선택 ($count)' : '멤버 선택',
+                // 선택 인원에 따라 문구가 바뀐다: 미선택 → 1:1 → 그룹
+                switch (count) {
+                  0 => '멤버 선택',
+                  1 => '대화하기',
+                  _ => '그룹 만들기 ($count)',
+                },
                 style: AppTextStyles.body1.copyWith(
                   color: _enabled ? Colors.white : AppColors.gray400,
                   fontWeight: FontWeight.w600,
