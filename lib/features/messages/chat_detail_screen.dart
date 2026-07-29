@@ -38,7 +38,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   int _shareTab = 0;
 
-  static const _shareTabs = ['사진', '영상', '파일', '코드'];
+  static const _shareTabs = ['사진', '영상', '파일'];
 
   @override
   void initState() {
@@ -219,7 +219,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 SizedBox(height: 56),
                 Center(
                   child: Text(
-                    '공유된 ${_shareTabs[_shareTab]}${_shareTab == 3 ? '가' : '이'} 없어요',
+                    '공유된 ${_shareTabs[_shareTab]}이 없어요',
                     style: AppTextStyles.body2.copyWith(
                       color: AppColors.gray400,
                     ),
