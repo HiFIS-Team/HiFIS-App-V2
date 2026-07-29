@@ -20,8 +20,19 @@ class WorkScreen extends StatefulWidget {
 class _WorkScreenState extends State<WorkScreen> {
   int _tab = 0;
 
-  /// 환경정비 점검 완료 항목 (목업 초기값)
-  final Set<String> _done = {'세탁', '건조기', '복도청소'};
+  /// 환경정비 항목별 오늘 수행 횟수 (목업 초기값)
+  final Map<String, int> _counts = {'세탁': 2, '건조기': 1, '복도청소': 1};
+
+  void _adjust(String task, int delta) {
+    setState(() {
+      final next = (_counts[task] ?? 0) + delta;
+      if (next <= 0) {
+        _counts.remove(task);
+      } else {
+        _counts[task] = next;
+      }
+    });
+  }
 
   static const _items = [
     _WorkItem(
@@ -116,29 +127,33 @@ class _WorkScreenState extends State<WorkScreen> {
             ),
             Container(height: 1, color: AppColors.gray100),
             SizedBox(height: 20),
-            // 탭 전환 시 콘텐츠 페이드
+            // 탭 전환 시 콘텐츠 페이드.
+            // 체크리스트 탭(환경정비)은 점수 카드 없이 리스트만 보여준다.
             AnimatedSwitcher(
               duration: Duration(milliseconds: 200),
               child: Column(
                 key: ValueKey(_tab),
                 children: [
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 20),
-                    child: _ScoreCard(item: item),
-                  ),
-                  SizedBox(height: 16),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 20),
-                    child: item.checklist != null
-                        ? _ChecklistCard(
-                            items: item.checklist!,
-                            done: _done,
-                            onToggle: (task) => setState(() {
-                              if (!_done.remove(task)) _done.add(task);
-                            }),
-                          )
-                        : _DetailCard(item: item),
-                  ),
+                  if (item.checklist != null)
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 20),
+                      child: _ChecklistCard(
+                        items: item.checklist!,
+                        counts: _counts,
+                        onAdjust: _adjust,
+                      ),
+                    )
+                  else ...[
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 20),
+                      child: _ScoreCard(item: item),
+                    ),
+                    SizedBox(height: 16),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 20),
+                      child: _DetailCard(item: item),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -284,20 +299,25 @@ class _ScoreCard extends StatelessWidget {
   }
 }
 
-/// 환경정비 점검 체크리스트 카드 — 항목이 2열로 내려가며 배치된다
+/// 환경정비 점검 카드 — 항목이 2열로 내려가며 배치되고,
+/// 각 항목의 좌우 −/+ 버튼으로 오늘 수행 횟수를 조절한다.
 class _ChecklistCard extends StatelessWidget {
   _ChecklistCard({
     required this.items,
-    required this.done,
-    required this.onToggle,
+    required this.counts,
+    required this.onAdjust,
   });
 
   final List<String> items;
-  final Set<String> done;
-  final ValueChanged<String> onToggle;
+  final Map<String, int> counts;
+
+  /// (항목, 증감량) — +1 또는 -1
+  final void Function(String task, int delta) onAdjust;
 
   @override
   Widget build(BuildContext context) {
+    final total = counts.values.fold(0, (sum, c) => sum + c);
+
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(20),
@@ -311,7 +331,7 @@ class _ChecklistCard extends StatelessWidget {
               children: [
                 Expanded(child: Text('오늘 점검 항목', style: AppTextStyles.label)),
                 Text(
-                  '${done.length}/${items.length}',
+                  '총 $total회',
                   style: AppTextStyles.caption.copyWith(
                     color: AppColors.primary,
                     fontWeight: FontWeight.w700,
@@ -326,19 +346,19 @@ class _ChecklistCard extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: _CheckChip(
+                  child: _CountChip(
                     label: items[i],
-                    checked: done.contains(items[i]),
-                    onTap: () => onToggle(items[i]),
+                    count: counts[items[i]] ?? 0,
+                    onAdjust: (delta) => onAdjust(items[i], delta),
                   ),
                 ),
                 SizedBox(width: 10),
                 Expanded(
                   child: i + 1 < items.length
-                      ? _CheckChip(
+                      ? _CountChip(
                           label: items[i + 1],
-                          checked: done.contains(items[i + 1]),
-                          onTap: () => onToggle(items[i + 1]),
+                          count: counts[items[i + 1]] ?? 0,
+                          onAdjust: (delta) => onAdjust(items[i + 1], delta),
                         )
                       : SizedBox(),
                 ),
@@ -351,47 +371,94 @@ class _ChecklistCard extends StatelessWidget {
   }
 }
 
-class _CheckChip extends StatelessWidget {
-  _CheckChip({required this.label, required this.checked, required this.onTap});
+/// 좌 − / 우 + 버튼이 달린 횟수 칩
+class _CountChip extends StatelessWidget {
+  _CountChip({
+    required this.label,
+    required this.count,
+    required this.onAdjust,
+  });
 
   final String label;
-  final bool checked;
+  final int count;
+  final ValueChanged<int> onAdjust;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = count > 0;
+
+    return AnimatedContainer(
+      duration: Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      height: 48,
+      decoration: BoxDecoration(
+        color: active ? AppColors.primaryLight : AppColors.gray50,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          _AdjustButton(
+            icon: CupertinoIcons.minus,
+            color: active ? AppColors.primary : AppColors.gray300,
+            onTap: () => onAdjust(-1),
+          ),
+          Expanded(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    label,
+                    maxLines: 1,
+                    style: AppTextStyles.body2.copyWith(
+                      fontSize: 14,
+                      color: active ? AppColors.primary : AppColors.textPrimary,
+                      fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                  if (active) ...[
+                    SizedBox(width: 5),
+                    Text(
+                      '$count',
+                      style: AppTextStyles.body2.copyWith(
+                        fontSize: 14,
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          _AdjustButton(
+            icon: CupertinoIcons.plus,
+            color: AppColors.primary,
+            onTap: () => onAdjust(1),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AdjustButton extends StatelessWidget {
+  _AdjustButton({required this.icon, required this.color, required this.onTap});
+
+  final IconData icon;
+  final Color color;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.95,
-      child: AnimatedContainer(
-        duration: Duration(milliseconds: 180),
-        curve: Curves.easeOut,
+      scale: 0.8,
+      child: SizedBox(
+        width: 38,
         height: 48,
-        decoration: BoxDecoration(
-          color: checked ? AppColors.primaryLight : AppColors.gray50,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (checked) ...[
-              Icon(
-                CupertinoIcons.checkmark_alt,
-                size: 15,
-                color: AppColors.primary,
-              ),
-              SizedBox(width: 4),
-            ],
-            Text(
-              label,
-              style: AppTextStyles.body2.copyWith(
-                fontSize: 14,
-                color: checked ? AppColors.primary : AppColors.textPrimary,
-                fontWeight: checked ? FontWeight.w700 : FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
+        child: Icon(icon, size: 15, color: color),
       ),
     );
   }
