@@ -278,7 +278,14 @@ class _ChatDockState extends State<_ChatDock> {
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(20),
-                      child: MessageScreen(embedded: true),
+                      // 패널 전용 내비게이터 — 채팅방·새 채팅 화면이
+                      // 콘텐츠 영역 전체가 아니라 패널 안에서 열린다
+                      child: Navigator(
+                        onGenerateRoute: (settings) => MaterialPageRoute(
+                          settings: settings,
+                          builder: (_) => MessageScreen(embedded: true),
+                        ),
+                      ),
                     ),
                   ),
                 ),
