@@ -185,7 +185,14 @@ class _ChatScreenState extends State<ChatScreen> {
             bottom: false,
             child: ListView(
               controller: _scrollController,
-              padding: EdgeInsets.fromLTRB(20, 70, 20, 120),
+              // 하단 여백은 입력바 높이(52+10)에 딱 맞게 — 고정 120이면
+              // 홈 인디케이터가 없는 데스크톱에서 마지막 말풍선과 너무 벌어진다
+              padding: EdgeInsets.fromLTRB(
+                20,
+                70,
+                20,
+                MediaQuery.paddingOf(context).bottom + 72,
+              ),
               children: [
                 Center(child: Text('오늘', style: AppTextStyles.caption)),
                 SizedBox(height: 16),
@@ -818,6 +825,8 @@ class _MessageInputBarState extends State<_MessageInputBar> {
     if (text.isEmpty) return;
     widget.onSend(text);
     _controller.clear();
+    // 엔터/전송 후 포커스가 풀리므로 다시 잡아 연속 입력이 되게 한다
+    widget.focusNode?.requestFocus();
   }
 
   @override
