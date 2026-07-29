@@ -5,11 +5,12 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_toast.dart';
+import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/pressable.dart';
 
 /// 동료 평가 탭 콘텐츠 (목업)
 ///
-/// - 평가 작성: 대상(본인/동료)을 고르고 5개 항목에 점수와 사유를 적는다.
+/// - 평가 작성: 사람 카드를 눌러 평가 화면으로 이동한다.
 ///   본인은 항목당 최대 5점, 동료는 항목당 최대 20점.
 /// - 평가 현황: 직원별 항목 점수·총합과 항목별 순위를 보여준다.
 class PeerReviewSection extends StatefulWidget {
@@ -19,14 +20,20 @@ class PeerReviewSection extends StatefulWidget {
   State<PeerReviewSection> createState() => _PeerReviewSectionState();
 }
 
+const _categories = ['업무 역량', '협업 소통', '성과 기여도', '태도·규정 준수', '리더십'];
+
+const _me = '김은후';
+
+/// 평가 대상 목록 — 본인 카드가 맨 앞. 아바타 색은 사내톡 멤버 목록과 동일.
+const _persons = [
+  _Person(_me, '본인 평가', AppColors.primary, isSelf: true),
+  _Person('이앨리스', '디자인팀 · 리드', AppColors.success),
+  _Person('오민준', '개발팀 · 대리', Color(0xFF00A8B5)),
+  _Person('신유나', '디자인팀 · 대리', Color(0xFF7C5CFC)),
+  _Person('권지호', '영업팀 · 사원', Color(0xFFE0447C)),
+];
+
 class _PeerReviewSectionState extends State<PeerReviewSection> {
-  static const _self = '나';
-  static const _me = '김은후';
-
-  static const _categories = ['업무 역량', '협업 소통', '성과 기여도', '태도·규정 준수', '리더십'];
-
-  static const _members = ['이앨리스', '오민준', '신유나', '권지호'];
-
   /// 직원별 항목 점수 (항목당 20점, 총 100점 만점 목업)
   static const _results = [
     _PeerScore('이앨리스', [18, 17, 16, 19, 15]),
@@ -36,71 +43,24 @@ class _PeerReviewSectionState extends State<PeerReviewSection> {
     _PeerScore('권지호', [13, 15, 12, 18, 11]),
   ];
 
-  /// 평가 대상 — 본인이면 항목당 5점, 동료면 20점
-  String _target = _self;
-
-  final Map<String, int> _scores = {};
-
-  late final Map<String, TextEditingController> _reasons = {
-    for (final category in _categories) category: TextEditingController(),
-  };
-
   /// 현황 순위 기준 — 0이면 총합, 1부터는 항목 순서
   int _metric = 0;
 
-  int get _maxScore => _target == _self ? 5 : 20;
-
-  @override
-  void dispose() {
-    for (final controller in _reasons.values) {
-      controller.dispose();
-    }
-    super.dispose();
-  }
-
-  void _setTarget(String name) {
-    if (_target == name) return;
-    setState(() {
-      _target = name;
-      _scores.clear();
-      for (final controller in _reasons.values) {
-        controller.clear();
-      }
-    });
-  }
-
-  void _adjust(String category, int delta) {
-    final next = ((_scores[category] ?? 0) + delta).clamp(0, _maxScore);
-    setState(() => _scores[category] = next);
-  }
-
-  void _submit() {
-    final total = _scores.values.fold(0, (sum, v) => sum + v);
-    if (total == 0) {
-      AppToast.show(context, '점수를 먼저 입력해주세요');
-      return;
-    }
-    FocusScope.of(context).unfocus();
-    AppToast.show(
+  void _openForm(_Person person) {
+    Navigator.push(
       context,
-      _target == _self ? '내 평가를 제출했습니다' : '$_target님 평가를 제출했습니다',
+      CupertinoPageRoute(builder: (_) => _PeerReviewFormScreen(person: person)),
     );
-    setState(() {
-      _scores.clear();
-      for (final controller in _reasons.values) {
-        controller.clear();
-      }
-    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Column(
-      children: [_buildFormCard(), SizedBox(height: 16), _buildRankingCard()],
+      children: [_buildPeopleCard(), SizedBox(height: 16), _buildRankingCard()],
     );
   }
 
-  Widget _buildFormCard() {
+  Widget _buildPeopleCard() {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(20),
@@ -113,83 +73,33 @@ class _PeerReviewSectionState extends State<PeerReviewSection> {
             child: Row(
               children: [
                 Expanded(child: Text('평가 작성', style: AppTextStyles.label)),
-                Text(
-                  '항목당 최대 $_maxScore점',
-                  style: AppTextStyles.caption.copyWith(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+                Text('평가할 사람을 선택하세요', style: AppTextStyles.caption),
               ],
             ),
           ),
-          SizedBox(height: 12),
-          // 평가 대상 선택 칩 — 본인(나) 또는 동료
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final name in [_self, ..._members])
-                _TargetChip(
-                  label: name,
-                  selected: _target == name,
-                  onTap: () => _setTarget(name),
-                ),
-            ],
-          ),
-          SizedBox(height: 18),
-          for (final category in _categories) ...[
-            _ScoreRow(
-              label: category,
-              score: _scores[category] ?? 0,
-              maxScore: _maxScore,
-              onAdjust: (delta) => _adjust(category, delta),
-            ),
-            SizedBox(height: 8),
-            // 왜 이 점수인지 사유를 적는 칸
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-              decoration: BoxDecoration(
-                color: AppColors.gray50,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: TextField(
-                controller: _reasons[category],
-                style: AppTextStyles.body2,
-                cursorColor: AppColors.primary,
-                decoration: InputDecoration(
-                  hintText: '왜 이 점수인지 적어주세요',
-                  hintStyle: AppTextStyles.body2.copyWith(
-                    color: AppColors.gray400,
+          SizedBox(height: 14),
+          for (var i = 0; i < _persons.length; i += 2) ...[
+            if (i > 0) SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _PersonTile(
+                    person: _persons[i],
+                    onTap: () => _openForm(_persons[i]),
                   ),
-                  border: InputBorder.none,
-                  isCollapsed: true,
                 ),
-              ),
+                SizedBox(width: 10),
+                Expanded(
+                  child: i + 1 < _persons.length
+                      ? _PersonTile(
+                          person: _persons[i + 1],
+                          onTap: () => _openForm(_persons[i + 1]),
+                        )
+                      : SizedBox(),
+                ),
+              ],
             ),
-            SizedBox(height: 14),
           ],
-          SizedBox(height: 4),
-          Pressable(
-            onTap: _submit,
-            scale: 0.97,
-            child: Container(
-              width: double.infinity,
-              height: 52,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Text(
-                '평가 제출',
-                style: AppTextStyles.body1.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );
@@ -227,7 +137,7 @@ class _PeerReviewSectionState extends State<PeerReviewSection> {
               children: [
                 for (var i = 0; i < metrics.length; i++) ...[
                   if (i > 0) SizedBox(width: 8),
-                  _TargetChip(
+                  _MetricChip(
                     label: metrics[i],
                     selected: _metric == i,
                     onTap: () => setState(() => _metric = i),
@@ -252,6 +162,20 @@ class _PeerReviewSectionState extends State<PeerReviewSection> {
   }
 }
 
+/// 평가 대상 한 명
+class _Person {
+  const _Person(this.name, this.caption, this.color, {this.isSelf = false});
+
+  final String name;
+
+  /// 카드에 보여줄 소속·직책 (본인은 '본인 평가')
+  final String caption;
+  final Color color;
+  final bool isSelf;
+
+  int get maxScore => isSelf ? 5 : 20;
+}
+
 /// 직원 한 명의 항목별 점수
 class _PeerScore {
   const _PeerScore(this.name, this.scores);
@@ -267,9 +191,87 @@ class _PeerScore {
   int valueOf(int metric) => metric == 0 ? total : scores[metric - 1];
 }
 
-/// 평가 대상·순위 기준 선택 칩
-class _TargetChip extends StatelessWidget {
-  _TargetChip({
+/// 사람 선택 카드 — 아바타·이름·소속. 본인 카드는 파란 배경으로 구분.
+class _PersonTile extends StatelessWidget {
+  _PersonTile({required this.person, required this.onTap});
+
+  final _Person person;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      scale: 0.96,
+      child: Container(
+        padding: EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: person.isSelf ? AppColors.primaryLight : AppColors.gray50,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: person.isSelf
+                ? AppColors.primary.withValues(alpha: 0.25)
+                : Colors.transparent,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: person.color,
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                person.name.characters.first,
+                style: TextStyle(
+                  fontFamily: AppTextStyles.fontFamily,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    person.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.body2.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    person.caption,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.caption.copyWith(
+                      fontSize: 11,
+                      color: person.isSelf
+                          ? AppColors.primary
+                          : AppColors.textTertiary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 순위 기준 선택 칩
+class _MetricChip extends StatelessWidget {
+  _MetricChip({
     required this.label,
     required this.selected,
     required this.onTap,
@@ -305,71 +307,6 @@ class _TargetChip extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-/// 항목 라벨 + −/+ 점수 스테퍼 줄
-class _ScoreRow extends StatelessWidget {
-  _ScoreRow({
-    required this.label,
-    required this.score,
-    required this.maxScore,
-    required this.onAdjust,
-  });
-
-  final String label;
-  final int score;
-  final int maxScore;
-  final ValueChanged<int> onAdjust;
-
-  @override
-  Widget build(BuildContext context) {
-    final active = score > 0;
-
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            label,
-            maxLines: 1,
-            style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w600),
-          ),
-        ),
-        _StepButton(
-          icon: CupertinoIcons.minus,
-          color: active ? AppColors.error : AppColors.gray300,
-          onTap: () => onAdjust(-1),
-        ),
-        SizedBox(
-          width: 58,
-          child: Center(
-            child: Text.rich(
-              TextSpan(
-                text: '$score',
-                style: AppTextStyles.body2.copyWith(
-                  color: active ? AppColors.primary : AppColors.textPrimary,
-                  fontWeight: FontWeight.w700,
-                ),
-                children: [
-                  TextSpan(
-                    text: ' / $maxScore',
-                    style: AppTextStyles.caption.copyWith(
-                      color: AppColors.gray400,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        _StepButton(
-          icon: CupertinoIcons.plus,
-          color: score < maxScore ? AppColors.primary : AppColors.gray300,
-          onTap: () => onAdjust(1),
-        ),
-      ],
     );
   }
 }
@@ -445,6 +382,259 @@ class _RankRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// 평가 작성 화면 — 사람 카드를 누르면 옆에서 슬라이드되어 열린다.
+/// 5개 항목에 점수(본인 5점/동료 20점)와 사유를 적고 제출한다.
+class _PeerReviewFormScreen extends StatefulWidget {
+  _PeerReviewFormScreen({required this.person});
+
+  final _Person person;
+
+  @override
+  State<_PeerReviewFormScreen> createState() => _PeerReviewFormScreenState();
+}
+
+class _PeerReviewFormScreenState extends State<_PeerReviewFormScreen> {
+  final Map<String, int> _scores = {};
+
+  late final Map<String, TextEditingController> _reasons = {
+    for (final category in _categories) category: TextEditingController(),
+  };
+
+  int get _max => widget.person.maxScore;
+
+  int get _total => _scores.values.fold(0, (sum, v) => sum + v);
+
+  @override
+  void dispose() {
+    for (final controller in _reasons.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  void _adjust(String category, int delta) {
+    final next = ((_scores[category] ?? 0) + delta).clamp(0, _max);
+    setState(() => _scores[category] = next);
+  }
+
+  void _submit() {
+    if (_total == 0) {
+      AppToast.show(context, '점수를 먼저 입력해주세요');
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    AppToast.show(
+      context,
+      widget.person.isSelf
+          ? '내 평가를 제출했습니다'
+          : '${widget.person.name}님 평가를 제출했습니다',
+    );
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final person = widget.person;
+
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      body: Stack(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 상단 고정 타이틀 영역만큼 비워둔다
+                SizedBox(height: 56),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(24, 12, 24, 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          person.caption,
+                          style: AppTextStyles.caption,
+                        ),
+                      ),
+                      Text(
+                        '총 $_total / ${_max * _categories.length}점',
+                        style: AppTextStyles.body2.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(height: 1, color: AppColors.gray100),
+                Expanded(
+                  child: ListView(
+                    padding: EdgeInsets.fromLTRB(
+                      24,
+                      16,
+                      24,
+                      MediaQuery.paddingOf(context).bottom + 24,
+                    ),
+                    children: [
+                      for (final category in _categories) ...[
+                        _ScoreRow(
+                          label: category,
+                          score: _scores[category] ?? 0,
+                          maxScore: _max,
+                          onAdjust: (delta) => _adjust(category, delta),
+                        ),
+                        SizedBox(height: 8),
+                        // 왜 이 점수인지 사유를 적는 칸
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 11,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.gray50,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: TextField(
+                            controller: _reasons[category],
+                            style: AppTextStyles.body2,
+                            cursorColor: AppColors.primary,
+                            decoration: InputDecoration(
+                              hintText: '왜 이 점수인지 적어주세요',
+                              hintStyle: AppTextStyles.body2.copyWith(
+                                color: AppColors.gray400,
+                              ),
+                              border: InputBorder.none,
+                              isCollapsed: true,
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 16),
+                      ],
+                      SizedBox(height: 4),
+                      Pressable(
+                        onTap: _submit,
+                        scale: 0.97,
+                        child: Container(
+                          width: double.infinity,
+                          height: 52,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Text(
+                            '평가 제출',
+                            style: AppTextStyles.body1.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // 상단 중앙 고정 타이틀 (터치는 아래로 통과)
+          IgnorePointer(
+            child: SafeArea(
+              bottom: false,
+              child: SizedBox(
+                height: 56,
+                child: Center(
+                  child: Text(
+                    person.isSelf ? '내 평가' : '${person.name} 평가',
+                    style: AppTextStyles.title3,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // 좌측 상단 고정 뒤로가기 글래스 버튼
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: EdgeInsets.only(top: 8, left: 16),
+              child: GlassIconButton(
+                symbol: 'chevron.backward',
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 항목 라벨 + −/+ 점수 스테퍼 줄
+class _ScoreRow extends StatelessWidget {
+  _ScoreRow({
+    required this.label,
+    required this.score,
+    required this.maxScore,
+    required this.onAdjust,
+  });
+
+  final String label;
+  final int score;
+  final int maxScore;
+  final ValueChanged<int> onAdjust;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = score > 0;
+
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            maxLines: 1,
+            style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w600),
+          ),
+        ),
+        _StepButton(
+          icon: CupertinoIcons.minus,
+          color: active ? AppColors.error : AppColors.gray300,
+          onTap: () => onAdjust(-1),
+        ),
+        SizedBox(
+          width: 58,
+          child: Center(
+            child: Text.rich(
+              TextSpan(
+                text: '$score',
+                style: AppTextStyles.body2.copyWith(
+                  color: active ? AppColors.primary : AppColors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
+                children: [
+                  TextSpan(
+                    text: ' / $maxScore',
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.gray400,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        _StepButton(
+          icon: CupertinoIcons.plus,
+          color: score < maxScore ? AppColors.primary : AppColors.gray300,
+          onTap: () => onAdjust(1),
+        ),
+      ],
     );
   }
 }
