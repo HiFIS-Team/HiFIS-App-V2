@@ -1,13 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/util/platform.dart';
 
 /// 홈 화면 (디자인 시스템 데모용 샘플)
 ///
@@ -17,8 +16,8 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 데스크톱(macOS)은 화면이 넓어서 프로젝트·공지를 나란히 배치한다
-    final desktop = defaultTargetPlatform == TargetPlatform.macOS;
+    // 데스크톱은 화면이 넓어서 프로젝트·공지를 나란히 배치한다
+    final desktop = isDesktop;
     return Scaffold(
       body: Stack(
         children: [

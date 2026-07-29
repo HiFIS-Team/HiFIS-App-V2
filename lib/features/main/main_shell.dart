@@ -1,12 +1,11 @@
 import 'dart:ui';
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/util/platform.dart';
 import '../../core/widgets/app_tab_bar.dart';
 import '../../core/widgets/pressable.dart';
 import 'desktop_sidebar.dart';
@@ -183,7 +182,7 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    if (defaultTargetPlatform == TargetPlatform.macOS) {
+    if (isDesktop) {
       return _buildDesktop();
     }
     return Scaffold(
@@ -479,7 +478,7 @@ class _HeaderButtonsState extends State<_HeaderButtons> {
   @override
   Widget build(BuildContext context) {
     // 출퇴근 바코드는 폰을 직원 리더기에 찍는 용도라 데스크톱에서는 뺀다
-    final desktop = defaultTargetPlatform == TargetPlatform.macOS;
+    final desktop = isDesktop;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [

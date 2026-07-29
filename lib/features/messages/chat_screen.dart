@@ -2,12 +2,11 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/util/platform.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/pressable.dart';
 import '../../core/widgets/top_frost.dart';
@@ -271,7 +270,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     // PC에서만 말풍선 호버 액션 아이콘을 보여준다
-    final desktop = defaultTargetPlatform == TargetPlatform.macOS;
+    final desktop = isDesktop;
     return Scaffold(
       backgroundColor: AppColors.surface,
       body: Stack(
