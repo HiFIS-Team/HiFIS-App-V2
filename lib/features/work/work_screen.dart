@@ -398,8 +398,9 @@ class _CountChip extends StatelessWidget {
       child: Row(
         children: [
           _AdjustButton(
+            // 감소는 빨강, 횟수가 없으면 비활성 회색
             icon: CupertinoIcons.minus,
-            color: active ? AppColors.primary : AppColors.gray300,
+            color: active ? AppColors.error : AppColors.gray300,
             onTap: () => onAdjust(-1),
           ),
           Expanded(
