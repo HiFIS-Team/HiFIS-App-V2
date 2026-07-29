@@ -189,30 +189,43 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  /// 호버 아이콘의 이모지 버튼 — 액션 목록 없이 이모지 피커만 띄운다
-  Future<void> _openEmojiPicker(_ChatMessage message) async {
+  /// 호버 아이콘의 이모지 버튼 — 누른 아이콘 위에 이모지 캡슐만 띄운다
+  /// (화면 가운데가 아니라 말풍선 곁에 뜨는 인스타그램 방식)
+  Future<void> _openEmojiPicker(_ChatMessage message, Offset anchor) async {
     final result = await showGeneralDialog<String>(
       context: context,
       barrierDismissible: true,
       barrierLabel: '이모지 피커',
-      barrierColor: Colors.black.withValues(alpha: 0.2),
-      transitionDuration: Duration(milliseconds: 200),
-      pageBuilder: (context, animation, secondaryAnimation) => _MessageMenu(
-        selected: message.reaction,
-        mine: message.mine,
-        emojiOnly: true,
-      ),
-      transitionBuilder: (context, animation, secondaryAnimation, child) =>
-          FadeTransition(
-            opacity: animation,
-            child: ScaleTransition(
-              scale: CurvedAnimation(
-                parent: animation,
-                curve: Curves.easeOutBack,
+      barrierColor: Colors.black.withValues(alpha: 0.08),
+      transitionDuration: Duration(milliseconds: 150),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        final size = MediaQuery.sizeOf(context);
+        // 캡슐 크기(이모지 6개 기준)에 맞춰 화면 밖으로 나가지 않게 클램프
+        const width = 286.0;
+        const height = 62.0;
+        final left = (anchor.dx - width / 2).clamp(
+          12.0,
+          size.width - width - 12.0,
+        );
+        final top = (anchor.dy - height - 12).clamp(
+          60.0,
+          size.height - height - 12.0,
+        );
+        return Stack(
+          children: [
+            Positioned(
+              left: left,
+              top: top,
+              child: Material(
+                type: MaterialType.transparency,
+                child: _EmojiCapsule(selected: message.reaction),
               ),
-              child: child,
             ),
-          ),
+          ],
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) =>
+          FadeTransition(opacity: animation, child: child),
     );
     if (result == null || !mounted) return;
     setState(
@@ -235,34 +248,40 @@ class _ChatScreenState extends State<ChatScreen> {
               ? [
                   _hoverIcon(
                     Icons.delete_outline_rounded,
-                    () => _unsend(message),
+                    (_) => _unsend(message),
                   ),
-                  _hoverIcon(Icons.reply_rounded, () => _replyTo(message)),
+                  _hoverIcon(Icons.reply_rounded, (_) => _replyTo(message)),
                   _hoverIcon(
                     Icons.mood_rounded,
-                    () => _openEmojiPicker(message),
+                    (anchor) => _openEmojiPicker(message, anchor),
                   ),
                 ]
               // 상대 말풍선은 오른쪽에 붙는다 (전송 취소는 내 메시지 전용)
               : [
                   _hoverIcon(
                     Icons.mood_rounded,
-                    () => _openEmojiPicker(message),
+                    (anchor) => _openEmojiPicker(message, anchor),
                   ),
-                  _hoverIcon(Icons.reply_rounded, () => _replyTo(message)),
+                  _hoverIcon(Icons.reply_rounded, (_) => _replyTo(message)),
                 ],
         ),
       ),
     );
   }
 
-  Widget _hoverIcon(IconData icon, VoidCallback onTap) {
-    return Pressable(
-      scale: 0.9,
-      onTap: onTap,
-      child: Padding(
-        padding: EdgeInsets.all(4),
-        child: Icon(icon, size: 16, color: AppColors.gray500),
+  /// 콜백에 아이콘의 화면 중심 좌표를 넘긴다 (이모지 캡슐 앵커용)
+  Widget _hoverIcon(IconData icon, void Function(Offset anchor) onTap) {
+    return Builder(
+      builder: (context) => Pressable(
+        scale: 0.9,
+        onTap: () {
+          final box = context.findRenderObject() as RenderBox;
+          onTap(box.localToGlobal(box.size.center(Offset.zero)));
+        },
+        child: Padding(
+          padding: EdgeInsets.all(4),
+          child: Icon(icon, size: 16, color: AppColors.gray500),
+        ),
       ),
     );
   }
@@ -768,10 +787,58 @@ class _ReactionPill extends StatelessWidget {
   }
 }
 
+/// 이모지 피커 글래스 캡슐 — 탭하면 해당 이모지 문자열로 pop된다.
+/// 가운데 메뉴(_MessageMenu)와 PC 호버 앵커 팝업 양쪽에서 쓴다.
+class _EmojiCapsule extends StatelessWidget {
+  _EmojiCapsule({this.selected});
+
+  /// 이미 달려 있는 리액션 (선택 표시용)
+  final String? selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(32),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.surface.withValues(alpha: 0.8),
+            borderRadius: BorderRadius.circular(32),
+            border: Border.all(color: AppColors.gray100),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final emoji in _reactionEmojis)
+                GestureDetector(
+                  onTap: () => Navigator.pop(context, emoji),
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: emoji == selected
+                          ? AppColors.gray100
+                          : Colors.transparent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: _EmojiText(emoji, size: 24),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// 길게 누르면 뜨는 메시지 메뉴 — 위에는 이모지 피커, 아래에는 액션 목록.
 /// 이모지 문자열 또는 [reply]/[unsend] 액션 값으로 pop된다.
 class _MessageMenu extends StatelessWidget {
-  _MessageMenu({this.selected, required this.mine, this.emojiOnly = false});
+  _MessageMenu({this.selected, required this.mine});
 
   static const reply = 'menu:reply';
   static const unsend = 'menu:unsend';
@@ -780,9 +847,6 @@ class _MessageMenu extends StatelessWidget {
 
   /// 내 메시지 여부. 전송 취소는 내 메시지에서만 보여준다.
   final bool mine;
-
-  /// true면 아래 액션 목록 없이 이모지 피커만 보여준다 (PC 호버 아이콘용)
-  final bool emojiOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -793,46 +857,10 @@ class _MessageMenu extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             // 이모지 피커 글래스 캡슐
-            ClipRRect(
-              borderRadius: BorderRadius.circular(32),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface.withValues(alpha: 0.8),
-                    borderRadius: BorderRadius.circular(32),
-                    border: Border.all(color: AppColors.gray100),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      for (final emoji in _reactionEmojis)
-                        GestureDetector(
-                          onTap: () => Navigator.pop(context, emoji),
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: emoji == selected
-                                  ? AppColors.gray100
-                                  : Colors.transparent,
-                              shape: BoxShape.circle,
-                            ),
-                            child: _EmojiText(emoji, size: 24),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            if (!emojiOnly) ...[
-              SizedBox(height: 12),
-              // 액션 메뉴 카드
-              _actionCard(context),
-            ],
+            _EmojiCapsule(selected: selected),
+            SizedBox(height: 12),
+            // 액션 메뉴 카드
+            _actionCard(context),
           ],
         ),
       ),
