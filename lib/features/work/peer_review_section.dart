@@ -279,11 +279,11 @@ class _PeerReviewFormScreenState extends State<_PeerReviewFormScreen> {
                           onAdjust: (delta) => _adjust(category, delta),
                         ),
                         SizedBox(height: 8),
-                        // 왜 이 점수인지 사유를 적는 칸
+                        // 왜 이 점수인지 사유를 적는 칸 — 여러 줄 입력
                         Container(
                           padding: EdgeInsets.symmetric(
                             horizontal: 14,
-                            vertical: 11,
+                            vertical: 12,
                           ),
                           decoration: BoxDecoration(
                             color: AppColors.gray50,
@@ -293,6 +293,9 @@ class _PeerReviewFormScreenState extends State<_PeerReviewFormScreen> {
                             controller: _reasons[category],
                             style: AppTextStyles.body2,
                             cursorColor: AppColors.primary,
+                            keyboardType: TextInputType.multiline,
+                            minLines: 3,
+                            maxLines: 5,
                             decoration: InputDecoration(
                               hintText: '왜 이 점수인지 적어주세요',
                               hintStyle: AppTextStyles.body2.copyWith(
