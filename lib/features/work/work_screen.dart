@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_toast.dart';
+import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/pressable.dart';
 
 /// 업무 탭 화면 (목업)
@@ -77,13 +78,13 @@ class _WorkScreenState extends State<WorkScreen> {
   }
 
   void _showHistory() {
-    showModalBottomSheet(
-      context: context,
-      useRootNavigator: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _HistorySheet(
-        myLogs: List.of(_logs),
-        allLogs: [..._logs, ..._teamLogs],
+    Navigator.push(
+      context,
+      CupertinoPageRoute(
+        builder: (_) => _HistoryScreen(
+          myLogs: List.of(_logs),
+          allLogs: [..._logs, ..._teamLogs],
+        ),
       ),
     );
   }
@@ -588,19 +589,19 @@ class _AdjustButtonState extends State<_AdjustButton> {
   }
 }
 
-/// 오늘 수행 내역 하단 시트 — 내 내역/전체 내역 탭으로 전환하며
-/// 최근 기록이 위로 오도록 시간 역순으로 보여준다
-class _HistorySheet extends StatefulWidget {
-  _HistorySheet({required this.myLogs, required this.allLogs});
+/// 오늘 수행 내역 화면 — 옆에서 슬라이드되어 열리고,
+/// 내 내역/전체 내역 탭을 전환하며 최근 기록이 위로 오도록 보여준다
+class _HistoryScreen extends StatefulWidget {
+  _HistoryScreen({required this.myLogs, required this.allLogs});
 
   final List<_WorkLog> myLogs;
   final List<_WorkLog> allLogs;
 
   @override
-  State<_HistorySheet> createState() => _HistorySheetState();
+  State<_HistoryScreen> createState() => _HistoryScreenState();
 }
 
-class _HistorySheetState extends State<_HistorySheet> {
+class _HistoryScreenState extends State<_HistoryScreen> {
   /// true면 전체 내역 탭
   bool _all = false;
 
@@ -620,31 +621,22 @@ class _HistorySheetState extends State<_HistorySheet> {
     final logs = _all ? widget.allLogs : widget.myLogs;
     final sorted = List.of(logs)..sort((a, b) => b.time.compareTo(a.time));
 
-    return Container(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * 0.66,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: SafeArea(
-        top: false,
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      body: SafeArea(
+        bottom: false,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 드래그 핸들
-            Container(
-              margin: EdgeInsets.only(top: 10),
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.gray200,
-                borderRadius: BorderRadius.circular(100),
+            Padding(
+              padding: EdgeInsets.only(top: 8, left: 16),
+              child: GlassIconButton(
+                symbol: 'chevron.backward',
+                onPressed: () => Navigator.pop(context),
               ),
             ),
             Padding(
-              padding: EdgeInsets.fromLTRB(24, 20, 24, 4),
+              padding: EdgeInsets.fromLTRB(24, 18, 24, 4),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -652,7 +644,7 @@ class _HistorySheetState extends State<_HistorySheet> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('오늘 내역', style: AppTextStyles.title3),
+                        Text('오늘 내역', style: AppTextStyles.title2),
                         SizedBox(height: 4),
                         Text(date, style: AppTextStyles.caption),
                       ],
@@ -700,11 +692,15 @@ class _HistorySheetState extends State<_HistorySheet> {
                 ),
               )
             else
-              Flexible(
+              Expanded(
                 child: ListView.separated(
                   key: ValueKey(_all),
-                  shrinkWrap: true,
-                  padding: EdgeInsets.fromLTRB(24, 12, 24, 16),
+                  padding: EdgeInsets.fromLTRB(
+                    24,
+                    12,
+                    24,
+                    MediaQuery.paddingOf(context).bottom + 24,
+                  ),
                   itemCount: sorted.length,
                   separatorBuilder: (_, _) =>
                       Divider(height: 1, color: AppColors.divider),
