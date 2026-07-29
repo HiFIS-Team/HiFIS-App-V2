@@ -424,39 +424,6 @@ class _CountChip extends StatelessWidget {
                       fontWeight: active ? FontWeight.w700 : FontWeight.w500,
                     ),
                   ),
-                  if (active) ...[
-                    SizedBox(width: 6),
-                    // 횟수 배지 — 숫자가 바뀔 때 아래에서 굴러 올라온다
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(100),
-                      ),
-                      child: AnimatedSwitcher(
-                        duration: Duration(milliseconds: 200),
-                        transitionBuilder: (child, animation) => FadeTransition(
-                          opacity: animation,
-                          child: SlideTransition(
-                            position: Tween(
-                              begin: Offset(0, 0.6),
-                              end: Offset.zero,
-                            ).animate(animation),
-                            child: child,
-                          ),
-                        ),
-                        child: Text(
-                          '$count',
-                          key: ValueKey(count),
-                          style: AppTextStyles.caption.copyWith(
-                            fontSize: 12,
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
