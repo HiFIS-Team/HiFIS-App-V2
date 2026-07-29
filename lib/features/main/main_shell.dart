@@ -227,15 +227,19 @@ class _HeaderButtonsState extends State<_HeaderButtons> {
 
   @override
   Widget build(BuildContext context) {
+    // 출퇴근 바코드는 폰을 직원 리더기에 찍는 용도라 데스크톱에서는 뺀다
+    final desktop = defaultTargetPlatform == TargetPlatform.macOS;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        GlassIconButton(
-          symbol: 'barcode.viewfinder',
-          enabled: !_overlayOpen,
-          onPressed: _openBarcode,
-        ),
-        SizedBox(width: 10),
+        if (!desktop) ...[
+          GlassIconButton(
+            symbol: 'barcode.viewfinder',
+            enabled: !_overlayOpen,
+            onPressed: _openBarcode,
+          ),
+          SizedBox(width: 10),
+        ],
         GlassIconButton(
           symbol: 'message',
           enabled: !_overlayOpen,
