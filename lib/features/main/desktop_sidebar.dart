@@ -228,15 +228,16 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
           pressedColor: AppColors.gray100,
           borderRadius: BorderRadius.circular(10),
           onTap: () => widget.onSelect(index),
-          child: AnimatedContainer(
-            duration: Duration(milliseconds: 150),
+          // 호버 배경은 애니메이션 없이 즉시 — 페이드가 있으면 커서를
+          // 빠르게 지나갈 때 이전 항목의 배경이 잔상처럼 깜빡인다
+          child: Container(
             height: 44,
             // 오른쪽 경계 헤어라인(1px)이 안쪽 폭을 깎으므로 14가 아닌 13 —
             // 14면 접힘 상태에서 아이콘이 1px 오버플로된다
             padding: EdgeInsets.symmetric(horizontal: 13),
             // 인스타그램처럼 배경색은 호버한 칸에만 — 선택 표시는 색·굵기로만
             decoration: BoxDecoration(
-              color: hovered ? AppColors.gray50 : Colors.transparent,
+              color: hovered ? AppColors.primaryLight : Colors.transparent,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
