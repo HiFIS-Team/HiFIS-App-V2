@@ -68,10 +68,17 @@ class _HeaderButtons extends StatefulWidget {
 
 class _HeaderButtonsState extends State<_HeaderButtons> {
   bool _overlayOpen = false;
+  bool _barcodeShowing = false;
 
   Future<void> _openBarcode() async {
-    setState(() => _overlayOpen = true);
-    await showAttendanceBarcode(context);
+    _barcodeShowing = true;
+    final closed = showAttendanceBarcode(context);
+    // 딤이 완전히 올라온 뒤(전환 380ms)에 버튼을 교체해 전환이 안 보이게 한다
+    Future.delayed(Duration(milliseconds: 400), () {
+      if (mounted && _barcodeShowing) setState(() => _overlayOpen = true);
+    });
+    await closed;
+    _barcodeShowing = false;
     if (mounted) setState(() => _overlayOpen = false);
   }
 

@@ -45,11 +45,14 @@ class GlassIconButton extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppColors.surface.withValues(alpha: 0.8),
               shape: BoxShape.circle,
+              // 네이티브 글래스의 밝은 림을 흉내내는 헤어라인 테두리
+              border: Border.all(color: AppColors.gray100),
             ),
             child: fallbackIcon != null
                 ? Icon(
+                    // 네이티브 SF 심볼 잉크 실측(≈20pt/40pt 버튼)에 맞춘 크기
                     fallbackIcon,
-                    size: size * 0.45,
+                    size: size * 0.66,
                     color: AppColors.gray700,
                   )
                 : null,
