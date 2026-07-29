@@ -89,7 +89,23 @@ class _MainShellState extends State<MainShell> {
 
   // ── macOS 데스크톱 셸 ──
 
-  /// 사이드바 선택 인덱스 (0~3 메인 탭, 4~7 서브 탭 페이지)
+  /// 데스크톱 전용 페이지 목록 — DesktopSidebar의 섹션 펼친 순서와 일치해야 한다
+  List<Widget> get _desktopPages => [
+    HomeScreen(),
+    WorkScreen(),
+    PlaceholderScreen(emoji: '📁', title: '프로젝트'),
+    PlaceholderScreen(emoji: '📅', title: '일정'),
+    PlaceholderScreen(emoji: '📝', title: '회의록'),
+    PlaceholderScreen(emoji: '🗂️', title: '문서함'),
+    PlaceholderScreen(emoji: '✅', title: '전자결재'),
+    PlaceholderScreen(emoji: '👥', title: '직원'),
+    PlaceholderScreen(emoji: '🗓️', title: '근태·월차'),
+    PlaceholderScreen(emoji: '💰', title: '급여'),
+    PlaceholderScreen(emoji: '📣', title: '공지'),
+    PlaceholderScreen(emoji: '🏆', title: '랭킹'),
+  ];
+
+  /// 사이드바 선택 인덱스 (_desktopPages 순서 기준)
   final _paneIndex = ValueNotifier<int>(0);
 
   /// 콘텐츠 영역 전용 내비게이터.
@@ -124,10 +140,7 @@ class _MainShellState extends State<MainShell> {
                       valueListenable: _paneIndex,
                       builder: (context, index, child) => Stack(
                         children: [
-                          IndexedStack(
-                            index: index,
-                            children: [..._mainPages, ..._subPages],
-                          ),
+                          IndexedStack(index: index, children: _desktopPages),
                           SafeArea(
                             bottom: false,
                             child: Align(
