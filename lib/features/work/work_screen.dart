@@ -21,18 +21,37 @@ class WorkScreen extends StatefulWidget {
 class _WorkScreenState extends State<WorkScreen> {
   int _tab = 0;
 
+  static const _me = '김은후';
+
   /// 환경정비 오늘 수행 로그 — 횟수는 이 로그에서 집계한다 (목업 초기값 포함)
   late final List<_WorkLog> _logs = _seedLogs();
+
+  /// 다른 직원들의 오늘 수행 기록 (목업, 전체 내역 탭에서만 사용)
+  late final List<_WorkLog> _teamLogs = _seedTeamLogs();
 
   static List<_WorkLog> _seedLogs() {
     final now = DateTime.now();
     DateTime at(int hour, int minute) =>
         DateTime(now.year, now.month, now.day, hour, minute);
     return [
-      _WorkLog(task: '세탁', time: at(8, 40)),
-      _WorkLog(task: '건조기', time: at(9, 15)),
-      _WorkLog(task: '복도청소', time: at(10, 5)),
-      _WorkLog(task: '세탁', time: at(11, 30)),
+      _WorkLog(name: _me, task: '세탁', time: at(8, 40)),
+      _WorkLog(name: _me, task: '건조기', time: at(9, 15)),
+      _WorkLog(name: _me, task: '복도청소', time: at(10, 5)),
+      _WorkLog(name: _me, task: '세탁', time: at(11, 30)),
+    ];
+  }
+
+  static List<_WorkLog> _seedTeamLogs() {
+    final now = DateTime.now();
+    DateTime at(int hour, int minute) =>
+        DateTime(now.year, now.month, now.day, hour, minute);
+    return [
+      _WorkLog(name: '이앨리스', task: '구역청소', time: at(8, 20)),
+      _WorkLog(name: '오민준', task: '기구관리', time: at(8, 55)),
+      _WorkLog(name: '신유나', task: '게시물', time: at(9, 40)),
+      _WorkLog(name: '권지호', task: '화장실청소', time: at(10, 25)),
+      _WorkLog(name: '이앨리스', task: '세탁', time: at(10, 50)),
+      _WorkLog(name: '오민준', task: '클레임해결', time: at(11, 45)),
     ];
   }
 
@@ -47,7 +66,7 @@ class _WorkScreenState extends State<WorkScreen> {
   void _adjust(String task, int delta) {
     setState(() {
       if (delta > 0) {
-        _logs.add(_WorkLog(task: task, time: DateTime.now()));
+        _logs.add(_WorkLog(name: _me, task: task, time: DateTime.now()));
       } else {
         // 감소는 해당 항목의 가장 최근 기록을 지운다
         final index = _logs.lastIndexWhere((log) => log.task == task);
@@ -62,7 +81,10 @@ class _WorkScreenState extends State<WorkScreen> {
       context: context,
       useRootNavigator: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _HistorySheet(logs: List.of(_logs)),
+      builder: (_) => _HistorySheet(
+        myLogs: List.of(_logs),
+        allLogs: [..._logs, ..._teamLogs],
+      ),
     );
   }
 
@@ -206,8 +228,9 @@ class _WorkScreenState extends State<WorkScreen> {
 
 /// 환경정비 수행 기록 한 건
 class _WorkLog {
-  _WorkLog({required this.task, required this.time});
+  _WorkLog({required this.name, required this.task, required this.time});
 
+  final String name;
   final String task;
   final DateTime time;
 }
@@ -565,11 +588,21 @@ class _AdjustButtonState extends State<_AdjustButton> {
   }
 }
 
-/// 오늘 수행 내역 하단 시트 — 최근 기록이 위로 오도록 시간 역순으로 보여준다
-class _HistorySheet extends StatelessWidget {
-  _HistorySheet({required this.logs});
+/// 오늘 수행 내역 하단 시트 — 내 내역/전체 내역 탭으로 전환하며
+/// 최근 기록이 위로 오도록 시간 역순으로 보여준다
+class _HistorySheet extends StatefulWidget {
+  _HistorySheet({required this.myLogs, required this.allLogs});
 
-  final List<_WorkLog> logs;
+  final List<_WorkLog> myLogs;
+  final List<_WorkLog> allLogs;
+
+  @override
+  State<_HistorySheet> createState() => _HistorySheetState();
+}
+
+class _HistorySheetState extends State<_HistorySheet> {
+  /// true면 전체 내역 탭
+  bool _all = false;
 
   static const _weekdays = ['월', '화', '수', '목', '금', '토', '일'];
 
@@ -584,6 +617,7 @@ class _HistorySheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final date = '${now.month}월 ${now.day}일 ${_weekdays[now.weekday - 1]}요일';
+    final logs = _all ? widget.allLogs : widget.myLogs;
     final sorted = List.of(logs)..sort((a, b) => b.time.compareTo(a.time));
 
     return Container(
@@ -634,11 +668,32 @@ class _HistorySheet extends StatelessWidget {
                 ],
               ),
             ),
+            SizedBox(height: 12),
+            // 내 내역 / 전체 내역 전환 탭 (업무 탭과 같은 밑줄 스타일)
+            Row(
+              children: [
+                Expanded(
+                  child: _WorkTab(
+                    label: '내 내역',
+                    selected: !_all,
+                    onTap: () => setState(() => _all = false),
+                  ),
+                ),
+                Expanded(
+                  child: _WorkTab(
+                    label: '전체 내역',
+                    selected: _all,
+                    onTap: () => setState(() => _all = true),
+                  ),
+                ),
+              ],
+            ),
+            Container(height: 1, color: AppColors.gray100),
             if (sorted.isEmpty)
               Padding(
                 padding: EdgeInsets.fromLTRB(24, 32, 24, 44),
                 child: Text(
-                  '오늘 완료한 항목이 없어요',
+                  _all ? '오늘 완료된 항목이 없어요' : '오늘 완료한 항목이 없어요',
                   style: AppTextStyles.body2.copyWith(
                     color: AppColors.textTertiary,
                   ),
@@ -647,6 +702,7 @@ class _HistorySheet extends StatelessWidget {
             else
               Flexible(
                 child: ListView.separated(
+                  key: ValueKey(_all),
                   shrinkWrap: true,
                   padding: EdgeInsets.fromLTRB(24, 12, 24, 16),
                   itemCount: sorted.length,
@@ -666,14 +722,32 @@ class _HistorySheet extends StatelessWidget {
                             ),
                           ),
                           SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              log.task,
+                          // 전체 내역에서는 누가 했는지 이름을 함께 보여준다
+                          if (_all) ...[
+                            Text(
+                              log.name,
                               style: AppTextStyles.body2.copyWith(
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                          ),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                log.task,
+                                style: AppTextStyles.body2.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ),
+                          ] else
+                            Expanded(
+                              child: Text(
+                                log.task,
+                                style: AppTextStyles.body2.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
                           Icon(
                             CupertinoIcons.checkmark_circle_fill,
                             size: 16,
