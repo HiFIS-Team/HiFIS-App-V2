@@ -21,19 +21,49 @@ class WorkScreen extends StatefulWidget {
 class _WorkScreenState extends State<WorkScreen> {
   int _tab = 0;
 
-  /// 환경정비 항목별 오늘 수행 횟수 (목업 초기값)
-  final Map<String, int> _counts = {'세탁': 2, '건조기': 1, '복도청소': 1};
+  /// 환경정비 오늘 수행 로그 — 횟수는 이 로그에서 집계한다 (목업 초기값 포함)
+  late final List<_WorkLog> _logs = _seedLogs();
+
+  static List<_WorkLog> _seedLogs() {
+    final now = DateTime.now();
+    DateTime at(int hour, int minute) =>
+        DateTime(now.year, now.month, now.day, hour, minute);
+    return [
+      _WorkLog(task: '세탁', time: at(8, 40)),
+      _WorkLog(task: '건조기', time: at(9, 15)),
+      _WorkLog(task: '복도청소', time: at(10, 5)),
+      _WorkLog(task: '세탁', time: at(11, 30)),
+    ];
+  }
+
+  Map<String, int> get _counts {
+    final counts = <String, int>{};
+    for (final log in _logs) {
+      counts[log.task] = (counts[log.task] ?? 0) + 1;
+    }
+    return counts;
+  }
 
   void _adjust(String task, int delta) {
     setState(() {
-      final next = (_counts[task] ?? 0) + delta;
-      if (next <= 0) {
-        _counts.remove(task);
+      if (delta > 0) {
+        _logs.add(_WorkLog(task: task, time: DateTime.now()));
       } else {
-        _counts[task] = next;
+        // 감소는 해당 항목의 가장 최근 기록을 지운다
+        final index = _logs.lastIndexWhere((log) => log.task == task);
+        if (index >= 0) _logs.removeAt(index);
       }
     });
     if (delta > 0) AppToast.show(context, '${_withJosa(task)} 완료했습니다');
+  }
+
+  void _showHistory() {
+    showModalBottomSheet(
+      context: context,
+      useRootNavigator: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _HistorySheet(logs: List.of(_logs)),
+    );
   }
 
   /// 받침 유무에 따라 을/를을 붙인다 (한글이 아니면 을(를))
@@ -150,6 +180,7 @@ class _WorkScreenState extends State<WorkScreen> {
                         items: item.checklist!,
                         counts: _counts,
                         onAdjust: _adjust,
+                        onShowHistory: _showHistory,
                       ),
                     )
                   else ...[
@@ -171,6 +202,14 @@ class _WorkScreenState extends State<WorkScreen> {
       ),
     );
   }
+}
+
+/// 환경정비 수행 기록 한 건
+class _WorkLog {
+  _WorkLog({required this.task, required this.time});
+
+  final String task;
+  final DateTime time;
 }
 
 class _WorkItem {
@@ -315,6 +354,7 @@ class _ChecklistCard extends StatelessWidget {
     required this.items,
     required this.counts,
     required this.onAdjust,
+    required this.onShowHistory,
   });
 
   final List<String> items;
@@ -322,6 +362,9 @@ class _ChecklistCard extends StatelessWidget {
 
   /// (항목, 증감량) — +1 또는 -1
   final void Function(String task, int delta) onAdjust;
+
+  /// 오늘 내역 시트 열기
+  final VoidCallback onShowHistory;
 
   @override
   Widget build(BuildContext context) {
@@ -339,11 +382,30 @@ class _ChecklistCard extends StatelessWidget {
             child: Row(
               children: [
                 Expanded(child: Text('오늘 점검 항목', style: AppTextStyles.label)),
-                Text(
-                  '총 $total회',
-                  style: AppTextStyles.caption.copyWith(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w700,
+                // 누르면 오늘 수행 내역 시트가 열린다
+                Pressable(
+                  onTap: onShowHistory,
+                  scale: 0.92,
+                  pressedColor: AppColors.gray100,
+                  borderRadius: BorderRadius.circular(100),
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '총 $total회',
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(width: 2),
+                      Icon(
+                        CupertinoIcons.chevron_right,
+                        size: 11,
+                        color: AppColors.primary,
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -497,6 +559,133 @@ class _AdjustButtonState extends State<_AdjustButton> {
               child: Icon(widget.icon, size: 13, color: widget.color),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 오늘 수행 내역 하단 시트 — 최근 기록이 위로 오도록 시간 역순으로 보여준다
+class _HistorySheet extends StatelessWidget {
+  _HistorySheet({required this.logs});
+
+  final List<_WorkLog> logs;
+
+  static const _weekdays = ['월', '화', '수', '목', '금', '토', '일'];
+
+  String _formatTime(DateTime time) {
+    final period = time.hour < 12 ? '오전' : '오후';
+    final hour = time.hour % 12 == 0 ? 12 : time.hour % 12;
+    final minute = time.minute.toString().padLeft(2, '0');
+    return '$period $hour:$minute';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final date = '${now.month}월 ${now.day}일 ${_weekdays[now.weekday - 1]}요일';
+    final sorted = List.of(logs)..sort((a, b) => b.time.compareTo(a.time));
+
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.66,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 드래그 핸들
+            Container(
+              margin: EdgeInsets.only(top: 10),
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.gray200,
+                borderRadius: BorderRadius.circular(100),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(24, 20, 24, 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('오늘 내역', style: AppTextStyles.title3),
+                        SizedBox(height: 4),
+                        Text(date, style: AppTextStyles.caption),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    '총 ${logs.length}회',
+                    style: AppTextStyles.body2.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (sorted.isEmpty)
+              Padding(
+                padding: EdgeInsets.fromLTRB(24, 32, 24, 44),
+                child: Text(
+                  '오늘 완료한 항목이 없어요',
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.textTertiary,
+                  ),
+                ),
+              )
+            else
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  padding: EdgeInsets.fromLTRB(24, 12, 24, 16),
+                  itemCount: sorted.length,
+                  separatorBuilder: (_, _) =>
+                      Divider(height: 1, color: AppColors.divider),
+                  itemBuilder: (_, index) {
+                    final log = sorted[index];
+                    return Padding(
+                      padding: EdgeInsets.symmetric(vertical: 13),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 64,
+                            child: Text(
+                              _formatTime(log.time),
+                              style: AppTextStyles.caption,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              log.task,
+                              style: AppTextStyles.body2.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          Icon(
+                            CupertinoIcons.checkmark_circle_fill,
+                            size: 16,
+                            color: AppColors.success,
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+          ],
         ),
       ),
     );
