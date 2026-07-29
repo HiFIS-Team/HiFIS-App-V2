@@ -14,7 +14,11 @@ import 'new_message_screen.dart';
 ///
 /// 데이터는 하드코딩된 샘플이며, 기능 개발 시 실제 대화 데이터로 교체한다.
 class MessageScreen extends StatefulWidget {
-  MessageScreen({super.key});
+  MessageScreen({super.key, this.embedded = false});
+
+  /// 데스크톱 플로팅 패널에 담길 때 true.
+  /// 뒤로가기 버튼을 숨긴다 (닫기는 패널 밖 X 버튼이 담당).
+  final bool embedded;
 
   @override
   State<MessageScreen> createState() => _MessageScreenState();
@@ -139,10 +143,11 @@ class _MessageScreenState extends State<MessageScreen> {
               padding: EdgeInsets.only(top: 8, left: 16, right: 16),
               child: Row(
                 children: [
-                  GlassIconButton(
-                    symbol: 'chevron.backward',
-                    onPressed: () => Navigator.pop(context),
-                  ),
+                  if (!widget.embedded)
+                    GlassIconButton(
+                      symbol: 'chevron.backward',
+                      onPressed: () => Navigator.pop(context),
+                    ),
                   Spacer(),
                   GlassIconButton(symbol: 'line.3.horizontal.decrease'),
                 ],

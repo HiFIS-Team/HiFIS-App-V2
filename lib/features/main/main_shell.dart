@@ -159,12 +159,12 @@ class _MainShellState extends State<MainShell> {
                               ),
                             ),
                           ),
-                          // 우하단 사내톡 플로팅 필 (인스타그램 데스크톱 패턴)
+                          // 우하단 사내톡 플로팅 필 + 패널 (인스타그램 데스크톱 패턴)
                           Align(
                             alignment: Alignment.bottomRight,
                             child: Padding(
                               padding: EdgeInsets.only(right: 20, bottom: 20),
-                              child: _ChatPill(),
+                              child: _ChatDock(),
                             ),
                           ),
                         ],
@@ -221,29 +221,82 @@ class _MainShellState extends State<MainShell> {
   }
 }
 
-/// 데스크톱 우하단 사내톡 플로팅 필
+/// 데스크톱 우하단 사내톡 플로팅 필 + 패널
 ///
 /// 인스타그램 데스크톱의 메시지 필과 같은 위치·역할이지만
 /// 앱의 글래스 스타일(블러 + 반투명 surface + 헤어라인)로 그린다.
-/// 누르면 사내톡 화면이 콘텐츠 영역 안에서 열린다.
-class _ChatPill extends StatelessWidget {
-  _ChatPill();
+/// 누르면 사내톡 패널이 위로 떠오르고, 필은 줄어들며 X 버튼으로 바뀐다
+/// (인스타그램은 필이 패널에 가려지는데 우리는 모프 애니메이션으로 대체).
+class _ChatDock extends StatefulWidget {
+  _ChatDock();
+
+  @override
+  State<_ChatDock> createState() => _ChatDockState();
+}
+
+class _ChatDockState extends State<_ChatDock> {
+  bool _open = false;
+
+  /// 펼친 필의 전체 폭 — 접힘(X 버튼) 폭은 높이와 같은 52
+  static const double _pillWidth = 184;
 
   @override
   Widget build(BuildContext context) {
-    // 사내톡 목업의 최근 대화 상대 3명 (기능 연동 시 실제 데이터로 교체)
-    final people = [
-      ('김', AppColors.primary),
-      ('박', AppColors.warning),
-      ('이', AppColors.success),
-    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // 창이 낮으면 패널 높이를 줄여 잘리지 않게 한다
+        final panelHeight = (constraints.maxHeight - 84).clamp(240.0, 560.0);
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            // 사내톡 패널 — 필 위로 떠오른다
+            IgnorePointer(
+              ignoring: !_open,
+              child: AnimatedOpacity(
+                duration: Duration(milliseconds: 200),
+                opacity: _open ? 1 : 0,
+                child: AnimatedScale(
+                  duration: Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  scale: _open ? 1 : 0.94,
+                  alignment: Alignment.bottomRight,
+                  child: Container(
+                    width: 380,
+                    height: panelHeight,
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppColors.gray100),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.14),
+                          blurRadius: 40,
+                          offset: Offset(0, 12),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: MessageScreen(embedded: true),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(height: 12),
+            _buildPill(),
+          ],
+        );
+      },
+    );
+  }
 
+  /// 사내톡 필 ↔ X 버튼 모프
+  Widget _buildPill() {
     return Pressable(
-      scale: 0.97,
-      onTap: () => Navigator.push(
-        context,
-        CupertinoPageRoute(builder: (_) => MessageScreen()),
-      ),
+      scale: 0.95,
+      onTap: () => setState(() => _open = !_open),
       child: DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(26),
@@ -259,74 +312,126 @@ class _ChatPill extends StatelessWidget {
           borderRadius: BorderRadius.circular(26),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-            child: Container(
+            child: AnimatedContainer(
+              duration: Duration(milliseconds: 250),
+              curve: Curves.easeOutCubic,
+              width: _open ? 52 : _pillWidth,
               height: 52,
-              padding: EdgeInsets.fromLTRB(18, 0, 12, 0),
               decoration: BoxDecoration(
                 color: AppColors.surface.withValues(alpha: 0.72),
                 borderRadius: BorderRadius.circular(26),
                 border: Border.all(color: AppColors.gray100),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.chat_bubble_outline_rounded,
-                    size: 19,
-                    color: AppColors.gray700,
-                  ),
-                  SizedBox(width: 8),
-                  Text(
-                    '사내톡',
-                    style: AppTextStyles.label.copyWith(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  SizedBox(width: 14),
-                  // 최근 대화 상대 아바타 겹침 스택
-                  SizedBox(
-                    width: 28.0 + 18 * (people.length - 1),
-                    height: 28,
-                    child: Stack(
-                      children: [
-                        for (var i = 0; i < people.length; i++)
-                          Positioned(
-                            left: i * 18.0,
-                            child: Container(
-                              width: 28,
-                              height: 28,
-                              decoration: BoxDecoration(
-                                color: people[i].$2,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: AppColors.surface,
-                                  width: 2,
-                                ),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  people[i].$1,
-                                  style: TextStyle(
-                                    fontFamily: AppTextStyles.fontFamily,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
+              // 폭이 줄어드는 동안 안쪽 내용은 원래 크기를 유지한 채
+              // 오른쪽 기준으로 잘려 나가야 자연스럽게 접힌다
+              child: OverflowBox(
+                minWidth: 0,
+                maxWidth: _pillWidth,
+                minHeight: 50,
+                maxHeight: 50,
+                alignment: Alignment.centerRight,
+                child: SizedBox(
+                  width: _pillWidth,
+                  height: 50,
+                  child: Stack(
+                    children: [
+                      // 펼침: 아이콘 + 사내톡 + 아바타
+                      AnimatedOpacity(
+                        duration: Duration(milliseconds: 150),
+                        opacity: _open ? 0 : 1,
+                        child: Padding(
+                          padding: EdgeInsets.fromLTRB(18, 0, 12, 0),
+                          child: _pillContent(),
+                        ),
+                      ),
+                      // 접힘: X (필의 오른쪽 끝 원 안에 자리한다)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: 50,
+                        child: AnimatedOpacity(
+                          duration: Duration(milliseconds: 150),
+                          opacity: _open ? 1 : 0,
+                          child: Center(
+                            child: Icon(
+                              Icons.close_rounded,
+                              size: 22,
+                              color: AppColors.gray700,
                             ),
                           ),
-                      ],
-                    ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _pillContent() {
+    // 사내톡 목업의 최근 대화 상대 3명 (기능 연동 시 실제 데이터로 교체)
+    final people = [
+      ('김', AppColors.primary),
+      ('박', AppColors.warning),
+      ('이', AppColors.success),
+    ];
+
+    return Row(
+      children: [
+        Icon(
+          Icons.chat_bubble_outline_rounded,
+          size: 19,
+          color: AppColors.gray700,
+        ),
+        SizedBox(width: 8),
+        Text(
+          '사내톡',
+          style: AppTextStyles.label.copyWith(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        Spacer(),
+        // 최근 대화 상대 아바타 겹침 스택
+        SizedBox(
+          width: 28.0 + 18 * (people.length - 1),
+          height: 28,
+          child: Stack(
+            children: [
+              for (var i = 0; i < people.length; i++)
+                Positioned(
+                  left: i * 18.0,
+                  child: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: people[i].$2,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.surface, width: 2),
+                    ),
+                    child: Center(
+                      child: Text(
+                        people[i].$1,
+                        style: TextStyle(
+                          fontFamily: AppTextStyles.fontFamily,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
