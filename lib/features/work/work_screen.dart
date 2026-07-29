@@ -177,18 +177,18 @@ class _WorkScreenState extends State<WorkScreen> {
             // 상단 글래스 헤더 버튼 영역만큼 비워둔다
             SizedBox(height: 64),
             // 항목 탭 — 사내톡 상세 '공유된 콘텐츠' 탭과 같은 밑줄 스타일.
-            // 스크롤과 무관하게 고정되고, 좌우 여백으로 가장자리와 띄운다.
+            // 라벨 폭 기준으로 배치하고 spaceBetween으로 좌우·항목 간
+            // 간격을 균등하게 맞춘다.
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10),
+              padding: EdgeInsets.symmetric(horizontal: 20),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   for (var i = 0; i < _items.length; i++)
-                    Expanded(
-                      child: _WorkTab(
-                        label: _items[i].label,
-                        selected: _tab == i,
-                        onTap: () => setState(() => _tab = i),
-                      ),
+                    _WorkTab(
+                      label: _items[i].label,
+                      selected: _tab == i,
+                      onTap: () => setState(() => _tab = i),
                     ),
                 ],
               ),
@@ -202,6 +202,12 @@ class _WorkScreenState extends State<WorkScreen> {
                   // 체크리스트 탭(환경정비)은 점수 카드 없이 리스트만 보여준다.
                   AnimatedSwitcher(
                     duration: Duration(milliseconds: 200),
+                    // 기본 정렬(가운데)은 높이가 다른 콘텐츠가 아래로 밀렸다
+                    // 올라와 보이므로 위쪽 기준으로 겹친다
+                    layoutBuilder: (currentChild, previousChildren) => Stack(
+                      alignment: Alignment.topCenter,
+                      children: [...previousChildren, ?currentChild],
+                    ),
                     child: Column(
                       key: ValueKey(_tab),
                       children: [
@@ -283,19 +289,38 @@ class _WorkItem {
 }
 
 class _WorkTab extends StatelessWidget {
-  _WorkTab({required this.label, required this.selected, required this.onTap});
+  _WorkTab({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.expand = false,
+  });
 
   final String label;
   final bool selected;
   final VoidCallback onTap;
 
+  /// true면 주어진 칸을 채우고 가운데 정렬 (내역 화면처럼 Expanded로 쓸 때)
+  final bool expand;
+
   @override
   Widget build(BuildContext context) {
+    final text = Text(
+      label,
+      maxLines: 1,
+      style: AppTextStyles.body2.copyWith(
+        fontSize: 14,
+        color: selected ? AppColors.textPrimary : AppColors.gray500,
+        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+      ),
+    );
+
     return Pressable(
       onTap: onTap,
       scale: 0.94,
       child: Container(
-        padding: EdgeInsets.symmetric(vertical: 12),
+        // 밑줄이 글자보다 살짝 넓게 깔리도록 좌우 여유를 준다
+        padding: EdgeInsets.symmetric(vertical: 12, horizontal: 2),
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(
@@ -304,21 +329,7 @@ class _WorkTab extends StatelessWidget {
             ),
           ),
         ),
-        child: Center(
-          // 칸보다 긴 라벨은 살짝 줄여서 옆 칸·가장자리를 침범하지 않게 한다
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              label,
-              maxLines: 1,
-              style: AppTextStyles.body2.copyWith(
-                fontSize: 14,
-                color: selected ? AppColors.textPrimary : AppColors.gray500,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              ),
-            ),
-          ),
-        ),
+        child: expand ? Center(child: text) : text,
       ),
     );
   }
@@ -680,6 +691,7 @@ class _HistoryScreenState extends State<_HistoryScreen> {
                       child: _WorkTab(
                         label: '내 내역',
                         selected: !_all,
+                        expand: true,
                         onTap: () => setState(() => _all = false),
                       ),
                     ),
@@ -687,6 +699,7 @@ class _HistoryScreenState extends State<_HistoryScreen> {
                       child: _WorkTab(
                         label: '전체 내역',
                         selected: _all,
+                        expand: true,
                         onTap: () => setState(() => _all = true),
                       ),
                     ),
