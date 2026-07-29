@@ -12,8 +12,8 @@ import '../../core/widgets/pressable.dart';
 /// 수업 개수 탭 콘텐츠 (목업)
 ///
 /// 수업은 회원의 싸인을 받아야 인정된다.
-/// - 내 회원: 등록된 회원 목록과 회원 등록, 회원별 싸인 받기
-/// - 싸인 내역: 받은 싸인 기록 (서명 미리보기 포함)
+/// - 상단: 회원 등록 / 세션 싸인 받기 버튼
+/// - 세션 기록: 받은 싸인 기록 (서명 미리보기·회차·시각)
 class LessonSection extends StatefulWidget {
   LessonSection({super.key});
 
@@ -43,8 +43,9 @@ final _members = <_LessonMember>[
     name: '최준영',
     color: _palette[1],
     total: 30,
-    done: 8,
+    done: 0,
     price: 55000,
+    isNew: true,
   ),
   _LessonMember(
     name: '한지우',
@@ -54,12 +55,6 @@ final _members = <_LessonMember>[
     price: 45000,
   ),
 ];
-
-/// 1,000 단위 콤마 표기
-String _comma(int n) => n.toString().replaceAllMapped(
-  RegExp(r'(\d)(?=(\d{3})+$)'),
-  (m) => '${m[1]},',
-);
 
 /// 받은 싸인 내역 (표시할 때 최신순 정렬)
 final _signs = <_LessonSign>[..._seedSigns()];
@@ -73,6 +68,8 @@ List<_LessonSign> _seedSigns() {
     _LessonSign(
       member: '박서연',
       round: 12,
+      total: 20,
+      isNew: false,
       time: at(9, 30),
       padSize: padSize,
       strokes: [
@@ -83,6 +80,8 @@ List<_LessonSign> _seedSigns() {
     _LessonSign(
       member: '한지우',
       round: 9,
+      total: 10,
+      isNew: false,
       time: at(11, 0),
       padSize: padSize,
       strokes: [
@@ -93,11 +92,18 @@ List<_LessonSign> _seedSigns() {
   ];
 }
 
-String _formatTime(DateTime time) {
+/// 1,000 단위 콤마 표기
+String _comma(int n) => n.toString().replaceAllMapped(
+  RegExp(r'(\d)(?=(\d{3})+$)'),
+  (m) => '${m[1]},',
+);
+
+/// '7.29 오전 9:30' 형태
+String _formatStamp(DateTime time) {
   final period = time.hour < 12 ? '오전' : '오후';
   final hour = time.hour % 12 == 0 ? 12 : time.hour % 12;
   final minute = time.minute.toString().padLeft(2, '0');
-  return '$period $hour:$minute';
+  return '${time.month}.${time.day} $period $hour:$minute';
 }
 
 class _LessonSectionState extends State<LessonSection> {
@@ -169,88 +175,123 @@ class _LessonSectionState extends State<LessonSection> {
           total: total,
           done: round.clamp(0, total),
           price: price,
+          // 진행 회차 없이 시작하면 신규, 이어서 시작하면 재등록으로 본다
+          isNew: round == 0,
         ),
       );
     });
     AppToast.show(context, '$name님이 등록되었습니다');
   }
 
-  Future<void> _requestSign(_LessonMember member) async {
+  /// 회원을 골라 싸인을 받는다
+  Future<void> _pickAndSign() async {
     await Navigator.push(
       context,
-      CupertinoPageRoute(builder: (_) => _SignScreen(member: member)),
+      CupertinoPageRoute(builder: (_) => _PickMemberScreen()),
     );
-    // 싸인 화면에서 기록이 추가됐을 수 있으니 갱신한다
+    // 싸인이 추가됐을 수 있으니 갱신한다
     if (mounted) setState(() {});
+  }
+
+  /// 기록 줄을 누르면 서명을 크게 보여준다
+  void _showDetail(_LessonSign sign) {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '싸인 크게 보기',
+      barrierColor: Colors.black.withValues(alpha: 0.45),
+      transitionDuration: Duration(milliseconds: 200),
+      pageBuilder: (context, animation, secondaryAnimation) => Center(
+        child: Material(
+          type: MaterialType.transparency,
+          child: Container(
+            width: 300,
+            padding: EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: double.infinity,
+                  height: 150,
+                  decoration: BoxDecoration(
+                    color: AppColors.gray50,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: CustomPaint(
+                    painter: _SignPainter(
+                      strokes: sign.strokes,
+                      sourceSize: sign.padSize,
+                      color: AppColors.textPrimary,
+                      strokeWidth: 2.4,
+                    ),
+                  ),
+                ),
+                SizedBox(height: 14),
+                Text(
+                  '${sign.member} · ${sign.round}/${sign.total}회차',
+                  style: AppTextStyles.body1.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(_formatStamp(sign.time), style: AppTextStyles.caption),
+              ],
+            ),
+          ),
+        ),
+      ),
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+        );
+        return FadeTransition(
+          opacity: curved,
+          child: ScaleTransition(
+            scale: Tween(begin: 0.92, end: 1.0).animate(curved),
+            child: child,
+          ),
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Column(
-      children: [_buildMemberCard(), SizedBox(height: 16), _buildSignCard()],
-    );
-  }
-
-  Widget _buildMemberCard() {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.fromLTRB(20, 20, 20, 10),
-      decoration: AppDecorations.card(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 4),
-            child: Row(
-              children: [
-                Expanded(child: Text('내 회원', style: AppTextStyles.label)),
-                // 새 회원 등록 버튼
-                Pressable(
-                  onTap: _register,
-                  scale: 0.94,
-                  child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: AppColors.gray50,
-                      borderRadius: BorderRadius.circular(100),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          CupertinoIcons.person_add,
-                          size: 13,
-                          color: AppColors.textSecondary,
-                        ),
-                        SizedBox(width: 5),
-                        Text(
-                          '회원 등록',
-                          style: AppTextStyles.caption.copyWith(
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+      children: [
+        // 상단 액션 버튼 두 개
+        Row(
+          children: [
+            Expanded(
+              child: _ActionButton(
+                icon: CupertinoIcons.person_add,
+                label: '회원 등록',
+                onTap: _register,
+              ),
             ),
-          ),
-          SizedBox(height: 8),
-          for (var i = 0; i < _members.length; i++) ...[
-            if (i > 0) Divider(height: 1, color: AppColors.divider),
-            _MemberRow(
-              member: _members[i],
-              onSign: () => _requestSign(_members[i]),
+            SizedBox(width: 10),
+            Expanded(
+              child: _ActionButton(
+                icon: CupertinoIcons.signature,
+                label: '세션 싸인 받기',
+                highlighted: true,
+                onTap: _pickAndSign,
+              ),
             ),
           ],
-        ],
-      ),
+        ),
+        SizedBox(height: 16),
+        _buildRecordCard(),
+      ],
     );
   }
 
-  Widget _buildSignCard() {
+  Widget _buildRecordCard() {
     final sorted = List.of(_signs)..sort((a, b) => b.time.compareTo(a.time));
 
     return Container(
@@ -263,13 +304,14 @@ class _LessonSectionState extends State<LessonSection> {
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 4),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Expanded(child: Text('싸인 내역', style: AppTextStyles.label)),
+                Text('세션 기록', style: AppTextStyles.label),
+                SizedBox(width: 6),
                 Text(
-                  '총 ${_signs.length}건',
-                  style: AppTextStyles.caption.copyWith(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w700,
+                  '${_signs.length}',
+                  style: AppTextStyles.label.copyWith(
+                    color: AppColors.textTertiary,
                   ),
                 ),
               ],
@@ -289,9 +331,86 @@ class _LessonSectionState extends State<LessonSection> {
           else
             for (var i = 0; i < sorted.length; i++) ...[
               if (i > 0) Divider(height: 1, color: AppColors.divider),
-              _SignRow(sign: sorted[i]),
+              _SignRow(sign: sorted[i], onTap: () => _showDetail(sorted[i])),
             ],
         ],
+      ),
+    );
+  }
+}
+
+/// 상단 액션 버튼 — 강조(파랑)와 기본(흰색) 두 가지
+class _ActionButton extends StatelessWidget {
+  _ActionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.highlighted = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool highlighted;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = highlighted ? AppColors.primary : AppColors.textPrimary;
+
+    return Pressable(
+      onTap: onTap,
+      scale: 0.96,
+      child: Container(
+        height: 56,
+        decoration: BoxDecoration(
+          color: highlighted ? AppColors.primaryLight : AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: highlighted
+                ? AppColors.primary.withValues(alpha: 0.35)
+                : AppColors.gray100,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 17, color: color),
+            SizedBox(width: 7),
+            Text(
+              label,
+              style: AppTextStyles.body2.copyWith(
+                color: color,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 신규/재등록 배지
+class _MemberBadge extends StatelessWidget {
+  _MemberBadge({required this.isNew});
+
+  final bool isNew;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+      decoration: BoxDecoration(
+        color: isNew ? AppColors.primaryLight : AppColors.gray100,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        isNew ? '신규' : '재등록',
+        style: AppTextStyles.caption.copyWith(
+          fontSize: 10,
+          color: isNew ? AppColors.primary : AppColors.textSecondary,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -305,6 +424,7 @@ class _LessonMember {
     required this.total,
     required this.price,
     this.done = 0,
+    this.isNew = false,
   });
 
   final String name;
@@ -316,6 +436,9 @@ class _LessonMember {
   /// 세션(1회) 단가, 원
   final int price;
 
+  /// 신규 회원 여부 (아니면 재등록)
+  final bool isNew;
+
   /// 싸인으로 확인된 진행 회차 — 싸인 한 번에 1회차씩 올라간다
   int done;
 }
@@ -325,6 +448,8 @@ class _LessonSign {
   _LessonSign({
     required this.member,
     required this.round,
+    required this.total,
+    required this.isNew,
     required this.time,
     required this.strokes,
     required this.padSize,
@@ -332,8 +457,10 @@ class _LessonSign {
 
   final String member;
 
-  /// 몇 회차 수업인지
+  /// 몇 회차 수업인지 / 총 몇 회 등록인지
   final int round;
+  final int total;
+  final bool isNew;
   final DateTime time;
 
   /// 서명 획 좌표 (패드 좌표계)
@@ -343,102 +470,31 @@ class _LessonSign {
   final Size padSize;
 }
 
-/// 회원 한 줄 — 아바타·이름·진행 현황과 싸인 받기 버튼
-class _MemberRow extends StatelessWidget {
-  _MemberRow({required this.member, required this.onSign});
-
-  final _LessonMember member;
-  final VoidCallback onSign;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 12),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: member.color,
-              shape: BoxShape.circle,
-            ),
-            child: Text(
-              member.name.characters.first,
-              style: TextStyle(
-                fontFamily: AppTextStyles.fontFamily,
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-          ),
-          SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  member.name,
-                  style: AppTextStyles.body2.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'PT ${member.total}회 중 ${member.done}회 · 회당 ${_comma(member.price)}원',
-                  style: AppTextStyles.caption.copyWith(
-                    fontSize: 11,
-                    color: AppColors.textTertiary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Pressable(
-            onTap: onSign,
-            scale: 0.93,
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 13, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppColors.primaryLight,
-                borderRadius: BorderRadius.circular(100),
-              ),
-              child: Text(
-                '싸인 받기',
-                style: AppTextStyles.caption.copyWith(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 싸인 내역 한 줄 — 서명 미리보기, 회원·회차, 시각
+/// 세션 기록 한 줄 — 서명 미리보기, 이름·배지, 회차·시각, +1
 class _SignRow extends StatelessWidget {
-  _SignRow({required this.sign});
+  _SignRow({required this.sign, required this.onTap});
 
   final _LessonSign sign;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return Pressable(
+      onTap: onTap,
+      scale: 0.98,
+      pressedColor: AppColors.gray50,
+      borderRadius: BorderRadius.circular(12),
       padding: EdgeInsets.symmetric(horizontal: 4, vertical: 12),
       child: Row(
         children: [
           // 서명 미리보기
           Container(
             width: 64,
-            height: 36,
+            height: 40,
             decoration: BoxDecoration(
               color: AppColors.gray50,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.gray100),
             ),
             child: CustomPaint(
               painter: _SignPainter(
@@ -454,24 +510,202 @@ class _SignRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '${sign.member} · ${sign.round}회차',
-                  style: AppTextStyles.body2.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      sign.member,
+                      style: AppTextStyles.body2.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    SizedBox(width: 6),
+                    _MemberBadge(isNew: sign.isNew),
+                  ],
                 ),
                 SizedBox(height: 2),
                 Text(
-                  '수업 확인 완료',
-                  style: AppTextStyles.caption.copyWith(
-                    fontSize: 11,
-                    color: AppColors.textTertiary,
+                  '${sign.round}/${sign.total}회차 · ${_formatStamp(sign.time)}',
+                  style: AppTextStyles.caption.copyWith(fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            '+1',
+            style: AppTextStyles.body2.copyWith(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          SizedBox(width: 6),
+          Icon(
+            CupertinoIcons.chevron_right,
+            size: 14,
+            color: AppColors.gray300,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 싸인 받을 회원 선택 화면
+class _PickMemberScreen extends StatefulWidget {
+  @override
+  State<_PickMemberScreen> createState() => _PickMemberScreenState();
+}
+
+class _PickMemberScreenState extends State<_PickMemberScreen> {
+  Future<void> _open(_LessonMember member) async {
+    final done = await Navigator.push<bool>(
+      context,
+      CupertinoPageRoute(builder: (_) => _SignScreen(member: member)),
+    );
+    // 싸인을 받았으면 선택 화면도 닫고 업무 탭으로 돌아간다
+    if (done == true && mounted) Navigator.pop(context);
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      body: Stack(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 상단 고정 타이틀 영역만큼 비워둔다
+                SizedBox(height: 56),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(24, 12, 24, 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '싸인 받을 회원을 선택하세요',
+                          style: AppTextStyles.caption,
+                        ),
+                      ),
+                      Text(
+                        '회원 ${_members.length}명',
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(height: 1, color: AppColors.gray100),
+                Expanded(
+                  child: ListView.separated(
+                    padding: EdgeInsets.fromLTRB(
+                      20,
+                      8,
+                      20,
+                      MediaQuery.paddingOf(context).bottom + 24,
+                    ),
+                    itemCount: _members.length,
+                    separatorBuilder: (_, _) =>
+                        Divider(height: 1, color: AppColors.divider),
+                    itemBuilder: (_, index) {
+                      final member = _members[index];
+                      return Pressable(
+                        onTap: () => _open(member),
+                        scale: 0.98,
+                        pressedColor: AppColors.gray50,
+                        borderRadius: BorderRadius.circular(12),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 12,
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 38,
+                              height: 38,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: member.color,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Text(
+                                member.name.characters.first,
+                                style: TextStyle(
+                                  fontFamily: AppTextStyles.fontFamily,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        member.name,
+                                        style: AppTextStyles.body2.copyWith(
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      SizedBox(width: 6),
+                                      _MemberBadge(isNew: member.isNew),
+                                    ],
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    '${member.done}/${member.total}회차 · 회당 ${_comma(member.price)}원',
+                                    style: AppTextStyles.caption.copyWith(
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(
+                              CupertinoIcons.chevron_right,
+                              size: 16,
+                              color: AppColors.gray300,
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],
             ),
           ),
-          Text(_formatTime(sign.time), style: AppTextStyles.caption),
+          // 상단 중앙 고정 타이틀 (터치는 아래로 통과)
+          IgnorePointer(
+            child: SafeArea(
+              bottom: false,
+              child: SizedBox(
+                height: 56,
+                child: Center(
+                  child: Text('세션 싸인 받기', style: AppTextStyles.title3),
+                ),
+              ),
+            ),
+          ),
+          // 좌측 상단 고정 뒤로가기 글래스 버튼
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: EdgeInsets.only(top: 8, left: 16),
+              child: GlassIconButton(
+                symbol: 'chevron.backward',
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -509,13 +743,15 @@ class _SignScreenState extends State<_SignScreen> {
       _LessonSign(
         member: member.name,
         round: member.done,
+        total: member.total,
+        isNew: member.isNew,
         time: DateTime.now(),
         strokes: [for (final stroke in _strokes) List.of(stroke)],
         padSize: _padSize,
       ),
     );
     AppToast.show(context, '${member.name}님 ${member.done}회차 수업이 기록되었습니다');
-    Navigator.pop(context);
+    Navigator.pop(context, true);
   }
 
   @override
@@ -539,7 +775,7 @@ class _SignScreenState extends State<_SignScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          '${member.done + 1}회차 수업 확인',
+                          '${member.done + 1}/${member.total}회차 수업 확인',
                           style: AppTextStyles.caption,
                         ),
                       ),
