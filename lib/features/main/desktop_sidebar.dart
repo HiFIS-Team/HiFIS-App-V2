@@ -75,16 +75,21 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
 
   @override
   Widget build(BuildContext context) {
-    // 섹션을 펼치면서 전역 인덱스를 매긴다
+    // 섹션을 펼치면서 전역 인덱스를 매긴다.
+    // 캡션과 항목을 섹션 단위로 묶어야 남는 공간이 섹션 사이에만 분배된다.
     final children = <Widget>[];
     var index = 0;
     for (final (title, items) in _sections) {
-      if (title != null) {
-        children.add(_sectionHeader(title));
-      }
-      for (final item in items) {
-        children.add(_item(index++, item));
-      }
+      children.add(
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (title != null) _sectionHeader(title),
+            for (final item in items) _item(index++, item),
+          ],
+        ),
+      );
     }
 
     return MouseRegion(
@@ -97,14 +102,6 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
         decoration: BoxDecoration(
           color: AppColors.surface,
           border: Border(right: BorderSide(color: AppColors.gray100)),
-          boxShadow: [
-            if (_hovered)
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 28,
-                offset: Offset(6, 0),
-              ),
-          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -112,11 +109,25 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
             SizedBox(height: 24),
             _logo(),
             SizedBox(height: 16),
-            // 창이 낮아도 메뉴가 잘리지 않게 스크롤 가능하게 둔다
+            // 업무 탭바처럼 섹션들을 남는 높이에 고르게 분배하고,
+            // 창이 낮으면 스크롤로 전환해 잘리지 않게 한다
             Expanded(
-              child: ListView(
-                padding: EdgeInsets.only(bottom: 16),
-                children: children,
+              child: LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.only(bottom: 20),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: children,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
@@ -212,7 +223,9 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
         child: AnimatedContainer(
           duration: Duration(milliseconds: 150),
           height: 44,
-          padding: EdgeInsets.symmetric(horizontal: 14),
+          // 오른쪽 경계 헤어라인(1px)이 안쪽 폭을 깎으므로 14가 아닌 13 —
+          // 14면 접힘 상태에서 아이콘이 1px 오버플로된다
+          padding: EdgeInsets.symmetric(horizontal: 13),
           decoration: BoxDecoration(
             color: selected ? AppColors.primaryLight : Colors.transparent,
             borderRadius: BorderRadius.circular(10),

@@ -114,14 +114,23 @@ class _MainShellState extends State<MainShell> {
 
   /// 데스크톱: 좌측 사이드바 + 넓은 콘텐츠 영역 (인스타그램 데스크톱 패턴)
   ///
-  /// 콘텐츠는 접힌 레일 폭만큼만 왼쪽을 비워두고, 사이드바는 커서를
-  /// 올리면 콘텐츠를 밀지 않고 그 위로 펼쳐진다.
+  /// 사이드바가 펼쳐지고 접힐 때 콘텐츠도 함께 줄었다 늘어난다.
   Widget _buildDesktop() {
     return Scaffold(
-      body: Stack(
+      body: Row(
         children: [
-          Positioned.fill(
-            left: DesktopSidebar.railWidth,
+          ValueListenableBuilder<int>(
+            valueListenable: _paneIndex,
+            builder: (context, index, child) => DesktopSidebar(
+              selectedIndex: index,
+              onSelect: (i) {
+                // 열려 있는 슬라이드인 화면을 닫고 탭을 바꾼다
+                _paneNavKey.currentState?.popUntil((r) => r.isFirst);
+                _paneIndex.value = i;
+              },
+            ),
+          ),
+          Expanded(
             child: ColoredBox(
               color: AppColors.surface,
               child: ClipRect(
@@ -149,21 +158,6 @@ class _MainShellState extends State<MainShell> {
                     ),
                   ),
                 ),
-              ),
-            ),
-          ),
-          // 사이드바 — 펼쳐질 때 콘텐츠 위로 떠오르도록 Stack 위층에 둔다
-          Align(
-            alignment: Alignment.centerLeft,
-            child: ValueListenableBuilder<int>(
-              valueListenable: _paneIndex,
-              builder: (context, index, child) => DesktopSidebar(
-                selectedIndex: index,
-                onSelect: (i) {
-                  // 열려 있는 슬라이드인 화면을 닫고 탭을 바꾼다
-                  _paneNavKey.currentState?.popUntil((r) => r.isFirst);
-                  _paneIndex.value = i;
-                },
               ),
             ),
           ),
