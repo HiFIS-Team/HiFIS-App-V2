@@ -840,43 +840,78 @@ class _RegisterScreenState extends State<_RegisterScreen> {
                           child: Text('재등록할 회원', style: AppTextStyles.label),
                         ),
                         SizedBox(height: 8),
-                        _FormField(controller: _search, hint: '회원 이름 검색'),
-                        SizedBox(height: 8),
-                        // 신규 탭의 입력 3칸 높이에 맞춘 스크롤 영역 —
-                        // 회원이 많아져도 등록권 위치가 밀리지 않는다
-                        SizedBox(
-                          height: 108,
-                          child: _filtered.isEmpty
-                              ? Center(
-                                  child: Text(
-                                    '검색 결과가 없어요',
-                                    style: AppTextStyles.body2.copyWith(
-                                      color: AppColors.textTertiary,
-                                    ),
-                                  ),
-                                )
-                              : ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: ListView(
-                                    padding: EdgeInsets.zero,
-                                    children: [
-                                      for (
-                                        var i = 0;
-                                        i < _filtered.length;
-                                        i++
-                                      ) ...[
-                                        if (i > 0) SizedBox(height: 8),
-                                        _RenewPickRow(
-                                          member: _filtered[i],
-                                          selected: _selected == _filtered[i],
-                                          onTap: () => setState(
-                                            () => _selected = _filtered[i],
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
+                        // 신규 탭의 입력 3칸을 투명한 틀로 깔아 전체 높이를
+                        // 픽셀 단위로 똑같이 맞춘다 — 등록권 위치가 두 탭에서
+                        // 완전히 같아지고, 회원 목록은 남는 공간에서 스크롤된다.
+                        Stack(
+                          children: [
+                            IgnorePointer(
+                              child: Opacity(
+                                opacity: 0,
+                                child: Column(
+                                  children: [
+                                    _FormField(controller: _name, hint: ''),
+                                    SizedBox(height: 8),
+                                    _FormField(controller: _phone, hint: ''),
+                                    SizedBox(height: 8),
+                                    _FormField(controller: _referrer, hint: ''),
+                                  ],
                                 ),
+                              ),
+                            ),
+                            Positioned.fill(
+                              child: Column(
+                                children: [
+                                  _FormField(
+                                    controller: _search,
+                                    hint: '회원 이름 검색',
+                                  ),
+                                  SizedBox(height: 8),
+                                  Expanded(
+                                    child: _filtered.isEmpty
+                                        ? Center(
+                                            child: Text(
+                                              '검색 결과가 없어요',
+                                              style: AppTextStyles.body2
+                                                  .copyWith(
+                                                    color:
+                                                        AppColors.textTertiary,
+                                                  ),
+                                            ),
+                                          )
+                                        : ClipRRect(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                            child: ListView(
+                                              padding: EdgeInsets.zero,
+                                              children: [
+                                                for (
+                                                  var i = 0;
+                                                  i < _filtered.length;
+                                                  i++
+                                                ) ...[
+                                                  if (i > 0)
+                                                    SizedBox(height: 8),
+                                                  _RenewPickRow(
+                                                    member: _filtered[i],
+                                                    selected:
+                                                        _selected ==
+                                                        _filtered[i],
+                                                    onTap: () => setState(
+                                                      () => _selected =
+                                                          _filtered[i],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                          ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                         SizedBox(height: 24),
                       ] else ...[
