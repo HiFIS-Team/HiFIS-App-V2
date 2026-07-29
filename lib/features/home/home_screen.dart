@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -15,6 +17,8 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 데스크톱(macOS)은 화면이 넓어서 프로젝트·공지를 나란히 배치한다
+    final desktop = defaultTargetPlatform == TargetPlatform.macOS;
     return Scaffold(
       body: Stack(
         children: [
@@ -27,9 +31,23 @@ class HomeScreen extends StatelessWidget {
                 SizedBox(height: 16),
                 _HeroStatusCard(),
                 SizedBox(height: 16),
-                _ProjectsCard(),
-                SizedBox(height: 16),
-                _NoticeCard(),
+                if (desktop)
+                  // 두 카드의 높이를 큰 쪽에 맞춰 같게 만든다
+                  IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(child: _ProjectsCard(count: 5, fill: true)),
+                        SizedBox(width: 16),
+                        Expanded(child: _NoticeCard()),
+                      ],
+                    ),
+                  )
+                else ...[
+                  _ProjectsCard(),
+                  SizedBox(height: 16),
+                  _NoticeCard(),
+                ],
               ],
             ),
           ),
@@ -345,39 +363,70 @@ class _CardHeader extends StatelessWidget {
 }
 
 class _ProjectsCard extends StatelessWidget {
-  _ProjectsCard();
+  _ProjectsCard({this.count = 3, this.fill = false});
+
+  /// 표시할 프로젝트 수 (데스크톱은 5개까지)
+  final int count;
+
+  /// true면 카드 높이에 맞춰 행 간격을 고르게 벌린다 (데스크톱 나란히 배치용)
+  final bool fill;
 
   @override
   Widget build(BuildContext context) {
-    // 내가 참여 중인 프로젝트만 마감 임박순 3개 (기능 연동 시 실제 데이터로 교체)
+    // 내가 참여 중인 프로젝트만 마감 임박순 (기능 연동 시 실제 데이터로 교체)
+    final rows = [
+      _ProjectRow(
+        name: '여름 회원 이벤트 프로모션',
+        members: '나 외 4명',
+        dday: 'D-2',
+        color: AppColors.error,
+      ),
+      _ProjectRow(
+        name: 'PT룸 장비 교체',
+        members: '나 외 2명',
+        dday: 'D-5',
+        color: AppColors.warning,
+      ),
+      _ProjectRow(
+        name: '신규 트레이너 온보딩',
+        members: '나 외 3명',
+        dday: 'D-12',
+        color: AppColors.primary,
+      ),
+      _ProjectRow(
+        name: '가을 시즌 클래스 개편',
+        members: '나 외 1명',
+        dday: 'D-16',
+        color: AppColors.primary,
+      ),
+      _ProjectRow(
+        name: '락커룸 리모델링',
+        members: '나 외 5명',
+        dday: 'D-23',
+        color: AppColors.gray500,
+      ),
+    ].take(count).toList();
+
     return Container(
       padding: EdgeInsets.all(20),
       decoration: AppDecorations.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _CardHeader(title: '프로젝트', count: 3),
+          _CardHeader(title: '프로젝트', count: rows.length),
           SizedBox(height: 14),
-          _ProjectRow(
-            name: '여름 회원 이벤트 프로모션',
-            members: '나 외 4명',
-            dday: 'D-2',
-            color: AppColors.error,
-          ),
-          SizedBox(height: 14),
-          _ProjectRow(
-            name: 'PT룸 장비 교체',
-            members: '나 외 2명',
-            dday: 'D-5',
-            color: AppColors.warning,
-          ),
-          SizedBox(height: 14),
-          _ProjectRow(
-            name: '신규 트레이너 온보딩',
-            members: '나 외 3명',
-            dday: 'D-12',
-            color: AppColors.primary,
-          ),
+          if (fill)
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: rows,
+              ),
+            )
+          else
+            for (var i = 0; i < rows.length; i++) ...[
+              if (i > 0) SizedBox(height: 14),
+              rows[i],
+            ],
         ],
       ),
     );
