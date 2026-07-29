@@ -580,7 +580,26 @@ class _SignRow extends StatelessWidget {
 }
 
 /// 세션 기록 전체 화면 — 옆에서 슬라이드되어 열리고 날짜별로 묶어 보여준다
-class _SignHistoryScreen extends StatelessWidget {
+class _SignHistoryScreen extends StatefulWidget {
+  @override
+  State<_SignHistoryScreen> createState() => _SignHistoryScreenState();
+}
+
+class _SignHistoryScreenState extends State<_SignHistoryScreen> {
+  final _search = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _search.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
   /// 오늘/어제/그 외 날짜 라벨
   String _dayLabel(DateTime time) {
     final now = DateTime.now();
@@ -594,7 +613,10 @@ class _SignHistoryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sorted = List.of(_signs)..sort((a, b) => b.time.compareTo(a.time));
+    final query = _search.text.trim();
+    final sorted =
+        _signs.where((s) => query.isEmpty || s.member.contains(query)).toList()
+          ..sort((a, b) => b.time.compareTo(a.time));
 
     // 날짜가 바뀌는 지점마다 그룹 헤더를 끼워 넣는다
     final children = <Widget>[];
@@ -642,7 +664,7 @@ class _SignHistoryScreen extends StatelessWidget {
                         child: Text('받은 싸인 기록', style: AppTextStyles.caption),
                       ),
                       Text(
-                        '총 ${_signs.length}건',
+                        '총 ${sorted.length}건',
                         style: AppTextStyles.caption.copyWith(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w700,
@@ -656,7 +678,7 @@ class _SignHistoryScreen extends StatelessWidget {
                   Padding(
                     padding: EdgeInsets.fromLTRB(24, 32, 24, 44),
                     child: Text(
-                      '아직 받은 싸인이 없어요',
+                      _signs.isEmpty ? '아직 받은 싸인이 없어요' : '검색 결과가 없어요',
                       style: AppTextStyles.body2.copyWith(
                         color: AppColors.textTertiary,
                       ),
@@ -669,7 +691,8 @@ class _SignHistoryScreen extends StatelessWidget {
                         20,
                         8,
                         20,
-                        MediaQuery.paddingOf(context).bottom + 24,
+                        // 하단 글래스 검색 바에 가리지 않도록 여유를 둔다
+                        MediaQuery.paddingOf(context).bottom + 96,
                       ),
                       children: children,
                     ),
@@ -700,6 +723,8 @@ class _SignHistoryScreen extends StatelessWidget {
               ),
             ),
           ),
+          // 하단 고정: 플로팅 글래스 검색 바 (키보드와 함께 상승)
+          _GlassSearchBar(controller: _search, hint: '회원 이름 검색'),
         ],
       ),
     );
@@ -1346,69 +1371,82 @@ class _PickMemberScreenState extends State<_PickMemberScreen> {
             ),
           ),
           // 하단 고정: 플로팅 글래스 검색 바 (키보드와 함께 상승)
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: SafeArea(
-              top: false,
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
+          _GlassSearchBar(controller: _search, hint: '회원 이름 검색'),
+        ],
+      ),
+    );
+  }
+}
+
+/// 하단 고정 플로팅 글래스 검색 바 — 화면 Stack 안에서 쓰며 키보드와 함께 상승한다
+class _GlassSearchBar extends StatelessWidget {
+  _GlassSearchBar({required this.controller, required this.hint});
+
+  final TextEditingController controller;
+  final String hint;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: Color(0x1F101828),
+                  blurRadius: 32,
+                  offset: Offset(0, 10),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(28),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
                 child: Container(
+                  height: 52,
+                  padding: EdgeInsets.symmetric(horizontal: 18),
                   decoration: BoxDecoration(
+                    color: AppColors.surface.withValues(alpha: 0.72),
                     borderRadius: BorderRadius.circular(28),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Color(0x1F101828),
-                        blurRadius: 32,
-                        offset: Offset(0, 10),
+                    // 네이티브 글래스의 림처럼 보이는 헤어라인
+                    border: Border.all(color: AppColors.gray100),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        CupertinoIcons.search,
+                        size: 20,
+                        color: AppColors.gray500,
+                      ),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: controller,
+                          style: AppTextStyles.body2,
+                          cursorColor: AppColors.primary,
+                          decoration: InputDecoration(
+                            hintText: hint,
+                            hintStyle: AppTextStyles.body2.copyWith(
+                              color: AppColors.gray400,
+                            ),
+                            border: InputBorder.none,
+                            isCollapsed: true,
+                          ),
+                        ),
                       ),
                     ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(28),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-                      child: Container(
-                        height: 52,
-                        padding: EdgeInsets.symmetric(horizontal: 18),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface.withValues(alpha: 0.72),
-                          borderRadius: BorderRadius.circular(28),
-                          // 네이티브 글래스의 림처럼 보이는 헤어라인
-                          border: Border.all(color: AppColors.gray100),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              CupertinoIcons.search,
-                              size: 20,
-                              color: AppColors.gray500,
-                            ),
-                            SizedBox(width: 10),
-                            Expanded(
-                              child: TextField(
-                                controller: _search,
-                                style: AppTextStyles.body2,
-                                cursorColor: AppColors.primary,
-                                decoration: InputDecoration(
-                                  hintText: '회원 이름 검색',
-                                  hintStyle: AppTextStyles.body2.copyWith(
-                                    color: AppColors.gray400,
-                                  ),
-                                  border: InputBorder.none,
-                                  isCollapsed: true,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
