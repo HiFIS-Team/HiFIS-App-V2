@@ -20,6 +20,9 @@ class WorkScreen extends StatefulWidget {
 class _WorkScreenState extends State<WorkScreen> {
   int _tab = 0;
 
+  /// 환경정비 점검 완료 항목 (목업 초기값)
+  final Set<String> _done = {'세탁', '건조기', '복도청소'};
+
   static const _items = [
     _WorkItem(
       label: '환경정비',
@@ -27,7 +30,31 @@ class _WorkScreenState extends State<WorkScreen> {
       unit: '점',
       delta: 3,
       comment: '담당 구역 점검을 꾸준히 잘 지키고 있어요',
-      rows: [('담당 구역', '웨이트존 A'), ('이번 주 점검', '12 / 13회'), ('지적 사항', '1건')],
+      rows: [],
+      checklist: [
+        '세탁',
+        '건조기',
+        '빨래 정리',
+        '구역청소',
+        '복도청소',
+        '락커정리',
+        '남탈부스',
+        '남탈청소',
+        '여탈부스',
+        '여탈청소',
+        '화장실청소',
+        '기구관리',
+        '회원지도',
+        'TM 회원관리',
+        '게시물',
+        '스토리',
+        '전단지',
+        '현수막',
+        '족자',
+        '블로그',
+        '클레임해결',
+        '기타',
+      ],
     ),
     _WorkItem(
       label: '동료 평가',
@@ -102,7 +129,15 @@ class _WorkScreenState extends State<WorkScreen> {
                   SizedBox(height: 16),
                   Padding(
                     padding: EdgeInsets.symmetric(horizontal: 20),
-                    child: _DetailCard(item: item),
+                    child: item.checklist != null
+                        ? _ChecklistCard(
+                            items: item.checklist!,
+                            done: _done,
+                            onToggle: (task) => setState(() {
+                              if (!_done.remove(task)) _done.add(task);
+                            }),
+                          )
+                        : _DetailCard(item: item),
                   ),
                 ],
               ),
@@ -122,6 +157,7 @@ class _WorkItem {
     required this.delta,
     required this.comment,
     required this.rows,
+    this.checklist,
   });
 
   final String label;
@@ -132,6 +168,9 @@ class _WorkItem {
   final int delta;
   final String comment;
   final List<(String, String)> rows;
+
+  /// 2열 점검 체크리스트 (있으면 상세 카드 대신 표시)
+  final List<String>? checklist;
 }
 
 class _WorkTab extends StatelessWidget {
@@ -240,6 +279,119 @@ class _ScoreCard extends StatelessWidget {
           SizedBox(height: 8),
           Text(item.comment, style: AppTextStyles.caption),
         ],
+      ),
+    );
+  }
+}
+
+/// 환경정비 점검 체크리스트 카드 — 항목이 2열로 내려가며 배치된다
+class _ChecklistCard extends StatelessWidget {
+  _ChecklistCard({
+    required this.items,
+    required this.done,
+    required this.onToggle,
+  });
+
+  final List<String> items;
+  final Set<String> done;
+  final ValueChanged<String> onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(20),
+      decoration: AppDecorations.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4),
+            child: Row(
+              children: [
+                Expanded(child: Text('오늘 점검 항목', style: AppTextStyles.label)),
+                Text(
+                  '${done.length}/${items.length}',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: 14),
+          for (var i = 0; i < items.length; i += 2) ...[
+            if (i > 0) SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _CheckChip(
+                    label: items[i],
+                    checked: done.contains(items[i]),
+                    onTap: () => onToggle(items[i]),
+                  ),
+                ),
+                SizedBox(width: 10),
+                Expanded(
+                  child: i + 1 < items.length
+                      ? _CheckChip(
+                          label: items[i + 1],
+                          checked: done.contains(items[i + 1]),
+                          onTap: () => onToggle(items[i + 1]),
+                        )
+                      : SizedBox(),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CheckChip extends StatelessWidget {
+  _CheckChip({required this.label, required this.checked, required this.onTap});
+
+  final String label;
+  final bool checked;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      scale: 0.95,
+      child: AnimatedContainer(
+        duration: Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        height: 48,
+        decoration: BoxDecoration(
+          color: checked ? AppColors.primaryLight : AppColors.gray50,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (checked) ...[
+              Icon(
+                CupertinoIcons.checkmark_alt,
+                size: 15,
+                color: AppColors.primary,
+              ),
+              SizedBox(width: 4),
+            ],
+            Text(
+              label,
+              style: AppTextStyles.body2.copyWith(
+                fontSize: 14,
+                color: checked ? AppColors.primary : AppColors.textPrimary,
+                fontWeight: checked ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
