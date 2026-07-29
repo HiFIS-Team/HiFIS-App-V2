@@ -46,6 +46,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   /// 채팅방 이름 (변경 시 갱신)
   late String _name = widget.name;
 
+  /// 이름 칸 인라인 수정용 — 변경 버튼을 눌러야 적용된다
+  late final _nameController = TextEditingController(text: widget.name);
+
   static const _shareTabs = ['사진', '영상', '파일'];
 
   @override
@@ -62,44 +65,21 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _nameController.dispose();
     super.dispose();
   }
 
-  Future<void> _rename() async {
-    final controller = TextEditingController(text: _name);
-    final result = await showCupertinoDialog<String>(
-      context: context,
-      builder: (dialogContext) => CupertinoAlertDialog(
-        title: Text('이름 변경'),
-        content: Padding(
-          padding: EdgeInsets.only(top: 12),
-          child: CupertinoTextField(
-            controller: controller,
-            autofocus: true,
-            placeholder: '채팅방 이름',
-            onSubmitted: (value) => Navigator.pop(dialogContext, value.trim()),
-          ),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text('취소'),
-          ),
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            onPressed: () =>
-                Navigator.pop(dialogContext, controller.text.trim()),
-            child: Text('저장'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (result == null || result.isEmpty || result == _name || !mounted) {
+  /// 이름 칸에 입력된 값을 적용한다. 빈 값이면 원래 이름으로 되돌린다.
+  void _applyRename() {
+    FocusScope.of(context).unfocus();
+    final value = _nameController.text.trim();
+    if (value.isEmpty) {
+      _nameController.text = _name;
       return;
     }
-    setState(() => _name = result);
-    widget.onRename?.call(result);
+    if (value == _name) return;
+    setState(() => _name = value);
+    widget.onRename?.call(value);
   }
 
   Future<void> _invite() async {
@@ -186,15 +166,26 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   child: Row(
                     children: [
                       Expanded(
-                        child: Text(
-                          _name,
+                        child: TextField(
+                          controller: _nameController,
                           style: AppTextStyles.body1.copyWith(
                             fontWeight: FontWeight.w600,
+                          ),
+                          cursorColor: AppColors.primary,
+                          textInputAction: TextInputAction.done,
+                          onSubmitted: (_) => _applyRename(),
+                          decoration: InputDecoration(
+                            hintText: '채팅방 이름',
+                            hintStyle: AppTextStyles.body1.copyWith(
+                              color: AppColors.gray400,
+                            ),
+                            border: InputBorder.none,
+                            isCollapsed: true,
                           ),
                         ),
                       ),
                       Pressable(
-                        onTap: _rename,
+                        onTap: _applyRename,
                         scale: 0.9,
                         child: Container(
                           padding: EdgeInsets.symmetric(
