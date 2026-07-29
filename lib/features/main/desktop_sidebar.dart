@@ -5,20 +5,33 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/pressable.dart';
 
-/// macOS 데스크톱용 좌측 사이드바 내비게이션 (ChatGPT 데스크톱 패턴)
+/// macOS 데스크톱용 좌측 사이드바 내비게이션 (인스타그램 데스크톱 패턴)
 ///
-/// 메뉴를 성격별 섹션(업무/문서/직원/소식)으로 묶어서 보여준다.
+/// 평소에는 아이콘만 있는 좁은 레일로 있다가, 커서를 올리면
+/// 펼쳐지면서 메뉴 제목과 섹션 캡션이 나타난다. 펼쳐질 때는
+/// 콘텐츠를 밀지 않고 그 위로 떠오른다.
+///
 /// 선택 인덱스는 섹션을 펼친 순서(0부터)이며,
 /// MainShell의 `_desktopPages` 순서와 반드시 일치해야 한다.
-class DesktopSidebar extends StatelessWidget {
+class DesktopSidebar extends StatefulWidget {
   DesktopSidebar({
     super.key,
     required this.selectedIndex,
     required this.onSelect,
   });
 
+  /// 접힌 레일 폭 — MainShell이 콘텐츠 왼쪽 여백으로 쓴다
+  static const double railWidth = 72;
+
   final int selectedIndex;
   final ValueChanged<int> onSelect;
+
+  @override
+  State<DesktopSidebar> createState() => _DesktopSidebarState();
+}
+
+class _DesktopSidebarState extends State<DesktopSidebar> {
+  bool _hovered = false;
 
   /// (섹션 제목, 메뉴 목록) — 제목이 null이면 캡션 없이 그린다
   static final List<(String?, List<(IconData, String)>)> _sections = [
@@ -53,6 +66,13 @@ class DesktopSidebar extends StatelessWidget {
     ),
   ];
 
+  /// 펼쳐질 때만 보이는 요소 (메뉴 제목, 섹션 캡션, 워드마크)
+  Widget _fade(Widget child) => AnimatedOpacity(
+    duration: Duration(milliseconds: 150),
+    opacity: _hovered ? 1 : 0,
+    child: child,
+  );
+
   @override
   Widget build(BuildContext context) {
     // 섹션을 펼치면서 전역 인덱스를 매긴다
@@ -60,59 +80,119 @@ class DesktopSidebar extends StatelessWidget {
     var index = 0;
     for (final (title, items) in _sections) {
       if (title != null) {
-        children.add(
-          Padding(
-            padding: EdgeInsets.fromLTRB(24, 18, 24, 6),
-            child: Text(
-              title,
-              style: AppTextStyles.caption.copyWith(
-                fontWeight: FontWeight.w600,
-                color: AppColors.gray400,
-              ),
-            ),
-          ),
-        );
+        children.add(_sectionHeader(title));
       }
       for (final item in items) {
         children.add(_item(index++, item));
       }
     }
 
-    return Container(
-      width: 224,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border(right: BorderSide(color: AppColors.gray100)),
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AnimatedContainer(
+        duration: Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+        width: _hovered ? 232 : DesktopSidebar.railWidth,
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          border: Border(right: BorderSide(color: AppColors.gray100)),
+          boxShadow: [
+            if (_hovered)
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 28,
+                offset: Offset(6, 0),
+              ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(height: 24),
+            _logo(),
+            SizedBox(height: 16),
+            // 창이 낮아도 메뉴가 잘리지 않게 스크롤 가능하게 둔다
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.only(bottom: 16),
+                children: children,
+              ),
+            ),
+          ],
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(height: 24),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 24),
-            child: Row(
-              children: [
-                Image.asset(
-                  'assets/images/hifis_mark.png',
-                  height: 22,
-                  cacheHeight: 66,
-                ),
-                SizedBox(width: 8),
-                Text(
-                  'HiFIS',
-                  style: AppTextStyles.title3.copyWith(
-                    fontWeight: FontWeight.w800,
+    );
+  }
+
+  Widget _logo() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 26),
+      child: SizedBox(
+        height: 26,
+        child: Row(
+          children: [
+            Image.asset(
+              'assets/images/hifis_mark.png',
+              height: 22,
+              cacheHeight: 66,
+            ),
+            Expanded(
+              child: ClipRect(
+                child: _fade(
+                  Padding(
+                    padding: EdgeInsets.only(left: 8),
+                    child: Text(
+                      'HiFIS',
+                      maxLines: 1,
+                      softWrap: false,
+                      overflow: TextOverflow.clip,
+                      style: AppTextStyles.title3.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ),
                 ),
-              ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionHeader(String title) {
+    return SizedBox(
+      height: 34,
+      child: Stack(
+        children: [
+          // 접힘: 짧은 구분선
+          Center(
+            child: AnimatedOpacity(
+              duration: Duration(milliseconds: 150),
+              opacity: _hovered ? 0 : 1,
+              child: Container(width: 24, height: 1, color: AppColors.gray100),
             ),
           ),
-          SizedBox(height: 16),
-          // 창이 낮아도 메뉴가 잘리지 않게 스크롤 가능하게 둔다
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.only(bottom: 16),
-              children: children,
+          // 펼침: 섹션 캡션
+          Positioned(
+            left: 26,
+            top: 0,
+            bottom: 0,
+            child: _fade(
+              Align(
+                alignment: Alignment.bottomLeft,
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.clip,
+                  style: AppTextStyles.caption.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.gray400,
+                  ),
+                ),
+              ),
             ),
           ),
         ],
@@ -121,36 +201,54 @@ class DesktopSidebar extends StatelessWidget {
   }
 
   Widget _item(int index, (IconData, String) item) {
-    final selected = index == selectedIndex;
+    final selected = index == widget.selectedIndex;
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       child: Pressable(
         scale: 0.97,
         pressedColor: AppColors.gray50,
         borderRadius: BorderRadius.circular(10),
-        onTap: () => onSelect(index),
+        onTap: () => widget.onSelect(index),
         child: AnimatedContainer(
           duration: Duration(milliseconds: 150),
-          height: 40,
-          padding: EdgeInsets.symmetric(horizontal: 12),
+          height: 44,
+          padding: EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
             color: selected ? AppColors.primaryLight : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
           ),
           child: Row(
             children: [
-              Icon(
-                item.$1,
-                size: 19,
-                color: selected ? AppColors.primary : AppColors.gray500,
+              SizedBox(
+                width: 20,
+                child: Icon(
+                  item.$1,
+                  size: 20,
+                  color: selected ? AppColors.primary : AppColors.gray500,
+                ),
               ),
-              SizedBox(width: 10),
-              Text(
-                item.$2,
-                style: AppTextStyles.label.copyWith(
-                  fontSize: 15,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  color: selected ? AppColors.primary : AppColors.gray600,
+              Expanded(
+                child: ClipRect(
+                  child: _fade(
+                    Padding(
+                      padding: EdgeInsets.only(left: 10),
+                      child: Text(
+                        item.$2,
+                        maxLines: 1,
+                        softWrap: false,
+                        overflow: TextOverflow.clip,
+                        style: AppTextStyles.label.copyWith(
+                          fontSize: 15,
+                          fontWeight: selected
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: selected
+                              ? AppColors.primary
+                              : AppColors.gray600,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],
