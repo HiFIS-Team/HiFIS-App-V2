@@ -623,140 +623,152 @@ class _HistoryScreenState extends State<_HistoryScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.surface,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
+      body: Stack(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 상단 고정 타이틀 영역만큼 비워둔다
+                SizedBox(height: 56),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(24, 12, 24, 0),
+                  child: Row(
+                    children: [
+                      Expanded(child: Text(date, style: AppTextStyles.caption)),
+                      Text(
+                        '총 ${logs.length}회',
+                        style: AppTextStyles.body2.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 8),
+                // 내 내역 / 전체 내역 전환 탭 (업무 탭과 같은 밑줄 스타일)
+                Row(
+                  children: [
+                    Expanded(
+                      child: _WorkTab(
+                        label: '내 내역',
+                        selected: !_all,
+                        onTap: () => setState(() => _all = false),
+                      ),
+                    ),
+                    Expanded(
+                      child: _WorkTab(
+                        label: '전체 내역',
+                        selected: _all,
+                        onTap: () => setState(() => _all = true),
+                      ),
+                    ),
+                  ],
+                ),
+                Container(height: 1, color: AppColors.gray100),
+                if (sorted.isEmpty)
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(24, 32, 24, 44),
+                    child: Text(
+                      _all ? '오늘 완료된 항목이 없어요' : '오늘 완료한 항목이 없어요',
+                      style: AppTextStyles.body2.copyWith(
+                        color: AppColors.textTertiary,
+                      ),
+                    ),
+                  )
+                else
+                  Expanded(
+                    child: ListView.separated(
+                      key: ValueKey(_all),
+                      padding: EdgeInsets.fromLTRB(
+                        24,
+                        12,
+                        24,
+                        MediaQuery.paddingOf(context).bottom + 24,
+                      ),
+                      itemCount: sorted.length,
+                      separatorBuilder: (_, _) =>
+                          Divider(height: 1, color: AppColors.divider),
+                      itemBuilder: (_, index) {
+                        final log = sorted[index];
+                        return Padding(
+                          padding: EdgeInsets.symmetric(vertical: 13),
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 64,
+                                child: Text(
+                                  _formatTime(log.time),
+                                  style: AppTextStyles.caption,
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                              // 전체 내역에서는 누가 했는지 이름을 함께 보여준다
+                              if (_all) ...[
+                                Text(
+                                  log.name,
+                                  style: AppTextStyles.body2.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    log.task,
+                                    style: AppTextStyles.body2.copyWith(
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ),
+                              ] else
+                                Expanded(
+                                  child: Text(
+                                    log.task,
+                                    style: AppTextStyles.body2.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              Icon(
+                                CupertinoIcons.checkmark_circle_fill,
+                                size: 16,
+                                color: AppColors.success,
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          // 상단 중앙 고정 타이틀 (터치는 아래로 통과)
+          IgnorePointer(
+            child: SafeArea(
+              bottom: false,
+              child: SizedBox(
+                height: 56,
+                child: Center(
+                  child: Text('오늘 내역', style: AppTextStyles.title3),
+                ),
+              ),
+            ),
+          ),
+          // 좌측 상단 고정 뒤로가기 글래스 버튼
+          SafeArea(
+            bottom: false,
+            child: Padding(
               padding: EdgeInsets.only(top: 8, left: 16),
               child: GlassIconButton(
                 symbol: 'chevron.backward',
                 onPressed: () => Navigator.pop(context),
               ),
             ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(24, 18, 24, 4),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('오늘 내역', style: AppTextStyles.title2),
-                        SizedBox(height: 4),
-                        Text(date, style: AppTextStyles.caption),
-                      ],
-                    ),
-                  ),
-                  Text(
-                    '총 ${logs.length}회',
-                    style: AppTextStyles.body2.copyWith(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: 12),
-            // 내 내역 / 전체 내역 전환 탭 (업무 탭과 같은 밑줄 스타일)
-            Row(
-              children: [
-                Expanded(
-                  child: _WorkTab(
-                    label: '내 내역',
-                    selected: !_all,
-                    onTap: () => setState(() => _all = false),
-                  ),
-                ),
-                Expanded(
-                  child: _WorkTab(
-                    label: '전체 내역',
-                    selected: _all,
-                    onTap: () => setState(() => _all = true),
-                  ),
-                ),
-              ],
-            ),
-            Container(height: 1, color: AppColors.gray100),
-            if (sorted.isEmpty)
-              Padding(
-                padding: EdgeInsets.fromLTRB(24, 32, 24, 44),
-                child: Text(
-                  _all ? '오늘 완료된 항목이 없어요' : '오늘 완료한 항목이 없어요',
-                  style: AppTextStyles.body2.copyWith(
-                    color: AppColors.textTertiary,
-                  ),
-                ),
-              )
-            else
-              Expanded(
-                child: ListView.separated(
-                  key: ValueKey(_all),
-                  padding: EdgeInsets.fromLTRB(
-                    24,
-                    12,
-                    24,
-                    MediaQuery.paddingOf(context).bottom + 24,
-                  ),
-                  itemCount: sorted.length,
-                  separatorBuilder: (_, _) =>
-                      Divider(height: 1, color: AppColors.divider),
-                  itemBuilder: (_, index) {
-                    final log = sorted[index];
-                    return Padding(
-                      padding: EdgeInsets.symmetric(vertical: 13),
-                      child: Row(
-                        children: [
-                          SizedBox(
-                            width: 64,
-                            child: Text(
-                              _formatTime(log.time),
-                              style: AppTextStyles.caption,
-                            ),
-                          ),
-                          SizedBox(width: 8),
-                          // 전체 내역에서는 누가 했는지 이름을 함께 보여준다
-                          if (_all) ...[
-                            Text(
-                              log.name,
-                              style: AppTextStyles.body2.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                log.task,
-                                style: AppTextStyles.body2.copyWith(
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ),
-                          ] else
-                            Expanded(
-                              child: Text(
-                                log.task,
-                                style: AppTextStyles.body2.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          Icon(
-                            CupertinoIcons.checkmark_circle_fill,
-                            size: 16,
-                            color: AppColors.success,
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
