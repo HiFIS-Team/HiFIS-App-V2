@@ -7,6 +7,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/pressable.dart';
+import 'peer_review_section.dart';
 
 /// 업무 탭 화면 (목업)
 ///
@@ -212,6 +213,11 @@ class _WorkScreenState extends State<WorkScreen> {
                               onAdjust: _adjust,
                               onShowHistory: _showHistory,
                             ),
+                          )
+                        else if (item.label == '동료 평가')
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 20),
+                            child: PeerReviewSection(),
                           )
                         else ...[
                           Padding(
