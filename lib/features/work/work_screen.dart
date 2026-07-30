@@ -574,30 +574,39 @@ class _ChecklistCard extends StatelessWidget {
             ),
           ),
           SizedBox(height: 14),
-          for (var i = 0; i < items.length; i += 2) ...[
-            if (i > 0) SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: _CountChip(
-                    label: items[i],
-                    count: counts[items[i]] ?? 0,
-                    onAdjust: (delta) => onAdjust(items[i], delta),
-                  ),
-                ),
-                SizedBox(width: 10),
-                Expanded(
-                  child: i + 1 < items.length
-                      ? _CountChip(
-                          label: items[i + 1],
-                          count: counts[items[i + 1]] ?? 0,
-                          onAdjust: (delta) => onAdjust(items[i + 1], delta),
-                        )
-                      : SizedBox(),
-                ),
-              ],
-            ),
-          ],
+          // 데스크톱은 폭이 넓어 한 줄에 여러 개를 넣는다.
+          // 칩이 찌그러지지 않게 남는 폭에 맞춰 개수를 정한다(최대 4개).
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final columns = isDesktop
+                  ? (constraints.maxWidth / 220).floor().clamp(2, 4)
+                  : 2;
+              return Column(
+                children: [
+                  for (var i = 0; i < items.length; i += columns) ...[
+                    if (i > 0) SizedBox(height: 10),
+                    Row(
+                      children: [
+                        for (var col = 0; col < columns; col++) ...[
+                          if (col > 0) SizedBox(width: 10),
+                          Expanded(
+                            child: i + col < items.length
+                                ? _CountChip(
+                                    label: items[i + col],
+                                    count: counts[items[i + col]] ?? 0,
+                                    onAdjust: (delta) =>
+                                        onAdjust(items[i + col], delta),
+                                  )
+                                : SizedBox(),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ],
+              );
+            },
+          ),
         ],
       ),
     );
