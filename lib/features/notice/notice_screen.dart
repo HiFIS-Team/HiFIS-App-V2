@@ -605,18 +605,16 @@ class _NoticeViewState extends State<_NoticeView> {
             )
           : EdgeInsets.fromLTRB(32, 64, 32, bottomBarInset(context)),
       children: [
-        // 폰은 제목이 길어 버튼과 나란히 두면 눌린다 — 버튼을 위로 올린다
-        if (phone) ...[
-          Align(alignment: Alignment.centerRight, child: actions),
-          SizedBox(height: 8),
+        // 폰은 편집·삭제가 헤더 글래스 버튼으로 올라가 제목만 남는다
+        if (phone)
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ?pin,
               Expanded(child: title),
             ],
-          ),
-        ] else
+          )
+        else
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
