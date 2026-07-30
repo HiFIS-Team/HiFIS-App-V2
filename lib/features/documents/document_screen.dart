@@ -212,27 +212,33 @@ class _DocumentScreenState extends State<DocumentScreen> {
                 ),
                 Container(height: 1, color: AppColors.gray100),
                 Expanded(
-                  child: items.isEmpty
-                      ? _Empty(place: _place, searching: _query.isNotEmpty)
-                      : _listView
-                      ? _ListBody(
-                          items: items,
-                          selected: _selected,
-                          onSelect: (i) => setState(() => _selected = i),
-                          onOpen: _open,
-                          onStar: _toggleStar,
-                          onRename: _rename,
-                          onDelete: _delete,
-                        )
-                      : _GridBody(
-                          items: items,
-                          selected: _selected,
-                          onSelect: (i) => setState(() => _selected = i),
-                          onOpen: _open,
-                          onStar: _toggleStar,
-                          onRename: _rename,
-                          onDelete: _delete,
-                        ),
+                  // 항목 바깥 빈 곳을 누르면 선택을 푼다 (파인더와 같게).
+                  // 항목 위의 탭은 항목 쪽이 먼저 가져가므로 여기까지 안 온다.
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => setState(() => _selected = null),
+                    child: items.isEmpty
+                        ? _Empty(place: _place, searching: _query.isNotEmpty)
+                        : _listView
+                        ? _ListBody(
+                            items: items,
+                            selected: _selected,
+                            onSelect: (i) => setState(() => _selected = i),
+                            onOpen: _open,
+                            onStar: _toggleStar,
+                            onRename: _rename,
+                            onDelete: _delete,
+                          )
+                        : _GridBody(
+                            items: items,
+                            selected: _selected,
+                            onSelect: (i) => setState(() => _selected = i),
+                            onOpen: _open,
+                            onStar: _toggleStar,
+                            onRename: _rename,
+                            onDelete: _delete,
+                          ),
+                  ),
                 ),
                 _StatusBar(items: items, selected: _selected),
               ],
@@ -811,9 +817,15 @@ class _GridTileState extends State<_GridTile> {
       onExit: (_) => setState(() => _hover = false),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        // 파인더처럼 한 번은 고르기, 두 번은 열기
-        onTap: widget.onSelect,
-        onDoubleTap: widget.onOpen,
+        // 더블클릭을 걸어두면 한 번 눌러도 두 번째를 기다리느라 반응이 늦다.
+        // 폴더는 바로 열고, 파일은 고른 뒤 한 번 더 누르면 연다.
+        onTap: () {
+          if (item.isFolder || widget.selected) {
+            widget.onOpen();
+          } else {
+            widget.onSelect();
+          }
+        },
         child: Container(
           padding: EdgeInsets.fromLTRB(8, 12, 8, 10),
           decoration: BoxDecoration(
@@ -991,8 +1003,14 @@ class _ListRowState extends State<_ListRow> {
       onExit: (_) => setState(() => _hover = false),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: widget.onSelect,
-        onDoubleTap: widget.onOpen,
+        // 아이콘 보기와 같은 규칙 — 더블클릭 대기가 없어 바로 반응한다
+        onTap: () {
+          if (item.isFolder || widget.selected) {
+            widget.onOpen();
+          } else {
+            widget.onSelect();
+          }
+        },
         child: Container(
           padding: EdgeInsets.symmetric(horizontal: 16, vertical: 9),
           decoration: BoxDecoration(
