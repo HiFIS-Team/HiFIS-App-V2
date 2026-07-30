@@ -18,8 +18,27 @@ class LazyIndexedStack extends StatefulWidget {
   State<LazyIndexedStack> createState() => _LazyIndexedStackState();
 }
 
-class _LazyIndexedStackState extends State<LazyIndexedStack> {
+class _LazyIndexedStackState extends State<LazyIndexedStack>
+    with SingleTickerProviderStateMixin {
   final _opened = <int>{};
+
+  /// 탭이 바뀔 때마다 처음부터 다시 재생한다 (1에서 시작해 첫 화면은 그냥 떠 있다)
+  late final _controller = AnimationController(
+    vsync: this,
+    duration: Duration(milliseconds: 240),
+    value: 1,
+  );
+
+  late final _fade = CurvedAnimation(
+    parent: _controller,
+    curve: Curves.easeOut,
+  );
+
+  /// 살짝 아래에서 올라오면서 나타난다 (화면 높이의 1.2% ≈ 9px)
+  late final _slide = Tween(
+    begin: Offset(0, 0.012),
+    end: Offset.zero,
+  ).animate(_fade);
 
   @override
   void initState() {
@@ -31,16 +50,33 @@ class _LazyIndexedStackState extends State<LazyIndexedStack> {
   void didUpdateWidget(LazyIndexedStack oldWidget) {
     super.didUpdateWidget(oldWidget);
     _opened.add(widget.index);
+    if (oldWidget.index != widget.index) _controller.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _fade.dispose();
+    _controller.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return IndexedStack(
-      index: widget.index,
-      children: [
-        for (var i = 0; i < widget.children.length; i++)
-          if (_opened.contains(i)) widget.children[i] else SizedBox.shrink(),
-      ],
+    return FadeTransition(
+      opacity: _fade,
+      child: SlideTransition(
+        position: _slide,
+        child: IndexedStack(
+          index: widget.index,
+          children: [
+            for (var i = 0; i < widget.children.length; i++)
+              if (_opened.contains(i))
+                widget.children[i]
+              else
+                SizedBox.shrink(),
+          ],
+        ),
+      ),
     );
   }
 }

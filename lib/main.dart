@@ -85,28 +85,59 @@ class _SplashGate extends StatefulWidget {
 }
 
 class _SplashGateState extends State<_SplashGate> {
+  /// 메인 화면을 스플래시 뒤에서 미리 만들어 두는 중
+  bool _warming = false;
+
+  /// 스플래시를 걷어내는 중
   bool _ready = false;
+
+  /// 다 걷어내서 스플래시를 트리에서 뺀 상태
+  bool _done = false;
 
   @override
   void initState() {
     super.initState();
-    Timer(Duration(milliseconds: 2600), () {
-      if (mounted) setState(() => _ready = true);
+    Timer(Duration(milliseconds: 2600), _warmUp);
+  }
+
+  /// 스플래시 뒤에 메인을 먼저 그려두고, 다 그려진 다음에 걷어낸다.
+  ///
+  /// 예전처럼 넘어가는 순간에 메인을 처음 만들면 화면 만드는 비용과
+  /// 사라지는 애니메이션이 한 프레임에 겹쳐서 진입할 때 끊겨 보인다.
+  void _warmUp() {
+    if (!mounted) return;
+    setState(() => _warming = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // 배치와 네이티브 뷰(탭바) 생성까지 자리를 잡을 여유를 준다
+      Timer(Duration(milliseconds: 120), () {
+        if (mounted) setState(() => _ready = true);
+      });
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedSwitcher(
-      duration: Duration(milliseconds: 350),
-      child: _ready
-          ? MainShell()
-          : Scaffold(
-              key: ValueKey('splash'),
-              backgroundColor: AppColors.surface,
-              // 런치 스크린 마크(110pt)와 같은 크기·위치에서 이어지도록
-              body: Center(child: AppLoading(size: 110)),
+    return Stack(
+      children: [
+        if (_warming) MainShell(),
+        if (!_done)
+          IgnorePointer(
+            ignoring: _ready,
+            child: AnimatedOpacity(
+              opacity: _ready ? 0 : 1,
+              duration: Duration(milliseconds: 420),
+              curve: Curves.easeOut,
+              onEnd: () {
+                if (_ready && mounted) setState(() => _done = true);
+              },
+              child: Scaffold(
+                backgroundColor: AppColors.surface,
+                // 런치 스크린 마크(110pt)와 같은 크기·위치에서 이어지도록
+                body: Center(child: AppLoading(size: 110)),
+              ),
             ),
+          ),
+      ],
     );
   }
 }
