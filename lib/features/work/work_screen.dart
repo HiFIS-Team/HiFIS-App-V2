@@ -81,7 +81,15 @@ class _WorkScreenState extends State<WorkScreen> {
     if (delta > 0) AppToast.show(context, '${_withJosa(task)} 완료했습니다');
   }
 
+  /// 데스크톱에서 점검 항목 아래에 내역 카드를 펼쳤는지
+  bool _historyOpen = false;
+
   void _showHistory() {
+    // 데스크톱은 화면 전환 대신 점검 항목 아래에 두 내역을 나란히 편다
+    if (isDesktop) {
+      setState(() => _historyOpen = !_historyOpen);
+      return;
+    }
     Navigator.push(
       context,
       CupertinoPageRoute(
@@ -228,7 +236,7 @@ class _WorkScreenState extends State<WorkScreen> {
                     child: Column(
                       key: ValueKey(_tab),
                       children: [
-                        if (item.checklist != null)
+                        if (item.checklist != null) ...[
                           Padding(
                             padding: EdgeInsets.symmetric(horizontal: 20),
                             child: _ChecklistCard(
@@ -236,9 +244,39 @@ class _WorkScreenState extends State<WorkScreen> {
                               counts: _counts,
                               onAdjust: _adjust,
                               onShowHistory: _showHistory,
+                              historyOpen: _historyOpen,
                             ),
-                          )
-                        else if (item.label == '동료 평가')
+                          ),
+                          // 데스크톱: 내 내역 / 전체 내역을 양쪽으로 나눠 편다
+                          if (isDesktop && _historyOpen) ...[
+                            SizedBox(height: 16),
+                            Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 20),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: _HistoryCard(
+                                      title: '내 내역',
+                                      logs: _logs,
+                                      showName: false,
+                                      emptyText: '오늘 완료한 항목이 없어요',
+                                    ),
+                                  ),
+                                  SizedBox(width: 16),
+                                  Expanded(
+                                    child: _HistoryCard(
+                                      title: '전체 내역',
+                                      logs: [..._logs, ..._teamLogs],
+                                      showName: true,
+                                      emptyText: '오늘 완료된 항목이 없어요',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ] else if (item.label == '동료 평가')
                           Padding(
                             padding: EdgeInsets.symmetric(horizontal: 20),
                             child: PeerReviewSection(),
@@ -517,6 +555,7 @@ class _ChecklistCard extends StatelessWidget {
     required this.counts,
     required this.onAdjust,
     required this.onShowHistory,
+    this.historyOpen = false,
   });
 
   final List<String> items;
@@ -527,6 +566,9 @@ class _ChecklistCard extends StatelessWidget {
 
   /// 오늘 내역 시트 열기
   final VoidCallback onShowHistory;
+
+  /// 데스크톱에서 아래 내역 카드가 펼쳐져 있는지 (화살표 방향에 쓴다)
+  final bool historyOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -563,7 +605,12 @@ class _ChecklistCard extends StatelessWidget {
                       ),
                       SizedBox(width: 2),
                       Icon(
-                        CupertinoIcons.chevron_right,
+                        // 데스크톱은 아래로 펼쳐지므로 화살표도 위아래로
+                        isDesktop
+                            ? (historyOpen
+                                  ? CupertinoIcons.chevron_up
+                                  : CupertinoIcons.chevron_down)
+                            : CupertinoIcons.chevron_right,
                         size: 11,
                         color: AppColors.primary,
                       ),
@@ -736,6 +783,132 @@ class _AdjustButtonState extends State<_AdjustButton> {
   }
 }
 
+/// 수행 기록 한 줄 — 시각 · (이름) · 항목 · 완료 체크.
+/// 내역 화면과 데스크톱 인라인 내역 카드가 함께 쓴다.
+class _LogRow extends StatelessWidget {
+  _LogRow({required this.log, required this.showName});
+
+  final _WorkLog log;
+
+  /// 전체 내역처럼 누가 했는지 함께 보여줄지
+  final bool showName;
+
+  static String formatTime(DateTime time) {
+    final period = time.hour < 12 ? '오전' : '오후';
+    final hour = time.hour % 12 == 0 ? 12 : time.hour % 12;
+    final minute = time.minute.toString().padLeft(2, '0');
+    return '$period $hour:$minute';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 13),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 64,
+            child: Text(formatTime(log.time), style: AppTextStyles.caption),
+          ),
+          SizedBox(width: 8),
+          if (showName) ...[
+            Text(
+              log.name,
+              style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w600),
+            ),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                log.task,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.body2.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ] else
+            Expanded(
+              child: Text(
+                log.task,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.body2.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          Icon(
+            CupertinoIcons.checkmark_circle_fill,
+            size: 16,
+            color: AppColors.success,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 데스크톱에서 점검 항목 아래에 펼쳐지는 내역 카드
+class _HistoryCard extends StatelessWidget {
+  _HistoryCard({
+    required this.title,
+    required this.logs,
+    required this.showName,
+    required this.emptyText,
+  });
+
+  final String title;
+  final List<_WorkLog> logs;
+  final bool showName;
+  final String emptyText;
+
+  @override
+  Widget build(BuildContext context) {
+    final sorted = List.of(logs)..sort((a, b) => b.time.compareTo(a.time));
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
+      decoration: AppDecorations.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4),
+            child: Row(
+              children: [
+                Expanded(child: Text(title, style: AppTextStyles.label)),
+                Text(
+                  '총 ${sorted.length}회',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (sorted.isEmpty)
+            Padding(
+              padding: EdgeInsets.fromLTRB(4, 20, 4, 20),
+              child: Text(
+                emptyText,
+                style: AppTextStyles.body2.copyWith(
+                  color: AppColors.textTertiary,
+                ),
+              ),
+            )
+          else
+            for (var i = 0; i < sorted.length; i++) ...[
+              if (i > 0) Divider(height: 1, color: AppColors.divider),
+              _LogRow(log: sorted[i], showName: showName),
+            ],
+        ],
+      ),
+    );
+  }
+}
+
 /// 오늘 수행 내역 화면 — 옆에서 슬라이드되어 열리고,
 /// 내 내역/전체 내역 탭을 전환하며 최근 기록이 위로 오도록 보여준다
 class _HistoryScreen extends StatefulWidget {
@@ -753,13 +926,6 @@ class _HistoryScreenState extends State<_HistoryScreen> {
   bool _all = false;
 
   static const _weekdays = ['월', '화', '수', '목', '금', '토', '일'];
-
-  String _formatTime(DateTime time) {
-    final period = time.hour < 12 ? '오전' : '오후';
-    final hour = time.hour % 12 == 0 ? 12 : time.hour % 12;
-    final minute = time.minute.toString().padLeft(2, '0');
-    return '$period $hour:$minute';
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -840,55 +1006,9 @@ class _HistoryScreenState extends State<_HistoryScreen> {
                       itemCount: sorted.length,
                       separatorBuilder: (_, _) =>
                           Divider(height: 1, color: AppColors.divider),
-                      itemBuilder: (_, index) {
-                        final log = sorted[index];
-                        return Padding(
-                          padding: EdgeInsets.symmetric(vertical: 13),
-                          child: Row(
-                            children: [
-                              SizedBox(
-                                width: 64,
-                                child: Text(
-                                  _formatTime(log.time),
-                                  style: AppTextStyles.caption,
-                                ),
-                              ),
-                              SizedBox(width: 8),
-                              // 전체 내역에서는 누가 했는지 이름을 함께 보여준다
-                              if (_all) ...[
-                                Text(
-                                  log.name,
-                                  style: AppTextStyles.body2.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    log.task,
-                                    style: AppTextStyles.body2.copyWith(
-                                      color: AppColors.textSecondary,
-                                    ),
-                                  ),
-                                ),
-                              ] else
-                                Expanded(
-                                  child: Text(
-                                    log.task,
-                                    style: AppTextStyles.body2.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              Icon(
-                                CupertinoIcons.checkmark_circle_fill,
-                                size: 16,
-                                color: AppColors.success,
-                              ),
-                            ],
-                          ),
-                        );
-                      },
+                      // 전체 내역에서는 누가 했는지 이름을 함께 보여준다
+                      itemBuilder: (_, index) =>
+                          _LogRow(log: sorted[index], showName: _all),
                     ),
                   ),
               ],
