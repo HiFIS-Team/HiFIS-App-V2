@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -37,6 +38,9 @@ class _DocumentScreenState extends State<DocumentScreen> {
 
   /// true면 목록 보기, false면 아이콘 보기
   bool _listView = false;
+
+  /// 파일을 끌어와 창 위에 올려둔 상태
+  bool _dragging = false;
 
   String _query = '';
 
@@ -143,6 +147,58 @@ class _DocumentScreenState extends State<DocumentScreen> {
       _place = _Place.all;
     });
     AppToast.show(context, '${result.files.length}개 파일을 올렸어요');
+  }
+
+  /// 창에 끌어다 놓은 것들을 담는다 (데스크톱 전용)
+  ///
+  /// 폴더를 통째로 놓으면 안쪽 구조까지 그대로 가져온다.
+  void _drop(List<String> paths) {
+    final target = _place == _Place.all ? _current : _root;
+    var added = 0;
+
+    setState(() {
+      for (final path in paths) {
+        final item = _itemAt(path);
+        if (item == null) continue;
+        target.children!.add(item);
+        added++;
+      }
+      target.updated = DateTime.now();
+      _place = _Place.all;
+    });
+
+    if (added > 0) AppToast.show(context, '$added개를 문서함에 담았어요');
+  }
+
+  /// 경로 하나를 문서함 항목으로 바꾼다 (폴더면 안쪽까지 훑는다)
+  _Item? _itemAt(String path) {
+    final name = path.split(Platform.pathSeparator).last;
+    try {
+      if (Directory(path).existsSync()) {
+        final children = <_Item>[];
+        for (final entity in Directory(path).listSync()) {
+          // 맥의 .DS_Store 같은 숨김 파일은 건너뛴다
+          if (entity.path.split(Platform.pathSeparator).last.startsWith('.')) {
+            continue;
+          }
+          final child = _itemAt(entity.path);
+          if (child != null) children.add(child);
+        }
+        return _Item.folder(name: name, children: children);
+      }
+
+      final stat = File(path).statSync();
+      return _Item.file(
+        name: name,
+        kind: _Kind.of(name),
+        bytes: stat.size,
+        updated: stat.modified,
+        path: path,
+      );
+    } catch (_) {
+      // 권한이 없거나 읽는 중에 사라진 것은 조용히 넘긴다
+      return null;
+    }
   }
 
   Future<void> _rename(_Item item) async {
@@ -280,65 +336,170 @@ class _DocumentScreenState extends State<DocumentScreen> {
           ),
           Container(width: 1, color: AppColors.gray100),
           Expanded(
-            child: Column(
-              children: [
-                _Toolbar(
-                  place: _place,
-                  path: _path,
-                  query: _query,
-                  listView: _listView,
-                  selected: _selected,
-                  canGoUp: _place == _Place.all && _path.length > 1,
-                  onGoUp: _goUp,
-                  onCrumb: _goTo,
-                  onQuery: (v) => setState(() => _query = v),
-                  onToggleView: () => setState(() => _listView = !_listView),
-                  onNewFolder: _newFolder,
-                  onUpload: _upload,
-                  onRename: () => _rename(_selected!),
-                  onDelete: () => _delete(_selected!),
-                ),
-                Container(height: 1, color: AppColors.gray100),
-                Expanded(
-                  // 항목 바깥 빈 곳을 누르면 선택을 푼다 (파인더와 같게).
-                  // 항목 위의 탭은 항목 쪽이 먼저 가져가므로 여기까지 안 온다.
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => setState(() => _selected = null),
-                    onSecondaryTapDown: (d) => _blankMenu(d.globalPosition),
-                    child: items.isEmpty
-                        ? _Empty(place: _place, searching: _query.isNotEmpty)
-                        : _listView
-                        ? _ListBody(
-                            items: items,
-                            selected: _selected,
-                            onSelect: (i) => setState(() => _selected = i),
-                            onOpen: _open,
-                            onStar: _toggleStar,
-                            onRename: _rename,
-                            onDelete: _delete,
-                            onMenu: _itemMenu,
-                          )
-                        : _GridBody(
-                            items: items,
-                            selected: _selected,
-                            onSelect: (i) => setState(() => _selected = i),
-                            onOpen: _open,
-                            onStar: _toggleStar,
-                            onRename: _rename,
-                            onDelete: _delete,
-                            onMenu: _itemMenu,
-                          ),
-                  ),
-                ),
-                _StatusBar(items: items, selected: _selected),
-              ],
+            // 창에 파일을 끌어다 놓으면 지금 폴더에 담긴다 (데스크톱 전용)
+            child: DropTarget(
+              onDragEntered: (_) => setState(() => _dragging = true),
+              onDragExited: (_) => setState(() => _dragging = false),
+              onDragDone: (detail) {
+                setState(() => _dragging = false);
+                _drop([for (final file in detail.files) file.path]);
+              },
+              child: Stack(
+                children: [
+                  _pane(items),
+                  if (_dragging) _DropOverlay(folder: _current.name),
+                ],
+              ),
             ),
           ),
         ],
       ),
     );
   }
+
+  /// 툴바 + 본문 + 상태 줄
+  Widget _pane(List<_Item> items) {
+    return Column(
+      children: [
+        _Toolbar(
+          place: _place,
+          path: _path,
+          query: _query,
+          listView: _listView,
+          selected: _selected,
+          canGoUp: _place == _Place.all && _path.length > 1,
+          onGoUp: _goUp,
+          onCrumb: _goTo,
+          onQuery: (v) => setState(() => _query = v),
+          onToggleView: () => setState(() => _listView = !_listView),
+          onNewFolder: _newFolder,
+          onUpload: _upload,
+          onRename: () => _rename(_selected!),
+          onDelete: () => _delete(_selected!),
+        ),
+        Container(height: 1, color: AppColors.gray100),
+        Expanded(
+          // 항목 바깥 빈 곳을 누르면 선택을 푼다 (파인더와 같게).
+          // 항목 위의 탭은 항목 쪽이 먼저 가져가므로 여기까지 안 온다.
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => setState(() => _selected = null),
+            onSecondaryTapDown: (d) => _blankMenu(d.globalPosition),
+            child: items.isEmpty
+                ? _Empty(place: _place, searching: _query.isNotEmpty)
+                : _listView
+                ? _ListBody(
+                    items: items,
+                    selected: _selected,
+                    onSelect: (i) => setState(() => _selected = i),
+                    onOpen: _open,
+                    onStar: _toggleStar,
+                    onRename: _rename,
+                    onDelete: _delete,
+                    onMenu: _itemMenu,
+                  )
+                : _GridBody(
+                    items: items,
+                    selected: _selected,
+                    onSelect: (i) => setState(() => _selected = i),
+                    onOpen: _open,
+                    onStar: _toggleStar,
+                    onRename: _rename,
+                    onDelete: _delete,
+                    onMenu: _itemMenu,
+                  ),
+          ),
+        ),
+        _StatusBar(items: items, selected: _selected),
+      ],
+    );
+  }
+}
+
+/// 파일을 끌어와 창 위에 올렸을 때 덮이는 안내막
+class _DropOverlay extends StatelessWidget {
+  _DropOverlay({required this.folder});
+
+  final String folder;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Container(
+        color: AppColors.primary.withValues(alpha: 0.08),
+        padding: EdgeInsets.all(16),
+        child: DottedBorderBox(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.file_download_rounded,
+                size: 40,
+                color: AppColors.primary,
+              ),
+              SizedBox(height: 12),
+              Text(
+                '여기에 놓으면 담겨요',
+                style: AppTextStyles.title3.copyWith(color: AppColors.primary),
+              ),
+              SizedBox(height: 4),
+              Text(
+                '$folder 폴더로 들어갑니다',
+                style: AppTextStyles.caption.copyWith(fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 점선 테두리 상자 — 놓을 자리를 표시한다
+class DottedBorderBox extends StatelessWidget {
+  DottedBorderBox({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _DashedBorderPainter(),
+      child: Center(child: child),
+    );
+  }
+}
+
+class _DashedBorderPainter extends CustomPainter {
+  static const _dash = 8.0;
+  static const _gap = 6.0;
+  static const _radius = 18.0;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppColors.primary.withValues(alpha: 0.6)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+
+    final path = Path()
+      ..addRRect(
+        RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(_radius)),
+      );
+
+    // 경로를 잘라 점선으로 그린다 (Flutter에는 점선 테두리가 없다)
+    for (final metric in path.computeMetrics()) {
+      var distance = 0.0;
+      while (distance < metric.length) {
+        final end = (distance + _dash).clamp(0.0, metric.length);
+        canvas.drawPath(metric.extractPath(distance, end), paint);
+        distance = end + _gap;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedBorderPainter oldDelegate) => false;
 }
 
 // ── 좌측 사이드바 ──

@@ -37,6 +37,7 @@ dependencies:
   cupertino_native: ^0.1.1
   barcode_widget: ^2.0.4
   file_picker: ^11.0.2
+  desktop_drop: ^0.7.1
 
 dev_dependencies:
   flutter_test:
