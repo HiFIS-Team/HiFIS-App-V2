@@ -469,6 +469,9 @@ class _HeaderButtons extends StatefulWidget {
 class _HeaderButtonsState extends State<_HeaderButtons> {
   bool _overlayOpen = false;
 
+  /// 데스크톱 알림 패널이 열려 있는지 (열리면 종 아이콘이 X로 바뀐다)
+  bool _notiOpen = false;
+
   Future<void> _openBarcode() async {
     setState(() => _overlayOpen = true);
     await showAttendanceBarcode(context);
@@ -479,7 +482,7 @@ class _HeaderButtonsState extends State<_HeaderButtons> {
   Widget build(BuildContext context) {
     // 출퇴근 바코드는 폰을 직원 리더기에 찍는 용도라 데스크톱에서는 뺀다
     final desktop = isDesktop;
-    return Row(
+    final buttons = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (!desktop) ...[
@@ -500,14 +503,21 @@ class _HeaderButtonsState extends State<_HeaderButtons> {
           ),
           SizedBox(width: 10),
         ],
+        // 데스크톱은 화면 전환 대신 아래에 알림 패널을 펼친다
         GlassIconButton(
-          symbol: 'bell',
-          showBadge: true,
+          symbol: desktop && _notiOpen ? 'xmark' : 'bell',
+          showBadge: !_notiOpen,
           enabled: !_overlayOpen,
-          onPressed: () => Navigator.push(
-            context,
-            CupertinoPageRoute(builder: (_) => NotificationScreen()),
-          ),
+          onPressed: () {
+            if (desktop) {
+              setState(() => _notiOpen = !_notiOpen);
+              return;
+            }
+            Navigator.push(
+              context,
+              CupertinoPageRoute(builder: (_) => NotificationScreen()),
+            );
+          },
         ),
         SizedBox(width: 10),
         GlassIconButton(
@@ -519,6 +529,56 @@ class _HeaderButtonsState extends State<_HeaderButtons> {
           ),
         ),
       ],
+    );
+
+    if (!desktop) return buttons;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // 사내톡 패널과 같은 크기 규칙 (창이 낮으면 함께 줄어든다)
+        final panelHeight = (constraints.maxHeight - 84).clamp(240.0, 560.0);
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            buttons,
+            SizedBox(height: 12),
+            IgnorePointer(
+              ignoring: !_notiOpen,
+              child: AnimatedOpacity(
+                duration: Duration(milliseconds: 200),
+                opacity: _notiOpen ? 1 : 0,
+                child: AnimatedScale(
+                  duration: Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  scale: _notiOpen ? 1 : 0.94,
+                  alignment: Alignment.topRight,
+                  child: Container(
+                    width: 380,
+                    height: panelHeight,
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppColors.gray100),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.14),
+                          blurRadius: 40,
+                          offset: Offset(0, 12),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: NotificationScreen(embedded: true),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

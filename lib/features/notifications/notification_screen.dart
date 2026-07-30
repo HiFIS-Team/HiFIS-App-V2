@@ -10,7 +10,11 @@ import '../../core/widgets/top_frost.dart';
 ///
 /// 데이터는 하드코딩된 샘플이며, 기능 개발 시 실제 알림 데이터로 교체한다.
 class NotificationScreen extends StatefulWidget {
-  NotificationScreen({super.key});
+  NotificationScreen({super.key, this.embedded = false});
+
+  /// 데스크톱 플로팅 패널에 담길 때 true.
+  /// 뒤로가기 버튼을 숨긴다 (닫기는 헤더의 X 버튼이 담당).
+  final bool embedded;
 
   @override
   State<NotificationScreen> createState() => _NotificationScreenState();
@@ -111,16 +115,17 @@ class _NotificationScreenState extends State<NotificationScreen> {
             ),
           ),
           // 좌측 상단 고정 뒤로가기 글래스 버튼
-          SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: EdgeInsets.only(top: 8, left: 16),
-              child: GlassIconButton(
-                symbol: 'chevron.backward',
-                onPressed: () => Navigator.pop(context),
+          if (!widget.embedded)
+            SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: EdgeInsets.only(top: 8, left: 16),
+                child: GlassIconButton(
+                  symbol: 'chevron.backward',
+                  onPressed: () => Navigator.pop(context),
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
