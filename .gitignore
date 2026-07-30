@@ -10,6 +10,9 @@
 # Miscellaneous
 *.class
 *.lock
+# 앱은 의존성 버전을 고정해야 어느 컴퓨터에서 받아도 같은 빌드가 나온다
+!pubspec.lock
+!**/Podfile.lock
 *.log
 *.pyc
 *.swp
