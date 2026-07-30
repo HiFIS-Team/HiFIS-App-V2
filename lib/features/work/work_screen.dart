@@ -6,6 +6,7 @@ import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
+import '../../core/util/sf_symbols.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/mode_switch.dart';
@@ -170,9 +171,78 @@ class _WorkScreenState extends State<WorkScreen> {
     ),
   ];
 
+  /// 항목 탭 — 데스크톱은 알약 토글, 폰은 밑줄 스타일
+  Widget _tabs() {
+    // 데스크톱은 넓은 화면에 밑줄 탭이 헐거워 보여서
+    // 분절 토글(ModeSwitch) 스타일의 알약 탭으로 보여준다
+    if (isDesktop) {
+      return Padding(
+        padding: EdgeInsets.fromLTRB(20, 0, 20, 16),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: _WorkSegmentedTabs(
+            labels: [for (final item in _items) item.label],
+            selected: _tab,
+            onSelect: (i) => setState(() => _tab = i),
+          ),
+        ),
+      );
+    }
+
+    // 항목 탭 — 사내톡 상세 '공유된 콘텐츠' 탭과 같은 밑줄 스타일.
+    // 5개가 한 화면에 다 들어와야 하므로 칸을 균등하게 나누고,
+    // 좁은 화면에서는 글자를 살짝 줄여서라도 옆으로 밀리지 않게 한다.
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 10),
+      child: Row(
+        children: [
+          for (var i = 0; i < _items.length; i++)
+            Expanded(
+              // 밑줄은 칸 전체가 아니라 글자 폭에 맞춘다
+              child: Center(
+                child: _WorkTab(
+                  label: _items[i].label,
+                  selected: _tab == i,
+                  onTap: () => setState(() => _tab = i),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final item = _items[_tab];
+
+    // 안드로이드는 글래스가 없어서 항목 탭이 같이 올라가 봐야 얻는 게 없다.
+    // 목록 화면들처럼 탭을 고정하고 내용만 스크롤한다.
+    if (!isApple && !isDesktop) {
+      return Scaffold(
+        body: Column(
+          children: [
+            ColoredBox(
+              color: AppColors.background,
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: EdgeInsets.only(top: 64),
+                  child: _tabs(),
+                ),
+              ),
+            ),
+            Container(height: 1, color: AppColors.gray100),
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.fromLTRB(0, 20, 0, bottomBarInset(context)),
+                children: [_content(item)],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     // 홈처럼 화면 전체가 한 번에 스크롤된다.
     // 항목 탭도 같이 올라가야 위쪽 글래스 버튼에 콘텐츠가 비친다.
@@ -182,127 +252,96 @@ class _WorkScreenState extends State<WorkScreen> {
         child: ListView(
           padding: EdgeInsets.fromLTRB(0, 64, 0, bottomBarInset(context)),
           children: [
-            // 데스크톱은 넓은 화면에 밑줄 탭이 헐거워 보여서
-            // 분절 토글(ModeSwitch) 스타일의 알약 탭으로 보여준다
-            if (isDesktop)
-              Padding(
-                padding: EdgeInsets.fromLTRB(20, 0, 20, 16),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: _WorkSegmentedTabs(
-                    labels: [for (final item in _items) item.label],
-                    selected: _tab,
-                    onSelect: (i) => setState(() => _tab = i),
-                  ),
-                ),
-              )
-            else
-              // 항목 탭 — 사내톡 상세 '공유된 콘텐츠' 탭과 같은 밑줄 스타일.
-              // 5개가 한 화면에 다 들어와야 하므로 칸을 균등하게 나누고,
-              // 좁은 화면에서는 글자를 살짝 줄여서라도 옆으로 밀리지 않게 한다.
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 10),
-                child: Row(
-                  children: [
-                    for (var i = 0; i < _items.length; i++)
-                      Expanded(
-                        // 밑줄은 칸 전체가 아니라 글자 폭에 맞춘다
-                        child: Center(
-                          child: _WorkTab(
-                            label: _items[i].label,
-                            selected: _tab == i,
-                            onTap: () => setState(() => _tab = i),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
+            _tabs(),
             Container(height: 1, color: AppColors.gray100),
             SizedBox(height: 20),
-            // 탭 전환 시 콘텐츠 페이드.
-            // 체크리스트 탭(환경정비)은 점수 카드 없이 리스트만 보여준다.
-            AnimatedSwitcher(
-              duration: Duration(milliseconds: 200),
-              // 기본 정렬(가운데)은 높이가 다른 콘텐츠가 아래로 밀렸다
-              // 올라와 보이므로 위쪽 기준으로 겹친다
-              layoutBuilder: (currentChild, previousChildren) => Stack(
-                alignment: Alignment.topCenter,
-                children: [...previousChildren, ?currentChild],
-              ),
-              child: Column(
-                key: ValueKey(_tab),
-                children: [
-                  if (item.checklist != null) ...[
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 20),
-                      child: _ChecklistCard(
-                        items: item.checklist!,
-                        counts: _counts,
-                        onAdjust: _adjust,
-                        onShowHistory: _showHistory,
-                      ),
-                    ),
-                    // 데스크톱: 내 내역 / 전체 내역을 양쪽에 상시 표시
-                    if (isDesktop) ...[
-                      SizedBox(height: 16),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 20),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: _HistoryCard(
-                                title: '내 내역',
-                                logs: _logs,
-                                showName: false,
-                                emptyText: '오늘 완료한 항목이 없어요',
-                              ),
-                            ),
-                            SizedBox(width: 16),
-                            Expanded(
-                              child: _HistoryCard(
-                                title: '전체 내역',
-                                logs: [..._logs, ..._teamLogs],
-                                showName: true,
-                                emptyText: '오늘 완료된 항목이 없어요',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ] else if (item.label == '동료 평가')
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 20),
-                      child: PeerReviewSection(),
-                    )
-                  else if (item.label == '수업 개수')
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 20),
-                      child: LessonSection(),
-                    )
-                  else if (item.label == '회원 친절도')
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 20),
-                      child: PraiseSection(),
-                    )
-                  else ...[
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 20),
-                      child: _ScoreCard(item: item),
-                    ),
-                    SizedBox(height: 16),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 20),
-                      child: _DetailCard(item: item),
-                    ),
-                  ],
-                ],
-              ),
-            ),
+            _content(item),
           ],
         ),
+      ),
+    );
+  }
+
+  /// 고른 항목의 내용 — 탭 전환 시 페이드로 바뀐다.
+  /// 체크리스트 탭(환경정비)은 점수 카드 없이 리스트만 보여준다.
+  Widget _content(_WorkItem item) {
+    return AnimatedSwitcher(
+      duration: Duration(milliseconds: 200),
+      // 기본 정렬(가운데)은 높이가 다른 콘텐츠가 아래로 밀렸다
+      // 올라와 보이므로 위쪽 기준으로 겹친다
+      layoutBuilder: (currentChild, previousChildren) => Stack(
+        alignment: Alignment.topCenter,
+        children: [...previousChildren, ?currentChild],
+      ),
+      child: Column(
+        key: ValueKey(_tab),
+        children: [
+          if (item.checklist != null) ...[
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: _ChecklistCard(
+                items: item.checklist!,
+                counts: _counts,
+                onAdjust: _adjust,
+                onShowHistory: _showHistory,
+              ),
+            ),
+            // 데스크톱: 내 내역 / 전체 내역을 양쪽에 상시 표시
+            if (isDesktop) ...[
+              SizedBox(height: 16),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: _HistoryCard(
+                        title: '내 내역',
+                        logs: _logs,
+                        showName: false,
+                        emptyText: '오늘 완료한 항목이 없어요',
+                      ),
+                    ),
+                    SizedBox(width: 16),
+                    Expanded(
+                      child: _HistoryCard(
+                        title: '전체 내역',
+                        logs: [..._logs, ..._teamLogs],
+                        showName: true,
+                        emptyText: '오늘 완료된 항목이 없어요',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ] else if (item.label == '동료 평가')
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: PeerReviewSection(),
+            )
+          else if (item.label == '수업 개수')
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: LessonSection(),
+            )
+          else if (item.label == '회원 친절도')
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: PraiseSection(),
+            )
+          else ...[
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: _ScoreCard(item: item),
+            ),
+            SizedBox(height: 16),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: _DetailCard(item: item),
+            ),
+          ],
+        ],
       ),
     );
   }
