@@ -1079,8 +1079,9 @@ class _RenewPickRow extends StatelessWidget {
     return Pressable(
       onTap: onTap,
       scale: 0.97,
-      child: AnimatedContainer(
-        duration: Duration(milliseconds: 150),
+      // 배경은 애니메이션 없이 즉시 — 페이드가 있으면 직전에 고른 회원이
+      // 서서히 사라지며 둘 다 선택된 것처럼 보인다
+      child: Container(
         padding: EdgeInsets.symmetric(horizontal: 14, vertical: 11),
         decoration: BoxDecoration(
           color: selected ? AppColors.primaryLight : AppColors.gray50,

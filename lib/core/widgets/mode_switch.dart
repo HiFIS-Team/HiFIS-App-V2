@@ -64,8 +64,9 @@ class _Segment extends StatelessWidget {
     return Pressable(
       onTap: onTap,
       scale: 0.97,
-      child: AnimatedContainer(
-        duration: Duration(milliseconds: 150),
+      // 배경은 애니메이션 없이 즉시 — 페이드가 있으면 직전에 선택돼 있던
+      // 칸이 서서히 사라지며 양쪽이 같이 눌린 것처럼 보인다
+      child: Container(
         decoration: BoxDecoration(
           color: selected ? AppColors.surface : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
