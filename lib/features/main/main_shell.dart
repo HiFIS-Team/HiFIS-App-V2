@@ -13,6 +13,7 @@ import '../../core/widgets/pressable.dart';
 import 'desktop_sidebar.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/placeholder_screen.dart';
+import '../../core/widgets/lazy_indexed_stack.dart';
 import '../approval/approval_screen.dart';
 import '../attendance/attendance_barcode_overlay.dart';
 import '../home/home_screen.dart';
@@ -158,7 +159,10 @@ class _MainShellState extends State<MainShell> {
                       valueListenable: _paneIndex,
                       builder: (context, index, child) => Stack(
                         children: [
-                          IndexedStack(index: index, children: _desktopPages),
+                          LazyIndexedStack(
+                            index: index,
+                            children: _desktopPages,
+                          ),
                           // 알림 패널 — 헤더 버튼보다 아래 레이어여야 한다.
                           // 위에 두면 패널 그림자가 네이티브 버튼 위를 덮어
                           // 오버레이가 생기면서 버튼 클릭이 먹지 않는다.
@@ -224,7 +228,7 @@ class _MainShellState extends State<MainShell> {
       extendBody: true,
       body: Stack(
         children: [
-          IndexedStack(
+          LazyIndexedStack(
             index: _androidTab,
             children: [..._mainPages, ..._subPages],
           ),
@@ -263,7 +267,7 @@ class _MainShellState extends State<MainShell> {
       extendBody: true,
       body: Stack(
         children: [
-          IndexedStack(
+          LazyIndexedStack(
             index: _subMenu ? _mainPages.length + (_subIndex - 1) : _mainIndex,
             children: [..._mainPages, ..._subPages],
           ),
