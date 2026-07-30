@@ -69,6 +69,43 @@ class ModeSwitch extends StatelessWidget {
   }
 }
 
+/// 여러 값 중 하나를 고르는 세그먼트 ([ModeSwitch]의 N개 버전)
+///
+/// 칸을 균등하게 나누고, 라벨이 길어 칸을 넘치면 글자를 줄여 맞춘다.
+class SegmentedTabs extends StatelessWidget {
+  SegmentedTabs({
+    super.key,
+    required this.labels,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final List<String> labels;
+  final int selected;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 48,
+      padding: EdgeInsets.all(4),
+      decoration: segmentTrack(),
+      child: Row(
+        children: [
+          for (var i = 0; i < labels.length; i++)
+            Expanded(
+              child: _Segment(
+                label: labels[i],
+                selected: i == selected,
+                onTap: () => onSelect(i),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _Segment extends StatelessWidget {
   _Segment({required this.label, required this.selected, required this.onTap});
 
@@ -86,12 +123,17 @@ class _Segment extends StatelessWidget {
       child: Container(
         decoration: segmentFill(selected: selected),
         child: Center(
-          child: Text(
-            label,
-            style: AppTextStyles.body2.copyWith(
-              fontSize: 14,
-              color: selected ? AppColors.textPrimary : AppColors.gray600,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          // 칸보다 라벨이 길면 줄여서 맞춘다 (3단 이상에서 넘칠 수 있다)
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              maxLines: 1,
+              style: AppTextStyles.body2.copyWith(
+                fontSize: 14,
+                color: selected ? AppColors.textPrimary : AppColors.gray600,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              ),
             ),
           ),
         ),
