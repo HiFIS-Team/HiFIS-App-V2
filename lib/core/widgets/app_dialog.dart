@@ -20,6 +20,10 @@ Future<T?> showFullPage<T>(BuildContext context, WidgetBuilder builder) {
 }
 
 /// 데스크톱 모달 틀 — 창 크기에 맞춰 줄어드는 둥근 상자
+///
+/// 안에 들어오는 건 폰 폭에 맞춰 만든 세로 목록이라, 창을 가득 채우면
+/// 글줄이 늘어지고 아래가 텅 빈다. 읽기 좋은 폭으로 잡고 높이도 창보다
+/// 확실히 작게 둬서 뒤 화면이 비쳐 모달로 읽히게 한다.
 class _ModalFrame extends StatelessWidget {
   _ModalFrame({required this.builder});
 
@@ -28,12 +32,12 @@ class _ModalFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
-    final width = size.width - 160;
-    final height = size.height - 120;
+    final width = size.width - 200;
+    final height = size.height - 200;
 
     return Container(
-      width: width < 880 ? width : 880,
-      height: height < 720 ? height : 720,
+      width: width < 620 ? width : 620,
+      height: height < 600 ? height : 600,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
