@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/data/staff.dart';
@@ -6,16 +7,19 @@ import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
+import '../../core/widgets/action_pill.dart';
+import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/avatar.dart';
-import '../../core/widgets/placeholder_screen.dart';
 import '../../core/widgets/pressable.dart';
+
+part 'project_phone.dart';
 
 /// 프로젝트 화면 (목업)
 ///
 /// 데스크톱은 좌측 목록 + 우측 상세 2단 구조(사내톡 전체보기와 같은 결).
+/// 폰은 같은 내용을 목록 화면 + 상세 화면 두 장으로 나눠 보여준다.
 /// 진행률은 따로 입력받지 않고 할 일 체크 비율로 자동 계산한다.
-/// 모바일 화면은 아직 준비 중 — PC를 먼저 다듬는다.
 class ProjectScreen extends StatefulWidget {
   ProjectScreen({super.key});
 
@@ -57,9 +61,18 @@ class _ProjectScreenState extends State<ProjectScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (!isDesktop) return PlaceholderScreen(emoji: '📁', title: '프로젝트');
-
     final list = _visible;
+
+    if (!isDesktop) {
+      return _ProjectPhone(
+        projects: list,
+        phase: _phase,
+        onFilter: (v) => setState(() => _phase = v),
+        onCreate: _create,
+        onChanged: () => setState(() {}),
+      );
+    }
+
     final selected = _syncSelection(list);
 
     // 배경은 다른 화면과 같은 회색 — 카드가 떠 보이게 한다.
@@ -390,12 +403,20 @@ class _EmptyDetail extends StatelessWidget {
 // ── 우측 상세 ──
 
 class _ProjectDetail extends StatelessWidget {
-  _ProjectDetail({super.key, required this.project, required this.onChanged});
+  _ProjectDetail({
+    super.key,
+    required this.project,
+    required this.onChanged,
+    this.phone = false,
+  });
 
   final _Project project;
 
   /// 목록의 진행률·정렬도 같이 갱신되도록 위로 알린다
   final VoidCallback onChanged;
+
+  /// 폰은 폭이 좁아 머리말을 여러 줄로 쌓는다
+  final bool phone;
 
   /// 할 일을 건드릴 때마다 활동 기록을 남긴다
   void _log(String text) {
@@ -470,79 +491,144 @@ class _ProjectDetail extends StatelessWidget {
     }
   }
 
+  /// 연장 신청 버튼 (끝난 프로젝트나 이미 올린 신청이 있으면 감춘다)
+  Widget _extendButton(BuildContext context) => Pressable(
+    onTap: () => _requestExtension(context),
+    scale: 0.94,
+    pressedColor: AppColors.gray100,
+    borderRadius: BorderRadius.circular(100),
+    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+    child: Text(
+      '기한 연장',
+      style: AppTextStyles.caption.copyWith(
+        color: AppColors.primary,
+        fontWeight: FontWeight.w700,
+      ),
+    ),
+  );
+
+  bool get _canExtend =>
+      project.phase != _Phase.done && project.request == null;
+
+  /// 데스크톱 머리말 — 한 줄에 이름·D-day, 오른쪽 끝에 참여자
+  List<Widget> _desktopHead(BuildContext context, int dday) => [
+    Row(
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: project.color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        SizedBox(width: 10),
+        Expanded(
+          child: Row(
+            children: [
+              Flexible(
+                child: Text(
+                  project.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.title1,
+                ),
+              ),
+              SizedBox(width: 10),
+              _DdayBadge(dday: dday, phase: project.phase),
+            ],
+          ),
+        ),
+        SizedBox(width: 16),
+        _MemberBar(project: project, onChanged: onChanged),
+      ],
+    ),
+    SizedBox(height: 6),
+    Row(
+      children: [
+        Text(
+          '${_date(project.start)} ~ ${_date(project.due)} · 담당 ${project.owner}',
+          style: AppTextStyles.caption,
+        ),
+        if (_canExtend) ...[SizedBox(width: 8), _extendButton(context)],
+      ],
+    ),
+    if (project.desc.isNotEmpty) ...[
+      SizedBox(height: 10),
+      Text(
+        project.desc,
+        style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
+      ),
+    ],
+  ];
+
+  /// 폰 머리말 — 이름 / 기간·담당 / 참여자·연장 순으로 쌓는다
+  List<Widget> _phoneHead(BuildContext context, int dday) => [
+    Row(
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: project.color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        SizedBox(width: 10),
+        Expanded(child: Text(project.name, style: AppTextStyles.title2)),
+      ],
+    ),
+    SizedBox(height: 10),
+    Row(
+      children: [
+        _DdayBadge(dday: dday, phase: project.phase),
+        SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            '${_date(project.start)} ~ ${_date(project.due)} · 담당 ${project.owner}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.caption,
+          ),
+        ),
+      ],
+    ),
+    if (project.desc.isNotEmpty) ...[
+      SizedBox(height: 10),
+      Text(
+        project.desc,
+        style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
+      ),
+    ],
+    SizedBox(height: 12),
+    Row(
+      children: [
+        _MemberBar(project: project, onChanged: onChanged),
+        Spacer(),
+        if (_canExtend) _extendButton(context),
+      ],
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
     final dday = _dday(project.due);
 
     return ListView(
-      padding: EdgeInsets.fromLTRB(28, 64, 28, bottomBarInset(context)),
+      padding: phone
+          // 폰 상세는 하단바 위로 올라오는 화면이라 화면 아래 여백만 남긴다
+          ? EdgeInsets.fromLTRB(
+              20,
+              8,
+              20,
+              MediaQuery.paddingOf(context).bottom + 32,
+            )
+          : EdgeInsets.fromLTRB(28, 64, 28, bottomBarInset(context)),
       children: [
-        // 제목 줄 — 색 점·이름·D-day, 오른쪽 끝에 참여자
-        Row(
-          children: [
-            Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                color: project.color,
-                shape: BoxShape.circle,
-              ),
-            ),
-            SizedBox(width: 10),
-            Expanded(
-              child: Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      project.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.title1,
-                    ),
-                  ),
-                  SizedBox(width: 10),
-                  _DdayBadge(dday: dday, phase: project.phase),
-                ],
-              ),
-            ),
-            SizedBox(width: 16),
-            _MemberBar(project: project, onChanged: onChanged),
-          ],
-        ),
-        SizedBox(height: 6),
-        Row(
-          children: [
-            Text(
-              '${_date(project.start)} ~ ${_date(project.due)} · 담당 ${project.owner}',
-              style: AppTextStyles.caption,
-            ),
-            // 끝난 프로젝트나 이미 올린 신청이 있으면 연장 버튼을 감춘다
-            if (project.phase != _Phase.done && project.request == null) ...[
-              SizedBox(width: 8),
-              Pressable(
-                onTap: () => _requestExtension(context),
-                scale: 0.94,
-                pressedColor: AppColors.gray100,
-                borderRadius: BorderRadius.circular(100),
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                child: Text(
-                  '기한 연장',
-                  style: AppTextStyles.caption.copyWith(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-        if (project.desc.isNotEmpty) ...[
-          SizedBox(height: 10),
-          Text(
-            project.desc,
-            style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
-          ),
-        ],
+        if (phone)
+          ..._phoneHead(context, dday)
+        else
+          ..._desktopHead(context, dday),
         if (project.request != null) ...[
           SizedBox(height: 14),
           _ExtensionCard(
@@ -607,9 +693,106 @@ class _ExtensionCard extends StatelessWidget {
   final VoidCallback onApprove;
   final VoidCallback onReject;
 
+  /// 반려·승인 버튼 (폰은 [fill]로 가로를 꽉 채운다)
+  Widget _buttons({required bool fill}) {
+    final reject = Pressable(
+      onTap: onReject,
+      scale: 0.96,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.gray200),
+        ),
+        child: Text(
+          '반려',
+          style: AppTextStyles.body2.copyWith(
+            fontSize: 14,
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+    final approve = Pressable(
+      onTap: onApprove,
+      scale: 0.96,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppColors.primary,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          '승인',
+          style: AppTextStyles.body2.copyWith(
+            fontSize: 14,
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+
+    return Row(
+      mainAxisSize: fill ? MainAxisSize.max : MainAxisSize.min,
+      children: fill
+          ? [
+              Expanded(child: reject),
+              SizedBox(width: 8),
+              Expanded(child: approve),
+            ]
+          : [reject, SizedBox(width: 6), approve],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final request = project.request!;
+
+    final info = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 좁은 화면에서는 제목과 날짜가 아래로 접힌다
+        Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          runSpacing: 2,
+          children: [
+            Text(
+              '기한 연장 승인 대기',
+              style: AppTextStyles.body2.copyWith(
+                color: AppColors.warning,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            Text(
+              '${_date(project.due)} → ${_date(request.due)}',
+              style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+        SizedBox(height: 4),
+        Text(
+          request.reason,
+          style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
+        ),
+        SizedBox(height: 4),
+        Text(
+          '${request.requester} · ${_relative(request.time)} 신청',
+          style: AppTextStyles.caption.copyWith(fontSize: 11),
+        ),
+      ],
+    );
+
+    final icon = Icon(
+      Icons.hourglass_empty_rounded,
+      size: 18,
+      color: AppColors.warning,
+    );
 
     return Container(
       padding: EdgeInsets.fromLTRB(16, 14, 14, 14),
@@ -617,95 +800,33 @@ class _ExtensionCard extends StatelessWidget {
         color: AppColors.warning.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            Icons.hourglass_empty_rounded,
-            size: 18,
-            color: AppColors.warning,
-          ),
-          SizedBox(width: 10),
-          Expanded(
-            child: Column(
+      // 폰은 버튼을 옆에 두면 내용이 눌려서 아래로 내린다
+      child: isDesktop
+          ? Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                icon,
+                SizedBox(width: 10),
+                Expanded(child: info),
+                SizedBox(width: 12),
+                _buttons(fill: false),
+              ],
+            )
+          : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      '기한 연장 승인 대기',
-                      style: AppTextStyles.body2.copyWith(
-                        color: AppColors.warning,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    SizedBox(width: 8),
-                    Text(
-                      '${_date(project.due)} → ${_date(request.due)}',
-                      style: AppTextStyles.body2.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    icon,
+                    SizedBox(width: 10),
+                    Expanded(child: info),
                   ],
                 ),
-                SizedBox(height: 4),
-                Text(
-                  request.reason,
-                  style: AppTextStyles.body2.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  '${request.requester} · ${_relative(request.time)} 신청',
-                  style: AppTextStyles.caption.copyWith(fontSize: 11),
-                ),
+                SizedBox(height: 12),
+                _buttons(fill: true),
               ],
             ),
-          ),
-          SizedBox(width: 12),
-          Pressable(
-            onTap: onReject,
-            scale: 0.96,
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.gray200),
-              ),
-              child: Text(
-                '반려',
-                style: AppTextStyles.body2.copyWith(
-                  fontSize: 14,
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ),
-          SizedBox(width: 6),
-          Pressable(
-            onTap: onApprove,
-            scale: 0.96,
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                '승인',
-                style: AppTextStyles.body2.copyWith(
-                  fontSize: 14,
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -825,6 +946,8 @@ class _TodoRowState extends State<_TodoRow> {
   @override
   Widget build(BuildContext context) {
     final todo = widget.todo;
+    // 폰은 커서가 없으니 삭제 버튼을 항상 띄워둔다
+    final showRemove = _hover || !isDesktop;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -873,7 +996,7 @@ class _TodoRowState extends State<_TodoRow> {
             SizedBox(width: 4),
             SizedBox(
               width: 28,
-              child: _hover
+              child: showRemove
                   ? Pressable(
                       onTap: widget.onRemove,
                       scale: 0.9,
@@ -1306,52 +1429,46 @@ Future<String?> _pickMember(
   required List<String> names,
   String? current,
 }) {
-  return showDialog<String>(
-    context: context,
-    barrierColor: Colors.black.withValues(alpha: 0.45),
-    builder: (context) => Center(
-      child: Material(
-        type: MaterialType.transparency,
-        child: Container(
-          width: 280,
-          padding: EdgeInsets.fromLTRB(16, 18, 16, 12),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(20),
+  return showAppDialog<String>(
+    context,
+    (context) => Container(
+      width: dialogWidth(context, 280),
+      padding: EdgeInsets.fromLTRB(16, 18, 16, 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 6),
+            child: Text('담당자 선택', style: AppTextStyles.title3),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 6),
-                child: Text('담당자 선택', style: AppTextStyles.title3),
+          SizedBox(height: 8),
+          for (final name in names)
+            _PickRow(
+              name: name,
+              role: staffOf(name).role,
+              selected: name == current,
+              onTap: () => Navigator.pop(context, name),
+            ),
+          Divider(height: 12, color: AppColors.divider),
+          Pressable(
+            onTap: () => Navigator.pop(context, ''),
+            scale: 0.98,
+            pressedColor: AppColors.gray50,
+            borderRadius: BorderRadius.circular(12),
+            padding: EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+            child: Text(
+              '담당자 없음',
+              style: AppTextStyles.body2.copyWith(
+                color: AppColors.textTertiary,
               ),
-              SizedBox(height: 8),
-              for (final name in names)
-                _PickRow(
-                  name: name,
-                  role: staffOf(name).role,
-                  selected: name == current,
-                  onTap: () => Navigator.pop(context, name),
-                ),
-              Divider(height: 12, color: AppColors.divider),
-              Pressable(
-                onTap: () => Navigator.pop(context, ''),
-                scale: 0.98,
-                pressedColor: AppColors.gray50,
-                borderRadius: BorderRadius.circular(12),
-                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-                child: Text(
-                  '담당자 없음',
-                  style: AppTextStyles.body2.copyWith(
-                    color: AppColors.textTertiary,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     ),
   );
@@ -1406,15 +1523,9 @@ Future<String?> _showDecisionDialog(
   required _Project project,
   required bool approve,
 }) {
-  return showDialog<String>(
-    context: context,
-    barrierColor: Colors.black.withValues(alpha: 0.45),
-    builder: (context) => Center(
-      child: Material(
-        type: MaterialType.transparency,
-        child: _DecisionDialog(project: project, approve: approve),
-      ),
-    ),
+  return showAppDialog<String>(
+    context,
+    (context) => _DecisionDialog(project: project, approve: approve),
   );
 }
 
@@ -1468,7 +1579,7 @@ class _DecisionDialogState extends State<_DecisionDialog> {
     final empty = _reason.text.trim().isEmpty;
 
     return Container(
-      width: 400,
+      width: dialogWidth(context, 400),
       padding: EdgeInsets.fromLTRB(24, 22, 24, 18),
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -1579,15 +1690,9 @@ Future<_Extension?> _showExtensionDialog(
   BuildContext context,
   _Project project,
 ) {
-  return showDialog<_Extension>(
-    context: context,
-    barrierColor: Colors.black.withValues(alpha: 0.45),
-    builder: (context) => Center(
-      child: Material(
-        type: MaterialType.transparency,
-        child: _ExtensionDialog(project: project),
-      ),
-    ),
+  return showAppDialog<_Extension>(
+    context,
+    (context) => _ExtensionDialog(project: project),
   );
 }
 
@@ -1676,7 +1781,7 @@ class _ExtensionDialogState extends State<_ExtensionDialog> {
     final overdue = _dday(project.due) < 0;
 
     return Container(
-      width: 400,
+      width: dialogWidth(context, 400),
       padding: EdgeInsets.fromLTRB(24, 22, 24, 18),
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -1809,16 +1914,7 @@ class _ExtensionDialogState extends State<_ExtensionDialog> {
 
 /// 새 프로젝트 만들기 — 만들면 그 프로젝트를 돌려준다
 Future<_Project?> _showProjectComposer(BuildContext context) {
-  return showDialog<_Project>(
-    context: context,
-    barrierColor: Colors.black.withValues(alpha: 0.45),
-    builder: (context) => Center(
-      child: Material(
-        type: MaterialType.transparency,
-        child: _ProjectComposer(),
-      ),
-    ),
-  );
+  return showAppDialog<_Project>(context, (context) => _ProjectComposer());
 }
 
 class _ProjectComposer extends StatefulWidget {
@@ -1943,7 +2039,7 @@ class _ProjectComposerState extends State<_ProjectComposer> {
     final dday = _dday(_due);
 
     return Container(
-      width: 460,
+      width: dialogWidth(context, 460),
       padding: EdgeInsets.fromLTRB(24, 22, 24, 18),
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -2306,53 +2402,47 @@ void _showMemberManager(
   _Project project,
   VoidCallback onChanged,
 ) {
-  showDialog<void>(
-    context: context,
-    barrierColor: Colors.black.withValues(alpha: 0.45),
-    builder: (context) => Center(
-      child: Material(
-        type: MaterialType.transparency,
-        child: StatefulBuilder(
-          builder: (context, setLocal) => Container(
-            width: 300,
-            padding: EdgeInsets.fromLTRB(16, 18, 16, 14),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(20),
+  showAppDialog<void>(
+    context,
+    (context) => StatefulBuilder(
+      builder: (context, setLocal) => Container(
+        width: dialogWidth(context, 300),
+        padding: EdgeInsets.fromLTRB(16, 18, 16, 14),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 6),
+              child: Text('참여 멤버', style: AppTextStyles.title3),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 6),
-                  child: Text('참여 멤버', style: AppTextStyles.title3),
-                ),
-                SizedBox(height: 8),
-                for (final staff in staffList)
-                  _MemberToggleRow(
-                    staff: staff,
-                    joined: project.members.contains(staff.name),
-                    onTap: () {
-                      setLocal(() {
-                        if (project.members.contains(staff.name)) {
-                          project.members.remove(staff.name);
-                          // 빠진 사람이 맡고 있던 할 일은 담당자를 비운다
-                          for (final todo in project.todos) {
-                            if (todo.assignee == staff.name) {
-                              todo.assignee = null;
-                            }
-                          }
-                        } else {
-                          project.members.add(staff.name);
+            SizedBox(height: 8),
+            for (final staff in staffList)
+              _MemberToggleRow(
+                staff: staff,
+                joined: project.members.contains(staff.name),
+                onTap: () {
+                  setLocal(() {
+                    if (project.members.contains(staff.name)) {
+                      project.members.remove(staff.name);
+                      // 빠진 사람이 맡고 있던 할 일은 담당자를 비운다
+                      for (final todo in project.todos) {
+                        if (todo.assignee == staff.name) {
+                          todo.assignee = null;
                         }
-                      });
-                      onChanged();
-                    },
-                  ),
-              ],
-            ),
-          ),
+                      }
+                    } else {
+                      project.members.add(staff.name);
+                    }
+                  });
+                  onChanged();
+                },
+              ),
+          ],
         ),
       ),
     ),

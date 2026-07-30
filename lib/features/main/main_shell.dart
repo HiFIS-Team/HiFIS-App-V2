@@ -64,14 +64,14 @@ class _MainShellState extends State<MainShell> {
   List<Widget> get _mainPages => [
     HomeScreen(),
     WorkScreen(),
-    PlaceholderScreen(emoji: '📁', title: '프로젝트'),
-    PlaceholderScreen(emoji: '📝', title: '회의록'),
+    ProjectScreen(),
+    MeetingScreen(),
   ];
 
   List<Widget> get _subPages => [
     PlaceholderScreen(emoji: '🗓️', title: '근태·월차'),
     PlaceholderScreen(emoji: '💰', title: '급여'),
-    PlaceholderScreen(emoji: '📣', title: '공지'),
+    NoticeScreen(),
     PlaceholderScreen(emoji: '🏆', title: '랭킹'),
   ];
 

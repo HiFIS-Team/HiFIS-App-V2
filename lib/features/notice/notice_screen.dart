@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/data/staff.dart';
@@ -6,20 +7,22 @@ import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
+import '../../core/widgets/action_pill.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/avatar.dart';
 import '../../core/widgets/block_editor.dart';
 import '../../core/widgets/markdown_view.dart';
 import '../../core/widgets/mode_switch.dart';
-import '../../core/widgets/placeholder_screen.dart';
 import '../../core/widgets/pressable.dart';
+
+part 'notice_phone.dart';
 
 /// 공지 화면 (목업)
 ///
 /// 데스크톱은 좌측 목록 + 우측 본문 2단 구조. 본문은 회의록과 같은
 /// 블록 편집기로 적고, 평소에는 렌더링된 모습으로 읽는다.
+/// 폰은 같은 내용을 목록 화면 + 본문 화면 두 장으로 나눠 보여준다.
 /// 열어보면 읽음 처리가 되고, 누가 확인했는지 아래에서 볼 수 있다.
-/// 모바일 화면은 아직 준비 중 — PC를 먼저 다듬는다.
 class NoticeScreen extends StatefulWidget {
   NoticeScreen({super.key});
 
@@ -90,9 +93,19 @@ class _NoticeScreenState extends State<NoticeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (!isDesktop) return PlaceholderScreen(emoji: '📣', title: '공지');
-
     final list = _visible;
+    final unread = _notices.where((n) => !n.readers.contains(me)).length;
+
+    if (!isDesktop) {
+      return _NoticePhone(
+        notices: list,
+        unreadOnly: _unreadOnly,
+        unread: unread,
+        onFilter: (v) => setState(() => _unreadOnly = v),
+        onChanged: () => setState(() {}),
+      );
+    }
+
     final selected = _syncSelection(list);
     // 목록을 처음 그릴 때 자동으로 고른 공지도 읽음 처리한다
     if (selected != null && !selected.readers.contains(me)) {
@@ -112,7 +125,7 @@ class _NoticeScreenState extends State<NoticeScreen> {
                 notices: list,
                 selected: selected,
                 unreadOnly: _unreadOnly,
-                unread: _notices.where((n) => !n.readers.contains(me)).length,
+                unread: unread,
                 onFilter: (v) => setState(() {
                   _unreadOnly = v;
                   _selected = null;
@@ -419,12 +432,16 @@ class _NoticeView extends StatefulWidget {
     required this.editing,
     required this.onChanged,
     required this.onDelete,
+    this.phone = false,
   });
 
   final _Notice notice;
   final bool editing;
   final VoidCallback onChanged;
   final VoidCallback onDelete;
+
+  /// 폰은 폭이 좁아 편집 버튼을 제목 위로 올린다
+  final bool phone;
 
   @override
   State<_NoticeView> createState() => _NoticeViewState();
@@ -479,94 +496,123 @@ class _NoticeViewState extends State<_NoticeView> {
         if (!notice.readers.contains(staff.name)) staff.name,
     ];
 
-    return ListView(
-      padding: EdgeInsets.fromLTRB(32, 64, 32, bottomBarInset(context)),
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (notice.pinned && !_editing) ...[
-              Padding(
-                padding: EdgeInsets.only(top: 6, right: 8),
-                child: Icon(
-                  Icons.push_pin_rounded,
-                  size: 20,
-                  color: AppColors.error,
-                ),
+    final phone = widget.phone;
+
+    final title = _editing
+        ? TextField(
+            controller: _title,
+            focusNode: _titleFocus,
+            style: AppTextStyles.title1,
+            cursorColor: AppColors.primary,
+            onChanged: (_) => _sync(),
+            decoration: InputDecoration(
+              hintText: '제목 없는 공지',
+              hintStyle: AppTextStyles.title1.copyWith(
+                color: AppColors.gray300,
               ),
-            ],
-            Expanded(
-              child: _editing
-                  ? TextField(
-                      controller: _title,
-                      focusNode: _titleFocus,
-                      style: AppTextStyles.title1,
-                      cursorColor: AppColors.primary,
-                      onChanged: (_) => _sync(),
-                      decoration: InputDecoration(
-                        hintText: '제목 없는 공지',
-                        hintStyle: AppTextStyles.title1.copyWith(
-                          color: AppColors.gray300,
-                        ),
-                        border: InputBorder.none,
-                        isCollapsed: true,
-                      ),
-                    )
-                  : Text(notice.displayTitle, style: AppTextStyles.title1),
+              border: InputBorder.none,
+              isCollapsed: true,
             ),
-            SizedBox(width: 16),
-            if (_editing) ...[
-              Pressable(
-                onTap: widget.onDelete,
-                scale: 0.95,
-                pressedColor: AppColors.gray100,
-                borderRadius: BorderRadius.circular(10),
-                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                child: Text(
-                  '삭제',
+          )
+        : Text(notice.displayTitle, style: AppTextStyles.title1);
+
+    final pin = notice.pinned && !_editing
+        ? Padding(
+            padding: EdgeInsets.only(top: 6, right: 8),
+            child: Icon(
+              Icons.push_pin_rounded,
+              size: 20,
+              color: AppColors.error,
+            ),
+          )
+        : null;
+
+    final actions = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_editing) ...[
+          Pressable(
+            onTap: widget.onDelete,
+            scale: 0.95,
+            pressedColor: AppColors.gray100,
+            borderRadius: BorderRadius.circular(10),
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Text(
+              '삭제',
+              style: AppTextStyles.body2.copyWith(
+                fontSize: 14,
+                color: AppColors.error,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          SizedBox(width: 6),
+        ],
+        Pressable(
+          onTap: _toggleEdit,
+          scale: 0.95,
+          child: Container(
+            padding: EdgeInsets.fromLTRB(12, 8, 14, 8),
+            decoration: BoxDecoration(
+              color: _editing ? AppColors.primary : AppColors.gray50,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _editing ? Icons.check_rounded : Icons.edit_rounded,
+                  size: 15,
+                  color: _editing ? Colors.white : AppColors.textSecondary,
+                ),
+                SizedBox(width: 4),
+                Text(
+                  _editing ? '완료' : '편집',
                   style: AppTextStyles.body2.copyWith(
                     fontSize: 14,
-                    color: AppColors.error,
+                    color: _editing ? Colors.white : AppColors.textSecondary,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-              ),
-              SizedBox(width: 6),
-            ],
-            Pressable(
-              onTap: _toggleEdit,
-              scale: 0.95,
-              child: Container(
-                padding: EdgeInsets.fromLTRB(12, 8, 14, 8),
-                decoration: BoxDecoration(
-                  color: _editing ? AppColors.primary : AppColors.gray50,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      _editing ? Icons.check_rounded : Icons.edit_rounded,
-                      size: 15,
-                      color: _editing ? Colors.white : AppColors.textSecondary,
-                    ),
-                    SizedBox(width: 4),
-                    Text(
-                      _editing ? '완료' : '편집',
-                      style: AppTextStyles.body2.copyWith(
-                        fontSize: 14,
-                        color: _editing
-                            ? Colors.white
-                            : AppColors.textSecondary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
+      ],
+    );
+
+    return ListView(
+      padding: phone
+          // 폰 본문은 하단바 위로 올라오는 화면이라 화면 아래 여백만 남긴다
+          ? EdgeInsets.fromLTRB(
+              20,
+              4,
+              20,
+              MediaQuery.paddingOf(context).bottom + 32,
+            )
+          : EdgeInsets.fromLTRB(32, 64, 32, bottomBarInset(context)),
+      children: [
+        // 폰은 제목이 길어 버튼과 나란히 두면 눌린다 — 버튼을 위로 올린다
+        if (phone) ...[
+          Align(alignment: Alignment.centerRight, child: actions),
+          SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ?pin,
+              Expanded(child: title),
+            ],
+          ),
+        ] else
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ?pin,
+              Expanded(child: title),
+              SizedBox(width: 16),
+              actions,
+            ],
+          ),
         SizedBox(height: 10),
         if (_editing) ...[
           Row(
