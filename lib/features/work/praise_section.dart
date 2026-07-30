@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/util/platform.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/glass_search_bar.dart';
 import '../../core/widgets/mode_switch.dart';
@@ -40,6 +41,9 @@ class _PraiseSectionState extends State<PraiseSection> {
     // 카드에는 최근 5건만 — 나머지는 전체 보기 화면에서
     final recent = items.take(5).toList();
     final title = _complaint ? '컴플레인' : '내게 온 칭찬';
+    final unresolved = _complaint && _showStatus
+        ? items.where((f) => f.status == _Status.pending).length
+        : 0;
 
     return Column(
       children: [
@@ -64,11 +68,26 @@ class _PraiseSectionState extends State<PraiseSection> {
                     Text(title, style: AppTextStyles.label),
                     SizedBox(width: 6),
                     Expanded(
-                      child: Text(
-                        '${items.length}',
-                        style: AppTextStyles.label.copyWith(
-                          color: AppColors.textTertiary,
-                        ),
+                      child: Row(
+                        children: [
+                          Text(
+                            '${items.length}',
+                            style: AppTextStyles.label.copyWith(
+                              color: AppColors.textTertiary,
+                            ),
+                          ),
+                          // 컴플레인은 아직 손대지 않은 건수를 같이 알려준다
+                          if (unresolved > 0) ...[
+                            SizedBox(width: 6),
+                            Text(
+                              '미처리 $unresolved',
+                              style: AppTextStyles.caption.copyWith(
+                                color: AppColors.warning,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                     Pressable(
@@ -115,7 +134,11 @@ class _PraiseSectionState extends State<PraiseSection> {
                   if (i > 0) Divider(height: 1, color: AppColors.divider),
                   _FeedbackRow(
                     feedback: recent[i],
-                    onTap: () => _showFeedbackDetail(context, recent[i]),
+                    onTap: () => _showFeedbackDetail(
+                      context,
+                      recent[i],
+                      onChanged: () => setState(() {}),
+                    ),
                   ),
                 ],
             ],
@@ -126,14 +149,32 @@ class _PraiseSectionState extends State<PraiseSection> {
   }
 }
 
+/// 컴플레인 처리 단계 (칭찬에는 쓰지 않는다)
+enum _Status {
+  pending('미처리'),
+  working('해결중'),
+  done('해결 완료');
+
+  const _Status(this.label);
+
+  final String label;
+
+  Color get color => switch (this) {
+    _Status.pending => AppColors.warning,
+    _Status.working => AppColors.primary,
+    _Status.done => AppColors.success,
+  };
+}
+
 /// 회원이 남긴 피드백 한 건 (칭찬 또는 컴플레인)
 class _Feedback {
-  const _Feedback({
+  _Feedback({
     required this.name,
     required this.colorValue,
     required this.text,
     required this.time,
     this.complaint = false,
+    this.status = _Status.pending,
   });
 
   final String name;
@@ -142,8 +183,14 @@ class _Feedback {
   final DateTime time;
   final bool complaint;
 
+  /// 컴플레인 처리 단계 — 상세 화면에서 바꾼다
+  _Status status;
+
   Color get color => Color(colorValue);
 }
+
+/// 컴플레인 상태 UI는 모바일에서만 — PC는 기존 화면 그대로 둔다
+bool get _showStatus => !isDesktop;
 
 /// 받은 피드백 목록 (목업). 탭을 오가도 유지되도록 모듈 전역으로 둔다.
 final _feedbacks = <_Feedback>[..._seedFeedbacks()];
@@ -215,6 +262,7 @@ List<_Feedback> _seedFeedbacks() {
       text: '기구 사용 후 정리를 부탁드리고 싶어요',
       time: at(1, 16, 40),
       complaint: true,
+      status: _Status.working,
     ),
     _Feedback(
       name: '정예린',
@@ -222,6 +270,7 @@ List<_Feedback> _seedFeedbacks() {
       text: '수업 예약 변경이 어려웠어요',
       time: at(3, 10, 15),
       complaint: true,
+      status: _Status.done,
     ),
   ];
 }
@@ -234,8 +283,13 @@ String _formatStamp(DateTime time) {
   return '${time.month}.${time.day} $period $hour:$minute';
 }
 
-/// 피드백 줄을 누르면 전체 내용을 크게 보여준다
-void _showFeedbackDetail(BuildContext context, _Feedback feedback) {
+/// 피드백 줄을 누르면 전체 내용을 크게 보여준다.
+/// 컴플레인이면 아래에 처리 단계 버튼이 붙고, 바꾸면 [onChanged]로 목록을 새로 그린다.
+void _showFeedbackDetail(
+  BuildContext context,
+  _Feedback feedback, {
+  VoidCallback? onChanged,
+}) {
   showGeneralDialog(
     context: context,
     barrierDismissible: true,
@@ -245,52 +299,7 @@ void _showFeedbackDetail(BuildContext context, _Feedback feedback) {
     pageBuilder: (context, animation, secondaryAnimation) => Center(
       child: Material(
         type: MaterialType.transparency,
-        child: Container(
-          width: 300,
-          padding: EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: feedback.color,
-                  shape: BoxShape.circle,
-                ),
-                child: Text(
-                  feedback.name.characters.first,
-                  style: TextStyle(
-                    fontFamily: AppTextStyles.fontFamily,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              SizedBox(height: 12),
-              Text(
-                feedback.name,
-                style: AppTextStyles.body1.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              SizedBox(height: 12),
-              Text(
-                feedback.text,
-                textAlign: TextAlign.center,
-                style: AppTextStyles.body2.copyWith(height: 1.5),
-              ),
-              SizedBox(height: 12),
-              Text(_formatStamp(feedback.time), style: AppTextStyles.caption),
-            ],
-          ),
-        ),
+        child: _FeedbackDetailCard(feedback: feedback, onChanged: onChanged),
       ),
     ),
     transitionBuilder: (context, animation, secondaryAnimation, child) {
@@ -307,6 +316,180 @@ void _showFeedbackDetail(BuildContext context, _Feedback feedback) {
       );
     },
   );
+}
+
+/// 피드백 크게 보기 카드 — 컴플레인은 처리 단계를 여기서 바꾼다
+class _FeedbackDetailCard extends StatefulWidget {
+  _FeedbackDetailCard({required this.feedback, this.onChanged});
+
+  final _Feedback feedback;
+  final VoidCallback? onChanged;
+
+  @override
+  State<_FeedbackDetailCard> createState() => _FeedbackDetailCardState();
+}
+
+class _FeedbackDetailCardState extends State<_FeedbackDetailCard> {
+  /// 같은 버튼을 다시 누르면 미처리로 되돌린다 (잘못 누른 걸 취소할 방법)
+  void _pick(_Status status) {
+    setState(
+      () => widget.feedback.status = widget.feedback.status == status
+          ? _Status.pending
+          : status,
+    );
+    widget.onChanged?.call();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final feedback = widget.feedback;
+    final withStatus = feedback.complaint && _showStatus;
+
+    return Container(
+      width: 300,
+      padding: EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: feedback.color,
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              feedback.name.characters.first,
+              style: TextStyle(
+                fontFamily: AppTextStyles.fontFamily,
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          SizedBox(height: 12),
+          Text(
+            feedback.name,
+            style: AppTextStyles.body1.copyWith(fontWeight: FontWeight.w700),
+          ),
+          if (withStatus) ...[
+            SizedBox(height: 8),
+            _StatusChip(status: feedback.status),
+          ],
+          SizedBox(height: 12),
+          Text(
+            feedback.text,
+            textAlign: TextAlign.center,
+            style: AppTextStyles.body2.copyWith(height: 1.5),
+          ),
+          SizedBox(height: 12),
+          Text(_formatStamp(feedback.time), style: AppTextStyles.caption),
+          if (withStatus) ...[
+            SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: _StatusButton(
+                    status: _Status.working,
+                    selected: feedback.status == _Status.working,
+                    onTap: () => _pick(_Status.working),
+                  ),
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: _StatusButton(
+                    status: _Status.done,
+                    selected: feedback.status == _Status.done,
+                    onTap: () => _pick(_Status.done),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// 처리 단계 알약 — 목록·상세에 같이 쓴다
+class _StatusChip extends StatelessWidget {
+  _StatusChip({required this.status});
+
+  final _Status status;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: status.color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(100),
+      ),
+      child: Text(
+        status.label,
+        style: AppTextStyles.caption.copyWith(
+          fontSize: 11,
+          color: status.color,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+/// 처리 단계 버튼 — 고르면 그 단계 색으로 꽉 찬다
+class _StatusButton extends StatelessWidget {
+  _StatusButton({
+    required this.status,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _Status status;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      scale: 0.96,
+      pressedColor: selected ? null : AppColors.gray100,
+      borderRadius: BorderRadius.circular(14),
+      // 애니메이션 없이 즉시 바꾼다 (색이 서서히 빠지면 둘 다 눌린 듯 보인다)
+      child: Container(
+        height: 46,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? status.color : AppColors.gray50,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (selected) ...[
+              Icon(Icons.check_rounded, size: 15, color: Colors.white),
+              SizedBox(width: 4),
+            ],
+            Text(
+              status.label,
+              style: AppTextStyles.body2.copyWith(
+                color: selected ? Colors.white : AppColors.textSecondary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// 피드백 한 줄 — 아바타, 이름, 내용, 시각과 끝의 화살표
@@ -349,11 +532,19 @@ class _FeedbackRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  feedback.name,
-                  style: AppTextStyles.body2.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      feedback.name,
+                      style: AppTextStyles.body2.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (feedback.complaint && _showStatus) ...[
+                      SizedBox(width: 6),
+                      _StatusChip(status: feedback.status),
+                    ],
+                  ],
                 ),
                 SizedBox(height: 3),
                 Text(
@@ -436,6 +627,9 @@ class _FeedbackHistoryScreenState extends State<_FeedbackHistoryScreen> {
             .toList()
           ..sort((a, b) => b.time.compareTo(a.time));
     final title = widget.complaint ? '컴플레인' : '내게 온 칭찬';
+    final unresolved = widget.complaint && _showStatus
+        ? sorted.where((f) => f.status == _Status.pending).length
+        : 0;
 
     // 날짜가 바뀌는 지점마다 그룹 헤더를 끼워 넣는다
     final children = <Widget>[];
@@ -462,7 +656,11 @@ class _FeedbackHistoryScreenState extends State<_FeedbackHistoryScreen> {
       children.add(
         _FeedbackRow(
           feedback: feedback,
-          onTap: () => _showFeedbackDetail(context, feedback),
+          onTap: () => _showFeedbackDetail(
+            context,
+            feedback,
+            onChanged: () => setState(() {}),
+          ),
         ),
       );
     }
@@ -484,7 +682,11 @@ class _FeedbackHistoryScreenState extends State<_FeedbackHistoryScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          widget.complaint ? '받은 컴플레인 기록' : '받은 칭찬 기록',
+                          widget.complaint
+                              ? (unresolved > 0
+                                    ? '받은 컴플레인 기록 · 미처리 $unresolved건'
+                                    : '받은 컴플레인 기록')
+                              : '받은 칭찬 기록',
                           style: AppTextStyles.caption,
                         ),
                       ),
