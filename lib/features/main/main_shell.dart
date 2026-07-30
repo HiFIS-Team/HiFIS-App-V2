@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
+import '../../core/util/sf_symbols.dart';
+import '../../core/widgets/android_tab_bar.dart';
 import '../../core/widgets/app_tab_bar.dart';
 import '../../core/widgets/pressable.dart';
 import 'desktop_sidebar.dart';
@@ -208,10 +210,49 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
+  /// 안드로이드 하단바에서 고른 탭 (0~3 메인, 4~7 서브)
+  int _androidTab = 0;
+
+  /// 안드로이드: 평평한 바 + 가운데 전체 버튼(반원 메뉴)
+  Widget _buildAndroid() {
+    return Scaffold(
+      extendBody: true,
+      body: Stack(
+        children: [
+          IndexedStack(
+            index: _androidTab,
+            children: [..._mainPages, ..._subPages],
+          ),
+          // 모든 탭 위에 떠 있는 공통 글래스 헤더
+          SafeArea(
+            bottom: false,
+            child: Align(
+              alignment: Alignment.topRight,
+              child: Padding(
+                padding: EdgeInsets.only(top: 8, right: 16),
+                child: _HeaderButtons(),
+              ),
+            ),
+          ),
+          // 하단바와 반원 메뉴 (딤이 화면 전체를 덮어야 해서 한 레이어로 둔다)
+          Positioned.fill(
+            child: AndroidTabBar(
+              index: _androidTab,
+              onSelect: (i) => setState(() => _androidTab = i),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isDesktop) {
       return _buildDesktop();
+    }
+    if (!isApple) {
+      return _buildAndroid();
     }
     return Scaffold(
       extendBody: true,
