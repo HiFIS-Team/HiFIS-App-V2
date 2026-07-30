@@ -186,11 +186,15 @@ class _ProjectList extends StatelessWidget {
         ),
         Expanded(
           child: projects.isEmpty
-              ? Padding(
-                  padding: EdgeInsets.fromLTRB(20, 4, 20, 0),
-                  child: EmptyCard(
-                    icon: Icons.folder_rounded,
-                    text: '${phase.label} 프로젝트가 없어요',
+              // Expanded 안에서 카드가 세로로 늘어나지 않게 위에 붙인다
+              ? Align(
+                  alignment: Alignment.topCenter,
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(20, 4, 20, 0),
+                    child: EmptyCard(
+                      icon: Icons.folder_rounded,
+                      text: '${phase.label} 프로젝트가 없어요',
+                    ),
                   ),
                 )
               : ListView.separated(
