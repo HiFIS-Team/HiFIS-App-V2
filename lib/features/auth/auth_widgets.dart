@@ -15,6 +15,7 @@ class _AuthScaffold extends StatelessWidget {
     this.title,
     this.caption,
     this.onBack,
+    this.width = 420,
   });
 
   final List<Widget> children;
@@ -22,8 +23,8 @@ class _AuthScaffold extends StatelessWidget {
   final String? caption;
   final VoidCallback? onBack;
 
-  /// 데스크톱 카드 폭
-  static const double cardWidth = 420;
+  /// 데스크톱 카드 폭 — 입력이 많은 화면은 넓혀서 두 줄로 나눈다
+  final double width;
 
   Widget _header() => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -67,7 +68,7 @@ class _AuthScaffold extends StatelessWidget {
           child: SingleChildScrollView(
             padding: EdgeInsets.symmetric(vertical: 40),
             child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: cardWidth),
+              constraints: BoxConstraints(maxWidth: width),
               child: Container(
                 padding: EdgeInsets.fromLTRB(36, 32, 36, 36),
                 decoration: AppDecorations.card(),
@@ -244,6 +245,43 @@ class _AuthFieldState extends State<_AuthField> {
             style: AppTextStyles.caption.copyWith(color: AppColors.error),
           ),
         ],
+      ],
+    );
+  }
+}
+
+/// 짝이 되는 입력 두 칸
+///
+/// 데스크톱은 카드가 넓어 나란히 두면 화면이 짧아지고, 폰은 칸이 좁아져
+/// 못 쓰므로 위아래로 쌓는다. 한쪽에만 빨간 안내가 붙어 높이가 달라져도
+/// 위를 맞춰 라벨 줄이 어긋나지 않게 한다.
+class _FieldPair extends StatelessWidget {
+  _FieldPair({required this.left, required this.right});
+
+  final Widget left;
+  final Widget right;
+
+  /// 두 칸 사이 간격 — 세로로 쌓일 때 칸 사이 간격과 같게 둔다
+  static const double gap = 16;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!isDesktop) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          left,
+          SizedBox(height: gap),
+          right,
+        ],
+      );
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: left),
+        SizedBox(width: gap),
+        Expanded(child: right),
       ],
     );
   }
