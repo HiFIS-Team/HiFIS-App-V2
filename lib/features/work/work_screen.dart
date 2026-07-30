@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/glass_icon_button.dart';
@@ -195,26 +196,38 @@ class _WorkScreenState extends State<WorkScreen> {
               )
             else
               // 항목 탭 — 사내톡 상세 '공유된 콘텐츠' 탭과 같은 밑줄 스타일.
-              // 라벨 폭 기준으로 배치하고 spaceBetween으로 좌우·항목 간
-              // 간격을 균등하게 맞춘다.
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    for (var i = 0; i < _items.length; i++)
-                      _WorkTab(
-                        label: _items[i].label,
-                        selected: _tab == i,
-                        onTap: () => setState(() => _tab = i),
-                      ),
-                  ],
+              // 라벨 폭 기준으로 배치하고 spaceBetween으로 간격을 균등하게 맞추되,
+              // 좁은 화면에서 라벨이 서로 붙지 않게 최소 간격을 두고
+              // 그래도 모자라면 옆으로 넘길 수 있게 한다.
+              LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minWidth: constraints.maxWidth - 40,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        for (var i = 0; i < _items.length; i++) ...[
+                          if (i > 0) SizedBox(width: 16),
+                          _WorkTab(
+                            label: _items[i].label,
+                            selected: _tab == i,
+                            onTap: () => setState(() => _tab = i),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                 ),
               ),
             Container(height: 1, color: AppColors.gray100),
             Expanded(
               child: ListView(
-                padding: EdgeInsets.fromLTRB(0, 20, 0, 110),
+                padding: EdgeInsets.fromLTRB(0, 20, 0, bottomBarInset(context)),
                 children: [
                   // 탭 전환 시 콘텐츠 페이드.
                   // 체크리스트 탭(환경정비)은 점수 카드 없이 리스트만 보여준다.

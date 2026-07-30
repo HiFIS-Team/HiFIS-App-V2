@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
 
 /// 홈 화면 (디자인 시스템 데모용 샘플)
@@ -24,7 +25,7 @@ class HomeScreen extends StatelessWidget {
           SafeArea(
             bottom: false,
             child: ListView(
-              padding: EdgeInsets.fromLTRB(20, 64, 20, 110),
+              padding: EdgeInsets.fromLTRB(20, 64, 20, bottomBarInset(context)),
               children: [
                 _GreetingCard(),
                 SizedBox(height: 16),
