@@ -565,25 +565,16 @@ class _ProjectDetail extends StatelessWidget {
           ],
         ),
         SizedBox(height: 22),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              flex: 3,
-              child: _TodoCard(
-                project: project,
-                onToggle: _toggle,
-                onRemove: _remove,
-                onAssign: (todo) => _assign(context, todo),
-              ),
-            ),
-            SizedBox(width: 16),
-            Expanded(
-              flex: 2,
-              child: _ActivityCard(project: project, onComment: _comment),
-            ),
-          ],
+        // 좌우로 나누면 짧은 쪽 아래가 비어 보여서 전폭으로 쌓는다.
+        // 칸 안에 스크롤을 넣지 않고 페이지가 늘어나는 쪽을 택했다.
+        _TodoCard(
+          project: project,
+          onToggle: _toggle,
+          onRemove: _remove,
+          onAssign: (todo) => _assign(context, todo),
         ),
+        SizedBox(height: 16),
+        _ActivityCard(project: project, onComment: _comment),
       ],
     );
   }
@@ -1031,6 +1022,10 @@ class _ActivityCardState extends State<_ActivityCard> {
   final _controller = TextEditingController();
   final _focus = FocusNode();
 
+  /// 활동은 계속 쌓이므로 처음에는 최근 것만 보여준다
+  static const _fold = 5;
+  bool _expanded = false;
+
   @override
   void dispose() {
     _controller.dispose();
@@ -1049,7 +1044,9 @@ class _ActivityCardState extends State<_ActivityCard> {
 
   @override
   Widget build(BuildContext context) {
-    final events = widget.project.events;
+    final all = widget.project.events;
+    final events = _expanded ? all : all.take(_fold).toList();
+    final hidden = all.length - events.length;
 
     return Container(
       padding: EdgeInsets.fromLTRB(20, 18, 20, 16),
@@ -1057,11 +1054,24 @@ class _ActivityCardState extends State<_ActivityCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('활동', style: AppTextStyles.label),
+          Row(
+            children: [
+              Text('활동', style: AppTextStyles.label),
+              SizedBox(width: 6),
+              Text(
+                '${all.length}',
+                style: AppTextStyles.label.copyWith(
+                  color: AppColors.textTertiary,
+                ),
+              ),
+            ],
+          ),
           SizedBox(height: 12),
           // 댓글 입력
           Row(
             children: [
+              _Avatar(name: _me, size: 34),
+              SizedBox(width: 10),
               Expanded(
                 child: Container(
                   padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -1182,6 +1192,24 @@ class _ActivityCardState extends State<_ActivityCard> {
                   ],
                 ),
               ),
+          if (hidden > 0)
+            Padding(
+              padding: EdgeInsets.only(top: 6),
+              child: Pressable(
+                onTap: () => setState(() => _expanded = true),
+                scale: 0.99,
+                pressedColor: AppColors.gray50,
+                borderRadius: BorderRadius.circular(10),
+                padding: EdgeInsets.symmetric(vertical: 9),
+                child: Text(
+                  '이전 활동 $hidden개 더 보기',
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
