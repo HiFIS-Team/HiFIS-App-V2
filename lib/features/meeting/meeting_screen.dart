@@ -12,6 +12,7 @@ import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/avatar.dart';
 import '../../core/widgets/block_editor.dart';
 import '../../core/widgets/empty_card.dart';
+import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/markdown_view.dart';
 import '../../core/widgets/pressable.dart';
 
@@ -107,6 +108,8 @@ class _MeetingScreenState extends State<MeetingScreen> {
                     editing: _startEditing,
                     onChanged: () => setState(() {}),
                     onDelete: () => _delete(selected),
+                    onToggleEdit: () =>
+                        setState(() => _startEditing = !_startEditing),
                   ),
           ),
         ],
@@ -338,17 +341,19 @@ class _NoteView extends StatefulWidget {
     required this.editing,
     required this.onChanged,
     required this.onDelete,
+    required this.onToggleEdit,
     this.phone = false,
   });
 
   final _Note note;
 
-  /// 새로 만든 회의록이면 편집 상태로 시작한다
+  /// 편집 상태 — 편집/완료 버튼을 어디에 두든 화면 쪽이 들고 있다
   final bool editing;
   final VoidCallback onChanged;
   final VoidCallback onDelete;
+  final VoidCallback onToggleEdit;
 
-  /// 폰은 폭이 좁아 편집 버튼을 제목 위로 올린다
+  /// 폰은 편집·삭제를 헤더 글래스 버튼으로 올려서 본문에는 그리지 않는다
   final bool phone;
 
   @override
@@ -359,7 +364,7 @@ class _NoteViewState extends State<_NoteView> {
   late final _title = TextEditingController(text: widget.note.title);
   final _titleFocus = FocusNode();
 
-  late bool _editing = widget.editing;
+  bool get _editing => widget.editing;
 
   /// 마크다운 문법 도움말 펼침 상태
   bool _help = false;
@@ -368,6 +373,13 @@ class _NoteViewState extends State<_NoteView> {
   void initState() {
     super.initState();
     if (_editing) _titleFocus.requestFocus();
+  }
+
+  @override
+  void didUpdateWidget(_NoteView old) {
+    super.didUpdateWidget(old);
+    // 헤더 버튼으로 편집을 켰을 때도 제목부터 입력할 수 있게 한다
+    if (_editing && !old.editing) _titleFocus.requestFocus();
   }
 
   @override
@@ -387,7 +399,7 @@ class _NoteViewState extends State<_NoteView> {
 
   void _toggleEdit() {
     if (_editing) _sync();
-    setState(() => _editing = !_editing);
+    widget.onToggleEdit();
   }
 
   Future<void> _pickDate() async {
@@ -516,12 +528,10 @@ class _NoteViewState extends State<_NoteView> {
             )
           : EdgeInsets.fromLTRB(32, 64, 32, bottomBarInset(context)),
       children: [
-        // 폰은 제목이 길어 버튼과 나란히 두면 눌린다 — 버튼을 위로 올린다
-        if (phone) ...[
-          Align(alignment: Alignment.centerRight, child: actions),
-          SizedBox(height: 8),
-          title,
-        ] else
+        // 폰은 편집·삭제가 헤더 글래스 버튼으로 올라가 제목만 남는다
+        if (phone)
+          title
+        else
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

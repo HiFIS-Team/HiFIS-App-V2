@@ -235,15 +235,34 @@ class _NoticePage extends StatefulWidget {
 }
 
 class _NoticePageState extends State<_NoticePage> {
+  late bool _editing = widget.editing;
+
   @override
   Widget build(BuildContext context) {
     return PhoneDetailScaffold(
       title: '공지',
+      // 편집·삭제는 헤더 글래스 버튼으로 올린다
+      actions: [
+        if (_editing)
+          GlassIconButton(
+            symbol: 'trash',
+            symbolColor: AppColors.error,
+            onPressed: () => Navigator.pop(context, 'delete'),
+          ),
+        GlassIconButton(
+          // 심볼이 바뀌어도 네이티브 버튼을 새로 만들지 않게 고정 식별자를 준다
+          stableId: 'edit',
+          symbol: _editing ? 'checkmark' : 'square.and.pencil',
+          symbolColor: _editing ? AppColors.primary : null,
+          onPressed: () => setState(() => _editing = !_editing),
+        ),
+      ],
       child: _NoticeView(
         notice: widget.notice,
-        editing: widget.editing,
+        editing: _editing,
         onChanged: () => setState(() {}),
         onDelete: () => Navigator.pop(context, 'delete'),
+        onToggleEdit: () => setState(() => _editing = !_editing),
         phone: true,
       ),
     );

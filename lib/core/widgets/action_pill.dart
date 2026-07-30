@@ -57,10 +57,18 @@ class ActionPill extends StatelessWidget {
 /// 본문은 스스로 스크롤하는 위젯([ListView] 등)을 넘기고,
 /// 위쪽 여백은 [topPadding]만큼 잡아 콘텐츠가 헤더 뒤로 지나가게 한다.
 class PhoneDetailScaffold extends StatefulWidget {
-  PhoneDetailScaffold({super.key, required this.title, required this.child});
+  PhoneDetailScaffold({
+    super.key,
+    required this.title,
+    required this.child,
+    this.actions = const [],
+  });
 
   final String title;
   final Widget child;
+
+  /// 우측 상단 글래스 버튼들 (편집·삭제 등)
+  final List<Widget> actions;
 
   /// 본문 스크롤 뷰가 위쪽에 잡아야 할 여백 (제목 아래로 내용이 시작된다)
   static const double topPadding = 68;
@@ -118,6 +126,25 @@ class _PhoneDetailScaffoldState extends State<PhoneDetailScaffold> {
               ),
             ),
           ),
+          if (widget.actions.isNotEmpty)
+            SafeArea(
+              bottom: false,
+              child: Align(
+                alignment: Alignment.topRight,
+                child: Padding(
+                  padding: EdgeInsets.only(top: 8, right: 16),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (var i = 0; i < widget.actions.length; i++) ...[
+                        if (i > 0) SizedBox(width: 10),
+                        widget.actions[i],
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

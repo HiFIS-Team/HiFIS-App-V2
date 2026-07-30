@@ -12,6 +12,7 @@ import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/avatar.dart';
 import '../../core/widgets/block_editor.dart';
 import '../../core/widgets/empty_card.dart';
+import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/markdown_view.dart';
 import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/pressable.dart';
@@ -147,6 +148,8 @@ class _NoticeScreenState extends State<NoticeScreen> {
                     editing: _startEditing,
                     onChanged: () => setState(() {}),
                     onDelete: () => _delete(selected),
+                    onToggleEdit: () =>
+                        setState(() => _startEditing = !_startEditing),
                   ),
           ),
         ],
@@ -431,15 +434,19 @@ class _NoticeView extends StatefulWidget {
     required this.editing,
     required this.onChanged,
     required this.onDelete,
+    required this.onToggleEdit,
     this.phone = false,
   });
 
   final _Notice notice;
+
+  /// 편집 상태 — 편집/완료 버튼을 어디에 두든 화면 쪽이 들고 있다
   final bool editing;
   final VoidCallback onChanged;
   final VoidCallback onDelete;
+  final VoidCallback onToggleEdit;
 
-  /// 폰은 폭이 좁아 편집 버튼을 제목 위로 올린다
+  /// 폰은 편집·삭제를 헤더 글래스 버튼으로 올려서 본문에는 그리지 않는다
   final bool phone;
 
   @override
@@ -450,13 +457,20 @@ class _NoticeViewState extends State<_NoticeView> {
   late final _title = TextEditingController(text: widget.notice.title);
   final _titleFocus = FocusNode();
 
-  late bool _editing = widget.editing;
+  bool get _editing => widget.editing;
   bool _help = false;
 
   @override
   void initState() {
     super.initState();
     if (_editing) _titleFocus.requestFocus();
+  }
+
+  @override
+  void didUpdateWidget(_NoticeView old) {
+    super.didUpdateWidget(old);
+    // 헤더 버튼으로 편집을 켰을 때도 제목부터 입력할 수 있게 한다
+    if (_editing && !old.editing) _titleFocus.requestFocus();
   }
 
   @override
@@ -473,7 +487,7 @@ class _NoticeViewState extends State<_NoticeView> {
 
   void _toggleEdit() {
     if (_editing) _sync();
-    setState(() => _editing = !_editing);
+    widget.onToggleEdit();
   }
 
   /// 본문의 체크박스를 눌렀을 때 그 줄만 바꿔 쓴다
