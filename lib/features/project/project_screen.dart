@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/data/staff.dart';
 import '../../core/theme/app_colors.dart';
@@ -2401,6 +2402,8 @@ void _showMemberManager(
   _Project project,
   VoidCallback onChanged,
 ) {
+  // 고를 때마다 뒤 화면까지 다시 그리면 한 번 누른 게 두 번 반응한 것처럼 보인다.
+  // 팝업 안에서만 갱신하고, 닫을 때 한 번만 위로 알린다.
   showAppDialog<void>(
     context,
     (context) => StatefulBuilder(
@@ -2438,14 +2441,14 @@ void _showMemberManager(
                       project.members.add(staff.name);
                     }
                   });
-                  onChanged();
+                  HapticFeedback.selectionClick();
                 },
               ),
           ],
         ),
       ),
     ),
-  );
+  ).then((_) => onChanged());
 }
 
 /// 멤버 관리 한 줄 — 오른쪽 동그라미로 참여 여부를 보여준다
