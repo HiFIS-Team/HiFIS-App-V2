@@ -116,61 +116,51 @@ final _days = <_Day>[..._seedDays()];
 
 final _leaves = <_Leave>[..._seedLeaves()];
 
-/// 이번 달 1일부터 오늘까지 채운다
+/// 지난달 전체와 이번 달 오늘까지를 채운다 (달력에서 앞뒤로 넘겨볼 수 있게)
 List<_Day> _seedDays() {
   final now = DateTime.now();
-  final days = <_Day>[];
+  final lastMonth = DateTime(now.year, now.month - 1);
+  final lastMonthDays = DateTime(now.year, now.month, 0).day;
 
-  // 날짜마다 같은 결과가 나오도록 일자를 씨앗처럼 쓴다 (난수를 쓰면 빌드마다 바뀐다)
-  for (var day = 1; day <= now.day; day++) {
-    final date = DateTime(now.year, now.month, day);
+  return [
+    for (var day = 1; day <= lastMonthDays; day++)
+      _seedDay(lastMonth.year, lastMonth.month, day),
+    for (var day = 1; day <= now.day; day++) _seedDay(now.year, now.month, day),
+  ];
+}
 
-    if (date.weekday == DateTime.sunday) {
-      days.add(_Day(date: date, status: _DayStatus.off));
-      continue;
-    }
+/// 하루치 목업 기록
+///
+/// 날짜를 씨앗처럼 써서 값을 정한다. 난수를 쓰면 화면을 다시 그릴 때마다
+/// 기록이 바뀌어 버린다.
+_Day _seedDay(int year, int month, int day) {
+  final date = DateTime(year, month, day);
 
-    // 월차 쓴 날 하나를 섞어둔다
-    if (day == 11) {
-      days.add(_Day(date: date, status: _DayStatus.leave));
-      continue;
-    }
-    if (day == 18) {
-      days.add(_Day(date: date, status: _DayStatus.absent));
-      continue;
-    }
-
-    final lateDay = day % 9 == 4;
-    final earlyDay = day % 7 == 5;
-    final checkIn = DateTime(
-      now.year,
-      now.month,
-      day,
-      _startHour,
-      lateDay ? 24 : (day % 5) * 2,
-    );
-    final checkOut = DateTime(
-      now.year,
-      now.month,
-      day,
-      earlyDay ? _endHour - 1 : _endHour,
-      earlyDay ? 40 : 5 + (day % 4) * 7,
-    );
-
-    days.add(
-      _Day(
-        date: date,
-        status: lateDay
-            ? _DayStatus.late
-            : earlyDay
-            ? _DayStatus.early
-            : _DayStatus.normal,
-        checkIn: checkIn,
-        checkOut: checkOut,
-      ),
-    );
+  if (date.weekday == DateTime.sunday) {
+    return _Day(date: date, status: _DayStatus.off);
   }
-  return days;
+  if (day == 11) return _Day(date: date, status: _DayStatus.leave);
+  if (day == 18) return _Day(date: date, status: _DayStatus.absent);
+
+  final late = (day + month) % 9 == 4;
+  final early = (day + month) % 7 == 5;
+
+  return _Day(
+    date: date,
+    status: late
+        ? _DayStatus.late
+        : early
+        ? _DayStatus.early
+        : _DayStatus.normal,
+    checkIn: DateTime(year, month, day, _startHour, late ? 24 : (day % 5) * 2),
+    checkOut: DateTime(
+      year,
+      month,
+      day,
+      early ? _endHour - 1 : _endHour,
+      early ? 40 : 5 + (day % 4) * 7,
+    ),
+  );
 }
 
 List<_Leave> _seedLeaves() {
@@ -228,6 +218,10 @@ String _duration(Duration value) {
   if (minutes == 0) return '$hours시간';
   return '$hours시간 $minutes분';
 }
+
+/// 달력 칸에 들어갈 짧은 근무 시간 — '8:08'
+String _shortDuration(Duration value) =>
+    '${value.inHours}:${(value.inMinutes % 60).toString().padLeft(2, '0')}';
 
 /// '09:02' 형태
 String _clock(DateTime? time) => time == null
