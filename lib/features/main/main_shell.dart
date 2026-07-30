@@ -17,6 +17,7 @@ import '../../core/widgets/lazy_indexed_stack.dart';
 import '../approval/approval_screen.dart';
 import '../documents/document_screen.dart';
 import '../attendance/attendance_barcode_overlay.dart';
+import '../attendance/attendance_screen.dart';
 import '../home/home_screen.dart';
 import '../meeting/meeting_screen.dart';
 import '../messages/desktop_chat_screen.dart';
@@ -99,7 +100,7 @@ class _MainShellState extends State<MainShell> {
   }
 
   List<Widget> get _subPages => [
-    PlaceholderScreen(emoji: '🗓️', title: '근태·월차'),
+    AttendanceScreen(),
     PlaceholderScreen(emoji: '💰', title: '급여'),
     NoticeScreen(),
     PlaceholderScreen(emoji: '🏆', title: '랭킹'),
@@ -142,7 +143,7 @@ class _MainShellState extends State<MainShell> {
     DocumentScreen(),
     ApprovalScreen(),
     PlaceholderScreen(emoji: '👥', title: '직원'),
-    PlaceholderScreen(emoji: '🗓️', title: '근태·월차'),
+    AttendanceScreen(),
     PlaceholderScreen(emoji: '💰', title: '급여'),
     NoticeScreen(),
     PlaceholderScreen(emoji: '🏆', title: '랭킹'),

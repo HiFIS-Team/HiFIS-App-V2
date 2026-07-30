@@ -38,16 +38,16 @@ class PhoneListScaffold extends StatefulWidget {
   PhoneListScaffold({
     super.key,
     required this.title,
-    required this.count,
     required this.children,
+    this.count,
     this.filter,
     this.onCreate,
   });
 
   final String title;
 
-  /// 타이틀 옆에 흐리게 붙는 개수
-  final int count;
+  /// 타이틀 옆에 흐리게 붙는 개수 (없으면 안 그린다)
+  final int? count;
 
   /// 타이틀 아래 필터 (단계 탭·전체/안읽음 전환 등)
   final Widget? filter;
@@ -87,13 +87,18 @@ class _PhoneListScaffoldState extends State<PhoneListScaffold> {
     return Row(
       children: [
         Text(widget.title, style: AppTextStyles.title1),
-        SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            '${widget.count}',
-            style: AppTextStyles.title2.copyWith(color: AppColors.textTertiary),
+        if (widget.count != null) ...[
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '${widget.count}',
+              style: AppTextStyles.title2.copyWith(
+                color: AppColors.textTertiary,
+              ),
+            ),
           ),
-        ),
+        ] else
+          Spacer(),
       ],
     );
   }
