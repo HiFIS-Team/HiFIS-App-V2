@@ -20,6 +20,7 @@ import '../work/work_screen.dart';
 import '../messages/message_screen.dart';
 import '../notifications/notification_screen.dart';
 import '../profile/profile_screen.dart';
+import '../project/project_screen.dart';
 
 /// 하단 탭바와 탭별 화면을 관리하는 루트 셸
 ///
@@ -101,7 +102,7 @@ class _MainShellState extends State<MainShell> {
   List<Widget> get _desktopPages => [
     HomeScreen(),
     WorkScreen(),
-    PlaceholderScreen(emoji: '📁', title: '프로젝트'),
+    ProjectScreen(),
     PlaceholderScreen(emoji: '📅', title: '일정'),
     PlaceholderScreen(emoji: '📝', title: '회의록'),
     PlaceholderScreen(emoji: '🗂️', title: '문서함'),

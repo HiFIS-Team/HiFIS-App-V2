@@ -1,0 +1,1785 @@
+import 'package:flutter/material.dart';
+
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_decorations.dart';
+import '../../core/theme/app_text_styles.dart';
+import '../../core/util/layout.dart';
+import '../../core/util/platform.dart';
+import '../../core/widgets/app_toast.dart';
+import '../../core/widgets/mode_switch.dart';
+import '../../core/widgets/placeholder_screen.dart';
+import '../../core/widgets/pressable.dart';
+
+/// 프로젝트 화면 (목업)
+///
+/// 데스크톱은 좌측 목록 + 우측 상세 2단 구조(사내톡 전체보기와 같은 결).
+/// 진행률은 따로 입력받지 않고 할 일 체크 비율로 자동 계산한다.
+/// 모바일 화면은 아직 준비 중 — PC를 먼저 다듬는다.
+class ProjectScreen extends StatefulWidget {
+  ProjectScreen({super.key});
+
+  @override
+  State<ProjectScreen> createState() => _ProjectScreenState();
+}
+
+class _ProjectScreenState extends State<ProjectScreen> {
+  /// true면 완료 목록
+  bool _finished = false;
+
+  /// 선택한 프로젝트 (목록이 바뀌면 첫 항목으로 되돌린다)
+  _Project? _selected;
+
+  List<_Project> get _visible {
+    final list = _projects.where((p) => p.finished == _finished).toList()
+      ..sort((a, b) => a.due.compareTo(b.due));
+    return list;
+  }
+
+  /// 데이터가 바뀌어도 선택이 목록 밖으로 나가지 않게 맞춰준다
+  _Project? _syncSelection(List<_Project> list) {
+    if (list.isEmpty) return null;
+    if (_selected != null && list.contains(_selected)) return _selected;
+    return list.first;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!isDesktop) return PlaceholderScreen(emoji: '📁', title: '프로젝트');
+
+    final list = _visible;
+    final selected = _syncSelection(list);
+
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      body: Row(
+        children: [
+          SizedBox(
+            width: 320,
+            child: _ProjectList(
+              projects: list,
+              selected: selected,
+              finished: _finished,
+              onFilter: (v) => setState(() {
+                _finished = v;
+                _selected = null;
+              }),
+              onSelect: (p) => setState(() => _selected = p),
+            ),
+          ),
+          Container(width: 1, color: AppColors.gray100),
+          Expanded(
+            child: selected == null
+                ? _EmptyDetail(finished: _finished)
+                : _ProjectDetail(
+                    // 프로젝트를 바꾸면 상세를 새로 그린다 (스크롤·입력 초기화)
+                    key: ValueKey(selected.name),
+                    project: selected,
+                    onChanged: () => setState(() {}),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── 좌측 목록 ──
+
+class _ProjectList extends StatelessWidget {
+  _ProjectList({
+    required this.projects,
+    required this.selected,
+    required this.finished,
+    required this.onFilter,
+    required this.onSelect,
+  });
+
+  final List<_Project> projects;
+  final _Project? selected;
+  final bool finished;
+  final ValueChanged<bool> onFilter;
+  final ValueChanged<_Project> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 상단 글래스 헤더 버튼 영역만큼 비워둔다
+        SizedBox(height: 64),
+        Padding(
+          padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+          child: Row(
+            children: [
+              Text('프로젝트', style: AppTextStyles.title2),
+              SizedBox(width: 8),
+              Text(
+                '${projects.length}',
+                style: AppTextStyles.title3.copyWith(
+                  color: AppColors.textTertiary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+          child: ModeSwitch(
+            left: '진행 중',
+            right: '완료',
+            value: finished,
+            onChanged: onFilter,
+          ),
+        ),
+        Expanded(
+          child: projects.isEmpty
+              ? Padding(
+                  padding: EdgeInsets.fromLTRB(20, 24, 20, 0),
+                  child: Text(
+                    finished ? '완료한 프로젝트가 없어요' : '진행 중인 프로젝트가 없어요',
+                    style: AppTextStyles.body2.copyWith(
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                )
+              : ListView.separated(
+                  padding: EdgeInsets.fromLTRB(12, 0, 12, 24),
+                  itemCount: projects.length,
+                  separatorBuilder: (_, _) => SizedBox(height: 4),
+                  itemBuilder: (context, i) => _ProjectTile(
+                    project: projects[i],
+                    selected: projects[i] == selected,
+                    onTap: () => onSelect(projects[i]),
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 목록 카드 한 장 — 이름·진행률 막대·D-day·참여자
+class _ProjectTile extends StatefulWidget {
+  _ProjectTile({
+    required this.project,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _Project project;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  State<_ProjectTile> createState() => _ProjectTileState();
+}
+
+class _ProjectTileState extends State<_ProjectTile> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final project = widget.project;
+    final dday = _dday(project.due);
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        // 애니메이션 없이 즉시 칠한다 (색이 서서히 빠지면 두 칸이 같이 켜진 듯 보인다)
+        child: Container(
+          padding: EdgeInsets.fromLTRB(12, 12, 12, 14),
+          decoration: BoxDecoration(
+            color: widget.selected
+                ? AppColors.primaryLight
+                : (_hover ? AppColors.gray50 : Colors.transparent),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: project.color,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      project.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.body2.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 6),
+                  _DdayBadge(dday: dday, finished: project.finished),
+                ],
+              ),
+              SizedBox(height: 10),
+              _ProgressBar(value: project.progress, color: project.color),
+              SizedBox(height: 8),
+              Row(
+                children: [
+                  _AvatarStack(names: project.members, size: 20),
+                  Spacer(),
+                  Text(
+                    '할 일 ${project.doneCount}/${project.todos.length}',
+                    style: AppTextStyles.caption.copyWith(fontSize: 11),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 고른 프로젝트가 없을 때의 우측 안내
+class _EmptyDetail extends StatelessWidget {
+  _EmptyDetail({required this.finished});
+
+  final bool finished;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 88,
+            height: 88,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.gray200, width: 2),
+            ),
+            child: Center(
+              child: Icon(
+                Icons.folder_rounded,
+                size: 38,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+          SizedBox(height: 20),
+          Text('프로젝트', style: AppTextStyles.title2),
+          SizedBox(height: 6),
+          Text(
+            finished ? '완료한 프로젝트가 아직 없어요' : '왼쪽에서 프로젝트를 골라주세요',
+            style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── 우측 상세 ──
+
+class _ProjectDetail extends StatelessWidget {
+  _ProjectDetail({super.key, required this.project, required this.onChanged});
+
+  final _Project project;
+
+  /// 목록의 진행률·정렬도 같이 갱신되도록 위로 알린다
+  final VoidCallback onChanged;
+
+  /// 할 일을 건드릴 때마다 활동 기록을 남긴다
+  void _log(String text) {
+    project.events.insert(
+      0,
+      _Event(author: _me, text: text, time: DateTime.now()),
+    );
+  }
+
+  void _toggle(_Todo todo) {
+    todo.done = !todo.done;
+    _log(todo.done ? "'${todo.text}' 완료" : "'${todo.text}' 완료 취소");
+    onChanged();
+  }
+
+  void _add(String text, String? assignee) {
+    project.todos.add(_Todo(text: text, assignee: assignee));
+    _log("'$text' 할 일 추가");
+    onChanged();
+  }
+
+  void _remove(_Todo todo) {
+    project.todos.remove(todo);
+    _log("'${todo.text}' 할 일 삭제");
+    onChanged();
+  }
+
+  Future<void> _assign(BuildContext context, _Todo todo) async {
+    final picked = await _pickMember(
+      context,
+      names: project.members,
+      current: todo.assignee,
+    );
+    if (picked == null) return;
+    todo.assignee = picked.isEmpty ? null : picked;
+    onChanged();
+  }
+
+  void _comment(String text) {
+    project.events.insert(
+      0,
+      _Event(author: _me, text: text, time: DateTime.now(), comment: true),
+    );
+    onChanged();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dday = _dday(project.due);
+
+    return ListView(
+      padding: EdgeInsets.fromLTRB(28, 64, 28, bottomBarInset(context)),
+      children: [
+        // 제목 줄
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 10,
+              height: 10,
+              margin: EdgeInsets.only(top: 10),
+              decoration: BoxDecoration(
+                color: project.color,
+                shape: BoxShape.circle,
+              ),
+            ),
+            SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          project.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.title1,
+                        ),
+                      ),
+                      SizedBox(width: 10),
+                      _DdayBadge(dday: dday, finished: project.finished),
+                    ],
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    '${_date(project.start)} ~ ${_date(project.due)} · 담당 ${project.owner}',
+                    style: AppTextStyles.caption,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 14),
+        Text(
+          project.desc,
+          style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
+        ),
+        SizedBox(height: 18),
+        // 진행률
+        Row(
+          children: [
+            Expanded(
+              child: _ProgressBar(
+                value: project.progress,
+                color: project.color,
+                height: 8,
+              ),
+            ),
+            SizedBox(width: 12),
+            Text(
+              '${(project.progress * 100).round()}%',
+              style: AppTextStyles.body2.copyWith(
+                fontWeight: FontWeight.w700,
+                color: project.finished ? AppColors.success : project.color,
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 20),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 3,
+              child: _TodoCard(
+                project: project,
+                onToggle: _toggle,
+                onAdd: _add,
+                onRemove: _remove,
+                onAssign: (todo) => _assign(context, todo),
+              ),
+            ),
+            SizedBox(width: 16),
+            Expanded(
+              flex: 2,
+              child: Column(
+                children: [
+                  _MemberCard(project: project, onChanged: onChanged),
+                  SizedBox(height: 16),
+                  _FileCard(project: project),
+                ],
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 16),
+        _ActivityCard(project: project, onComment: _comment),
+      ],
+    );
+  }
+}
+
+/// 할 일 체크리스트 — 체크 비율이 그대로 진행률이 된다
+class _TodoCard extends StatelessWidget {
+  _TodoCard({
+    required this.project,
+    required this.onToggle,
+    required this.onAdd,
+    required this.onRemove,
+    required this.onAssign,
+  });
+
+  final _Project project;
+  final ValueChanged<_Todo> onToggle;
+  final void Function(String text, String? assignee) onAdd;
+  final ValueChanged<_Todo> onRemove;
+  final ValueChanged<_Todo> onAssign;
+
+  @override
+  Widget build(BuildContext context) {
+    final todos = project.todos;
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, 18, 20, 14),
+      decoration: AppDecorations.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('할 일', style: AppTextStyles.label),
+              SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '${project.doneCount}/${todos.length}',
+                  style: AppTextStyles.label.copyWith(
+                    color: AppColors.textTertiary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 6),
+          if (todos.isEmpty)
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: 14),
+              child: Text(
+                '아직 할 일이 없어요',
+                style: AppTextStyles.body2.copyWith(
+                  color: AppColors.textTertiary,
+                ),
+              ),
+            )
+          else
+            for (var i = 0; i < todos.length; i++) ...[
+              if (i > 0) Divider(height: 1, color: AppColors.divider),
+              _TodoRow(
+                todo: todos[i],
+                onToggle: () => onToggle(todos[i]),
+                onRemove: () => onRemove(todos[i]),
+                onAssign: () => onAssign(todos[i]),
+              ),
+            ],
+          Divider(height: 1, color: AppColors.divider),
+          _TodoComposer(members: project.members, onAdd: onAdd),
+        ],
+      ),
+    );
+  }
+}
+
+/// 할 일 한 줄 — 체크·내용·담당자, 커서를 올리면 삭제가 나온다
+class _TodoRow extends StatefulWidget {
+  _TodoRow({
+    required this.todo,
+    required this.onToggle,
+    required this.onRemove,
+    required this.onAssign,
+  });
+
+  final _Todo todo;
+  final VoidCallback onToggle;
+  final VoidCallback onRemove;
+  final VoidCallback onAssign;
+
+  @override
+  State<_TodoRow> createState() => _TodoRowState();
+}
+
+class _TodoRowState extends State<_TodoRow> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final todo = widget.todo;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: 9),
+        child: Row(
+          children: [
+            Pressable(
+              onTap: widget.onToggle,
+              scale: 0.9,
+              child: Container(
+                width: 22,
+                height: 22,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: todo.done ? AppColors.primary : Colors.transparent,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: todo.done ? AppColors.primary : AppColors.gray300,
+                    width: 1.5,
+                  ),
+                ),
+                child: todo.done
+                    ? Icon(Icons.check_rounded, size: 14, color: Colors.white)
+                    : null,
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                todo.text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.body2.copyWith(
+                  color: todo.done
+                      ? AppColors.textTertiary
+                      : AppColors.textPrimary,
+                  decoration: todo.done ? TextDecoration.lineThrough : null,
+                  decorationColor: AppColors.gray400,
+                ),
+              ),
+            ),
+            SizedBox(width: 8),
+            _AssigneeChip(name: todo.assignee, onTap: widget.onAssign),
+            SizedBox(width: 4),
+            SizedBox(
+              width: 28,
+              child: _hover
+                  ? Pressable(
+                      onTap: widget.onRemove,
+                      scale: 0.9,
+                      child: Icon(
+                        Icons.close_rounded,
+                        size: 16,
+                        color: AppColors.gray400,
+                      ),
+                    )
+                  : null,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 담당자 알약 — 누르면 참여자 중에서 고른다
+class _AssigneeChip extends StatelessWidget {
+  _AssigneeChip({required this.name, required this.onTap});
+
+  final String? name;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final assigned = name != null;
+
+    return Pressable(
+      onTap: onTap,
+      scale: 0.96,
+      pressedColor: AppColors.gray100,
+      borderRadius: BorderRadius.circular(100),
+      padding: EdgeInsets.fromLTRB(assigned ? 3 : 8, 3, 8, 3),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (assigned) ...[_Avatar(name: name!, size: 20), SizedBox(width: 5)],
+          Text(
+            assigned ? name! : '담당자',
+            style: AppTextStyles.caption.copyWith(
+              fontSize: 12,
+              color: assigned ? AppColors.textSecondary : AppColors.gray400,
+              fontWeight: assigned ? FontWeight.w600 : FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 할 일 추가 줄 — 누르면 입력칸으로 펼쳐진다
+class _TodoComposer extends StatefulWidget {
+  _TodoComposer({required this.members, required this.onAdd});
+
+  final List<String> members;
+  final void Function(String text, String? assignee) onAdd;
+
+  @override
+  State<_TodoComposer> createState() => _TodoComposerState();
+}
+
+class _TodoComposerState extends State<_TodoComposer> {
+  final _controller = TextEditingController();
+  final _focus = FocusNode();
+  bool _open = false;
+  String? _assignee;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final text = _controller.text.trim();
+    if (text.isEmpty) {
+      setState(() => _open = false);
+      return;
+    }
+    widget.onAdd(text, _assignee);
+    _controller.clear();
+    // 연달아 적을 수 있게 담당자와 포커스는 유지한다
+    _focus.requestFocus();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_open) {
+      return Pressable(
+        onTap: () {
+          setState(() => _open = true);
+          _focus.requestFocus();
+        },
+        scale: 0.99,
+        pressedColor: AppColors.gray50,
+        borderRadius: BorderRadius.circular(10),
+        padding: EdgeInsets.symmetric(vertical: 11),
+        child: Row(
+          children: [
+            Icon(Icons.add_rounded, size: 18, color: AppColors.primary),
+            SizedBox(width: 8),
+            Text(
+              '할 일 추가',
+              style: AppTextStyles.body2.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              decoration: BoxDecoration(
+                color: AppColors.gray50,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: TextField(
+                controller: _controller,
+                focusNode: _focus,
+                style: AppTextStyles.body2,
+                cursorColor: AppColors.primary,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _submit(),
+                onTapOutside: (_) => _submit(),
+                decoration: InputDecoration(
+                  hintText: '무엇을 해야 하나요?',
+                  hintStyle: AppTextStyles.body2.copyWith(
+                    color: AppColors.gray400,
+                  ),
+                  border: InputBorder.none,
+                  isCollapsed: true,
+                ),
+              ),
+            ),
+          ),
+          SizedBox(width: 6),
+          _AssigneeChip(
+            name: _assignee,
+            onTap: () async {
+              final picked = await _pickMember(
+                context,
+                names: widget.members,
+                current: _assignee,
+              );
+              if (picked == null) return;
+              setState(() => _assignee = picked.isEmpty ? null : picked);
+              _focus.requestFocus();
+            },
+          ),
+          SizedBox(width: 4),
+          Pressable(
+            onTap: _submit,
+            scale: 0.94,
+            child: Container(
+              width: 34,
+              height: 34,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(Icons.check_rounded, size: 18, color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 참여 멤버 카드
+class _MemberCard extends StatelessWidget {
+  _MemberCard({required this.project, required this.onChanged});
+
+  final _Project project;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, 18, 20, 16),
+      decoration: AppDecorations.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('참여 멤버', style: AppTextStyles.label),
+              SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '${project.members.length}',
+                  style: AppTextStyles.label.copyWith(
+                    color: AppColors.textTertiary,
+                  ),
+                ),
+              ),
+              Pressable(
+                onTap: () => _showMemberManager(context, project, onChanged),
+                scale: 0.92,
+                pressedColor: AppColors.gray100,
+                borderRadius: BorderRadius.circular(100),
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Text(
+                  '관리',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 10),
+          for (final name in project.members)
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: 5),
+              child: Row(
+                children: [
+                  _Avatar(name: name, size: 30),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      name == _me ? '$name (나)' : name,
+                      style: AppTextStyles.body2.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  Text(_staffOf(name).role, style: AppTextStyles.caption),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 첨부 파일 카드 (업로드 연동 전 목업)
+class _FileCard extends StatelessWidget {
+  _FileCard({required this.project});
+
+  final _Project project;
+
+  IconData _icon(String name) {
+    final ext = name.split('.').last.toLowerCase();
+    return switch (ext) {
+      'pdf' => Icons.picture_as_pdf_rounded,
+      'xlsx' || 'csv' => Icons.table_chart_rounded,
+      'png' || 'jpg' || 'jpeg' => Icons.image_rounded,
+      _ => Icons.insert_drive_file_rounded,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, 18, 20, 16),
+      decoration: AppDecorations.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('파일', style: AppTextStyles.label),
+              SizedBox(width: 6),
+              Text(
+                '${project.files.length}',
+                style: AppTextStyles.label.copyWith(
+                  color: AppColors.textTertiary,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 10),
+          for (final file in project.files)
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: 5),
+              child: Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.gray50,
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: Icon(
+                      _icon(file.name),
+                      size: 17,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          file.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.body2.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          '${file.size} · ${file.uploader}',
+                          style: AppTextStyles.caption.copyWith(fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          SizedBox(height: 8),
+          // TODO: 파일 업로드 연동
+          Pressable(
+            onTap: () => AppToast.show(context, '파일 업로드는 준비 중이에요'),
+            scale: 0.99,
+            child: DottedBorderBox(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.file_upload_outlined,
+                    size: 16,
+                    color: AppColors.gray400,
+                  ),
+                  SizedBox(width: 6),
+                  Text(
+                    '파일 올리기',
+                    style: AppTextStyles.caption.copyWith(fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 점선 테두리 상자 (파일 올리기 영역)
+class DottedBorderBox extends StatelessWidget {
+  DottedBorderBox({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.gray20,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.gray200),
+      ),
+      child: child,
+    );
+  }
+}
+
+/// 댓글·활동 타임라인
+class _ActivityCard extends StatefulWidget {
+  _ActivityCard({required this.project, required this.onComment});
+
+  final _Project project;
+  final ValueChanged<String> onComment;
+
+  @override
+  State<_ActivityCard> createState() => _ActivityCardState();
+}
+
+class _ActivityCardState extends State<_ActivityCard> {
+  final _controller = TextEditingController();
+  final _focus = FocusNode();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  void _send() {
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
+    widget.onComment(text);
+    _controller.clear();
+    // 보낸 뒤에도 계속 쓸 수 있게 포커스를 되돌린다
+    _focus.requestFocus();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final events = widget.project.events;
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, 18, 20, 16),
+      decoration: AppDecorations.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('활동', style: AppTextStyles.label),
+          SizedBox(height: 12),
+          // 댓글 입력
+          Row(
+            children: [
+              _Avatar(name: _me, size: 32),
+              SizedBox(width: 10),
+              Expanded(
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.gray50,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: TextField(
+                    controller: _controller,
+                    focusNode: _focus,
+                    style: AppTextStyles.body2,
+                    cursorColor: AppColors.primary,
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => _send(),
+                    decoration: InputDecoration(
+                      hintText: '댓글을 남겨보세요',
+                      hintStyle: AppTextStyles.body2.copyWith(
+                        color: AppColors.gray400,
+                      ),
+                      border: InputBorder.none,
+                      isCollapsed: true,
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(width: 8),
+              Pressable(
+                onTap: _send,
+                scale: 0.94,
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.arrow_upward_rounded,
+                    size: 18,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 14),
+          if (events.isEmpty)
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: 10),
+              child: Text(
+                '아직 활동이 없어요',
+                style: AppTextStyles.body2.copyWith(
+                  color: AppColors.textTertiary,
+                ),
+              ),
+            )
+          else
+            for (final event in events)
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: 7),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (event.comment)
+                      _Avatar(name: event.author, size: 28)
+                    else
+                      // 시스템 기록은 아바타 대신 점으로 구분한다
+                      Container(
+                        width: 28,
+                        height: 28,
+                        alignment: Alignment.center,
+                        child: Container(
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(
+                            color: AppColors.gray300,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                event.author,
+                                style: AppTextStyles.caption.copyWith(
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              SizedBox(width: 6),
+                              Text(
+                                _relative(event.time),
+                                style: AppTextStyles.caption.copyWith(
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 1),
+                          Text(
+                            event.text,
+                            style: AppTextStyles.body2.copyWith(
+                              color: event.comment
+                                  ? AppColors.textPrimary
+                                  : AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── 공통 조각 ──
+
+/// D-day 배지 — 임박할수록 빨개진다
+class _DdayBadge extends StatelessWidget {
+  _DdayBadge({required this.dday, required this.finished});
+
+  final int dday;
+  final bool finished;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = finished
+        ? AppColors.success
+        : dday <= 2
+        ? AppColors.error
+        : dday <= 7
+        ? AppColors.warning
+        : AppColors.primary;
+    final label = finished
+        ? '완료'
+        : dday == 0
+        ? 'D-DAY'
+        : dday > 0
+        ? 'D-$dday'
+        : 'D+${-dday}';
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(100),
+      ),
+      child: Text(
+        label,
+        style: AppTextStyles.caption.copyWith(
+          fontSize: 11,
+          color: color,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+/// 진행률 막대
+class _ProgressBar extends StatelessWidget {
+  _ProgressBar({required this.value, required this.color, this.height = 5});
+
+  final double value;
+  final Color color;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(100),
+      child: LinearProgressIndicator(
+        value: value,
+        minHeight: height,
+        backgroundColor: AppColors.gray100,
+        valueColor: AlwaysStoppedAnimation(
+          value >= 1 ? AppColors.success : color,
+        ),
+      ),
+    );
+  }
+}
+
+/// 이름 첫 글자 동그라미
+class _Avatar extends StatelessWidget {
+  _Avatar({required this.name, this.size = 24});
+
+  final String name;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: _staffOf(name).color,
+        shape: BoxShape.circle,
+      ),
+      child: Text(
+        name.characters.first,
+        style: TextStyle(
+          fontFamily: AppTextStyles.fontFamily,
+          fontSize: size * 0.42,
+          fontWeight: FontWeight.w600,
+          color: Colors.white,
+        ),
+      ),
+    );
+  }
+}
+
+/// 참여자 아바타 겹쳐 보이기 (넘치면 +N)
+class _AvatarStack extends StatelessWidget {
+  _AvatarStack({required this.names, this.size = 22});
+
+  final List<String> names;
+  final double size;
+
+  /// 이보다 많으면 나머지는 +N으로 접는다
+  static const _max = 4;
+
+  @override
+  Widget build(BuildContext context) {
+    final shown = names.take(_max).toList();
+    final rest = names.length - shown.length;
+    final step = size * 0.72;
+
+    return SizedBox(
+      height: size,
+      width: shown.length * step + (rest > 0 ? step + size * 0.4 : size - step),
+      child: Stack(
+        children: [
+          for (var i = 0; i < shown.length; i++)
+            Positioned(
+              left: i * step,
+              child: Container(
+                padding: EdgeInsets.all(1.5),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  shape: BoxShape.circle,
+                ),
+                child: _Avatar(name: shown[i], size: size - 3),
+              ),
+            ),
+          if (rest > 0)
+            Positioned(
+              left: shown.length * step,
+              child: Container(
+                width: size,
+                height: size,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.gray100,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.surface, width: 1.5),
+                ),
+                child: Text(
+                  '+$rest',
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.fontFamily,
+                    fontSize: size * 0.38,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── 팝업 ──
+
+/// 담당자 고르기 — 고르면 이름, '담당자 없음'이면 빈 문자열, 취소면 null
+Future<String?> _pickMember(
+  BuildContext context, {
+  required List<String> names,
+  String? current,
+}) {
+  return showDialog<String>(
+    context: context,
+    barrierColor: Colors.black.withValues(alpha: 0.45),
+    builder: (context) => Center(
+      child: Material(
+        type: MaterialType.transparency,
+        child: Container(
+          width: 280,
+          padding: EdgeInsets.fromLTRB(16, 18, 16, 12),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 6),
+                child: Text('담당자 선택', style: AppTextStyles.title3),
+              ),
+              SizedBox(height: 8),
+              for (final name in names)
+                _PickRow(
+                  name: name,
+                  role: _staffOf(name).role,
+                  selected: name == current,
+                  onTap: () => Navigator.pop(context, name),
+                ),
+              Divider(height: 12, color: AppColors.divider),
+              Pressable(
+                onTap: () => Navigator.pop(context, ''),
+                scale: 0.98,
+                pressedColor: AppColors.gray50,
+                borderRadius: BorderRadius.circular(12),
+                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                child: Text(
+                  '담당자 없음',
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.textTertiary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// 담당자 목록 한 줄
+class _PickRow extends StatelessWidget {
+  _PickRow({
+    required this.name,
+    required this.role,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String name;
+  final String role;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      scale: 0.98,
+      pressedColor: AppColors.gray100,
+      borderRadius: BorderRadius.circular(12),
+      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 7),
+      child: Row(
+        children: [
+          _Avatar(name: name, size: 30),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              name,
+              style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
+          Text(role, style: AppTextStyles.caption),
+          if (selected) ...[
+            SizedBox(width: 8),
+            Icon(Icons.check_rounded, size: 16, color: AppColors.primary),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// 참여 멤버 관리 — 직원을 눌러 넣고 뺀다
+void _showMemberManager(
+  BuildContext context,
+  _Project project,
+  VoidCallback onChanged,
+) {
+  showDialog<void>(
+    context: context,
+    barrierColor: Colors.black.withValues(alpha: 0.45),
+    builder: (context) => Center(
+      child: Material(
+        type: MaterialType.transparency,
+        child: StatefulBuilder(
+          builder: (context, setLocal) => Container(
+            width: 300,
+            padding: EdgeInsets.fromLTRB(16, 18, 16, 14),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 6),
+                  child: Text('참여 멤버', style: AppTextStyles.title3),
+                ),
+                SizedBox(height: 8),
+                for (final staff in _staff)
+                  _MemberToggleRow(
+                    staff: staff,
+                    joined: project.members.contains(staff.name),
+                    onTap: () {
+                      setLocal(() {
+                        if (project.members.contains(staff.name)) {
+                          project.members.remove(staff.name);
+                          // 빠진 사람이 맡고 있던 할 일은 담당자를 비운다
+                          for (final todo in project.todos) {
+                            if (todo.assignee == staff.name) {
+                              todo.assignee = null;
+                            }
+                          }
+                        } else {
+                          project.members.add(staff.name);
+                        }
+                      });
+                      onChanged();
+                    },
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// 멤버 관리 한 줄 — 오른쪽 동그라미로 참여 여부를 보여준다
+class _MemberToggleRow extends StatelessWidget {
+  _MemberToggleRow({
+    required this.staff,
+    required this.joined,
+    required this.onTap,
+  });
+
+  final _Staff staff;
+  final bool joined;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      scale: 0.98,
+      pressedColor: AppColors.gray100,
+      borderRadius: BorderRadius.circular(12),
+      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 7),
+      child: Row(
+        children: [
+          _Avatar(name: staff.name, size: 32),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              staff.name == _me ? '${staff.name} (나)' : staff.name,
+              style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
+          Text(staff.role, style: AppTextStyles.caption),
+          SizedBox(width: 10),
+          Container(
+            width: 22,
+            height: 22,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: joined ? AppColors.primary : Colors.transparent,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: joined ? AppColors.primary : AppColors.gray300,
+                width: 1.5,
+              ),
+            ),
+            child: joined
+                ? Icon(Icons.check_rounded, size: 14, color: Colors.white)
+                : null,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── 데이터 (목업) ──
+
+const _me = '김은후';
+
+/// 직원 명단 — 아바타 색은 사내톡·동료 평가와 같은 색을 쓴다
+class _Staff {
+  const _Staff(this.name, this.role, this.color);
+
+  final String name;
+  final String role;
+  final Color color;
+}
+
+const _staff = [
+  _Staff(_me, '트레이너', AppColors.primary),
+  _Staff('이준승', '대표', Color(0xFF7C5CFC)),
+  _Staff('김피스', '개발', Color(0xFF00A8B5)),
+  _Staff('민중기', '점장', AppColors.success),
+  _Staff('박준현', '트레이너', AppColors.warning),
+  _Staff('유찬빈', '트레이너', Color(0xFF5C7CFA)),
+  _Staff('전상현', 'FC', Color(0xFFE0447C)),
+];
+
+_Staff _staffOf(String name) => _staff.firstWhere(
+  (s) => s.name == name,
+  orElse: () => _Staff(name, '', AppColors.gray400),
+);
+
+/// 할 일 한 건
+class _Todo {
+  _Todo({required this.text, this.assignee, this.done = false});
+
+  String text;
+  String? assignee;
+  bool done;
+}
+
+/// 첨부 파일 한 건
+class _File {
+  const _File(this.name, this.size, this.uploader);
+
+  final String name;
+  final String size;
+  final String uploader;
+}
+
+/// 활동 기록 한 줄 (댓글이면 comment = true)
+class _Event {
+  _Event({
+    required this.author,
+    required this.text,
+    required this.time,
+    this.comment = false,
+  });
+
+  final String author;
+  final String text;
+  final DateTime time;
+  final bool comment;
+}
+
+/// 프로젝트 한 건 — 진행률은 할 일에서 계산한다
+class _Project {
+  _Project({
+    required this.name,
+    required this.desc,
+    required this.color,
+    required this.owner,
+    required this.start,
+    required this.due,
+    required this.members,
+    required this.todos,
+    required this.files,
+    required this.events,
+  });
+
+  final String name;
+  final String desc;
+  final Color color;
+  final String owner;
+  final DateTime start;
+  final DateTime due;
+  final List<String> members;
+  final List<_Todo> todos;
+  final List<_File> files;
+  final List<_Event> events;
+
+  int get doneCount => todos.where((t) => t.done).length;
+
+  double get progress => todos.isEmpty ? 0 : doneCount / todos.length;
+
+  /// 할 일을 다 끝냈으면 완료로 본다 (상태를 따로 관리하지 않는다)
+  bool get finished => todos.isNotEmpty && doneCount == todos.length;
+}
+
+/// 목업 프로젝트. 탭을 오가도 유지되도록 모듈 전역으로 둔다.
+final _projects = <_Project>[..._seedProjects()];
+
+List<_Project> _seedProjects() {
+  final now = DateTime.now();
+  DateTime day(int offset) =>
+      DateTime(now.year, now.month, now.day + offset, 18);
+  DateTime ago(int hours) => now.subtract(Duration(hours: hours));
+
+  return [
+    _Project(
+      name: '여름 회원 이벤트 프로모션',
+      desc: '7~8월 신규 회원 유치를 위한 여름 프로모션. 포스터·SNS·경품까지 한 번에 진행합니다.',
+      color: AppColors.error,
+      owner: '민중기',
+      start: day(-12),
+      due: day(2),
+      members: [_me, '민중기', '이준승', '전상현', '박준현'],
+      todos: [
+        _Todo(text: '포스터 시안 확정', assignee: '이준승', done: true),
+        _Todo(text: '경품 업체 선정', assignee: '박준현', done: true),
+        _Todo(text: '인스타 예약 발행', assignee: '전상현'),
+        _Todo(text: '현수막 설치', assignee: _me),
+        _Todo(text: '이벤트 안내 문자 발송', assignee: '민중기'),
+      ],
+      files: [
+        _File('여름_이벤트_포스터_시안.pdf', '2.4MB', '이준승'),
+        _File('경품_견적서.xlsx', '88KB', '박준현'),
+      ],
+      events: [
+        _Event(
+          author: '민중기',
+          text: '현수막은 정문 쪽으로 걸어주세요',
+          time: ago(3),
+          comment: true,
+        ),
+        _Event(author: '박준현', text: "'경품 업체 선정' 완료", time: ago(20)),
+        _Event(author: '이준승', text: "'포스터 시안 확정' 완료", time: ago(46)),
+      ],
+    ),
+    _Project(
+      name: 'PT룸 장비 교체',
+      desc: '노후된 PT룸 소도구와 벤치를 교체합니다. 예산 승인 후 순차 반입.',
+      color: AppColors.warning,
+      owner: '박준현',
+      start: day(-6),
+      due: day(5),
+      members: [_me, '박준현', '유찬빈'],
+      todos: [
+        _Todo(text: '교체 대상 목록 정리', assignee: '박준현', done: true),
+        _Todo(text: '견적 3곳 비교', assignee: '유찬빈', done: true),
+        _Todo(text: '예산 결재 올리기', assignee: '박준현'),
+        _Todo(text: '기존 장비 처분', assignee: _me),
+        _Todo(text: '반입 일정 공지', assignee: '유찬빈'),
+      ],
+      files: [_File('장비_견적_비교.xlsx', '124KB', '유찬빈')],
+      events: [
+        _Event(author: '유찬빈', text: "'견적 3곳 비교' 완료", time: ago(30)),
+        _Event(
+          author: '박준현',
+          text: '벤치는 두 대만 먼저 들이는 게 좋겠어요',
+          time: ago(52),
+          comment: true,
+        ),
+      ],
+    ),
+    _Project(
+      name: '신규 트레이너 온보딩',
+      desc: '신규 입사 트레이너 2명의 교육 과정과 첫 달 스케줄을 준비합니다.',
+      color: AppColors.primary,
+      owner: '민중기',
+      start: day(-3),
+      due: day(12),
+      members: [_me, '민중기', '유찬빈', '전상현'],
+      todos: [
+        _Todo(text: '교육 자료 최신화', assignee: '민중기', done: true),
+        _Todo(text: '멘토 배정', assignee: _me),
+        _Todo(text: '첫 주 스케줄 편성', assignee: '유찬빈'),
+        _Todo(text: '사내 계정 발급 요청', assignee: '전상현'),
+      ],
+      files: [_File('온보딩_체크리스트.pdf', '640KB', '민중기')],
+      events: [_Event(author: '민중기', text: "'교육 자료 최신화' 완료", time: ago(8))],
+    ),
+    _Project(
+      name: '가을 시즌 클래스 개편',
+      desc: '가을 시즌 GX 클래스 시간표를 개편하고 신규 프로그램을 도입합니다.',
+      color: AppColors.primary,
+      owner: '유찬빈',
+      start: day(-1),
+      due: day(16),
+      members: [_me, '유찬빈'],
+      todos: [
+        _Todo(text: '회원 선호 시간대 조사', assignee: '유찬빈'),
+        _Todo(text: '신규 프로그램 후보 정리', assignee: _me),
+        _Todo(text: '강사 일정 조율'),
+      ],
+      files: [],
+      events: [],
+    ),
+    _Project(
+      name: '락커룸 리모델링',
+      desc: '락커룸 샤워부스와 락커 교체 공사. 공사 기간 중 이용 안내가 필요합니다.',
+      color: AppColors.gray500,
+      owner: '이준승',
+      start: day(2),
+      due: day(23),
+      members: [_me, '이준승', '민중기', '김피스', '박준현', '전상현'],
+      todos: [
+        _Todo(text: '공사 업체 선정', assignee: '이준승'),
+        _Todo(text: '공사 기간 회원 안내문', assignee: '민중기'),
+        _Todo(text: '임시 락커 배치도', assignee: _me),
+      ],
+      files: [_File('락커룸_도면.png', '1.8MB', '이준승')],
+      events: [
+        _Event(
+          author: '이준승',
+          text: '공사는 휴관일 끼고 진행하려 합니다',
+          time: ago(70),
+          comment: true,
+        ),
+      ],
+    ),
+    // 완료 탭 확인용 — 할 일이 모두 체크된 프로젝트
+    _Project(
+      name: '상반기 회원권 정책 개편',
+      desc: '상반기 회원권 가격과 환불 규정을 정비했습니다.',
+      color: AppColors.success,
+      owner: '이준승',
+      start: day(-40),
+      due: day(-6),
+      members: [_me, '이준승', '민중기'],
+      todos: [
+        _Todo(text: '경쟁사 가격 조사', assignee: '민중기', done: true),
+        _Todo(text: '신규 가격표 확정', assignee: '이준승', done: true),
+        _Todo(text: '환불 규정 문구 수정', assignee: _me, done: true),
+      ],
+      files: [_File('회원권_정책_최종.pdf', '320KB', '이준승')],
+      events: [_Event(author: '이준승', text: "'신규 가격표 확정' 완료", time: ago(150))],
+    ),
+  ];
+}
+
+// ── 표시용 계산 ──
+
+/// 마감까지 남은 일수 (오늘 기준, 지났으면 음수)
+int _dday(DateTime due) {
+  final now = DateTime.now();
+  return DateTime(
+    due.year,
+    due.month,
+    due.day,
+  ).difference(DateTime(now.year, now.month, now.day)).inDays;
+}
+
+/// '7.30' 형태
+String _date(DateTime time) => '${time.month}.${time.day}';
+
+/// '방금 · 12분 전 · 3시간 전 · 7.28' 형태
+String _relative(DateTime time) {
+  final diff = DateTime.now().difference(time);
+  if (diff.inMinutes < 1) return '방금';
+  if (diff.inMinutes < 60) return '${diff.inMinutes}분 전';
+  if (diff.inHours < 24) return '${diff.inHours}시간 전';
+  if (diff.inDays < 7) return '${diff.inDays}일 전';
+  return _date(time);
+}
