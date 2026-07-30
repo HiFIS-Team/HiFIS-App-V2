@@ -11,6 +11,7 @@ import '../../core/widgets/action_pill.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/avatar.dart';
 import '../../core/widgets/block_editor.dart';
+import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/markdown_view.dart';
 import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/pressable.dart';
@@ -234,12 +235,10 @@ class _NoticeList extends StatelessWidget {
         Expanded(
           child: notices.isEmpty
               ? Padding(
-                  padding: EdgeInsets.fromLTRB(20, 12, 20, 0),
-                  child: Text(
-                    unreadOnly ? '안 읽은 공지가 없어요' : '올라온 공지가 없어요',
-                    style: AppTextStyles.body2.copyWith(
-                      color: AppColors.textTertiary,
-                    ),
+                  padding: EdgeInsets.fromLTRB(20, 4, 20, 0),
+                  child: EmptyCard(
+                    icon: Icons.campaign_rounded,
+                    text: unreadOnly ? '안 읽은 공지가 없어요' : '올라온 공지가 없어요',
                   ),
                 )
               : ListView.separated(

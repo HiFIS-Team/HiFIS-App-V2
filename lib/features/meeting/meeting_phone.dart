@@ -2,6 +2,15 @@ part of 'meeting_screen.dart';
 
 // ── 폰 화면 ──
 
+/// 폰 목록이 비었을 때 — 알림 화면과 같은 빈 카드를 목록 자리에 올린다
+Widget _emptyCard({required IconData icon, required String text}) => Align(
+  alignment: Alignment.topCenter,
+  child: Padding(
+    padding: EdgeInsets.symmetric(horizontal: 20),
+    child: EmptyCard(icon: icon, text: text),
+  ),
+);
+
 /// 폰: 회의록 카드 목록. 카드를 누르면 본문이 옆에서 밀려 들어온다.
 class _MeetingPhone extends StatelessWidget {
   _MeetingPhone({required this.notes, required this.onChanged});
@@ -80,7 +89,7 @@ class _MeetingPhone extends StatelessWidget {
             ),
             Expanded(
               child: notes.isEmpty
-                  ? _PhoneEmpty(
+                  ? _emptyCard(
                       icon: Icons.description_outlined,
                       text: '작성된 회의록이 없어요',
                     )
@@ -151,43 +160,6 @@ class _NoteCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// 폰 목록이 비었을 때
-class _PhoneEmpty extends StatelessWidget {
-  _PhoneEmpty({required this.icon, required this.text});
-
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.gray200, width: 2),
-            ),
-            child: Center(
-              child: Icon(icon, size: 30, color: AppColors.gray300),
-            ),
-          ),
-          SizedBox(height: 16),
-          Text(
-            text,
-            style: AppTextStyles.body2.copyWith(color: AppColors.textTertiary),
-          ),
-          // 하단바에 가리지 않게 살짝 위로 올린다
-          SizedBox(height: 60),
-        ],
       ),
     );
   }

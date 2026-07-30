@@ -11,6 +11,7 @@ import '../../core/widgets/action_pill.dart';
 import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/avatar.dart';
+import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/pressable.dart';
 
 part 'project_phone.dart';
@@ -185,12 +186,10 @@ class _ProjectList extends StatelessWidget {
         Expanded(
           child: projects.isEmpty
               ? Padding(
-                  padding: EdgeInsets.fromLTRB(20, 24, 20, 0),
-                  child: Text(
-                    '${phase.label} 프로젝트가 없어요',
-                    style: AppTextStyles.body2.copyWith(
-                      color: AppColors.textTertiary,
-                    ),
+                  padding: EdgeInsets.fromLTRB(20, 4, 20, 0),
+                  child: EmptyCard(
+                    icon: Icons.folder_rounded,
+                    text: '${phase.label} 프로젝트가 없어요',
                   ),
                 )
               : ListView.separated(

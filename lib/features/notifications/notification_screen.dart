@@ -4,6 +4,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_toast.dart';
+import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/pressable.dart';
@@ -121,7 +122,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 ),
                 SizedBox(height: 20),
                 if (shown.isEmpty)
-                  _EmptyCard(unreadOnly: _unreadOnly)
+                  EmptyCard(
+                    icon: Icons.notifications_none_rounded,
+                    text: _unreadOnly ? '안 읽은 알림이 없어요' : '알림이 없어요',
+                  )
                 else ...[
                   if (today.isNotEmpty) ...[
                     _SectionLabel('오늘'),
@@ -215,45 +219,6 @@ class _SectionLabel extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.only(left: 4),
       child: Text(label, style: AppTextStyles.label),
-    );
-  }
-}
-
-/// 알림이 없을 때 — 둥근 사각 아이콘과 안내 문구
-class _EmptyCard extends StatelessWidget {
-  _EmptyCard({required this.unreadOnly});
-
-  final bool unreadOnly;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(vertical: 52),
-      decoration: AppDecorations.card(),
-      child: Column(
-        children: [
-          Container(
-            width: 64,
-            height: 64,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.gray50,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Icon(
-              Icons.notifications_none_rounded,
-              size: 28,
-              color: AppColors.gray400,
-            ),
-          ),
-          SizedBox(height: 14),
-          Text(
-            unreadOnly ? '안 읽은 알림이 없어요' : '알림이 없어요',
-            style: AppTextStyles.body2.copyWith(color: AppColors.textTertiary),
-          ),
-        ],
-      ),
     );
   }
 }

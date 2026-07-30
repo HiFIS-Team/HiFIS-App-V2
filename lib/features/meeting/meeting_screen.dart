@@ -11,6 +11,7 @@ import '../../core/widgets/action_pill.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/avatar.dart';
 import '../../core/widgets/block_editor.dart';
+import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/markdown_view.dart';
 import '../../core/widgets/pressable.dart';
 
@@ -177,12 +178,10 @@ class _NoteList extends StatelessWidget {
         Expanded(
           child: notes.isEmpty
               ? Padding(
-                  padding: EdgeInsets.fromLTRB(20, 12, 20, 0),
-                  child: Text(
-                    '작성된 회의록이 없어요',
-                    style: AppTextStyles.body2.copyWith(
-                      color: AppColors.textTertiary,
-                    ),
+                  padding: EdgeInsets.fromLTRB(20, 4, 20, 0),
+                  child: EmptyCard(
+                    icon: Icons.description_outlined,
+                    text: '작성된 회의록이 없어요',
                   ),
                 )
               : ListView.separated(
