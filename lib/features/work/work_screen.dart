@@ -81,15 +81,8 @@ class _WorkScreenState extends State<WorkScreen> {
     if (delta > 0) AppToast.show(context, '${_withJosa(task)} 완료했습니다');
   }
 
-  /// 데스크톱에서 점검 항목 아래에 내역 카드를 펼쳤는지
-  bool _historyOpen = false;
-
+  /// 폰 전용 — 데스크톱은 점검 항목 아래에 내역이 상시 떠 있다
   void _showHistory() {
-    // 데스크톱은 화면 전환 대신 점검 항목 아래에 두 내역을 나란히 편다
-    if (isDesktop) {
-      setState(() => _historyOpen = !_historyOpen);
-      return;
-    }
     Navigator.push(
       context,
       CupertinoPageRoute(
@@ -244,11 +237,10 @@ class _WorkScreenState extends State<WorkScreen> {
                               counts: _counts,
                               onAdjust: _adjust,
                               onShowHistory: _showHistory,
-                              historyOpen: _historyOpen,
                             ),
                           ),
-                          // 데스크톱: 내 내역 / 전체 내역을 양쪽으로 나눠 편다
-                          if (isDesktop && _historyOpen) ...[
+                          // 데스크톱: 내 내역 / 전체 내역을 양쪽에 상시 표시
+                          if (isDesktop) ...[
                             SizedBox(height: 16),
                             Padding(
                               padding: EdgeInsets.symmetric(horizontal: 20),
@@ -555,7 +547,6 @@ class _ChecklistCard extends StatelessWidget {
     required this.counts,
     required this.onAdjust,
     required this.onShowHistory,
-    this.historyOpen = false,
   });
 
   final List<String> items;
@@ -564,11 +555,8 @@ class _ChecklistCard extends StatelessWidget {
   /// (항목, 증감량) — +1 또는 -1
   final void Function(String task, int delta) onAdjust;
 
-  /// 오늘 내역 시트 열기
+  /// 오늘 내역 시트 열기 (폰 전용)
   final VoidCallback onShowHistory;
-
-  /// 데스크톱에서 아래 내역 카드가 펼쳐져 있는지 (화살표 방향에 쓴다)
-  final bool historyOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -586,37 +574,45 @@ class _ChecklistCard extends StatelessWidget {
             child: Row(
               children: [
                 Expanded(child: Text('오늘 점검 항목', style: AppTextStyles.label)),
-                // 누르면 오늘 수행 내역 시트가 열린다
-                Pressable(
-                  onTap: onShowHistory,
-                  scale: 0.92,
-                  pressedColor: AppColors.gray100,
-                  borderRadius: BorderRadius.circular(100),
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '총 $total회',
-                        style: AppTextStyles.caption.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      SizedBox(width: 2),
-                      Icon(
-                        // 데스크톱은 아래로 펼쳐지므로 화살표도 위아래로
-                        isDesktop
-                            ? (historyOpen
-                                  ? CupertinoIcons.chevron_up
-                                  : CupertinoIcons.chevron_down)
-                            : CupertinoIcons.chevron_right,
-                        size: 11,
+                // 데스크톱은 아래에 내역이 상시 떠 있어 총 횟수만 표시하고,
+                // 폰은 누르면 오늘 수행 내역 화면이 열린다
+                if (isDesktop)
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: Text(
+                      '총 $total회',
+                      style: AppTextStyles.caption.copyWith(
                         color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
                       ),
-                    ],
+                    ),
+                  )
+                else
+                  Pressable(
+                    onTap: onShowHistory,
+                    scale: 0.92,
+                    pressedColor: AppColors.gray100,
+                    borderRadius: BorderRadius.circular(100),
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '총 $total회',
+                          style: AppTextStyles.caption.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        SizedBox(width: 2),
+                        Icon(
+                          CupertinoIcons.chevron_right,
+                          size: 11,
+                          color: AppColors.primary,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -849,8 +845,9 @@ class _LogRow extends StatelessWidget {
   }
 }
 
-/// 데스크톱에서 점검 항목 아래에 펼쳐지는 내역 카드
-class _HistoryCard extends StatelessWidget {
+/// 데스크톱에서 점검 항목 아래에 상시 떠 있는 내역 카드.
+/// 다섯 줄까지만 펼치고 그보다 많으면 카드 안에서 스크롤한다.
+class _HistoryCard extends StatefulWidget {
   _HistoryCard({
     required this.title,
     required this.logs,
@@ -864,8 +861,25 @@ class _HistoryCard extends StatelessWidget {
   final String emptyText;
 
   @override
+  State<_HistoryCard> createState() => _HistoryCardState();
+}
+
+class _HistoryCardState extends State<_HistoryCard> {
+  final _scrollController = ScrollController();
+
+  /// 한 줄 높이(위아래 여백 13 + 본문 22.5)에 구분선을 더한 다섯 줄 높이
+  static const _maxListHeight = 5 * 48.5 + 4;
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final sorted = List.of(logs)..sort((a, b) => b.time.compareTo(a.time));
+    final sorted = List.of(widget.logs)
+      ..sort((a, b) => b.time.compareTo(a.time));
 
     return Container(
       padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
@@ -877,7 +891,7 @@ class _HistoryCard extends StatelessWidget {
             padding: EdgeInsets.symmetric(horizontal: 4),
             child: Row(
               children: [
-                Expanded(child: Text(title, style: AppTextStyles.label)),
+                Expanded(child: Text(widget.title, style: AppTextStyles.label)),
                 Text(
                   '총 ${sorted.length}회',
                   style: AppTextStyles.caption.copyWith(
@@ -892,17 +906,30 @@ class _HistoryCard extends StatelessWidget {
             Padding(
               padding: EdgeInsets.fromLTRB(4, 20, 4, 20),
               child: Text(
-                emptyText,
+                widget.emptyText,
                 style: AppTextStyles.body2.copyWith(
                   color: AppColors.textTertiary,
                 ),
               ),
             )
           else
-            for (var i = 0; i < sorted.length; i++) ...[
-              if (i > 0) Divider(height: 1, color: AppColors.divider),
-              _LogRow(log: sorted[i], showName: showName),
-            ],
+            ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: _maxListHeight),
+              child: Scrollbar(
+                controller: _scrollController,
+                child: SingleChildScrollView(
+                  controller: _scrollController,
+                  child: Column(
+                    children: [
+                      for (var i = 0; i < sorted.length; i++) ...[
+                        if (i > 0) Divider(height: 1, color: AppColors.divider),
+                        _LogRow(log: sorted[i], showName: widget.showName),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
