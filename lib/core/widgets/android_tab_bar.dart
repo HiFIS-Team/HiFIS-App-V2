@@ -53,10 +53,15 @@ class _AndroidTabBarState extends State<AndroidTabBar>
   ];
 
   /// 반원의 반지름 — 전체 버튼 중심에서 서브 메뉴 중심까지
-  static const double _radius = 112;
+  static const double _radius = 124;
 
-  /// 서브 메뉴를 감싸는 그라데이션 반달의 반지름
-  static const double _discRadius = 158;
+  /// 호 전체를 위로 띄우는 양.
+  /// 이게 없으면 양 끝 항목(근태·랭킹)의 라벨이 하단바에 가린다.
+  static const double _lift = 30;
+
+  /// 서브 메뉴를 감싸는 그라데이션 반달의 최대 반지름
+  /// (좁은 화면에서는 화면 절반까지만)
+  static const double _maxDiscRadius = 190;
 
   @override
   void dispose() {
@@ -220,8 +225,9 @@ class _AndroidTabBarState extends State<AndroidTabBar>
 
   /// 전체 버튼에서 피어나는 그라데이션 반달 — 서브 메뉴가 이 위에 놓인다
   Widget _disc({required double width, required double centerY}) {
+    final radius = math.min(_maxDiscRadius, width / 2);
     return Positioned(
-      left: width / 2 - _discRadius,
+      left: width / 2 - radius,
       bottom: centerY,
       child: IgnorePointer(
         ignoring: !_open,
@@ -231,17 +237,15 @@ class _AndroidTabBarState extends State<AndroidTabBar>
               .clamp(0.0, 1.0),
           alignment: Alignment.bottomCenter,
           child: Container(
-            width: _discRadius * 2,
-            height: _discRadius,
+            width: radius * 2,
+            height: radius,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [AppColors.gradientStart, AppColors.gradientEnd],
               ),
-              borderRadius: BorderRadius.vertical(
-                top: Radius.circular(_discRadius),
-              ),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(radius)),
               boxShadow: [
                 BoxShadow(
                   color: AppColors.primary.withValues(alpha: 0.35),
@@ -263,7 +267,7 @@ class _AndroidTabBarState extends State<AndroidTabBar>
     // 왼쪽부터 오른쪽으로 반원(180°→0°)에 고르게 배치한다
     final angle = math.pi - (i + 0.5) / _fan.length * math.pi;
     final dx = _radius * math.cos(angle);
-    final dy = _radius * math.sin(angle);
+    final dy = _radius * math.sin(angle) + _lift;
 
     const itemW = 74.0;
     const itemH = 76.0;
