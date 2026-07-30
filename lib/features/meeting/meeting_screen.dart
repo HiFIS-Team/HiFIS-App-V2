@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/data/staff.dart';
 import '../../core/theme/app_colors.dart';
@@ -346,23 +347,12 @@ class _NoteView extends StatefulWidget {
 
 class _NoteViewState extends State<_NoteView> {
   late final _title = TextEditingController(text: widget.note.title);
-  late final _body = TextEditingController(text: widget.note.body);
   final _titleFocus = FocusNode();
-  final _bodyFocus = FocusNode();
 
   late bool _editing = widget.editing;
 
   /// 마크다운 문법 도움말 펼침 상태
   bool _help = false;
-
-  /// 명령어 메뉴를 연 '/'의 위치 (닫혀 있으면 null)
-  int? _slash;
-
-  /// '/' 뒤에 이어 친 검색어
-  String _query = '';
-
-  /// 본문 글꼴 — 커서 위치 계산에도 같은 값을 쓴다
-  TextStyle get _bodyStyle => AppTextStyles.body2.copyWith(height: 1.7);
 
   @override
   void initState() {
@@ -373,9 +363,7 @@ class _NoteViewState extends State<_NoteView> {
   @override
   void dispose() {
     _title.dispose();
-    _body.dispose();
     _titleFocus.dispose();
-    _bodyFocus.dispose();
     super.dispose();
   }
 
@@ -383,7 +371,6 @@ class _NoteViewState extends State<_NoteView> {
   void _sync() {
     widget.note
       ..title = _title.text.trim()
-      ..body = _body.text
       ..updated = DateTime.now();
     widget.onChanged();
   }
@@ -391,7 +378,6 @@ class _NoteViewState extends State<_NoteView> {
   void _toggleEdit() {
     if (_editing) _sync();
     setState(() => _editing = !_editing);
-    if (_editing) _bodyFocus.requestFocus();
   }
 
   Future<void> _pickDate() async {
@@ -429,141 +415,7 @@ class _NoteViewState extends State<_NoteView> {
         ? lines[line].replaceFirst(RegExp(r'\[[ xX]\]'), '[x]')
         : lines[line].replaceFirst(RegExp(r'\[[ xX]\]'), '[ ]');
     widget.note.body = lines.join('\n');
-    _body.text = widget.note.body;
     widget.onChanged();
-  }
-
-  /// 커서가 있는 줄 앞에 마크다운 기호를 붙인다 (이미 있으면 뗀다)
-  void _prefix(String token) {
-    final text = _body.text;
-    final offset = _body.selection.baseOffset.clamp(0, text.length);
-    final start = text.lastIndexOf('\n', offset == 0 ? 0 : offset - 1) + 1;
-    final line = text.substring(start);
-    final end = line.contains('\n') ? start + line.indexOf('\n') : text.length;
-    final current = text.substring(start, end);
-
-    final stripped = current.replaceFirst(
-      RegExp(r'^(#{1,3} |[-*] \[[ xX]\] |[-*] |> |\d+\. )'),
-      '',
-    );
-    final next = current.startsWith(token) ? stripped : '$token$stripped';
-
-    _body.value = TextEditingValue(
-      text: text.replaceRange(start, end, next),
-      selection: TextSelection.collapsed(offset: start + next.length),
-    );
-    _bodyFocus.requestFocus();
-    _sync();
-  }
-
-  /// 선택한 글자를 기호로 감싼다 (선택이 없으면 기호만 넣고 사이에 커서를 둔다)
-  void _wrap(String token) {
-    final text = _body.text;
-    final selection = _body.selection;
-    final start = selection.start < 0 ? text.length : selection.start;
-    final end = selection.end < 0 ? text.length : selection.end;
-    final picked = text.substring(start, end);
-
-    _body.value = TextEditingValue(
-      text: text.replaceRange(start, end, '$token$picked$token'),
-      selection: TextSelection.collapsed(
-        offset: start + token.length + picked.length,
-      ),
-    );
-    _bodyFocus.requestFocus();
-    _sync();
-  }
-
-  void _insertLine(String text) {
-    final source = _body.text;
-    final offset = _body.selection.baseOffset.clamp(0, source.length);
-    final chunk = offset > 0 && source[offset - 1] != '\n'
-        ? '\n$text\n'
-        : '$text\n';
-    _body.value = TextEditingValue(
-      text: source.replaceRange(offset, offset, chunk),
-      selection: TextSelection.collapsed(offset: offset + chunk.length),
-    );
-    _bodyFocus.requestFocus();
-    _sync();
-  }
-
-  // ── 슬래시 명령어 ──
-
-  /// 입력이 바뀔 때마다 커서 앞을 훑어 '/' 명령어 상태를 갱신한다.
-  /// 줄 맨 앞이나 공백 뒤의 '/'만 명령어로 본다.
-  void _updateSlash() {
-    final text = _body.text;
-    final cursor = _body.selection.baseOffset;
-    if (cursor <= 0 || cursor > text.length) {
-      _slash = null;
-      return;
-    }
-
-    var i = cursor - 1;
-    while (i >= 0) {
-      final char = text[i];
-      if (char == '/') break;
-      // 공백·줄바꿈을 만나면 명령어가 아니다
-      if (char == '\n' || char == ' ') {
-        _slash = null;
-        return;
-      }
-      i--;
-    }
-    if (i < 0 || (i > 0 && text[i - 1] != '\n' && text[i - 1] != ' ')) {
-      _slash = null;
-      return;
-    }
-
-    _slash = i;
-    _query = text.substring(i + 1, cursor);
-  }
-
-  List<_Command> get _matches => _query.isEmpty
-      ? _commands
-      : _commands
-            .where(
-              (c) =>
-                  c.label.contains(_query) ||
-                  c.token.startsWith(_query) ||
-                  c.keyword.contains(_query.toLowerCase()),
-            )
-            .toList();
-
-  /// 고른 명령어를 넣는다 — '/검색어'는 지우고 그 자리에 문법을 적용한다
-  void _run(_Command command) {
-    final start = _slash!;
-    final cursor = _body.selection.baseOffset;
-    _body.value = TextEditingValue(
-      text: _body.text.replaceRange(start, cursor, ''),
-      selection: TextSelection.collapsed(offset: start),
-    );
-    setState(() => _slash = null);
-
-    switch (command.type) {
-      case _Type.prefix:
-        _prefix(command.token);
-      case _Type.wrap:
-        _wrap(command.token);
-      case _Type.line:
-        _insertLine(command.token);
-    }
-  }
-
-  /// 커서가 화면 어디에 있는지 재서 명령어 메뉴를 그 아래에 띄운다
-  Offset _caret(double width) {
-    final text = _body.text;
-    final cursor = _body.selection.baseOffset.clamp(0, text.length);
-    final painter = TextPainter(
-      text: TextSpan(text: text.substring(0, cursor), style: _bodyStyle),
-      textDirection: TextDirection.ltr,
-    )..layout(maxWidth: width - 32);
-    final offset = painter.getOffsetForCaret(
-      TextPosition(offset: cursor),
-      Rect.zero,
-    );
-    return Offset(offset.dx + 16, offset.dy + 16 + painter.preferredLineHeight);
   }
 
   @override
@@ -753,62 +605,14 @@ class _NoteViewState extends State<_NoteView> {
         Container(height: 1, color: AppColors.gray100),
         SizedBox(height: 14),
         if (_editing)
-          LayoutBuilder(
-            builder: (context, constraints) => Stack(
-              children: [
-                TextField(
-                  controller: _body,
-                  focusNode: _bodyFocus,
-                  style: _bodyStyle,
-                  cursorColor: AppColors.primary,
-                  maxLines: null,
-                  minLines: 16,
-                  keyboardType: TextInputType.multiline,
-                  onChanged: (_) => setState(() {
-                    _updateSlash();
-                    _sync();
-                  }),
-                  onTap: () => setState(() => _slash = null),
-                  decoration: InputDecoration(
-                    hintText: "'/'를 입력하면 명령어가 나와요",
-                    hintStyle: _bodyStyle.copyWith(color: AppColors.gray400),
-                    filled: true,
-                    fillColor: AppColors.gray20,
-                    contentPadding: EdgeInsets.all(16),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(color: AppColors.gray100),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(color: AppColors.gray100),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(color: AppColors.primary),
-                    ),
-                  ),
-                ),
-                // 커서 바로 아래에 뜨는 명령어 메뉴
-                if (_slash != null && _matches.isNotEmpty)
-                  Builder(
-                    builder: (context) {
-                      final caret = _caret(constraints.maxWidth);
-                      return Positioned(
-                        left: caret.dx.clamp(
-                          0,
-                          (constraints.maxWidth - 260).clamp(
-                            0,
-                            constraints.maxWidth,
-                          ),
-                        ),
-                        top: caret.dy + 4,
-                        child: _SlashMenu(commands: _matches, onPick: _run),
-                      );
-                    },
-                  ),
-              ],
-            ),
+          _BlockEditor(
+            source: widget.note.body,
+            onChanged: (markdown) {
+              widget.note
+                ..body = markdown
+                ..updated = DateTime.now();
+              widget.onChanged();
+            },
           )
         else if (note.body.trim().isEmpty)
           Text(
@@ -820,6 +624,615 @@ class _NoteViewState extends State<_NoteView> {
       ],
     );
   }
+}
+
+// ── 블록 편집기 ──
+
+/// 노션식 블록 편집기
+///
+/// 줄 하나가 블록 하나다. `# `, `- `, `- [ ] ` 처럼 기호를 치고 스페이스를 누르면
+/// 기호는 사라지고 그 줄이 바로 제목·목록·체크박스로 바뀐다.
+/// 저장은 마크다운 원문으로 돌려준다.
+class _BlockEditor extends StatefulWidget {
+  _BlockEditor({required this.source, required this.onChanged});
+
+  final String source;
+
+  /// 마크다운 원문
+  final ValueChanged<String> onChanged;
+
+  @override
+  State<_BlockEditor> createState() => _BlockEditorState();
+}
+
+class _BlockEditorState extends State<_BlockEditor> {
+  late final List<_Block> _blocks = _parse(widget.source);
+
+  /// 명령어 메뉴가 열린 블록과 검색어
+  _Block? _menuBlock;
+  String _query = '';
+
+  final _link = LayerLink();
+
+  @override
+  void dispose() {
+    for (final block in _blocks) {
+      block.dispose();
+    }
+    super.dispose();
+  }
+
+  void _emit() => widget.onChanged(_serialize(_blocks));
+
+  /// 위젯이 붙은 다음에 커서를 옮긴다 (새로 만든 블록은 아직 트리에 없다)
+  void _focus(_Block block, {int? offset}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      block.focus.requestFocus();
+      final at = offset ?? block.controller.text.length;
+      block.controller.selection = TextSelection.collapsed(offset: at);
+    });
+  }
+
+  // ── 입력 처리 ──
+
+  void _onChanged(int index) {
+    final block = _blocks[index];
+    final text = block.controller.text;
+
+    // 엔터는 줄바꿈 문자로 들어온다 — 그 자리에서 블록을 나눈다
+    final br = text.indexOf('\n');
+    if (br >= 0) {
+      _enter(index, br);
+      return;
+    }
+
+    // 기호 + 스페이스를 치면 바로 그 블록으로 바뀐다
+    final shortcut = _shortcutOf(text);
+    if (shortcut != null) {
+      setState(() {
+        block.type = shortcut.$1;
+        block.controller.text = text.substring(shortcut.$2);
+        block.controller.selection = TextSelection.collapsed(offset: 0);
+        _menuBlock = null;
+      });
+      _emit();
+      return;
+    }
+
+    setState(() => _updateMenu(block));
+    _emit();
+  }
+
+  /// 줄바꿈이 들어온 지점에서 블록을 둘로 나눈다
+  void _enter(int index, int br) {
+    final block = _blocks[index];
+    final text = block.controller.text;
+    final before = text.substring(0, br);
+    final after = text.substring(br + 1);
+
+    // '---' 한 줄이면 구분선으로 바꾼다
+    if (before.trim() == '---') {
+      final next = _Block(text: after);
+      setState(() {
+        block.type = _BlockType.divider;
+        block.controller.text = '';
+        _blocks.insert(index + 1, next);
+        _menuBlock = null;
+      });
+      _focus(next, offset: 0);
+      _emit();
+      return;
+    }
+
+    // 빈 목록·인용 블록에서 엔터를 치면 문단으로 되돌린다
+    if (before.isEmpty && block.type != _BlockType.paragraph) {
+      setState(() {
+        block.type = _BlockType.paragraph;
+        block.checked = false;
+        block.controller.text = after;
+        _menuBlock = null;
+      });
+      _focus(block, offset: 0);
+      _emit();
+      return;
+    }
+
+    final next = _Block(type: _inherit(block.type), text: after);
+    setState(() {
+      block.controller.text = before;
+      _blocks.insert(index + 1, next);
+      _menuBlock = null;
+    });
+    _focus(next, offset: 0);
+    _emit();
+  }
+
+  /// 줄 맨 앞에서 백스페이스 — 블록 종류를 풀거나 앞 블록과 합친다
+  void _backspace(int index) {
+    final block = _blocks[index];
+
+    if (block.type != _BlockType.paragraph) {
+      setState(() {
+        block.type = _BlockType.paragraph;
+        block.checked = false;
+      });
+      _emit();
+      return;
+    }
+    if (index == 0) return;
+
+    final previous = _blocks[index - 1];
+    if (previous.type == _BlockType.divider) {
+      setState(() {
+        _blocks.removeAt(index - 1);
+        previous.dispose();
+      });
+      _emit();
+      return;
+    }
+
+    final offset = previous.controller.text.length;
+    setState(() {
+      previous.controller.text =
+          previous.controller.text + block.controller.text;
+      _blocks.removeAt(index);
+    });
+    _focus(previous, offset: offset);
+    block.dispose();
+    _emit();
+  }
+
+  // ── 슬래시 명령어 ──
+
+  void _updateMenu(_Block block) {
+    final text = block.controller.text;
+    final cursor = block.controller.selection.baseOffset;
+    if (cursor <= 0 || cursor > text.length) {
+      _menuBlock = null;
+      return;
+    }
+
+    var i = cursor - 1;
+    while (i >= 0) {
+      if (text[i] == '/') break;
+      // 공백을 만나면 명령어가 아니다
+      if (text[i] == ' ') {
+        _menuBlock = null;
+        return;
+      }
+      i--;
+    }
+    if (i < 0 || (i > 0 && text[i - 1] != ' ')) {
+      _menuBlock = null;
+      return;
+    }
+
+    _menuBlock = block;
+    _query = text.substring(i + 1, cursor);
+  }
+
+  List<_Command> get _matches => _query.isEmpty
+      ? _commands
+      : _commands
+            .where(
+              (c) =>
+                  c.label.contains(_query) ||
+                  c.hint.startsWith(_query) ||
+                  c.keyword.contains(_query.toLowerCase()),
+            )
+            .toList();
+
+  /// 고른 명령어 적용 — '/검색어'는 지우고 블록 종류를 바꾼다
+  void _run(_Block block, _Command command) {
+    final text = block.controller.text;
+    final cursor = block.controller.selection.baseOffset.clamp(0, text.length);
+    final start = (cursor - _query.length - 1).clamp(0, text.length);
+    final stripped = text.replaceRange(start, cursor, '');
+    final index = _blocks.indexOf(block);
+
+    setState(() {
+      _menuBlock = null;
+      block.controller.text = stripped;
+
+      switch (command.type) {
+        case _Type.block:
+          block.type = command.block!;
+          if (command.block == _BlockType.divider) {
+            // 구분선 뒤에는 이어서 쓸 빈 줄을 하나 둔다
+            final next = _Block(text: stripped);
+            block.controller.text = '';
+            _blocks.insert(index + 1, next);
+            _focus(next, offset: 0);
+          } else {
+            _focus(block, offset: start);
+          }
+        case _Type.wrap:
+          // 인라인 기호는 글자 사이에 커서를 둔다
+          block.controller.text = stripped.replaceRange(
+            start,
+            start,
+            '${command.token}${command.token}',
+          );
+          _focus(block, offset: start + command.token.length);
+      }
+    });
+    _emit();
+  }
+
+  // ── 그리기 ──
+
+  @override
+  Widget build(BuildContext context) {
+    if (_blocks.isEmpty) _blocks.add(_Block());
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(16, 12, 16, 12),
+      decoration: BoxDecoration(
+        color: AppColors.gray20,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.gray100),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < _blocks.length; i++)
+            _BlockRow(
+              block: _blocks[i],
+              number: _numberOf(i),
+              // 처음이자 비어 있는 블록에만 안내를 띄운다
+              hint: _blocks.length == 1 && _blocks[i].controller.text.isEmpty
+                  ? "'/'를 입력하면 명령어가 나와요"
+                  : null,
+              link: _blocks[i] == _menuBlock ? _link : null,
+              onChanged: () => _onChanged(i),
+              onBackspace: () => _backspace(i),
+              onCheck: () {
+                setState(() => _blocks[i].checked = !_blocks[i].checked);
+                _emit();
+              },
+              onTap: () => setState(() => _menuBlock = null),
+            ),
+          // 아래 빈 곳을 눌러도 마지막 줄에 커서가 간다
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => _focus(_blocks.last),
+            child: SizedBox(height: 120, width: double.infinity),
+          ),
+          if (_menuBlock != null && _matches.isNotEmpty)
+            CompositedTransformFollower(
+              link: _link,
+              targetAnchor: Alignment.bottomLeft,
+              followerAnchor: Alignment.topLeft,
+              offset: Offset(0, 4),
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: _SlashMenu(
+                  commands: _matches,
+                  onPick: (command) => _run(_menuBlock!, command),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// 번호 목록은 위로 이어지는 번호 블록을 세어 번호를 매긴다
+  int _numberOf(int index) {
+    if (_blocks[index].type != _BlockType.numbered) return 0;
+    var number = 1;
+    for (var i = index - 1; i >= 0; i--) {
+      if (_blocks[i].type != _BlockType.numbered) break;
+      number++;
+    }
+    return number;
+  }
+}
+
+/// 블록 한 줄 — 종류에 맞는 글꼴과 앞머리(글머리표·번호·체크박스)를 붙인다
+class _BlockRow extends StatelessWidget {
+  _BlockRow({
+    required this.block,
+    required this.number,
+    required this.hint,
+    required this.link,
+    required this.onChanged,
+    required this.onBackspace,
+    required this.onCheck,
+    required this.onTap,
+  });
+
+  final _Block block;
+  final int number;
+  final String? hint;
+
+  /// 명령어 메뉴가 이 블록에 붙어 있으면 위치 기준을 잡아준다
+  final LayerLink? link;
+  final VoidCallback onChanged;
+  final VoidCallback onBackspace;
+  final VoidCallback onCheck;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (block.type == _BlockType.divider) {
+      return Padding(
+        padding: EdgeInsets.symmetric(vertical: 10),
+        child: Container(height: 1, color: AppColors.gray200),
+      );
+    }
+
+    final done = block.type == _BlockType.todo && block.checked;
+    final style = switch (block.type) {
+      _BlockType.h1 => AppTextStyles.title2,
+      _BlockType.h2 => AppTextStyles.title3,
+      _BlockType.h3 => AppTextStyles.body1.copyWith(
+        fontWeight: FontWeight.w700,
+      ),
+      _BlockType.quote => AppTextStyles.body2.copyWith(
+        height: 1.7,
+        color: AppColors.textSecondary,
+      ),
+      _ => AppTextStyles.body2.copyWith(
+        height: 1.7,
+        color: done ? AppColors.textTertiary : AppColors.textPrimary,
+        decoration: done ? TextDecoration.lineThrough : null,
+        decorationColor: AppColors.gray400,
+      ),
+    };
+
+    final field = Focus(
+      // 줄 맨 앞에서 백스페이스를 누르면 종류를 풀거나 앞줄과 합친다
+      onKeyEvent: (node, event) {
+        if (event is! KeyDownEvent) return KeyEventResult.ignored;
+        if (event.logicalKey != LogicalKeyboardKey.backspace) {
+          return KeyEventResult.ignored;
+        }
+        final selection = block.controller.selection;
+        if (!selection.isCollapsed || selection.baseOffset != 0) {
+          return KeyEventResult.ignored;
+        }
+        onBackspace();
+        return KeyEventResult.handled;
+      },
+      child: TextField(
+        controller: block.controller,
+        focusNode: block.focus,
+        style: style,
+        cursorColor: AppColors.primary,
+        maxLines: null,
+        keyboardType: TextInputType.multiline,
+        onChanged: (_) => onChanged(),
+        onTap: onTap,
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: style.copyWith(color: AppColors.gray400),
+          border: InputBorder.none,
+          isCollapsed: true,
+        ),
+      ),
+    );
+
+    return Padding(
+      padding: EdgeInsets.only(
+        top: block.type == _BlockType.h1 || block.type == _BlockType.h2
+            ? 10
+            : 3,
+        bottom: 3,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (block.type == _BlockType.quote)
+            Container(
+              width: 3,
+              height: 22,
+              margin: EdgeInsets.only(right: 10, top: 2),
+              decoration: BoxDecoration(
+                color: AppColors.gray200,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          if (block.type == _BlockType.bullet)
+            SizedBox(
+              width: 20,
+              child: Text(
+                '•',
+                style: AppTextStyles.body2.copyWith(
+                  height: 1.7,
+                  color: AppColors.textTertiary,
+                ),
+              ),
+            ),
+          if (block.type == _BlockType.numbered)
+            SizedBox(
+              width: 22,
+              child: Text(
+                '$number.',
+                style: AppTextStyles.body2.copyWith(
+                  height: 1.7,
+                  color: AppColors.textTertiary,
+                ),
+              ),
+            ),
+          if (block.type == _BlockType.todo)
+            Padding(
+              padding: EdgeInsets.only(right: 10, top: 4),
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: onCheck,
+                  child: Container(
+                    width: 18,
+                    height: 18,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: block.checked
+                          ? AppColors.primary
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(5),
+                      border: Border.all(
+                        color: block.checked
+                            ? AppColors.primary
+                            : AppColors.gray300,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: block.checked
+                        ? Icon(
+                            Icons.check_rounded,
+                            size: 12,
+                            color: Colors.white,
+                          )
+                        : null,
+                  ),
+                ),
+              ),
+            ),
+          Expanded(
+            child: link == null
+                ? field
+                : CompositedTransformTarget(link: link!, child: field),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 편집기의 블록 한 개
+class _Block {
+  _Block({
+    this.type = _BlockType.paragraph,
+    String text = '',
+    this.checked = false,
+  }) : controller = TextEditingController(text: text);
+
+  _BlockType type;
+  bool checked;
+  final TextEditingController controller;
+  final FocusNode focus = FocusNode();
+
+  void dispose() {
+    controller.dispose();
+    focus.dispose();
+  }
+}
+
+enum _BlockType {
+  paragraph,
+  h1,
+  h2,
+  h3,
+  bullet,
+  numbered,
+  todo,
+  quote,
+  divider,
+}
+
+/// 엔터를 쳤을 때 새 블록이 물려받을 종류 (목록은 이어지고 나머지는 문단)
+_BlockType _inherit(_BlockType type) => switch (type) {
+  _BlockType.bullet || _BlockType.numbered || _BlockType.todo => type,
+  _ => _BlockType.paragraph,
+};
+
+/// 기호 + 스페이스 단축 입력 — (바뀔 종류, 지울 글자 수)
+(_BlockType, int)? _shortcutOf(String text) {
+  const shortcuts = {
+    '# ': _BlockType.h1,
+    '## ': _BlockType.h2,
+    '### ': _BlockType.h3,
+    '- ': _BlockType.bullet,
+    '* ': _BlockType.bullet,
+    '1. ': _BlockType.numbered,
+    '[] ': _BlockType.todo,
+    '[ ] ': _BlockType.todo,
+    '> ': _BlockType.quote,
+  };
+  for (final entry in shortcuts.entries) {
+    if (text.startsWith(entry.key)) return (entry.value, entry.key.length);
+  }
+  return null;
+}
+
+/// 마크다운 원문 → 블록
+List<_Block> _parse(String source) {
+  final blocks = <_Block>[];
+  for (final line in source.split('\n')) {
+    final trimmed = line.trimRight();
+    if (trimmed.trim() == '---') {
+      blocks.add(_Block(type: _BlockType.divider));
+      continue;
+    }
+    final checkbox = RegExp(r'^\s*[-*]\s+\[([ xX])\]\s*(.*)$').firstMatch(line);
+    if (checkbox != null) {
+      blocks.add(
+        _Block(
+          type: _BlockType.todo,
+          text: checkbox[2]!,
+          checked: checkbox[1]!.toLowerCase() == 'x',
+        ),
+      );
+      continue;
+    }
+    final heading = RegExp(r'^(#{1,3})\s+(.*)$').firstMatch(line);
+    if (heading != null) {
+      blocks.add(
+        _Block(
+          type: switch (heading[1]!.length) {
+            1 => _BlockType.h1,
+            2 => _BlockType.h2,
+            _ => _BlockType.h3,
+          },
+          text: heading[2]!,
+        ),
+      );
+      continue;
+    }
+    final ordered = RegExp(r'^\s*\d+\.\s+(.*)$').firstMatch(line);
+    if (ordered != null) {
+      blocks.add(_Block(type: _BlockType.numbered, text: ordered[1]!));
+      continue;
+    }
+    final bullet = RegExp(r'^\s*[-*]\s+(.*)$').firstMatch(line);
+    if (bullet != null) {
+      blocks.add(_Block(type: _BlockType.bullet, text: bullet[1]!));
+      continue;
+    }
+    if (line.trimLeft().startsWith('> ')) {
+      blocks.add(
+        _Block(type: _BlockType.quote, text: line.trimLeft().substring(2)),
+      );
+      continue;
+    }
+    blocks.add(_Block(text: trimmed));
+  }
+  if (blocks.isEmpty) blocks.add(_Block());
+  return blocks;
+}
+
+/// 블록 → 마크다운 원문 (저장·읽기 모드에서 쓴다)
+String _serialize(List<_Block> blocks) {
+  var number = 0;
+  final lines = <String>[];
+  for (final block in blocks) {
+    final text = block.controller.text;
+    number = block.type == _BlockType.numbered ? number + 1 : 0;
+    lines.add(switch (block.type) {
+      _BlockType.h1 => '# $text',
+      _BlockType.h2 => '## $text',
+      _BlockType.h3 => '### $text',
+      _BlockType.bullet => '- $text',
+      _BlockType.numbered => '$number. $text',
+      _BlockType.todo => '- [${block.checked ? 'x' : ' '}] $text',
+      _BlockType.quote => '> $text',
+      _BlockType.divider => '---',
+      _BlockType.paragraph => text,
+    });
+  }
+  return lines.join('\n');
 }
 
 /// 커서 아래에 뜨는 '/' 명령어 메뉴
@@ -1049,16 +1462,13 @@ class _PersonChip extends StatelessWidget {
 
 // ── 슬래시 명령어 목록 ──
 
-/// 명령어가 본문에 들어가는 방식
+/// 명령어가 본문에 적용되는 방식
 enum _Type {
-  /// 줄 앞에 기호를 붙인다
-  prefix,
+  /// 블록 종류를 바꾼다
+  block,
 
-  /// 선택한 글자를 감싼다
+  /// 인라인 기호로 감싼다
   wrap,
-
-  /// 한 줄을 통째로 넣는다
-  line,
 }
 
 class _Command {
@@ -1067,8 +1477,9 @@ class _Command {
     required this.hint,
     required this.keyword,
     required this.icon,
-    required this.token,
     required this.type,
+    this.block,
+    this.token = '',
   });
 
   final String label;
@@ -1079,8 +1490,13 @@ class _Command {
   /// 영문으로 쳐도 걸리게 하는 검색어
   final String keyword;
   final IconData icon;
-  final String token;
   final _Type type;
+
+  /// block 방식일 때 바뀔 종류
+  final _BlockType? block;
+
+  /// wrap 방식일 때 감쌀 기호
+  final String token;
 }
 
 const _commands = [
@@ -1089,80 +1505,88 @@ const _commands = [
     hint: '#',
     keyword: 'h1 title',
     icon: Icons.title_rounded,
-    token: '# ',
-    type: _Type.prefix,
+    type: _Type.block,
+    block: _BlockType.h1,
   ),
   _Command(
     label: '소제목',
     hint: '##',
     keyword: 'h2',
     icon: Icons.title_rounded,
-    token: '## ',
-    type: _Type.prefix,
+    type: _Type.block,
+    block: _BlockType.h2,
   ),
   _Command(
     label: '작은 제목',
     hint: '###',
     keyword: 'h3',
     icon: Icons.title_rounded,
-    token: '### ',
-    type: _Type.prefix,
+    type: _Type.block,
+    block: _BlockType.h3,
   ),
   _Command(
     label: '글머리 목록',
     hint: '-',
     keyword: 'list bullet',
     icon: Icons.format_list_bulleted_rounded,
-    token: '- ',
-    type: _Type.prefix,
+    type: _Type.block,
+    block: _BlockType.bullet,
   ),
   _Command(
     label: '번호 목록',
     hint: '1.',
     keyword: 'number ol',
     icon: Icons.format_list_numbered_rounded,
-    token: '1. ',
-    type: _Type.prefix,
+    type: _Type.block,
+    block: _BlockType.numbered,
   ),
   _Command(
     label: '체크박스',
-    hint: '- [ ]',
+    hint: '[]',
     keyword: 'todo check',
     icon: Icons.checklist_rounded,
-    token: '- [ ] ',
-    type: _Type.prefix,
+    type: _Type.block,
+    block: _BlockType.todo,
   ),
   _Command(
     label: '인용',
     hint: '>',
     keyword: 'quote',
     icon: Icons.format_quote_rounded,
-    token: '> ',
-    type: _Type.prefix,
-  ),
-  _Command(
-    label: '굵게',
-    hint: '**',
-    keyword: 'bold',
-    icon: Icons.format_bold_rounded,
-    token: '**',
-    type: _Type.wrap,
-  ),
-  _Command(
-    label: '인라인 코드',
-    hint: '`',
-    keyword: 'code',
-    icon: Icons.code_rounded,
-    token: '`',
-    type: _Type.wrap,
+    type: _Type.block,
+    block: _BlockType.quote,
   ),
   _Command(
     label: '구분선',
     hint: '---',
     keyword: 'divider line hr',
     icon: Icons.horizontal_rule_rounded,
-    token: '---',
-    type: _Type.line,
+    type: _Type.block,
+    block: _BlockType.divider,
+  ),
+  _Command(
+    label: '문단',
+    hint: 'p',
+    keyword: 'text paragraph',
+    icon: Icons.notes_rounded,
+    type: _Type.block,
+    block: _BlockType.paragraph,
+  ),
+  _Command(
+    label: '굵게',
+    hint: '**',
+    keyword: 'bold',
+    icon: Icons.format_bold_rounded,
+    type: _Type.wrap,
+    token: '**',
+  ),
+  _Command(
+    label: '인라인 코드',
+    hint: '`',
+    keyword: 'code',
+    icon: Icons.code_rounded,
+    type: _Type.wrap,
+    token: '`',
   ),
 ];
 
