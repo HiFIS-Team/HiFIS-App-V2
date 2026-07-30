@@ -359,9 +359,9 @@ class _WorkSegmentedTabsState extends State<_WorkSegmentedTabs> {
         scale: 0.97,
         borderRadius: BorderRadius.circular(10),
         onTap: () => widget.onSelect(index),
-        child: AnimatedContainer(
-          duration: Duration(milliseconds: 160),
-          curve: Curves.easeOut,
+        // 배경은 애니메이션 없이 즉시 — 페이드가 있으면 직전에 선택돼 있던
+        // 칸의 알약이 서서히 사라지며 둘 다 눌린 것처럼 보인다
+        child: Container(
           padding: EdgeInsets.symmetric(horizontal: 18),
           alignment: Alignment.center,
           decoration: BoxDecoration(
