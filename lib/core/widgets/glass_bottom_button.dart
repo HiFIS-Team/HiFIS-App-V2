@@ -24,8 +24,10 @@ class GlassBottomButton extends StatelessWidget {
   final String label;
   final VoidCallback onPressed;
 
-  /// false면 흐리게 보인다. 눌리는 것 자체는 막지 않는다
-  /// (눌렀을 때 왜 안 되는지 안내를 띄우기 위함).
+  /// 아직 조건이 안 갖춰졌으면 false — 맑은 글래스로 두고,
+  /// 갖춰지면 파란 프로미넌트 글래스로 채운다.
+  /// 비활성화(enabled: false)하면 iOS가 글래스 재질을 빼버리므로
+  /// 누르는 것 자체는 막지 않고 동작 쪽에서 안내를 띄운다.
   final bool active;
 
   /// 탭바와 같은 높이
@@ -39,16 +41,19 @@ class GlassBottomButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       top: false,
-      minimum: EdgeInsets.only(bottom: 10),
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 20),
+        padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
         child: SizedBox(
           height: height,
           child: isApple
               ? CNButton(
+                  // 테마 전환 시 설정 유실 버그 회피용 재생성 키
+                  key: ValueKey('glass-cta-$label-${AppColors.isDark}'),
                   label: label,
-                  style: CNButtonStyle.prominentGlass,
-                  tint: active ? AppColors.primary : AppColors.gray300,
+                  style: active
+                      ? CNButtonStyle.prominentGlass
+                      : CNButtonStyle.glass,
+                  tint: AppColors.primary,
                   height: height,
                   onPressed: onPressed,
                 )
@@ -81,14 +86,19 @@ class GlassBottomButton extends StatelessWidget {
               height: height,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: (active ? AppColors.primary : AppColors.gray300)
-                    .withValues(alpha: 0.88),
+                // 조건이 갖춰지기 전에는 반투명 흰 글래스, 갖춰지면 파랗게 찬다
+                color: active
+                    ? AppColors.primary.withValues(alpha: 0.88)
+                    : AppColors.surface.withValues(alpha: 0.72),
                 borderRadius: BorderRadius.circular(height / 2),
+                border: Border.all(
+                  color: active ? Colors.transparent : AppColors.gray100,
+                ),
               ),
               child: Text(
                 label,
                 style: AppTextStyles.body1.copyWith(
-                  color: Colors.white,
+                  color: active ? Colors.white : AppColors.textSecondary,
                   fontWeight: FontWeight.w700,
                 ),
               ),
