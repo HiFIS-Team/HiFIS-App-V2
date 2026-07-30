@@ -65,8 +65,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         )
         .length;
 
+    // 배경은 다른 화면과 같은 회색, 달력은 그 위에 얹힌 흰 카드로 둔다
     return Scaffold(
-      backgroundColor: AppColors.surface,
       body: Column(
         children: [
           // 상단 글래스 헤더 버튼 영역만큼 비워둔다
@@ -167,6 +167,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               padding: EdgeInsets.fromLTRB(28, 0, 28, 24),
               child: Container(
                 decoration: BoxDecoration(
+                  color: AppColors.surface,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: AppColors.gray100),
                 ),

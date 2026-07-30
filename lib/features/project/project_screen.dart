@@ -62,22 +62,26 @@ class _ProjectScreenState extends State<ProjectScreen> {
     final list = _visible;
     final selected = _syncSelection(list);
 
+    // 배경은 다른 화면과 같은 회색 — 카드가 떠 보이게 한다.
+    // 목록 쪽만 흰 패널로 둬서 좌우 영역이 구분된다.
     return Scaffold(
-      backgroundColor: AppColors.surface,
       body: Row(
         children: [
           SizedBox(
             width: 320,
-            child: _ProjectList(
-              projects: list,
-              selected: selected,
-              phase: _phase,
-              onFilter: (v) => setState(() {
-                _phase = v;
-                _selected = null;
-              }),
-              onSelect: (p) => setState(() => _selected = p),
-              onCreate: _create,
+            child: ColoredBox(
+              color: AppColors.surface,
+              child: _ProjectList(
+                projects: list,
+                selected: selected,
+                phase: _phase,
+                onFilter: (v) => setState(() {
+                  _phase = v;
+                  _selected = null;
+                }),
+                onSelect: (p) => setState(() => _selected = p),
+                onCreate: _create,
+              ),
             ),
           ),
           Container(width: 1, color: AppColors.gray100),
