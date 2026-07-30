@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/util/platform.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/pressable.dart';
@@ -177,23 +178,38 @@ class _WorkScreenState extends State<WorkScreen> {
           children: [
             // 상단 글래스 헤더 버튼 영역만큼 비워둔다
             SizedBox(height: 64),
-            // 항목 탭 — 사내톡 상세 '공유된 콘텐츠' 탭과 같은 밑줄 스타일.
-            // 라벨 폭 기준으로 배치하고 spaceBetween으로 좌우·항목 간
-            // 간격을 균등하게 맞춘다.
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  for (var i = 0; i < _items.length; i++)
-                    _WorkTab(
-                      label: _items[i].label,
-                      selected: _tab == i,
-                      onTap: () => setState(() => _tab = i),
-                    ),
-                ],
+            // 데스크톱은 넓은 화면에 밑줄 탭이 헐거워 보여서
+            // 분절 토글(ModeSwitch) 스타일의 알약 탭으로 보여준다
+            if (isDesktop)
+              Padding(
+                padding: EdgeInsets.fromLTRB(20, 0, 20, 16),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: _WorkSegmentedTabs(
+                    labels: [for (final item in _items) item.label],
+                    selected: _tab,
+                    onSelect: (i) => setState(() => _tab = i),
+                  ),
+                ),
+              )
+            else
+              // 항목 탭 — 사내톡 상세 '공유된 콘텐츠' 탭과 같은 밑줄 스타일.
+              // 라벨 폭 기준으로 배치하고 spaceBetween으로 좌우·항목 간
+              // 간격을 균등하게 맞춘다.
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    for (var i = 0; i < _items.length; i++)
+                      _WorkTab(
+                        label: _items[i].label,
+                        selected: _tab == i,
+                        onTap: () => setState(() => _tab = i),
+                      ),
+                  ],
+                ),
               ),
-            ),
             Container(height: 1, color: AppColors.gray100),
             Expanded(
               child: ListView(
@@ -292,6 +308,86 @@ class _WorkItem {
 
   /// 2열 점검 체크리스트 (있으면 상세 카드 대신 표시)
   final List<String>? checklist;
+}
+
+/// 데스크톱 업무 항목 탭 — 회색 트랙 위에 흰 알약이 움직이는 분절 토글.
+/// 커서를 올리면 선택되지 않은 칸도 옅게 반응한다.
+class _WorkSegmentedTabs extends StatefulWidget {
+  _WorkSegmentedTabs({
+    required this.labels,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final List<String> labels;
+  final int selected;
+  final ValueChanged<int> onSelect;
+
+  @override
+  State<_WorkSegmentedTabs> createState() => _WorkSegmentedTabsState();
+}
+
+class _WorkSegmentedTabsState extends State<_WorkSegmentedTabs> {
+  int? _hover;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 48,
+      padding: EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.gray50,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [for (var i = 0; i < widget.labels.length; i++) _segment(i)],
+      ),
+    );
+  }
+
+  Widget _segment(int index) {
+    final selected = index == widget.selected;
+    final hovered = index == _hover;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = index),
+      onExit: (_) => setState(() {
+        if (_hover == index) _hover = null;
+      }),
+      child: Pressable(
+        scale: 0.97,
+        borderRadius: BorderRadius.circular(10),
+        onTap: () => widget.onSelect(index),
+        child: AnimatedContainer(
+          duration: Duration(milliseconds: 160),
+          curve: Curves.easeOut,
+          padding: EdgeInsets.symmetric(horizontal: 18),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected
+                ? AppColors.surface
+                : hovered
+                ? AppColors.gray100
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: selected ? AppColors.gray100 : Colors.transparent,
+            ),
+          ),
+          child: Text(
+            widget.labels[index],
+            maxLines: 1,
+            style: AppTextStyles.body2.copyWith(
+              fontSize: 14,
+              color: selected ? AppColors.primary : AppColors.gray500,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _WorkTab extends StatelessWidget {
