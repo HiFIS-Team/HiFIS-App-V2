@@ -13,6 +13,7 @@ import '../../core/widgets/pressable.dart';
 import 'desktop_sidebar.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/placeholder_screen.dart';
+import '../approval/approval_screen.dart';
 import '../attendance/attendance_barcode_overlay.dart';
 import '../home/home_screen.dart';
 import '../meeting/meeting_screen.dart';
@@ -108,7 +109,7 @@ class _MainShellState extends State<MainShell> {
     ScheduleScreen(),
     MeetingScreen(),
     PlaceholderScreen(emoji: '🗂️', title: '문서함'),
-    PlaceholderScreen(emoji: '✅', title: '전자결재'),
+    ApprovalScreen(),
     PlaceholderScreen(emoji: '👥', title: '직원'),
     PlaceholderScreen(emoji: '🗓️', title: '근태·월차'),
     PlaceholderScreen(emoji: '💰', title: '급여'),
