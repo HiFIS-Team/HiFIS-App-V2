@@ -173,13 +173,14 @@ class _WorkScreenState extends State<WorkScreen> {
   Widget build(BuildContext context) {
     final item = _items[_tab];
 
+    // 홈처럼 화면 전체가 한 번에 스크롤된다.
+    // 항목 탭도 같이 올라가야 위쪽 글래스 버튼에 콘텐츠가 비친다.
     return Scaffold(
       body: SafeArea(
         bottom: false,
-        child: Column(
+        child: ListView(
+          padding: EdgeInsets.fromLTRB(0, 64, 0, bottomBarInset(context)),
           children: [
-            // 상단 글래스 헤더 버튼 영역만큼 비워둔다
-            SizedBox(height: 64),
             // 데스크톱은 넓은 화면에 밑줄 탭이 헐거워 보여서
             // 분절 토글(ModeSwitch) 스타일의 알약 탭으로 보여준다
             if (isDesktop)
@@ -225,91 +226,85 @@ class _WorkScreenState extends State<WorkScreen> {
                 ),
               ),
             Container(height: 1, color: AppColors.gray100),
-            Expanded(
-              child: ListView(
-                padding: EdgeInsets.fromLTRB(0, 20, 0, bottomBarInset(context)),
+            SizedBox(height: 20),
+            // 탭 전환 시 콘텐츠 페이드.
+            // 체크리스트 탭(환경정비)은 점수 카드 없이 리스트만 보여준다.
+            AnimatedSwitcher(
+              duration: Duration(milliseconds: 200),
+              // 기본 정렬(가운데)은 높이가 다른 콘텐츠가 아래로 밀렸다
+              // 올라와 보이므로 위쪽 기준으로 겹친다
+              layoutBuilder: (currentChild, previousChildren) => Stack(
+                alignment: Alignment.topCenter,
+                children: [...previousChildren, ?currentChild],
+              ),
+              child: Column(
+                key: ValueKey(_tab),
                 children: [
-                  // 탭 전환 시 콘텐츠 페이드.
-                  // 체크리스트 탭(환경정비)은 점수 카드 없이 리스트만 보여준다.
-                  AnimatedSwitcher(
-                    duration: Duration(milliseconds: 200),
-                    // 기본 정렬(가운데)은 높이가 다른 콘텐츠가 아래로 밀렸다
-                    // 올라와 보이므로 위쪽 기준으로 겹친다
-                    layoutBuilder: (currentChild, previousChildren) => Stack(
-                      alignment: Alignment.topCenter,
-                      children: [...previousChildren, ?currentChild],
+                  if (item.checklist != null) ...[
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 20),
+                      child: _ChecklistCard(
+                        items: item.checklist!,
+                        counts: _counts,
+                        onAdjust: _adjust,
+                        onShowHistory: _showHistory,
+                      ),
                     ),
-                    child: Column(
-                      key: ValueKey(_tab),
-                      children: [
-                        if (item.checklist != null) ...[
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 20),
-                            child: _ChecklistCard(
-                              items: item.checklist!,
-                              counts: _counts,
-                              onAdjust: _adjust,
-                              onShowHistory: _showHistory,
+                    // 데스크톱: 내 내역 / 전체 내역을 양쪽에 상시 표시
+                    if (isDesktop) ...[
+                      SizedBox(height: 16),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 20),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: _HistoryCard(
+                                title: '내 내역',
+                                logs: _logs,
+                                showName: false,
+                                emptyText: '오늘 완료한 항목이 없어요',
+                              ),
                             ),
-                          ),
-                          // 데스크톱: 내 내역 / 전체 내역을 양쪽에 상시 표시
-                          if (isDesktop) ...[
-                            SizedBox(height: 16),
-                            Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 20),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: _HistoryCard(
-                                      title: '내 내역',
-                                      logs: _logs,
-                                      showName: false,
-                                      emptyText: '오늘 완료한 항목이 없어요',
-                                    ),
-                                  ),
-                                  SizedBox(width: 16),
-                                  Expanded(
-                                    child: _HistoryCard(
-                                      title: '전체 내역',
-                                      logs: [..._logs, ..._teamLogs],
-                                      showName: true,
-                                      emptyText: '오늘 완료된 항목이 없어요',
-                                    ),
-                                  ),
-                                ],
+                            SizedBox(width: 16),
+                            Expanded(
+                              child: _HistoryCard(
+                                title: '전체 내역',
+                                logs: [..._logs, ..._teamLogs],
+                                showName: true,
+                                emptyText: '오늘 완료된 항목이 없어요',
                               ),
                             ),
                           ],
-                        ] else if (item.label == '동료 평가')
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 20),
-                            child: PeerReviewSection(),
-                          )
-                        else if (item.label == '수업 개수')
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 20),
-                            child: LessonSection(),
-                          )
-                        else if (item.label == '회원 친절도')
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 20),
-                            child: PraiseSection(),
-                          )
-                        else ...[
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 20),
-                            child: _ScoreCard(item: item),
-                          ),
-                          SizedBox(height: 16),
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 20),
-                            child: _DetailCard(item: item),
-                          ),
-                        ],
-                      ],
+                        ),
+                      ),
+                    ],
+                  ] else if (item.label == '동료 평가')
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 20),
+                      child: PeerReviewSection(),
+                    )
+                  else if (item.label == '수업 개수')
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 20),
+                      child: LessonSection(),
+                    )
+                  else if (item.label == '회원 친절도')
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 20),
+                      child: PraiseSection(),
+                    )
+                  else ...[
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 20),
+                      child: _ScoreCard(item: item),
                     ),
-                  ),
+                    SizedBox(height: 16),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 20),
+                      child: _DetailCard(item: item),
+                    ),
+                  ],
                 ],
               ),
             ),
