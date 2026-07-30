@@ -49,52 +49,19 @@ class _MeetingPhone extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        children: [
-          // 홈처럼 화면 전체가 한 번에 스크롤된다.
-          // 타이틀도 같이 올라가야 위쪽 글래스 버튼에 콘텐츠가 비친다.
-          SafeArea(
-            bottom: false,
-            child: ListView(
-              padding: EdgeInsets.fromLTRB(20, 64, 20, bottomBarInset(context)),
-              children: [
-                Padding(
-                  padding: EdgeInsets.only(bottom: 16),
-                  child: Row(
-                    children: [
-                      Text('회의록', style: AppTextStyles.title1),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '${notes.length}',
-                          style: AppTextStyles.title2.copyWith(
-                            color: AppColors.textTertiary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (notes.isEmpty)
-                  EmptyCard(
-                    icon: Icons.description_outlined,
-                    text: '작성된 회의록이 없어요',
-                  )
-                else
-                  for (var i = 0; i < notes.length; i++) ...[
-                    if (i > 0) SizedBox(height: 12),
-                    _NoteCard(
-                      note: notes[i],
-                      onTap: () => _open(context, notes[i]),
-                    ),
-                  ],
-              ],
-            ),
-          ),
-          PhoneCreateButton(onTap: () => _create(context)),
-        ],
-      ),
+    return PhoneListScaffold(
+      title: '회의록',
+      count: notes.length,
+      onCreate: () => _create(context),
+      children: [
+        if (notes.isEmpty)
+          EmptyCard(icon: Icons.description_outlined, text: '작성된 회의록이 없어요')
+        else
+          for (var i = 0; i < notes.length; i++) ...[
+            if (i > 0) SizedBox(height: 12),
+            _NoteCard(note: notes[i], onTap: () => _open(context, notes[i])),
+          ],
+      ],
     );
   }
 }

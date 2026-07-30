@@ -64,59 +64,31 @@ class _NoticePhone extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        children: [
-          // 홈처럼 화면 전체가 한 번에 스크롤된다.
-          // 타이틀·필터도 같이 올라가야 위쪽 글래스 버튼에 콘텐츠가 비친다.
-          SafeArea(
-            bottom: false,
-            child: ListView(
-              padding: EdgeInsets.fromLTRB(20, 64, 20, bottomBarInset(context)),
-              children: [
-                Padding(
-                  padding: EdgeInsets.only(bottom: 14),
-                  child: Row(
-                    children: [
-                      Text('공지', style: AppTextStyles.title1),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '${notices.length}',
-                          style: AppTextStyles.title2.copyWith(
-                            color: AppColors.textTertiary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                ModeSwitch(
-                  left: '전체',
-                  right: unread > 0 ? '안읽음 $unread' : '안읽음',
-                  value: unreadOnly,
-                  onChanged: onFilter,
-                ),
-                SizedBox(height: 16),
-                if (notices.isEmpty)
-                  EmptyCard(
-                    icon: Icons.campaign_rounded,
-                    text: unreadOnly ? '안 읽은 공지가 없어요' : '올라온 공지가 없어요',
-                  )
-                else
-                  for (var i = 0; i < notices.length; i++) ...[
-                    if (i > 0) SizedBox(height: 12),
-                    _NoticeCard(
-                      notice: notices[i],
-                      onTap: () => _open(context, notices[i]),
-                    ),
-                  ],
-              ],
-            ),
-          ),
-          PhoneCreateButton(onTap: () => _create(context)),
-        ],
+    return PhoneListScaffold(
+      title: '공지',
+      count: notices.length,
+      filter: ModeSwitch(
+        left: '전체',
+        right: unread > 0 ? '안읽음 $unread' : '안읽음',
+        value: unreadOnly,
+        onChanged: onFilter,
       ),
+      onCreate: () => _create(context),
+      children: [
+        if (notices.isEmpty)
+          EmptyCard(
+            icon: Icons.campaign_rounded,
+            text: unreadOnly ? '안 읽은 공지가 없어요' : '올라온 공지가 없어요',
+          )
+        else
+          for (var i = 0; i < notices.length; i++) ...[
+            if (i > 0) SizedBox(height: 12),
+            _NoticeCard(
+              notice: notices[i],
+              onTap: () => _open(context, notices[i]),
+            ),
+          ],
+      ],
     );
   }
 }

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
+import '../util/layout.dart';
+import '../util/sf_symbols.dart';
 import 'glass_icon_button.dart';
 import 'top_frost.dart';
 
@@ -20,6 +22,157 @@ class PhoneCreateButton extends StatelessWidget {
       child: Padding(
         padding: EdgeInsets.only(top: 8, left: 16),
         child: GlassIconButton(symbol: 'plus', onPressed: onTap),
+      ),
+    );
+  }
+}
+
+/// 폰 목록 화면 공통 껍데기 — 타이틀 + 개수 + 필터 + 목록
+///
+/// 플랫폼에 따라 헤더를 다르게 다룬다.
+/// - iOS: 화면 전체가 하나의 스크롤. 타이틀·필터가 같이 올라가면서 상단
+///   글래스 버튼 뒤로 지나가 비쳐 보인다 (글래스를 쓰는 이유).
+/// - 안드로이드: 글래스가 없어 비치는 효과를 못 얻으므로 타이틀·필터를
+///   고정 헤더로 두고 목록만 스크롤한다. 스크롤을 시작하면 경계선이 생긴다.
+class PhoneListScaffold extends StatefulWidget {
+  PhoneListScaffold({
+    super.key,
+    required this.title,
+    required this.count,
+    required this.children,
+    this.filter,
+    this.onCreate,
+  });
+
+  final String title;
+
+  /// 타이틀 옆에 흐리게 붙는 개수
+  final int count;
+
+  /// 타이틀 아래 필터 (단계 탭·전체/안읽음 전환 등)
+  final Widget? filter;
+
+  /// 목록 본문 — 카드들 또는 빈 카드
+  final List<Widget> children;
+
+  /// 좌측 상단 만들기 버튼 (없으면 안 그린다)
+  final VoidCallback? onCreate;
+
+  @override
+  State<PhoneListScaffold> createState() => _PhoneListScaffoldState();
+}
+
+class _PhoneListScaffoldState extends State<PhoneListScaffold> {
+  /// 안드로이드 고정 헤더 아래 경계선을 보일지.
+  /// 값만 흘려보내서 목록 전체가 다시 그려지지 않게 한다.
+  final _scrolled = ValueNotifier(false);
+
+  @override
+  void dispose() {
+    _scrolled.dispose();
+    super.dispose();
+  }
+
+  bool _onScroll(ScrollNotification notification) {
+    if (notification.metrics.axis == Axis.vertical) {
+      _scrolled.value = notification.metrics.pixels > 4;
+    }
+    return false;
+  }
+
+  /// 필터가 있으면 그 아래 간격이 따로 붙으므로 타이틀 아래는 조금만 띄운다
+  double get _titleGap => widget.filter == null ? 16 : 14;
+
+  Widget _titleRow() {
+    return Row(
+      children: [
+        Text(widget.title, style: AppTextStyles.title1),
+        SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            '${widget.count}',
+            style: AppTextStyles.title2.copyWith(color: AppColors.textTertiary),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// iOS — 타이틀·필터까지 전부 한 스크롤
+  Widget _oneScroll(BuildContext context) {
+    return SafeArea(
+      bottom: false,
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(20, 64, 20, bottomBarInset(context)),
+        children: [
+          Padding(
+            padding: EdgeInsets.only(bottom: _titleGap),
+            child: _titleRow(),
+          ),
+          if (widget.filter != null) ...[widget.filter!, SizedBox(height: 16)],
+          ...widget.children,
+        ],
+      ),
+    );
+  }
+
+  /// 안드로이드 — 헤더 고정, 목록만 스크롤
+  Widget _fixedHeader(BuildContext context) {
+    return Column(
+      children: [
+        ColoredBox(
+          color: AppColors.background,
+          child: SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(20, 64, 20, _titleGap),
+                  child: Column(
+                    children: [
+                      _titleRow(),
+                      if (widget.filter != null) ...[
+                        SizedBox(height: 14),
+                        widget.filter!,
+                      ],
+                    ],
+                  ),
+                ),
+                ValueListenableBuilder<bool>(
+                  valueListenable: _scrolled,
+                  builder: (context, scrolled, child) => AnimatedOpacity(
+                    opacity: scrolled ? 1 : 0,
+                    duration: Duration(milliseconds: 150),
+                    child: child,
+                  ),
+                  child: Container(height: 1, color: AppColors.gray200),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Expanded(
+          child: NotificationListener<ScrollNotification>(
+            onNotification: _onScroll,
+            child: ListView(
+              padding: EdgeInsets.fromLTRB(20, 16, 20, bottomBarInset(context)),
+              children: widget.children,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Stack(
+        children: [
+          isApple ? _oneScroll(context) : _fixedHeader(context),
+          if (widget.onCreate != null)
+            PhoneCreateButton(onTap: widget.onCreate!),
+        ],
       ),
     );
   }

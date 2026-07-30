@@ -33,54 +33,26 @@ class _ProjectPhone extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        children: [
-          // 홈처럼 화면 전체가 한 번에 스크롤된다.
-          // 타이틀·단계 탭도 같이 올라가야 위쪽 글래스 버튼에 콘텐츠가 비친다.
-          SafeArea(
-            bottom: false,
-            child: ListView(
-              padding: EdgeInsets.fromLTRB(20, 64, 20, bottomBarInset(context)),
-              children: [
-                Padding(
-                  padding: EdgeInsets.only(bottom: 14),
-                  child: Row(
-                    children: [
-                      Text('프로젝트', style: AppTextStyles.title1),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '${projects.length}',
-                          style: AppTextStyles.title2.copyWith(
-                            color: AppColors.textTertiary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                _PhaseTabs(selected: phase, onSelect: onFilter),
-                SizedBox(height: 16),
-                if (projects.isEmpty)
-                  EmptyCard(
-                    icon: Icons.folder_rounded,
-                    text: '${phase.label} 프로젝트가 없어요',
-                  )
-                else
-                  for (var i = 0; i < projects.length; i++) ...[
-                    if (i > 0) SizedBox(height: 12),
-                    _ProjectCard(
-                      project: projects[i],
-                      onTap: () => _open(context, projects[i]),
-                    ),
-                  ],
-              ],
+    return PhoneListScaffold(
+      title: '프로젝트',
+      count: projects.length,
+      filter: _PhaseTabs(selected: phase, onSelect: onFilter),
+      onCreate: onCreate,
+      children: [
+        if (projects.isEmpty)
+          EmptyCard(
+            icon: Icons.folder_rounded,
+            text: '${phase.label} 프로젝트가 없어요',
+          )
+        else
+          for (var i = 0; i < projects.length; i++) ...[
+            if (i > 0) SizedBox(height: 12),
+            _ProjectCard(
+              project: projects[i],
+              onTap: () => _open(context, projects[i]),
             ),
-          ),
-          PhoneCreateButton(onTap: onCreate),
-        ],
-      ),
+          ],
+      ],
     );
   }
 }
