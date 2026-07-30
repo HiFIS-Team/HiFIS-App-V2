@@ -18,6 +18,7 @@ const _icons = <String, IconData>{
   'arrow.up.left.and.arrow.down.right': Icons.open_in_full_rounded,
   'barcode.viewfinder': Icons.qr_code_scanner_rounded,
   'bell': Icons.notifications_none_rounded,
+  'checkmark': Icons.done_all_rounded,
   'chevron.backward': Icons.arrow_back_ios_new_rounded,
   'door.right.hand.open': Icons.logout_rounded,
   'line.3.horizontal.decrease': Icons.filter_list_rounded,
