@@ -1,4 +1,3 @@
-import 'package:cupertino_native/cupertino_native.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,6 +6,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_toast.dart';
+import '../../core/widgets/glass_bottom_button.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/pressable.dart';
 
@@ -372,35 +372,22 @@ class _PeerReviewFormScreenState extends State<_PeerReviewFormScreen> {
               ),
             ),
           ),
-          // 하단 고정: 네이티브 리퀴드 글래스 제출 버튼 (키보드와 함께 상승)
+          // 하단 고정: 제출 버튼 (키보드와 함께 상승)
           Align(
             alignment: Alignment.bottomCenter,
-            child: SafeArea(
-              top: false,
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: CNButton(
-                        // 테마 전환 시 설정 유실 버그 회피용 재생성 키
-                        key: ValueKey('pr-submit-${AppColors.isDark}'),
-                        label: '평가 제출',
-                        // 전 항목이 채워지기 전에는 글래스, 채워지면 파란
-                        // 프로미넌트 글래스. 비활성화하면 iOS가 글래스 재질을
-                        // 빼버려서 항상 활성으로 두고, 미완성 시 동작은
-                        // _submit에서 무시한다.
-                        style: _complete
-                            ? CNButtonStyle.prominentGlass
-                            : CNButtonStyle.glass,
-                        tint: AppColors.primary,
-                        height: 56,
-                        onPressed: _submit,
-                      ),
-                    ),
-                  ],
+            child: BottomActionBar(
+              children: [
+                Expanded(
+                  child: BottomActionButton(
+                    id: 'pr-submit',
+                    label: '평가 제출',
+                    // 전 항목이 채워져야 채워진 상태가 되고,
+                    // 미완성 시 동작은 _submit에서 무시한다
+                    filled: _complete,
+                    onPressed: _submit,
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ],

@@ -1,9 +1,9 @@
-import 'package:cupertino_native/cupertino_native.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/glass_bottom_button.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/top_frost.dart';
 import 'chat_screen.dart';
@@ -230,43 +230,31 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
               ),
             ),
           ),
-          // 하단 고정: 네이티브 리퀴드 글래스 버튼 (키보드와 함께 상승)
+          // 하단 고정: 글래스 버튼 (키보드와 함께 상승)
           Align(
             alignment: Alignment.bottomCenter,
-            child: SafeArea(
-              top: false,
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
-                child: Row(
-                  children: [
-                    CNButton(
-                      // 테마 전환 시 설정 유실 버그 회피용 재생성 키
-                      key: ValueKey('nm-cancel-${AppColors.isDark}'),
-                      label: '취소',
-                      style: CNButtonStyle.glass,
-                      height: 56,
-                      shrinkWrap: true,
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: CNButton(
-                        key: ValueKey('nm-cta-${AppColors.isDark}'),
-                        label: _ctaLabel,
-                        // 선택 전에는 글래스, 선택되면 파란 프로미넌트 글래스.
-                        // 비활성화하면 iOS가 글래스 재질을 빼버려서 항상 활성으로
-                        // 두고, 미선택 시 동작은 _confirm에서 무시한다.
-                        style: _selected.isEmpty
-                            ? CNButtonStyle.glass
-                            : CNButtonStyle.prominentGlass,
-                        tint: AppColors.primary,
-                        height: 56,
-                        onPressed: _confirm,
-                      ),
-                    ),
-                  ],
+            child: BottomActionBar(
+              children: [
+                BottomActionButton(
+                  id: 'nm-cancel',
+                  label: '취소',
+                  filled: false,
+                  tinted: false,
+                  shrinkWrap: true,
+                  onPressed: () => Navigator.pop(context),
                 ),
-              ),
+                SizedBox(width: 10),
+                Expanded(
+                  child: BottomActionButton(
+                    id: 'nm-cta',
+                    label: _ctaLabel,
+                    // 아무도 안 골랐으면 비어 있는 상태로 두고,
+                    // 동작은 _confirm에서 무시한다
+                    filled: _selected.isNotEmpty,
+                    onPressed: _confirm,
+                  ),
+                ),
+              ],
             ),
           ),
         ],

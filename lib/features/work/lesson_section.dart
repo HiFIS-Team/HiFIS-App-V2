@@ -1,4 +1,3 @@
-import 'package:cupertino_native/cupertino_native.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -6,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_toast.dart';
+import '../../core/widgets/glass_bottom_button.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/glass_search_bar.dart';
 import '../../core/widgets/mode_switch.dart';
@@ -1028,32 +1028,19 @@ class _RegisterScreenState extends State<_RegisterScreen> {
           // 하단 고정: 네이티브 리퀴드 글래스 등록 버튼
           Align(
             alignment: Alignment.bottomCenter,
-            child: SafeArea(
-              top: false,
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: CNButton(
-                        // 테마 전환 시 설정 유실 버그 회피용 재생성 키
-                        key: ValueKey('register-${AppColors.isDark}'),
-                        label: _renew ? '재등록' : '신규 회원 등록',
-                        // 필수 입력이 채워지기 전에는 글래스, 채워지면 파란
-                        // 프로미넌트 글래스. 비활성화하면 iOS가 글래스 재질을
-                        // 빼버려서 항상 활성으로 두고, 미완성 시 동작은
-                        // _submit에서 무시한다.
-                        style: _complete
-                            ? CNButtonStyle.prominentGlass
-                            : CNButtonStyle.glass,
-                        tint: AppColors.primary,
-                        height: 56,
-                        onPressed: _submit,
-                      ),
-                    ),
-                  ],
+            child: BottomActionBar(
+              children: [
+                Expanded(
+                  child: BottomActionButton(
+                    id: 'register',
+                    label: _renew ? '재등록' : '신규 회원 등록',
+                    // 필수 입력이 채워져야 채워진 상태가 되고,
+                    // 미완성 시 동작은 _submit에서 무시한다
+                    filled: _complete,
+                    onPressed: _submit,
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ],
@@ -1571,34 +1558,22 @@ class _SignScreenState extends State<_SignScreen> {
               ),
             ),
           ),
-          // 하단 고정: 네이티브 리퀴드 글래스 완료 버튼
+          // 하단 고정: 완료 버튼
           Align(
             alignment: Alignment.bottomCenter,
-            child: SafeArea(
-              top: false,
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: CNButton(
-                        // 테마 전환 시 설정 유실 버그 회피용 재생성 키
-                        key: ValueKey('sign-done-${AppColors.isDark}'),
-                        label: '싸인 완료',
-                        // 서명 전에는 글래스, 서명하면 파란 프로미넌트 글래스.
-                        // 비활성화하면 iOS가 글래스 재질을 빼버려서 항상 활성으로
-                        // 두고, 미서명 시 동작은 _complete에서 무시한다.
-                        style: _signed
-                            ? CNButtonStyle.prominentGlass
-                            : CNButtonStyle.glass,
-                        tint: AppColors.primary,
-                        height: 56,
-                        onPressed: _complete,
-                      ),
-                    ),
-                  ],
+            child: BottomActionBar(
+              children: [
+                Expanded(
+                  child: BottomActionButton(
+                    id: 'sign-done',
+                    label: '싸인 완료',
+                    // 서명해야 채워진 상태가 되고,
+                    // 미서명 시 동작은 _complete에서 무시한다
+                    filled: _signed,
+                    onPressed: _complete,
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ],
