@@ -176,6 +176,8 @@ class _ProfileSummaryCard extends StatelessWidget {
       decoration: AppDecorations.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        // 데스크톱에서 스크롤 밖에 놓이면 세로로 늘어나므로 내용만큼만 차지한다
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
