@@ -6,9 +6,14 @@ import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'core/util/platform.dart';
 import 'core/widgets/app_loading.dart';
+import 'features/auth/auth_screen.dart';
+import 'features/auth/auth_session.dart';
 import 'features/main/main_shell.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // 자동 로그인 여부를 먼저 읽어야 스플래시 뒤에서 맞는 화면을 그릴 수 있다
+  await AuthSession.instance.restore();
   runApp(HiFISApp());
 }
 
@@ -75,6 +80,29 @@ class _HiFISAppState extends State<HiFISApp> with WidgetsBindingObserver {
   }
 }
 
+/// 로그인 상태에 따라 로그인 화면과 메인을 바꿔 낀다.
+///
+/// 로그인/로그아웃은 [AuthSession]의 값만 바꾸면 되고, 화면 교체는 여기서
+/// 한 번에 처리한다. 갈아 끼울 때는 짧게 겹쳐 넘겨 뚝 끊기지 않게 한다.
+class _AuthGate extends StatelessWidget {
+  _AuthGate();
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: AuthSession.instance,
+      builder: (context, signedIn, _) => AnimatedSwitcher(
+        duration: Duration(milliseconds: 320),
+        switchInCurve: Curves.easeOut,
+        switchOutCurve: Curves.easeIn,
+        child: signedIn
+            ? MainShell(key: ValueKey('main'))
+            : LoginScreen(key: ValueKey('login')),
+      ),
+    );
+  }
+}
+
 /// 앱 시작 시 케틀벨 로딩 애니메이션을 한 사이클 보여준 뒤 메인으로 넘어간다.
 /// 실제 초기 데이터 로딩이 생기면 타이머 대신 그 완료 시점으로 교체한다.
 class _SplashGate extends StatefulWidget {
@@ -119,7 +147,7 @@ class _SplashGateState extends State<_SplashGate> {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        if (_warming) MainShell(),
+        if (_warming) _AuthGate(),
         if (!_done)
           IgnorePointer(
             ignoring: _ready,

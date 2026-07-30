@@ -38,6 +38,7 @@ dependencies:
   barcode_widget: ^2.0.4
   file_picker: ^11.0.2
   desktop_drop: ^0.7.1
+  shared_preferences: ^2.5.5
 
 dev_dependencies:
   flutter_test:
