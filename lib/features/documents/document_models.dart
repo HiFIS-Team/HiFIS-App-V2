@@ -20,7 +20,10 @@ enum _Kind {
   sheet('스프레드시트', Icons.table_chart_rounded),
   slide('프레젠테이션', Icons.slideshow_rounded),
   image('이미지', Icons.image_rounded),
-  archive('압축 파일', Icons.folder_zip_rounded);
+  video('동영상', Icons.movie_rounded),
+  audio('오디오', Icons.audiotrack_rounded),
+  archive('압축 파일', Icons.folder_zip_rounded),
+  other('파일', Icons.insert_drive_file_rounded);
 
   const _Kind(this.label, this.icon);
 
@@ -35,8 +38,34 @@ enum _Kind {
     _Kind.sheet => AppColors.success,
     _Kind.slide => AppColors.warning,
     _Kind.image => Color(0xFF7C5CFC),
+    _Kind.video => Color(0xFFE0447C),
+    _Kind.audio => Color(0xFF00A8B5),
     _Kind.archive => AppColors.gray500,
+    _Kind.other => AppColors.gray500,
   };
+
+  /// 확장자로 종류를 고른다 (올린 파일의 아이콘·색을 정하는 데 쓴다)
+  static _Kind of(String fileName) {
+    final dot = fileName.lastIndexOf('.');
+    final ext = dot < 0 ? '' : fileName.substring(dot + 1).toLowerCase();
+    return switch (ext) {
+      'pdf' => _Kind.pdf,
+      'doc' || 'docx' || 'txt' || 'rtf' || 'hwp' || 'md' => _Kind.doc,
+      'xls' || 'xlsx' || 'csv' || 'numbers' => _Kind.sheet,
+      'ppt' || 'pptx' || 'key' => _Kind.slide,
+      'png' ||
+      'jpg' ||
+      'jpeg' ||
+      'gif' ||
+      'webp' ||
+      'heic' ||
+      'bmp' => _Kind.image,
+      'mp4' || 'mov' || 'avi' || 'mkv' || 'webm' || 'm4v' => _Kind.video,
+      'mp3' || 'wav' || 'm4a' || 'aac' || 'flac' => _Kind.audio,
+      'zip' || 'rar' || '7z' || 'tar' || 'gz' => _Kind.archive,
+      _ => _Kind.other,
+    };
+  }
 }
 
 /// 문서함 항목 — 폴더이거나 파일이다
@@ -46,6 +75,7 @@ class _Item {
   _Item.folder({required this.name, List<_Item>? children, DateTime? updated})
     : kind = _Kind.folder,
       bytes = 0,
+      path = null,
       children = children ?? [],
       updated = updated ?? DateTime.now();
 
@@ -55,6 +85,7 @@ class _Item {
     required this.bytes,
     required this.updated,
     this.starred = false,
+    this.path,
   }) : children = null;
 
   String name;
@@ -66,10 +97,16 @@ class _Item {
   DateTime updated;
   bool starred = false;
 
+  /// 올린 파일의 실제 경로 — 목업 데이터는 null이라 미리보기가 없다
+  final String? path;
+
   /// null이면 파일
   final List<_Item>? children;
 
   bool get isFolder => children != null;
+
+  /// 실제로 올린 이미지라 화면에 띄울 수 있는지
+  bool get canPreview => path != null && kind == _Kind.image;
 
   /// 'KB · MB' 표기 — 파인더처럼 1000 단위로 끊는다
   String get sizeLabel {

@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -46,8 +49,7 @@ class _DocumentScreenState extends State<DocumentScreen> {
 
   void _open(_Item item) {
     if (!item.isFolder) {
-      // 미리보기는 아직 없다 — 무엇을 눌렀는지만 알려준다
-      AppToast.show(context, '${item.name} 미리보기는 준비 중이에요');
+      _showFilePreview(context, item);
       return;
     }
     setState(() {
@@ -108,6 +110,39 @@ class _DocumentScreenState extends State<DocumentScreen> {
       _selected = folder;
     });
     AppToast.show(context, '폴더를 만들었어요');
+  }
+
+  /// 컴퓨터에서 파일을 골라 지금 폴더에 담는다
+  ///
+  /// 서버가 없으니 실제로 올리지는 않고, 고른 파일의 이름·크기·경로를
+  /// 그대로 목록에 넣어둔다. 이미지는 그 경로로 미리보기까지 된다.
+  Future<void> _upload() async {
+    final result = await FilePicker.pickFiles(
+      dialogTitle: '문서함에 올릴 파일 선택',
+      allowMultiple: true,
+    );
+    if (result == null || !mounted) return;
+
+    // 위치 보기 중에 올리면 최상위에 담긴다
+    final target = _place == _Place.all ? _current : _root;
+    final now = DateTime.now();
+
+    setState(() {
+      for (final picked in result.files) {
+        target.children!.add(
+          _Item.file(
+            name: picked.name,
+            kind: _Kind.of(picked.name),
+            bytes: picked.size,
+            updated: now,
+            path: picked.path,
+          ),
+        );
+      }
+      target.updated = now;
+      _place = _Place.all;
+    });
+    AppToast.show(context, '${result.files.length}개 파일을 올렸어요');
   }
 
   Future<void> _rename(_Item item) async {
@@ -183,6 +218,7 @@ class _DocumentScreenState extends State<DocumentScreen> {
         icon: Icons.create_new_folder_rounded,
         onTap: _newFolder,
       ),
+      _MenuEntry(label: '파일 올리기', icon: Icons.upload_rounded, onTap: _upload),
       _MenuEntry.divider(),
       _MenuEntry(
         label: _listView ? '아이콘 보기' : '목록 보기',
@@ -258,6 +294,7 @@ class _DocumentScreenState extends State<DocumentScreen> {
                   onQuery: (v) => setState(() => _query = v),
                   onToggleView: () => setState(() => _listView = !_listView),
                   onNewFolder: _newFolder,
+                  onUpload: _upload,
                   onRename: () => _rename(_selected!),
                   onDelete: () => _delete(_selected!),
                 ),
@@ -531,6 +568,7 @@ class _Toolbar extends StatelessWidget {
     required this.onQuery,
     required this.onToggleView,
     required this.onNewFolder,
+    required this.onUpload,
     required this.onRename,
     required this.onDelete,
   });
@@ -546,6 +584,7 @@ class _Toolbar extends StatelessWidget {
   final ValueChanged<String> onQuery;
   final VoidCallback onToggleView;
   final VoidCallback onNewFolder;
+  final VoidCallback onUpload;
   final VoidCallback onRename;
   final VoidCallback onDelete;
 
@@ -592,9 +631,15 @@ class _Toolbar extends StatelessWidget {
             tooltip: listView ? '아이콘 보기' : '목록 보기',
             onTap: onToggleView,
           ),
+          SizedBox(width: 6),
+          _RoundButton(
+            icon: Icons.create_new_folder_rounded,
+            tooltip: '새 폴더',
+            onTap: onNewFolder,
+          ),
           SizedBox(width: 10),
           Pressable(
-            onTap: onNewFolder,
+            onTap: onUpload,
             scale: 0.95,
             child: Container(
               height: 36,
@@ -607,14 +652,10 @@ class _Toolbar extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    Icons.create_new_folder_rounded,
-                    size: 15,
-                    color: Colors.white,
-                  ),
+                  Icon(Icons.upload_rounded, size: 15, color: Colors.white),
                   SizedBox(width: 6),
                   Text(
-                    '새 폴더',
+                    '파일 올리기',
                     style: AppTextStyles.caption.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.w700,
@@ -1628,4 +1669,145 @@ class _MenuRowState extends State<_MenuRow> {
       ),
     );
   }
+}
+
+// ── 파일 미리보기 ──
+
+/// 파일을 열었을 때 보여주는 창
+///
+/// 올린 이미지는 실제로 그려주고, 그 밖의 형식은 아직 뷰어가 없어
+/// 파일 정보만 보여준다.
+void _showFilePreview(BuildContext context, _Item item) {
+  showAppDialog<void>(context, (context) => _FilePreviewCard(item: item));
+}
+
+class _FilePreviewCard extends StatelessWidget {
+  _FilePreviewCard({required this.item});
+
+  final _Item item;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+
+    return Container(
+      width: dialogWidth(context, 420),
+      padding: EdgeInsets.fromLTRB(24, 24, 24, 20),
+      decoration: AppDecorations.card(radius: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Icon(item.kind.icon, size: 26, color: item.kind.color),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  item.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.body1.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 16),
+          if (item.canPreview)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: size.height * 0.5),
+                child: Image.file(
+                  File(item.path!),
+                  fit: BoxFit.contain,
+                  width: double.infinity,
+                  // 파일이 지워졌거나 못 읽으면 자리만 채운다
+                  errorBuilder: (context, error, stack) =>
+                      _placeholder('이미지를 불러올 수 없어요'),
+                ),
+              ),
+            )
+          else
+            _placeholder(
+              item.path == null
+                  ? '샘플 문서라 미리보기가 없어요'
+                  : '${item.kind.label}은 아직 미리보기를 지원하지 않아요',
+            ),
+          SizedBox(height: 16),
+          _info('종류', item.kind.label),
+          _info('크기', item.sizeLabel),
+          _info('수정한 날짜', _stamp(item.updated)),
+          if (item.path != null) _info('위치', item.path!),
+          SizedBox(height: 14),
+          Pressable(
+            onTap: () => Navigator.pop(context),
+            scale: 0.97,
+            child: Container(
+              height: 46,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.gray50,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '닫기',
+                style: AppTextStyles.body2.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _placeholder(String text) => Container(
+    width: double.infinity,
+    padding: EdgeInsets.symmetric(vertical: 40),
+    decoration: BoxDecoration(
+      color: AppColors.gray50,
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(item.kind.icon, size: 34, color: AppColors.gray400),
+        SizedBox(height: 10),
+        Text(
+          text,
+          textAlign: TextAlign.center,
+          style: AppTextStyles.caption.copyWith(fontSize: 12),
+        ),
+      ],
+    ),
+  );
+
+  Widget _info(String label, String value) => Padding(
+    padding: EdgeInsets.only(bottom: 8),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 76,
+          child: Text(
+            label,
+            style: AppTextStyles.caption.copyWith(fontSize: 12),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.body2.copyWith(fontSize: 12.5),
+          ),
+        ),
+      ],
+    ),
+  );
 }
