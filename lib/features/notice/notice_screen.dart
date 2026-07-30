@@ -1,0 +1,911 @@
+import 'package:flutter/material.dart';
+
+import '../../core/data/staff.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_decorations.dart';
+import '../../core/theme/app_text_styles.dart';
+import '../../core/util/layout.dart';
+import '../../core/util/platform.dart';
+import '../../core/widgets/app_toast.dart';
+import '../../core/widgets/avatar.dart';
+import '../../core/widgets/block_editor.dart';
+import '../../core/widgets/markdown_view.dart';
+import '../../core/widgets/mode_switch.dart';
+import '../../core/widgets/placeholder_screen.dart';
+import '../../core/widgets/pressable.dart';
+
+/// 공지 화면 (목업)
+///
+/// 데스크톱은 좌측 목록 + 우측 본문 2단 구조. 본문은 회의록과 같은
+/// 블록 편집기로 적고, 평소에는 렌더링된 모습으로 읽는다.
+/// 열어보면 읽음 처리가 되고, 누가 확인했는지 아래에서 볼 수 있다.
+/// 모바일 화면은 아직 준비 중 — PC를 먼저 다듬는다.
+class NoticeScreen extends StatefulWidget {
+  NoticeScreen({super.key});
+
+  @override
+  State<NoticeScreen> createState() => _NoticeScreenState();
+}
+
+class _NoticeScreenState extends State<NoticeScreen> {
+  /// true면 안 읽은 공지만
+  bool _unreadOnly = false;
+
+  _Notice? _selected;
+
+  /// 새로 쓴 공지는 바로 편집 모드로 연다
+  bool _startEditing = false;
+
+  List<_Notice> get _visible {
+    final list = _notices
+        .where((n) => !_unreadOnly || !n.readers.contains(me))
+        .toList();
+    // 고정 공지가 위, 그다음 최신순
+    list.sort((a, b) {
+      if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
+      return b.date.compareTo(a.date);
+    });
+    return list;
+  }
+
+  _Notice? _syncSelection(List<_Notice> list) {
+    if (list.isEmpty) return null;
+    if (_selected != null && list.contains(_selected)) return _selected;
+    return list.first;
+  }
+
+  /// 공지를 열면 읽은 것으로 표시한다
+  void _open(_Notice notice) {
+    setState(() {
+      _selected = notice;
+      _startEditing = false;
+      notice.readers.add(me);
+    });
+  }
+
+  void _create() {
+    final now = DateTime.now();
+    final notice = _Notice(
+      title: '',
+      body: '',
+      author: me,
+      date: DateTime(now.year, now.month, now.day),
+      readers: {me},
+    );
+    setState(() {
+      _notices.add(notice);
+      _unreadOnly = false;
+      _selected = notice;
+      _startEditing = true;
+    });
+  }
+
+  void _delete(_Notice notice) {
+    setState(() {
+      _notices.remove(notice);
+      _selected = null;
+    });
+    AppToast.show(context, '공지를 삭제했어요');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!isDesktop) return PlaceholderScreen(emoji: '📣', title: '공지');
+
+    final list = _visible;
+    final selected = _syncSelection(list);
+    // 목록을 처음 그릴 때 자동으로 고른 공지도 읽음 처리한다
+    if (selected != null && !selected.readers.contains(me)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => selected.readers.add(me));
+      });
+    }
+
+    return Scaffold(
+      body: Row(
+        children: [
+          SizedBox(
+            width: 320,
+            child: ColoredBox(
+              color: AppColors.surface,
+              child: _NoticeList(
+                notices: list,
+                selected: selected,
+                unreadOnly: _unreadOnly,
+                unread: _notices.where((n) => !n.readers.contains(me)).length,
+                onFilter: (v) => setState(() {
+                  _unreadOnly = v;
+                  _selected = null;
+                }),
+                onSelect: _open,
+                onCreate: _create,
+              ),
+            ),
+          ),
+          Container(width: 1, color: AppColors.gray100),
+          Expanded(
+            child: selected == null
+                ? _EmptyNotice(unreadOnly: _unreadOnly, onCreate: _create)
+                : _NoticeView(
+                    // 공지를 바꾸면 편집 상태를 새로 시작한다
+                    key: ValueKey(selected),
+                    notice: selected,
+                    editing: _startEditing,
+                    onChanged: () => setState(() {}),
+                    onDelete: () => _delete(selected),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── 좌측 목록 ──
+
+class _NoticeList extends StatelessWidget {
+  _NoticeList({
+    required this.notices,
+    required this.selected,
+    required this.unreadOnly,
+    required this.unread,
+    required this.onFilter,
+    required this.onSelect,
+    required this.onCreate,
+  });
+
+  final List<_Notice> notices;
+  final _Notice? selected;
+  final bool unreadOnly;
+
+  /// 안 읽은 공지 수 (필터 라벨에 쓴다)
+  final int unread;
+  final ValueChanged<bool> onFilter;
+  final ValueChanged<_Notice> onSelect;
+  final VoidCallback onCreate;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 상단 글래스 헤더 버튼 영역만큼 비워둔다
+        SizedBox(height: 64),
+        Padding(
+          padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+          child: Row(
+            children: [
+              Text('공지', style: AppTextStyles.title2),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${notices.length}',
+                  style: AppTextStyles.title3.copyWith(
+                    color: AppColors.textTertiary,
+                  ),
+                ),
+              ),
+              Pressable(
+                onTap: onCreate,
+                scale: 0.94,
+                pressedColor: AppColors.primaryLight,
+                borderRadius: BorderRadius.circular(100),
+                padding: EdgeInsets.fromLTRB(8, 5, 10, 5),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.add_rounded, size: 16, color: AppColors.primary),
+                    SizedBox(width: 2),
+                    Text(
+                      '공지 작성',
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+          child: ModeSwitch(
+            left: '전체',
+            right: unread > 0 ? '안읽음 $unread' : '안읽음',
+            value: unreadOnly,
+            onChanged: onFilter,
+          ),
+        ),
+        Expanded(
+          child: notices.isEmpty
+              ? Padding(
+                  padding: EdgeInsets.fromLTRB(20, 12, 20, 0),
+                  child: Text(
+                    unreadOnly ? '안 읽은 공지가 없어요' : '올라온 공지가 없어요',
+                    style: AppTextStyles.body2.copyWith(
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                )
+              : ListView.separated(
+                  padding: EdgeInsets.fromLTRB(12, 0, 12, 24),
+                  itemCount: notices.length,
+                  separatorBuilder: (_, _) => SizedBox(height: 4),
+                  itemBuilder: (context, i) => _NoticeTile(
+                    notice: notices[i],
+                    selected: notices[i] == selected,
+                    onTap: () => onSelect(notices[i]),
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+class _NoticeTile extends StatefulWidget {
+  _NoticeTile({
+    required this.notice,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _Notice notice;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  State<_NoticeTile> createState() => _NoticeTileState();
+}
+
+class _NoticeTileState extends State<_NoticeTile> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final notice = widget.notice;
+    final unread = !notice.readers.contains(me);
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        // 애니메이션 없이 즉시 칠한다 (색이 서서히 빠지면 두 칸이 같이 켜진 듯 보인다)
+        child: Container(
+          padding: EdgeInsets.fromLTRB(12, 12, 12, 12),
+          decoration: BoxDecoration(
+            color: widget.selected
+                ? AppColors.primaryLight
+                : (_hover ? AppColors.gray50 : Colors.transparent),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  if (notice.pinned) ...[
+                    Icon(
+                      Icons.push_pin_rounded,
+                      size: 13,
+                      color: AppColors.error,
+                    ),
+                    SizedBox(width: 4),
+                  ],
+                  Expanded(
+                    child: Text(
+                      notice.displayTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.body2.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  if (unread) ...[
+                    SizedBox(width: 6),
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              SizedBox(height: 3),
+              Text(
+                notice.preview,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.caption.copyWith(fontSize: 12),
+              ),
+              SizedBox(height: 8),
+              Row(
+                children: [
+                  Avatar(name: notice.author, size: 18),
+                  SizedBox(width: 6),
+                  Text(
+                    '${notice.author} · ${_date(notice.date)}',
+                    style: AppTextStyles.caption.copyWith(fontSize: 11),
+                  ),
+                  Spacer(),
+                  Text(
+                    '${notice.readers.length}/${staffList.length} 확인',
+                    style: AppTextStyles.caption.copyWith(fontSize: 11),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyNotice extends StatelessWidget {
+  _EmptyNotice({required this.unreadOnly, required this.onCreate});
+
+  final bool unreadOnly;
+  final VoidCallback onCreate;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 88,
+            height: 88,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.gray200, width: 2),
+            ),
+            child: Center(
+              child: Icon(
+                Icons.campaign_rounded,
+                size: 38,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+          SizedBox(height: 20),
+          Text('공지', style: AppTextStyles.title2),
+          SizedBox(height: 6),
+          Text(
+            unreadOnly ? '안 읽은 공지가 없어요' : '지점에 알릴 내용을 적어보세요',
+            style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
+          ),
+          SizedBox(height: 24),
+          Pressable(
+            onTap: onCreate,
+            scale: 0.97,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '공지 작성',
+                style: AppTextStyles.body2.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── 우측 본문 ──
+
+class _NoticeView extends StatefulWidget {
+  _NoticeView({
+    super.key,
+    required this.notice,
+    required this.editing,
+    required this.onChanged,
+    required this.onDelete,
+  });
+
+  final _Notice notice;
+  final bool editing;
+  final VoidCallback onChanged;
+  final VoidCallback onDelete;
+
+  @override
+  State<_NoticeView> createState() => _NoticeViewState();
+}
+
+class _NoticeViewState extends State<_NoticeView> {
+  late final _title = TextEditingController(text: widget.notice.title);
+  final _titleFocus = FocusNode();
+
+  late bool _editing = widget.editing;
+  bool _help = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_editing) _titleFocus.requestFocus();
+  }
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _titleFocus.dispose();
+    super.dispose();
+  }
+
+  void _sync() {
+    widget.notice.title = _title.text.trim();
+    widget.onChanged();
+  }
+
+  void _toggleEdit() {
+    if (_editing) _sync();
+    setState(() => _editing = !_editing);
+  }
+
+  /// 본문의 체크박스를 눌렀을 때 그 줄만 바꿔 쓴다
+  void _toggleCheckbox(int line, bool checked) {
+    final lines = widget.notice.body.split('\n');
+    if (line >= lines.length) return;
+    lines[line] = checked
+        ? lines[line].replaceFirst(RegExp(r'\[[ xX]\]'), '[x]')
+        : lines[line].replaceFirst(RegExp(r'\[[ xX]\]'), '[ ]');
+    widget.notice.body = lines.join('\n');
+    widget.onChanged();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final notice = widget.notice;
+    final unreadNames = [
+      for (final staff in staffList)
+        if (!notice.readers.contains(staff.name)) staff.name,
+    ];
+
+    return ListView(
+      padding: EdgeInsets.fromLTRB(32, 64, 32, bottomBarInset(context)),
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (notice.pinned && !_editing) ...[
+              Padding(
+                padding: EdgeInsets.only(top: 6, right: 8),
+                child: Icon(
+                  Icons.push_pin_rounded,
+                  size: 20,
+                  color: AppColors.error,
+                ),
+              ),
+            ],
+            Expanded(
+              child: _editing
+                  ? TextField(
+                      controller: _title,
+                      focusNode: _titleFocus,
+                      style: AppTextStyles.title1,
+                      cursorColor: AppColors.primary,
+                      onChanged: (_) => _sync(),
+                      decoration: InputDecoration(
+                        hintText: '제목 없는 공지',
+                        hintStyle: AppTextStyles.title1.copyWith(
+                          color: AppColors.gray300,
+                        ),
+                        border: InputBorder.none,
+                        isCollapsed: true,
+                      ),
+                    )
+                  : Text(notice.displayTitle, style: AppTextStyles.title1),
+            ),
+            SizedBox(width: 16),
+            if (_editing) ...[
+              Pressable(
+                onTap: widget.onDelete,
+                scale: 0.95,
+                pressedColor: AppColors.gray100,
+                borderRadius: BorderRadius.circular(10),
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Text(
+                  '삭제',
+                  style: AppTextStyles.body2.copyWith(
+                    fontSize: 14,
+                    color: AppColors.error,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              SizedBox(width: 6),
+            ],
+            Pressable(
+              onTap: _toggleEdit,
+              scale: 0.95,
+              child: Container(
+                padding: EdgeInsets.fromLTRB(12, 8, 14, 8),
+                decoration: BoxDecoration(
+                  color: _editing ? AppColors.primary : AppColors.gray50,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _editing ? Icons.check_rounded : Icons.edit_rounded,
+                      size: 15,
+                      color: _editing ? Colors.white : AppColors.textSecondary,
+                    ),
+                    SizedBox(width: 4),
+                    Text(
+                      _editing ? '완료' : '편집',
+                      style: AppTextStyles.body2.copyWith(
+                        fontSize: 14,
+                        color: _editing
+                            ? Colors.white
+                            : AppColors.textSecondary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 10),
+        if (_editing) ...[
+          Row(
+            children: [
+              // 중요 공지는 목록 맨 위에 고정된다
+              Pressable(
+                onTap: () {
+                  setState(() => notice.pinned = !notice.pinned);
+                  widget.onChanged();
+                },
+                scale: 0.96,
+                borderRadius: BorderRadius.circular(100),
+                child: Container(
+                  padding: EdgeInsets.fromLTRB(10, 6, 12, 6),
+                  decoration: BoxDecoration(
+                    color: notice.pinned
+                        ? AppColors.error.withValues(alpha: 0.1)
+                        : AppColors.gray50,
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.push_pin_rounded,
+                        size: 14,
+                        color: notice.pinned
+                            ? AppColors.error
+                            : AppColors.textSecondary,
+                      ),
+                      SizedBox(width: 5),
+                      Text(
+                        '상단 고정',
+                        style: AppTextStyles.body2.copyWith(
+                          fontSize: 14,
+                          color: notice.pinned
+                              ? AppColors.error
+                              : AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              SizedBox(width: 6),
+              // 마크다운 문법 도움말 (펼침)
+              Pressable(
+                onTap: () => setState(() => _help = !_help),
+                scale: 0.97,
+                pressedColor: AppColors.gray100,
+                borderRadius: BorderRadius.circular(10),
+                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.help_outline_rounded,
+                      size: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                    SizedBox(width: 6),
+                    Text(
+                      '마크다운 문법',
+                      style: AppTextStyles.body2.copyWith(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(width: 2),
+                    Icon(
+                      _help
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      size: 16,
+                      color: AppColors.textSecondary,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (_help) ...[SizedBox(height: 10), MarkdownHelpPanel()],
+        ] else
+          Row(
+            children: [
+              Avatar(name: notice.author, size: 24),
+              SizedBox(width: 8),
+              Text(
+                '${notice.author} ${staffOf(notice.author).role} · ${_date(notice.date)}',
+                style: AppTextStyles.caption,
+              ),
+            ],
+          ),
+        SizedBox(height: 14),
+        Container(height: 1, color: AppColors.gray100),
+        SizedBox(height: 14),
+        if (_editing)
+          BlockEditor(
+            source: notice.body,
+            onChanged: (markdown) {
+              notice.body = markdown;
+              widget.onChanged();
+            },
+          )
+        else ...[
+          if (notice.body.trim().isEmpty)
+            Text(
+              '아직 내용이 없어요. 편집을 눌러 적어보세요',
+              style: AppTextStyles.body2.copyWith(
+                color: AppColors.textTertiary,
+              ),
+            )
+          else
+            MarkdownView(source: notice.body, onCheckbox: _toggleCheckbox),
+          SizedBox(height: 24),
+          _ReadCard(notice: notice, unreadNames: unreadNames),
+        ],
+      ],
+    );
+  }
+}
+
+/// 읽음 현황 — 누가 확인했고 누가 안 봤는지
+class _ReadCard extends StatelessWidget {
+  _ReadCard({required this.notice, required this.unreadNames});
+
+  final _Notice notice;
+  final List<String> unreadNames;
+
+  @override
+  Widget build(BuildContext context) {
+    final readNames = [
+      for (final staff in staffList)
+        if (notice.readers.contains(staff.name)) staff.name,
+    ];
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(20, 18, 20, 18),
+      decoration: AppDecorations.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('확인 현황', style: AppTextStyles.label),
+              SizedBox(width: 6),
+              Text(
+                '${readNames.length}/${staffList.length}',
+                style: AppTextStyles.label.copyWith(
+                  color: AppColors.textTertiary,
+                ),
+              ),
+              Spacer(),
+              if (unreadNames.isEmpty)
+                Text(
+                  '모두 확인했어요',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.success,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+            ],
+          ),
+          SizedBox(height: 12),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final name in readNames) _ReaderChip(name: name, read: true),
+              for (final name in unreadNames)
+                _ReaderChip(name: name, read: false),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 확인 여부 알약 — 안 본 사람은 흐리게
+class _ReaderChip extends StatelessWidget {
+  _ReaderChip({required this.name, required this.read});
+
+  final String name;
+  final bool read;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(4, 4, 10, 4),
+      decoration: BoxDecoration(
+        color: read ? AppColors.gray50 : Colors.transparent,
+        borderRadius: BorderRadius.circular(100),
+        border: Border.all(
+          color: read ? Colors.transparent : AppColors.gray200,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Opacity(
+            opacity: read ? 1 : 0.4,
+            child: Avatar(name: name, size: 22),
+          ),
+          SizedBox(width: 6),
+          Text(
+            name == me ? '나' : name,
+            style: AppTextStyles.caption.copyWith(
+              fontSize: 12,
+              color: read ? AppColors.textPrimary : AppColors.gray400,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (read) ...[
+            SizedBox(width: 4),
+            Icon(Icons.check_rounded, size: 13, color: AppColors.success),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ── 데이터 (목업) ──
+
+/// 공지 한 건 — 본문은 마크다운 원문 그대로 담는다
+class _Notice {
+  _Notice({
+    required this.title,
+    required this.body,
+    required this.author,
+    required this.date,
+    required this.readers,
+    this.pinned = false,
+  });
+
+  String title;
+  String body;
+  final String author;
+  final DateTime date;
+
+  /// 상단 고정 (중요 공지)
+  bool pinned;
+
+  /// 확인한 사람
+  final Set<String> readers;
+
+  String get displayTitle => title.isEmpty ? '제목 없는 공지' : title;
+
+  /// 목록에 보여줄 첫 줄 (마크다운 기호는 떼고)
+  String get preview {
+    for (final line in body.split('\n')) {
+      final text = line
+          .replaceAll(RegExp(r'^(#{1,3} |[-*] \[[ xX]\] |[-*] |> |\d+\. )'), '')
+          .replaceAll(RegExp(r'[*`~]'), '')
+          .trim();
+      if (text.isNotEmpty) return text;
+    }
+    return '내용 없음';
+  }
+}
+
+/// 올라온 공지 (목업). 탭을 오가도 유지되도록 모듈 전역으로 둔다.
+final _notices = <_Notice>[..._seed()];
+
+List<_Notice> _seed() {
+  final now = DateTime.now();
+  DateTime day(int offset) => DateTime(now.year, now.month, now.day + offset);
+
+  return [
+    _Notice(
+      title: '여름 이벤트 기간 근무 안내',
+      author: '민중기',
+      date: day(0),
+      pinned: true,
+      readers: {'민중기', '이준승', '박준현'},
+      body: '''
+## 기간
+7월 28일 ~ 8월 31일
+
+## 안내
+- 이벤트 기간 동안 **오전 6시 오픈**으로 30분 앞당깁니다
+- 주말 마감은 기존과 동일하게 22시입니다
+- 상담 문의가 늘 수 있으니 데스크 응대를 우선해주세요
+
+> 근무표 변경이 필요하면 전자결재로 근무 변경 신청을 올려주세요
+
+## 체크
+- [ ] 오픈 시간 변경 확인
+- [ ] 담당 구역 이벤트 안내물 부착
+''',
+    ),
+    _Notice(
+      title: '기구 정기 점검 일정',
+      author: '박준현',
+      date: day(-1),
+      readers: {'박준현', me},
+      body: '''
+8월 2일 오전 9시부터 12시까지 헬스장 기구 정기 점검이 있습니다.
+
+- 점검 중에는 러닝머신 3~5번 사용이 어렵습니다
+- 회원님께는 데스크에서 미리 안내 부탁드립니다
+- 점검 완료 후 이상 있는 기구는 바로 공유해주세요
+''',
+    ),
+    _Notice(
+      title: '8월 급여 지급일 안내',
+      author: '이준승',
+      date: day(-3),
+      readers: {'이준승', '민중기'},
+      body: '''
+8월 급여는 **8월 10일(월)** 지급 예정입니다.
+
+- 지급일이 주말인 경우 앞당겨 지급합니다
+- 급여 명세는 앱 급여 탭에서 확인할 수 있습니다
+- 문의는 대표에게 개별 메시지 주세요
+''',
+    ),
+    _Notice(
+      title: '탈의실 이용 안내 재공지',
+      author: '전상현',
+      date: day(-6),
+      readers: {'전상현', '민중기', '유찬빈', '이준승', '박준현', me},
+      body: '''
+탈의실 사용 관련 회원 문의가 반복되어 다시 안내드립니다.
+
+1. 사용한 수건은 반드시 수거함에 넣도록 안내
+2. 락커 장기 미사용 시 정리 안내 문자 발송
+3. 샤워부스 청소는 마감 담당자가 확인
+
+> 반복 문의 건은 회원 친절도 컴플레인으로 올라올 수 있으니 미리 챙겨주세요
+''',
+    ),
+  ];
+}
+
+// ── 표시용 계산 ──
+
+/// '7.30' 형태
+String _date(DateTime time) => '${time.month}.${time.day}';

@@ -20,6 +20,7 @@ import '../meeting/meeting_screen.dart';
 import '../messages/desktop_chat_screen.dart';
 import '../work/work_screen.dart';
 import '../messages/message_screen.dart';
+import '../notice/notice_screen.dart';
 import '../notifications/notification_screen.dart';
 import '../profile/profile_screen.dart';
 import '../project/project_screen.dart';
@@ -113,7 +114,7 @@ class _MainShellState extends State<MainShell> {
     PlaceholderScreen(emoji: '👥', title: '직원'),
     PlaceholderScreen(emoji: '🗓️', title: '근태·월차'),
     PlaceholderScreen(emoji: '💰', title: '급여'),
-    PlaceholderScreen(emoji: '📣', title: '공지'),
+    NoticeScreen(),
     PlaceholderScreen(emoji: '🏆', title: '랭킹'),
   ];
 
