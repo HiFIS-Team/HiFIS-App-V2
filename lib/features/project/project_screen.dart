@@ -14,6 +14,7 @@ import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/avatar.dart';
 import '../../core/widgets/glass_bottom_button.dart';
 import '../../core/widgets/empty_card.dart';
+import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/pressable.dart';
 
 part 'project_phone.dart';
@@ -226,10 +227,7 @@ class _PhaseTabs extends StatelessWidget {
     return Container(
       height: 44,
       padding: EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: AppColors.gray50,
-        borderRadius: BorderRadius.circular(14),
-      ),
+      decoration: segmentTrack(),
       child: Row(
         children: [
           for (final phase in _Phase.values)
@@ -240,17 +238,7 @@ class _PhaseTabs extends StatelessWidget {
                 // 배경은 애니메이션 없이 즉시 바꾼다 (페이드가 있으면 두 칸이
                 // 같이 눌린 것처럼 보인다)
                 child: Container(
-                  decoration: BoxDecoration(
-                    color: phase == selected
-                        ? AppColors.surface
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: phase == selected
-                          ? AppColors.gray100
-                          : Colors.transparent,
-                    ),
-                  ),
+                  decoration: segmentFill(selected: phase == selected),
                   child: Center(
                     child: Text(
                       phase.label,
@@ -258,7 +246,7 @@ class _PhaseTabs extends StatelessWidget {
                         fontSize: 13,
                         color: phase == selected
                             ? AppColors.textPrimary
-                            : AppColors.gray500,
+                            : AppColors.gray600,
                         fontWeight: phase == selected
                             ? FontWeight.w700
                             : FontWeight.w500,

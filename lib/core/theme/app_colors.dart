@@ -51,6 +51,13 @@ abstract final class AppColors {
   static Color get background =>
       _dark ? const Color(0xFF101419) : const Color(0xFFF2F4F6);
   static Color get surface => _dark ? const Color(0xFF1A212B) : Colors.white;
+
+  /// 세그먼트 스위치의 회색 트랙
+  ///
+  /// 라이트에서 gray50은 화면 배경(background)과 같은 색이라 트랙이 안 보이고,
+  /// 안 눌린 칸이 배경 위에 글자만 얹힌 것처럼 보인다. 한 단계 진한 면을 쓴다.
+  /// 다크는 배경이 트랙보다 훨씬 어두워 gray50으로도 충분히 구분된다.
+  static Color get track => _dark ? gray50 : gray100;
   static Color get textPrimary => gray900;
   static Color get textSecondary => gray600;
   static Color get textTertiary => gray400;

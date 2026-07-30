@@ -8,6 +8,7 @@ import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/glass_icon_button.dart';
+import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/pressable.dart';
 import 'lesson_section.dart';
 import 'peer_review_section.dart';
@@ -373,10 +374,7 @@ class _WorkSegmentedTabsState extends State<_WorkSegmentedTabs> {
     return Container(
       height: 48,
       padding: EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: AppColors.gray50,
-        borderRadius: BorderRadius.circular(14),
-      ),
+      decoration: segmentTrack(),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [for (var i = 0; i < widget.labels.length; i++) _segment(i)],
@@ -402,23 +400,13 @@ class _WorkSegmentedTabsState extends State<_WorkSegmentedTabs> {
         child: Container(
           padding: EdgeInsets.symmetric(horizontal: 18),
           alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: selected
-                ? AppColors.surface
-                : hovered
-                ? AppColors.gray100
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: selected ? AppColors.gray100 : Colors.transparent,
-            ),
-          ),
+          decoration: segmentFill(selected: selected, hovered: hovered),
           child: Text(
             widget.labels[index],
             maxLines: 1,
             style: AppTextStyles.body2.copyWith(
               fontSize: 14,
-              color: selected ? AppColors.primary : AppColors.gray500,
+              color: selected ? AppColors.primary : AppColors.gray600,
               fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
             ),
           ),
