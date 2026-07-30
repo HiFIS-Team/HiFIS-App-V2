@@ -35,6 +35,7 @@ class PhoneDetailScaffold extends StatefulWidget {
     required this.title,
     required this.child,
     this.actions = const [],
+    this.bottomBar,
   });
 
   final String title;
@@ -42,6 +43,9 @@ class PhoneDetailScaffold extends StatefulWidget {
 
   /// 우측 상단 글래스 버튼들 (편집·삭제 등)
   final List<Widget> actions;
+
+  /// 하단 탭바 자리에 띄울 버튼 (GlassBottomButton 등)
+  final Widget? bottomBar;
 
   /// 본문 스크롤 뷰가 위쪽에 잡아야 할 여백 (제목 아래로 내용이 시작된다)
   static const double topPadding = 68;
@@ -99,6 +103,8 @@ class _PhoneDetailScaffoldState extends State<PhoneDetailScaffold> {
               ),
             ),
           ),
+          if (widget.bottomBar != null)
+            Align(alignment: Alignment.bottomCenter, child: widget.bottomBar),
           if (widget.actions.isNotEmpty)
             SafeArea(
               bottom: false,

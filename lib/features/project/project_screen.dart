@@ -12,6 +12,7 @@ import '../../core/widgets/phone_scaffold.dart';
 import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/avatar.dart';
+import '../../core/widgets/glass_bottom_button.dart';
 import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/pressable.dart';
 
@@ -2226,28 +2227,23 @@ class _ProjectComposerState extends State<_ProjectComposer> {
     );
   }
 
-  /// 만들기 버튼 — 폰은 하단 전폭, 데스크톱은 팝업 우측 작은 버튼
-  Widget _submitButton({required bool fill}) {
+  /// 만들기 버튼 (데스크톱 팝업 전용 — 폰은 하단 글래스 버튼을 쓴다)
+  Widget _submitButton() {
     final empty = _name.text.trim().isEmpty;
 
     return Pressable(
       onTap: _submit,
       scale: 0.97,
       child: Container(
-        height: fill ? 56 : null,
-        width: fill ? double.infinity : null,
-        alignment: Alignment.center,
-        padding: fill
-            ? null
-            : EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(
           // 이름을 적기 전에는 흐리게 — 눌러도 안내만 뜬다
           color: empty ? AppColors.gray200 : AppColors.primary,
-          borderRadius: BorderRadius.circular(fill ? 14 : 12),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Text(
           '만들기',
-          style: (fill ? AppTextStyles.body1 : AppTextStyles.body2).copyWith(
+          style: AppTextStyles.body2.copyWith(
             color: empty ? AppColors.gray500 : Colors.white,
             fontWeight: FontWeight.w700,
           ),
@@ -2264,17 +2260,26 @@ class _ProjectComposerState extends State<_ProjectComposer> {
     if (widget.phone) {
       return PhoneDetailScaffold(
         title: '새 프로젝트',
+        // 만들기는 하단 탭바 자리에 글래스 버튼으로 띄운다
+        bottomBar: GlassBottomButton(
+          label: '만들기',
+          active: _name.text.trim().isNotEmpty,
+          onPressed: _submit,
+        ),
         child: ListView(
           padding: EdgeInsets.fromLTRB(
             20,
             PhoneDetailScaffold.topPadding,
             20,
-            MediaQuery.paddingOf(context).bottom + 32,
+            GlassBottomButton.inset(context),
           ),
           children: [
-            _form(context, dday),
-            SizedBox(height: 28),
-            _submitButton(fill: true),
+            // 입력칸(gray50)이 회색 배경에 묻히지 않게 흰 카드 위에 올린다
+            Container(
+              padding: EdgeInsets.fromLTRB(20, 20, 20, 22),
+              decoration: AppDecorations.card(),
+              child: _form(context, dday),
+            ),
           ],
         ),
       );
@@ -2318,7 +2323,7 @@ class _ProjectComposerState extends State<_ProjectComposer> {
                   ),
                 ),
                 SizedBox(width: 8),
-                _submitButton(fill: false),
+                _submitButton(),
               ],
             ),
           ],
