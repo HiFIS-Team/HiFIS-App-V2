@@ -29,9 +29,10 @@ class AndroidTabBar extends StatefulWidget {
 
 class _AndroidTabBarState extends State<AndroidTabBar>
     with SingleTickerProviderStateMixin {
+  // 항목이 하나씩 차례로 튀어나올 시간을 주려고 조금 길게 잡는다
   late final AnimationController _controller = AnimationController(
     vsync: this,
-    duration: Duration(milliseconds: 280),
+    duration: Duration(milliseconds: 420),
   );
 
   bool _open = false;
@@ -59,9 +60,8 @@ class _AndroidTabBarState extends State<AndroidTabBar>
   /// 이게 없으면 양 끝 항목(근태·랭킹)의 라벨이 하단바에 가린다.
   static const double _lift = 30;
 
-  /// 서브 메뉴를 감싸는 그라데이션 반달의 최대 반지름
-  /// (좁은 화면에서는 화면 절반까지만)
-  static const double _maxDiscRadius = 190;
+  /// 항목 하나가 튀어나오는 데 걸리는 비율. 나머지는 시차로 쓴다.
+  static const double _popSpan = 0.55;
 
   @override
   void dispose() {
@@ -103,13 +103,12 @@ class _AndroidTabBarState extends State<AndroidTabBar>
                 onTap: _toggle,
                 child: ColoredBox(
                   color: Colors.black.withValues(
-                    alpha: 0.22 * _controller.value.clamp(0.0, 1.0),
+                    alpha: 0.35 * _controller.value.clamp(0.0, 1.0),
                   ),
                 ),
               ),
             ),
           ),
-          _disc(width: width, centerY: centerY),
           for (var i = 0; i < _fan.length; i++)
             _fanItem(i, width: width, centerY: centerY),
           Align(alignment: Alignment.bottomCenter, child: _bar(safeBottom)),
@@ -223,43 +222,6 @@ class _AndroidTabBarState extends State<AndroidTabBar>
     );
   }
 
-  /// 전체 버튼에서 피어나는 그라데이션 반달 — 서브 메뉴가 이 위에 놓인다
-  Widget _disc({required double width, required double centerY}) {
-    final radius = math.min(_maxDiscRadius, width / 2);
-    return Positioned(
-      left: width / 2 - radius,
-      bottom: centerY,
-      child: IgnorePointer(
-        ignoring: !_open,
-        child: Transform.scale(
-          scale: Curves.easeOutCubic
-              .transform(_controller.value.clamp(0.0, 1.0))
-              .clamp(0.0, 1.0),
-          alignment: Alignment.bottomCenter,
-          child: Container(
-            width: radius * 2,
-            height: radius,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [AppColors.gradientStart, AppColors.gradientEnd],
-              ),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(radius)),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.35),
-                  blurRadius: 28,
-                  offset: Offset(0, 8),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _fanItem(int i, {required double width, required double centerY}) {
     final (index, icon, label) = _fan[i];
     final selected = widget.index == index;
@@ -272,11 +234,13 @@ class _AndroidTabBarState extends State<AndroidTabBar>
     const itemW = 74.0;
     const itemH = 76.0;
 
-    // 바깥쪽부터 차례로 튀어나오게 살짝 시차를 준다
+    // 왼쪽부터 하나씩 차례로 튀어나오고, 닫을 때는 오른쪽부터 사라진다.
+    // (열 때는 뒤로 젖혔다 튀는 곡선, 닫을 때는 되감기는 곡선)
+    final begin = i * (1 - _popSpan) / (_fan.length - 1);
     final t = CurvedAnimation(
       parent: _controller,
-      curve: Interval(i * 0.06, 1, curve: Curves.easeOutBack),
-      reverseCurve: Interval(i * 0.06, 1, curve: Curves.easeIn),
+      curve: Interval(begin, begin + _popSpan, curve: Curves.easeOutBack),
+      reverseCurve: Interval(begin, begin + _popSpan, curve: Curves.easeInBack),
     ).value;
 
     return Positioned(
@@ -285,7 +249,7 @@ class _AndroidTabBarState extends State<AndroidTabBar>
       child: IgnorePointer(
         ignoring: !_open,
         child: Opacity(
-          opacity: _controller.value.clamp(0.0, 1.0),
+          opacity: t.clamp(0.0, 1.0),
           child: Transform.scale(
             scale: t.clamp(0.0, 1.5),
             child: SizedBox(
@@ -301,23 +265,22 @@ class _AndroidTabBarState extends State<AndroidTabBar>
                       width: 50,
                       height: 50,
                       alignment: Alignment.center,
-                      // 그라데이션 반달 위에 놓이므로 흰색 계열로 그리고,
-                      // 선택된 항목만 꽉 찬 흰 원으로 도드라지게 한다
+                      // 딤 위에 뜨는 흰 원. 지금 보고 있는 탭만 파랗게.
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(
-                          alpha: selected ? 1 : 0.22,
-                        ),
+                        color: selected ? AppColors.primary : AppColors.surface,
                         shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white.withValues(
-                            alpha: selected ? 1 : 0.5,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.18),
+                            blurRadius: 16,
+                            offset: Offset(0, 6),
                           ),
-                        ),
+                        ],
                       ),
                       child: Icon(
                         icon,
                         size: 22,
-                        color: selected ? AppColors.primary : Colors.white,
+                        color: selected ? Colors.white : AppColors.gray700,
                       ),
                     ),
                     SizedBox(height: 6),
