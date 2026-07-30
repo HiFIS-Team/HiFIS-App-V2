@@ -55,6 +55,9 @@ class _AndroidTabBarState extends State<AndroidTabBar>
   /// 반원의 반지름 — 전체 버튼 중심에서 서브 메뉴 중심까지
   static const double _radius = 112;
 
+  /// 서브 메뉴를 감싸는 그라데이션 반달의 반지름
+  static const double _discRadius = 158;
+
   @override
   void dispose() {
     _controller.dispose();
@@ -95,12 +98,13 @@ class _AndroidTabBarState extends State<AndroidTabBar>
                 onTap: _toggle,
                 child: ColoredBox(
                   color: Colors.black.withValues(
-                    alpha: 0.28 * _controller.value.clamp(0.0, 1.0),
+                    alpha: 0.22 * _controller.value.clamp(0.0, 1.0),
                   ),
                 ),
               ),
             ),
           ),
+          _disc(width: width, centerY: centerY),
           for (var i = 0; i < _fan.length; i++)
             _fanItem(i, width: width, centerY: centerY),
           Align(alignment: Alignment.bottomCenter, child: _bar(safeBottom)),
@@ -214,6 +218,44 @@ class _AndroidTabBarState extends State<AndroidTabBar>
     );
   }
 
+  /// 전체 버튼에서 피어나는 그라데이션 반달 — 서브 메뉴가 이 위에 놓인다
+  Widget _disc({required double width, required double centerY}) {
+    return Positioned(
+      left: width / 2 - _discRadius,
+      bottom: centerY,
+      child: IgnorePointer(
+        ignoring: !_open,
+        child: Transform.scale(
+          scale: Curves.easeOutCubic
+              .transform(_controller.value.clamp(0.0, 1.0))
+              .clamp(0.0, 1.0),
+          alignment: Alignment.bottomCenter,
+          child: Container(
+            width: _discRadius * 2,
+            height: _discRadius,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [AppColors.gradientStart, AppColors.gradientEnd],
+              ),
+              borderRadius: BorderRadius.vertical(
+                top: Radius.circular(_discRadius),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.35),
+                  blurRadius: 28,
+                  offset: Offset(0, 8),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _fanItem(int i, {required double width, required double centerY}) {
     final (index, icon, label) = _fan[i];
     final selected = widget.index == index;
@@ -255,22 +297,23 @@ class _AndroidTabBarState extends State<AndroidTabBar>
                       width: 50,
                       height: 50,
                       alignment: Alignment.center,
+                      // 그라데이션 반달 위에 놓이므로 흰색 계열로 그리고,
+                      // 선택된 항목만 꽉 찬 흰 원으로 도드라지게 한다
                       decoration: BoxDecoration(
-                        color: selected ? AppColors.primary : AppColors.surface,
+                        color: Colors.white.withValues(
+                          alpha: selected ? 1 : 0.22,
+                        ),
                         shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.gray100),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.10),
-                            blurRadius: 14,
-                            offset: Offset(0, 4),
+                        border: Border.all(
+                          color: Colors.white.withValues(
+                            alpha: selected ? 1 : 0.5,
                           ),
-                        ],
+                        ),
                       ),
                       child: Icon(
                         icon,
                         size: 22,
-                        color: selected ? Colors.white : AppColors.gray700,
+                        color: selected ? AppColors.primary : Colors.white,
                       ),
                     ),
                     SizedBox(height: 6),
