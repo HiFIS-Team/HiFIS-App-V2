@@ -615,10 +615,10 @@ class _ProjectDetail extends StatelessWidget {
 
     return ListView(
       padding: phone
-          // 폰 상세는 하단바 위로 올라오는 화면이라 화면 아래 여백만 남긴다
+          // 폰 상세는 헤더 뒤로 스크롤되고, 하단바가 없어 화면 아래 여백만 남긴다
           ? EdgeInsets.fromLTRB(
               20,
-              8,
+              PhoneDetailScaffold.topPadding,
               20,
               MediaQuery.paddingOf(context).bottom + 32,
             )

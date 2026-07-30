@@ -4,6 +4,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import 'glass_icon_button.dart';
 import 'pressable.dart';
+import 'top_frost.dart';
 
 /// 화면 우상단 주요 동작 알약 (새 프로젝트·새 회의록·공지 작성)
 ///
@@ -53,20 +54,32 @@ class ActionPill extends StatelessWidget {
 
 /// 폰 상세 화면 공통 껍데기 — 상단 가운데 제목 + 좌측 뒤로가기 글래스 버튼
 ///
-/// 본문은 스스로 스크롤하는 위젯([ListView] 등)을 넘긴다.
-class PhoneDetailScaffold extends StatelessWidget {
-  PhoneDetailScaffold({
-    super.key,
-    required this.title,
-    required this.child,
-    this.action,
-  });
+/// 본문은 스스로 스크롤하는 위젯([ListView] 등)을 넘기고,
+/// 위쪽 여백은 [topPadding]만큼 잡아 콘텐츠가 헤더 뒤로 지나가게 한다.
+class PhoneDetailScaffold extends StatefulWidget {
+  PhoneDetailScaffold({super.key, required this.title, required this.child});
 
   final String title;
   final Widget child;
 
-  /// 우측 상단에 놓을 버튼 (없으면 제목만)
-  final Widget? action;
+  /// 본문 스크롤 뷰가 위쪽에 잡아야 할 여백 (제목 아래로 내용이 시작된다)
+  static const double topPadding = 68;
+
+  @override
+  State<PhoneDetailScaffold> createState() => _PhoneDetailScaffoldState();
+}
+
+class _PhoneDetailScaffoldState extends State<PhoneDetailScaffold> {
+  /// 0(펼침) ~ 1(접힘). 스크롤에 따른 상단 블러 강도.
+  double _collapse = 0;
+
+  /// 본문 스크롤 컨트롤러를 넘겨받지 않아도 되도록 알림으로 오프셋을 읽는다
+  bool _onScroll(ScrollNotification notification) {
+    if (notification.metrics.axis != Axis.vertical) return false;
+    final t = ((notification.metrics.pixels - 30) / 30).clamp(0.0, 1.0);
+    if (t != _collapse) setState(() => _collapse = t);
+    return false;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -75,24 +88,26 @@ class PhoneDetailScaffold extends StatelessWidget {
         children: [
           SafeArea(
             bottom: false,
-            child: Column(
-              children: [
-                // 상단 고정 타이틀 영역만큼 비워둔다
-                SizedBox(height: 56),
-                Expanded(child: child),
-              ],
+            child: NotificationListener<ScrollNotification>(
+              onNotification: _onScroll,
+              child: widget.child,
             ),
           ),
-          // 터치는 아래로 통과시켜 뒤로가기 버튼만 눌리게 한다
+          // 스크롤 시 상단 프로그레시브 블러 — 콘텐츠가 헤더 뒤로 흐려진다
+          TopFrost(collapse: _collapse, color: AppColors.background),
+          // 상단 중앙 고정 타이틀 (터치는 아래 본문으로 통과)
           IgnorePointer(
             child: SafeArea(
               bottom: false,
               child: SizedBox(
                 height: 56,
-                child: Center(child: Text(title, style: AppTextStyles.title3)),
+                child: Center(
+                  child: Text(widget.title, style: AppTextStyles.title3),
+                ),
               ),
             ),
           ),
+          // 좌측 상단 고정 뒤로가기 글래스 버튼
           SafeArea(
             bottom: false,
             child: Padding(
@@ -103,17 +118,6 @@ class PhoneDetailScaffold extends StatelessWidget {
               ),
             ),
           ),
-          if (action != null)
-            SafeArea(
-              bottom: false,
-              child: Align(
-                alignment: Alignment.topRight,
-                child: Padding(
-                  padding: EdgeInsets.only(top: 8, right: 16),
-                  child: action,
-                ),
-              ),
-            ),
         ],
       ),
     );
