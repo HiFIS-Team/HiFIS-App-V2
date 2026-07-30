@@ -53,8 +53,7 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
 
   /// 승인·반려 모두 의견을 남겨야 처리된다
   Future<void> _decide(_Doc doc, {required bool approve}) async {
-    final step = doc.current;
-    if (step == null) return;
+    if (doc.state != _State.pending) return;
     final comment = await _showDecisionDialog(
       context,
       doc: doc,
@@ -63,10 +62,10 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
     if (comment == null) return;
 
     setState(() {
-      step
+      doc
         ..state = approve ? _State.approved : _State.rejected
         ..comment = comment
-        ..at = DateTime.now();
+        ..decidedAt = DateTime.now();
     });
     if (!mounted) return;
     AppToast.show(context, approve ? '결재를 승인했어요' : '결재를 반려했어요');
@@ -518,37 +517,63 @@ class _DocDetail extends StatelessWidget {
             ],
           ),
         ),
-        SizedBox(height: 16),
-        Container(
-          width: double.infinity,
-          padding: EdgeInsets.fromLTRB(20, 18, 20, 14),
-          decoration: AppDecorations.card(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text('결재선', style: AppTextStyles.label),
-                  SizedBox(width: 6),
-                  Text(
-                    '${doc.line.where((s) => s.state == _State.approved).length}/${doc.line.length}',
-                    style: AppTextStyles.label.copyWith(
-                      color: AppColors.textTertiary,
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 6),
-              for (var i = 0; i < doc.line.length; i++)
-                _StepRow(
-                  order: i + 1,
-                  step: doc.line[i],
-                  // 앞 사람이 끝나야 차례가 온다
-                  turn: doc.current == doc.line[i],
+        if (doc.state != _State.pending) ...[
+          SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.fromLTRB(20, 16, 20, 16),
+            decoration: BoxDecoration(
+              color: doc.state.color.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  doc.state == _State.approved
+                      ? Icons.check_circle_rounded
+                      : Icons.cancel_rounded,
+                  size: 20,
+                  color: doc.state.color,
                 ),
-            ],
+                SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            doc.state == _State.approved ? '승인됨' : '반려됨',
+                            style: AppTextStyles.body2.copyWith(
+                              color: doc.state.color,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            '$_admin ${staffOf(_admin).role}'
+                            '${doc.decidedAt == null ? '' : ' · ${_date(doc.decidedAt!)}'}',
+                            style: AppTextStyles.caption.copyWith(fontSize: 12),
+                          ),
+                        ],
+                      ),
+                      if (doc.comment.isNotEmpty) ...[
+                        SizedBox(height: 4),
+                        Text(
+                          doc.comment,
+                          style: AppTextStyles.body2.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
         if (doc.state == _State.pending) ...[
           SizedBox(height: 18),
           Row(
@@ -603,113 +628,12 @@ class _DocDetail extends StatelessWidget {
           SizedBox(height: 8),
           Center(
             child: Text(
-              '${doc.current?.approver ?? ''} 차례예요 · 승인·반려 모두 의견을 남겨야 해요',
+              '$_admin ${staffOf(_admin).role} 결재 대기 · 승인·반려 모두 의견을 남겨야 해요',
               style: AppTextStyles.caption.copyWith(fontSize: 12),
             ),
           ),
         ],
       ],
-    );
-  }
-}
-
-/// 결재선 한 줄 — 순번·결재자·처리 결과와 의견
-class _StepRow extends StatelessWidget {
-  _StepRow({required this.order, required this.step, required this.turn});
-
-  final int order;
-  final _Step step;
-
-  /// 지금 이 사람 차례인지
-  final bool turn;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 22,
-            height: 22,
-            margin: EdgeInsets.only(top: 4),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: step.state == _State.pending
-                  ? AppColors.gray50
-                  : step.state.color.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: step.state == _State.pending
-                ? Text(
-                    '$order',
-                    style: AppTextStyles.caption.copyWith(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  )
-                : Icon(
-                    step.state == _State.approved
-                        ? Icons.check_rounded
-                        : Icons.close_rounded,
-                    size: 13,
-                    color: step.state.color,
-                  ),
-          ),
-          SizedBox(width: 10),
-          Avatar(name: step.approver, size: 30),
-          SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      step.approver,
-                      style: AppTextStyles.body2.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    SizedBox(width: 6),
-                    Text(
-                      staffOf(step.approver).role,
-                      style: AppTextStyles.caption.copyWith(fontSize: 11),
-                    ),
-                    if (turn) ...[
-                      SizedBox(width: 6),
-                      Text(
-                        '차례',
-                        style: AppTextStyles.caption.copyWith(
-                          fontSize: 11,
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                if (step.comment.isNotEmpty) ...[
-                  SizedBox(height: 2),
-                  Text(
-                    step.comment,
-                    style: AppTextStyles.body2.copyWith(
-                      fontSize: 14,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          if (step.at != null)
-            Text(
-              _date(step.at!),
-              style: AppTextStyles.caption.copyWith(fontSize: 11),
-            ),
-        ],
-      ),
     );
   }
 }
@@ -767,9 +691,6 @@ class _ComposerState extends State<_Composer> {
 
   _Kind _kind = _Kind.expense;
 
-  /// 기본 결재선 — 점장이 먼저 보고 대표가 마무리한다
-  final _line = <String>['민중기', '이준승'];
-
   @override
   void initState() {
     super.initState();
@@ -793,10 +714,6 @@ class _ComposerState extends State<_Composer> {
       _titleFocus.requestFocus();
       return;
     }
-    if (_line.isEmpty) {
-      AppToast.show(context, '결재선을 한 명 이상 지정해주세요');
-      return;
-    }
     Navigator.pop(
       context,
       _Doc(
@@ -806,10 +723,6 @@ class _ComposerState extends State<_Composer> {
         body: _body.text.trim(),
         writer: me,
         date: DateTime.now(),
-        line: [
-          for (final staff in staffList)
-            if (_line.contains(staff.name)) _Step(approver: staff.name),
-        ],
       ),
     );
   }
@@ -896,39 +809,20 @@ class _ComposerState extends State<_Composer> {
                       lines: 4,
                     ),
                     SizedBox(height: 14),
+                    // 결재는 최고관리자 한 사람이 처리한다
                     Row(
                       children: [
-                        Text('결재선', style: AppTextStyles.label),
+                        Text('결재자', style: AppTextStyles.label),
+                        SizedBox(width: 10),
+                        Avatar(name: _admin, size: 24),
                         SizedBox(width: 6),
                         Text(
-                          _line.isEmpty ? '지정 필요' : _line.join(' → '),
-                          style: AppTextStyles.caption.copyWith(
-                            color: _line.isEmpty
-                                ? AppColors.error
-                                : AppColors.textSecondary,
+                          '$_admin ${staffOf(_admin).role}',
+                          style: AppTextStyles.body2.copyWith(
+                            fontSize: 14,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                      ],
-                    ),
-                    SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        for (final staff in staffList)
-                          if (staff.name != me)
-                            _PersonChip(
-                              staff: staff,
-                              joined: _line.contains(staff.name),
-                              onTap: () => setState(() {
-                                if (_line.contains(staff.name)) {
-                                  _line.remove(staff.name);
-                                } else {
-                                  _line.add(staff.name);
-                                }
-                              }),
-                            ),
                       ],
                     ),
                   ],
@@ -1329,46 +1223,6 @@ class _ThousandsFormatter extends TextInputFormatter {
   }
 }
 
-/// 결재선 고르는 알약
-class _PersonChip extends StatelessWidget {
-  _PersonChip({required this.staff, required this.joined, required this.onTap});
-
-  final Staff staff;
-  final bool joined;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Pressable(
-      onTap: onTap,
-      scale: 0.96,
-      borderRadius: BorderRadius.circular(100),
-      child: Container(
-        padding: EdgeInsets.fromLTRB(4, 4, 10, 4),
-        decoration: BoxDecoration(
-          color: joined ? AppColors.primaryLight : AppColors.gray50,
-          borderRadius: BorderRadius.circular(100),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Avatar(name: staff.name, size: 22),
-            SizedBox(width: 6),
-            Text(
-              staff.name,
-              style: AppTextStyles.caption.copyWith(
-                fontSize: 12,
-                color: joined ? AppColors.primary : AppColors.textSecondary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 // ── 데이터 (목업) ──
 
 /// 결재 종류
@@ -1403,20 +1257,8 @@ enum _State {
   };
 }
 
-/// 결재선 한 단계
-class _Step {
-  _Step({
-    required this.approver,
-    this.state = _State.pending,
-    this.comment = '',
-    this.at,
-  });
-
-  final String approver;
-  _State state;
-  String comment;
-  DateTime? at;
-}
+/// 결재는 최고관리자(대표)가 처리한다
+final _admin = staffList.firstWhere((s) => s.role == '대표').name;
 
 /// 결재 문서 한 건
 class _Doc {
@@ -1427,7 +1269,9 @@ class _Doc {
     required this.body,
     required this.writer,
     required this.date,
-    required this.line,
+    this.state = _State.pending,
+    this.comment = '',
+    this.decidedAt,
   });
 
   final _Kind kind;
@@ -1436,23 +1280,13 @@ class _Doc {
   final String body;
   final String writer;
   final DateTime date;
-  final List<_Step> line;
 
-  /// 지금 결재할 차례인 단계 (끝났으면 null)
-  _Step? get current {
-    for (final step in line) {
-      if (step.state == _State.rejected) return null;
-      if (step.state == _State.pending) return step;
-    }
-    return null;
-  }
+  /// 처리 상태 — 최고관리자가 승인·반려하면 바뀐다
+  _State state;
 
-  /// 문서 상태는 결재선에서 끌어낸다 — 한 명이라도 반려면 반려
-  _State get state {
-    if (line.any((s) => s.state == _State.rejected)) return _State.rejected;
-    if (line.every((s) => s.state == _State.approved)) return _State.approved;
-    return _State.pending;
-  }
+  /// 처리하며 남긴 의견
+  String comment;
+  DateTime? decidedAt;
 }
 
 /// 올라온 결재 (목업). 탭을 오가도 유지되도록 모듈 전역으로 둔다.
@@ -1470,10 +1304,6 @@ List<_Doc> _seed() {
       body: '노후된 케틀벨·밴드 교체가 필요합니다.\n견적 3곳 비교 후 최저가 업체로 진행하려 합니다.',
       writer: '박준현',
       date: day(0),
-      line: [
-        _Step(approver: '민중기'),
-        _Step(approver: '이준승'),
-      ],
     ),
     _Doc(
       kind: _Kind.supply,
@@ -1482,7 +1312,6 @@ List<_Doc> _seed() {
       body: '월 정기 발주 건입니다. 수량은 지난달과 동일합니다.',
       writer: me,
       date: day(-1),
-      line: [_Step(approver: '민중기')],
     ),
     _Doc(
       kind: _Kind.trip,
@@ -1491,15 +1320,6 @@ List<_Doc> _seed() {
       body: '8월 12일 코엑스 박람회 참관 요청드립니다.\n신규 기구 도입 검토를 위한 사전 조사 목적입니다.',
       writer: '유찬빈',
       date: day(-2),
-      line: [
-        _Step(
-          approver: '민중기',
-          state: _State.approved,
-          comment: '기구 도입 검토에 도움이 될 것 같습니다',
-          at: day(-1),
-        ),
-        _Step(approver: '이준승'),
-      ],
     ),
     _Doc(
       kind: _Kind.expense,
@@ -1508,14 +1328,9 @@ List<_Doc> _seed() {
       body: '7월 팀 회식 지출 건입니다. 영수증 첨부 예정입니다.',
       writer: '민중기',
       date: day(-5),
-      line: [
-        _Step(
-          approver: '이준승',
-          state: _State.approved,
-          comment: '고생 많았습니다. 승인합니다',
-          at: day(-4),
-        ),
-      ],
+      state: _State.approved,
+      comment: '고생 많았습니다. 승인합니다',
+      decidedAt: day(-4),
     ),
     _Doc(
       kind: _Kind.shift,
@@ -1524,14 +1339,9 @@ List<_Doc> _seed() {
       body: '개인 사정으로 8월 4일 오전 근무를 오후로 변경하고자 합니다.',
       writer: '전상현',
       date: day(-6),
-      line: [
-        _Step(
-          approver: '민중기',
-          state: _State.rejected,
-          comment: '해당 날짜는 인원이 부족합니다. 다른 날로 조정 부탁드려요',
-          at: day(-5),
-        ),
-      ],
+      state: _State.rejected,
+      comment: '해당 날짜는 인원이 부족합니다. 다른 날로 조정 부탁드려요',
+      decidedAt: day(-5),
     ),
   ];
 }
