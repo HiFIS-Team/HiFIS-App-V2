@@ -42,6 +42,18 @@ class _ProjectScreenState extends State<ProjectScreen> {
     return list.first;
   }
 
+  Future<void> _create() async {
+    final created = await _showProjectComposer(context);
+    if (created == null || !mounted) return;
+    setState(() {
+      _projects.add(created);
+      // 새 프로젝트는 할 일이 없어 늘 진행 중 — 만든 걸 바로 열어준다
+      _finished = false;
+      _selected = created;
+    });
+    AppToast.show(context, '프로젝트를 만들었어요');
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!isDesktop) return PlaceholderScreen(emoji: '📁', title: '프로젝트');
@@ -64,6 +76,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
                 _selected = null;
               }),
               onSelect: (p) => setState(() => _selected = p),
+              onCreate: _create,
             ),
           ),
           Container(width: 1, color: AppColors.gray100),
@@ -92,6 +105,7 @@ class _ProjectList extends StatelessWidget {
     required this.finished,
     required this.onFilter,
     required this.onSelect,
+    required this.onCreate,
   });
 
   final List<_Project> projects;
@@ -99,6 +113,7 @@ class _ProjectList extends StatelessWidget {
   final bool finished;
   final ValueChanged<bool> onFilter;
   final ValueChanged<_Project> onSelect;
+  final VoidCallback onCreate;
 
   @override
   Widget build(BuildContext context) {
@@ -113,10 +128,33 @@ class _ProjectList extends StatelessWidget {
             children: [
               Text('프로젝트', style: AppTextStyles.title2),
               SizedBox(width: 8),
-              Text(
-                '${projects.length}',
-                style: AppTextStyles.title3.copyWith(
-                  color: AppColors.textTertiary,
+              Expanded(
+                child: Text(
+                  '${projects.length}',
+                  style: AppTextStyles.title3.copyWith(
+                    color: AppColors.textTertiary,
+                  ),
+                ),
+              ),
+              Pressable(
+                onTap: onCreate,
+                scale: 0.94,
+                pressedColor: AppColors.primaryLight,
+                borderRadius: BorderRadius.circular(100),
+                padding: EdgeInsets.fromLTRB(8, 5, 10, 5),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.add_rounded, size: 16, color: AppColors.primary),
+                    SizedBox(width: 2),
+                    Text(
+                      '새 프로젝트',
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -391,11 +429,13 @@ class _ProjectDetail extends StatelessWidget {
             ),
           ],
         ),
-        SizedBox(height: 14),
-        Text(
-          project.desc,
-          style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
-        ),
+        if (project.desc.isNotEmpty) ...[
+          SizedBox(height: 14),
+          Text(
+            project.desc,
+            style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
+          ),
+        ],
         SizedBox(height: 18),
         // 진행률
         Row(
@@ -1404,6 +1444,406 @@ class _PickRow extends StatelessWidget {
             Icon(Icons.check_rounded, size: 16, color: AppColors.primary),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// 새 프로젝트 만들기 — 만들면 그 프로젝트를 돌려준다
+Future<_Project?> _showProjectComposer(BuildContext context) {
+  return showDialog<_Project>(
+    context: context,
+    barrierColor: Colors.black.withValues(alpha: 0.45),
+    builder: (context) => Center(
+      child: Material(
+        type: MaterialType.transparency,
+        child: _ProjectComposer(),
+      ),
+    ),
+  );
+}
+
+class _ProjectComposer extends StatefulWidget {
+  _ProjectComposer();
+
+  @override
+  State<_ProjectComposer> createState() => _ProjectComposerState();
+}
+
+class _ProjectComposerState extends State<_ProjectComposer> {
+  final _name = TextEditingController();
+  final _desc = TextEditingController();
+  final _nameFocus = FocusNode();
+
+  /// 기본 마감은 2주 뒤
+  late DateTime _due = DateTime.now().add(Duration(days: 14));
+
+  /// 나는 항상 참여한다 (담당자 기본값이라 뺄 수 없게 둔다)
+  final _members = <String>[_me];
+  String _owner = _me;
+  Color _color = AppColors.primary;
+
+  /// 프로젝트를 구분하는 색 — 빨강은 D-day 배지와 헷갈려서 뺐다
+  static const _palette = [
+    AppColors.primary,
+    Color(0xFF7C5CFC),
+    Color(0xFF00A8B5),
+    AppColors.success,
+    AppColors.warning,
+    Color(0xFF8B95A1),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _name.addListener(() => setState(() {}));
+    _nameFocus.requestFocus();
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _desc.dispose();
+    _nameFocus.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDue() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _due,
+      firstDate: DateTime(now.year - 1),
+      lastDate: DateTime(now.year + 3),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme:
+              (AppColors.isDark
+                      ? ColorScheme.dark(surface: AppColors.surface)
+                      : ColorScheme.light(surface: AppColors.surface))
+                  .copyWith(
+                    primary: AppColors.primary,
+                    onPrimary: Colors.white,
+                    onSurface: AppColors.textPrimary,
+                  ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) setState(() => _due = picked);
+  }
+
+  void _toggleMember(String name) {
+    setState(() {
+      if (_members.contains(name)) {
+        _members.remove(name);
+        // 빠진 사람이 담당이었으면 나로 되돌린다
+        if (_owner == name) _owner = _me;
+      } else {
+        _members.add(name);
+      }
+    });
+  }
+
+  void _submit() {
+    final name = _name.text.trim();
+    if (name.isEmpty) {
+      AppToast.show(context, '프로젝트 이름을 입력해주세요');
+      _nameFocus.requestFocus();
+      return;
+    }
+    final now = DateTime.now();
+    Navigator.pop(
+      context,
+      _Project(
+        name: name,
+        desc: _desc.text.trim(),
+        color: _color,
+        owner: _owner,
+        start: now,
+        due: _due,
+        // 명단 순서대로 정렬해 두면 아바타 줄이 화면마다 같은 순서로 보인다
+        members: [
+          for (final staff in _staff)
+            if (_members.contains(staff.name)) staff.name,
+        ],
+        todos: [],
+        files: [],
+        events: [_Event(author: _me, text: '프로젝트 생성', time: now)],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dday = _dday(_due);
+
+    return Container(
+      width: 420,
+      padding: EdgeInsets.fromLTRB(24, 22, 24, 18),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('새 프로젝트', style: AppTextStyles.title2),
+          SizedBox(height: 16),
+          _Field(
+            controller: _name,
+            focusNode: _nameFocus,
+            hint: '프로젝트 이름',
+            bold: true,
+            onSubmitted: _submit,
+          ),
+          SizedBox(height: 8),
+          _Field(controller: _desc, hint: '어떤 프로젝트인가요? (선택)', lines: 2),
+          SizedBox(height: 16),
+          Row(
+            children: [
+              SizedBox(
+                width: 62,
+                child: Text('마감일', style: AppTextStyles.label),
+              ),
+              Pressable(
+                onTap: _pickDue,
+                scale: 0.97,
+                pressedColor: AppColors.gray100,
+                borderRadius: BorderRadius.circular(10),
+                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.calendar_today_rounded,
+                      size: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                    SizedBox(width: 6),
+                    Text(
+                      '${_due.year}.${_due.month}.${_due.day}',
+                      style: AppTextStyles.body2.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(width: 6),
+              _DdayBadge(dday: dday, finished: false),
+            ],
+          ),
+          SizedBox(height: 10),
+          Row(
+            children: [
+              SizedBox(
+                width: 62,
+                child: Text('담당', style: AppTextStyles.label),
+              ),
+              _AssigneeChip(
+                name: _owner,
+                onTap: () async {
+                  final picked = await _pickMember(
+                    context,
+                    names: _members,
+                    current: _owner,
+                  );
+                  // 담당은 비울 수 없다 (빈 문자열 = 담당자 없음)
+                  if (picked == null || picked.isEmpty) return;
+                  setState(() => _owner = picked);
+                },
+              ),
+            ],
+          ),
+          SizedBox(height: 14),
+          Text('참여 멤버', style: AppTextStyles.label),
+          SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final staff in _staff)
+                _MemberChip(
+                  staff: staff,
+                  joined: _members.contains(staff.name),
+                  // 나는 담당 기본값이라 빼지 않는다
+                  onTap: staff.name == _me
+                      ? null
+                      : () => _toggleMember(staff.name),
+                ),
+            ],
+          ),
+          SizedBox(height: 16),
+          Row(
+            children: [
+              SizedBox(
+                width: 62,
+                child: Text('색상', style: AppTextStyles.label),
+              ),
+              for (final color in _palette) ...[
+                Pressable(
+                  onTap: () => setState(() => _color = color),
+                  scale: 0.9,
+                  child: Container(
+                    width: 26,
+                    height: 26,
+                    margin: EdgeInsets.only(right: 8),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                    ),
+                    child: _color == color
+                        ? Icon(
+                            Icons.check_rounded,
+                            size: 15,
+                            color: Colors.white,
+                          )
+                        : null,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Pressable(
+                onTap: () => Navigator.pop(context),
+                scale: 0.97,
+                pressedColor: AppColors.gray100,
+                borderRadius: BorderRadius.circular(12),
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                child: Text(
+                  '취소',
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              SizedBox(width: 8),
+              Pressable(
+                onTap: _submit,
+                scale: 0.97,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  decoration: BoxDecoration(
+                    // 이름을 적기 전에는 흐리게 — 눌러도 안내만 뜬다
+                    color: _name.text.trim().isEmpty
+                        ? AppColors.gray200
+                        : AppColors.primary,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '만들기',
+                    style: AppTextStyles.body2.copyWith(
+                      color: _name.text.trim().isEmpty
+                          ? AppColors.gray500
+                          : Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 생성 폼 입력칸
+class _Field extends StatelessWidget {
+  _Field({
+    required this.controller,
+    required this.hint,
+    this.focusNode,
+    this.lines = 1,
+    this.bold = false,
+    this.onSubmitted,
+  });
+
+  final TextEditingController controller;
+  final String hint;
+  final FocusNode? focusNode;
+  final int lines;
+  final bool bold;
+  final VoidCallback? onSubmitted;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.gray50,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: TextField(
+        controller: controller,
+        focusNode: focusNode,
+        style: bold
+            ? AppTextStyles.body1.copyWith(fontWeight: FontWeight.w600)
+            : AppTextStyles.body2,
+        cursorColor: AppColors.primary,
+        minLines: lines,
+        maxLines: lines,
+        keyboardType: lines > 1 ? TextInputType.multiline : null,
+        textInputAction: lines > 1
+            ? TextInputAction.newline
+            : TextInputAction.done,
+        onSubmitted: (_) => onSubmitted?.call(),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: (bold ? AppTextStyles.body1 : AppTextStyles.body2)
+              .copyWith(color: AppColors.gray400),
+          border: InputBorder.none,
+          isCollapsed: true,
+        ),
+      ),
+    );
+  }
+}
+
+/// 참여 멤버 고르는 알약 (생성 폼)
+class _MemberChip extends StatelessWidget {
+  _MemberChip({required this.staff, required this.joined, this.onTap});
+
+  final _Staff staff;
+  final bool joined;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap ?? () {},
+      scale: onTap == null ? 1 : 0.96,
+      borderRadius: BorderRadius.circular(100),
+      child: Container(
+        padding: EdgeInsets.fromLTRB(4, 4, 10, 4),
+        decoration: BoxDecoration(
+          color: joined ? AppColors.primaryLight : AppColors.gray50,
+          borderRadius: BorderRadius.circular(100),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _Avatar(name: staff.name, size: 22),
+            SizedBox(width: 6),
+            Text(
+              staff.name == _me ? '나' : staff.name,
+              style: AppTextStyles.caption.copyWith(
+                fontSize: 12,
+                color: joined ? AppColors.primary : AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
