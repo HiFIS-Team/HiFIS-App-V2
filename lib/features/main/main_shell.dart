@@ -21,6 +21,7 @@ import '../messages/message_screen.dart';
 import '../notifications/notification_screen.dart';
 import '../profile/profile_screen.dart';
 import '../project/project_screen.dart';
+import '../schedule/schedule_screen.dart';
 
 /// 하단 탭바와 탭별 화면을 관리하는 루트 셸
 ///
@@ -103,7 +104,7 @@ class _MainShellState extends State<MainShell> {
     HomeScreen(),
     WorkScreen(),
     ProjectScreen(),
-    PlaceholderScreen(emoji: '📅', title: '일정'),
+    ScheduleScreen(),
     PlaceholderScreen(emoji: '📝', title: '회의록'),
     PlaceholderScreen(emoji: '🗂️', title: '문서함'),
     PlaceholderScreen(emoji: '✅', title: '전자결재'),
