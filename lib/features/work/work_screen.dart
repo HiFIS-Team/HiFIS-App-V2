@@ -198,32 +198,24 @@ class _WorkScreenState extends State<WorkScreen> {
               )
             else
               // 항목 탭 — 사내톡 상세 '공유된 콘텐츠' 탭과 같은 밑줄 스타일.
-              // 라벨 폭 기준으로 배치하고 spaceBetween으로 간격을 균등하게 맞추되,
-              // 좁은 화면에서 라벨이 서로 붙지 않게 최소 간격을 두고
-              // 그래도 모자라면 옆으로 넘길 수 있게 한다.
-              LayoutBuilder(
-                builder: (context, constraints) => SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.symmetric(horizontal: 20),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minWidth: constraints.maxWidth - 40,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        for (var i = 0; i < _items.length; i++) ...[
-                          if (i > 0) SizedBox(width: 16),
-                          _WorkTab(
+              // 5개가 한 화면에 다 들어와야 하므로 칸을 균등하게 나누고,
+              // 좁은 화면에서는 글자를 살짝 줄여서라도 옆으로 밀리지 않게 한다.
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 10),
+                child: Row(
+                  children: [
+                    for (var i = 0; i < _items.length; i++)
+                      Expanded(
+                        // 밑줄은 칸 전체가 아니라 글자 폭에 맞춘다
+                        child: Center(
+                          child: _WorkTab(
                             label: _items[i].label,
                             selected: _tab == i,
                             onTap: () => setState(() => _tab = i),
                           ),
-                        ],
-                      ],
-                    ),
-                  ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             Container(height: 1, color: AppColors.gray100),
@@ -443,6 +435,9 @@ class _WorkTab extends StatelessWidget {
       ),
     );
 
+    // 칸이 좁으면 글자를 줄여서 맞춘다 (옆으로 밀리거나 잘리지 않게)
+    final fitted = FittedBox(fit: BoxFit.scaleDown, child: text);
+
     return Pressable(
       onTap: onTap,
       scale: 0.94,
@@ -457,7 +452,7 @@ class _WorkTab extends StatelessWidget {
             ),
           ),
         ),
-        child: expand ? Center(child: text) : text,
+        child: expand ? Center(child: fitted) : fitted,
       ),
     );
   }
