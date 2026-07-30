@@ -576,61 +576,57 @@ class _DocDetail extends StatelessWidget {
         ],
         if (doc.state == _State.pending) ...[
           SizedBox(height: 18),
+          // 안내는 왼쪽, 버튼은 오른쪽에 작게
           Row(
             children: [
               Expanded(
-                child: Pressable(
-                  onTap: onReject,
-                  scale: 0.98,
-                  child: Container(
-                    height: 52,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.gray200),
-                    ),
-                    child: Text(
-                      '반려',
-                      style: AppTextStyles.body1.copyWith(
-                        color: AppColors.error,
-                        fontWeight: FontWeight.w700,
-                      ),
+                child: Text(
+                  '$_admin ${staffOf(_admin).role} 결재 대기 · 의견을 남겨야 처리돼요',
+                  style: AppTextStyles.caption.copyWith(fontSize: 12),
+                ),
+              ),
+              SizedBox(width: 12),
+              Pressable(
+                onTap: onReject,
+                scale: 0.96,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(11),
+                    border: Border.all(color: AppColors.gray200),
+                  ),
+                  child: Text(
+                    '반려',
+                    style: AppTextStyles.body2.copyWith(
+                      fontSize: 14,
+                      color: AppColors.error,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
               ),
-              SizedBox(width: 10),
-              Expanded(
-                flex: 2,
-                child: Pressable(
-                  onTap: onApprove,
-                  scale: 0.98,
-                  child: Container(
-                    height: 52,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Text(
-                      '승인',
-                      style: AppTextStyles.body1.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
+              SizedBox(width: 8),
+              Pressable(
+                onTap: onApprove,
+                scale: 0.96,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: Text(
+                    '승인',
+                    style: AppTextStyles.body2.copyWith(
+                      fontSize: 14,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
               ),
             ],
-          ),
-          SizedBox(height: 8),
-          Center(
-            child: Text(
-              '$_admin ${staffOf(_admin).role} 결재 대기 · 승인·반려 모두 의견을 남겨야 해요',
-              style: AppTextStyles.caption.copyWith(fontSize: 12),
-            ),
           ),
         ],
       ],
