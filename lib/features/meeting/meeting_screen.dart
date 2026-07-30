@@ -352,6 +352,18 @@ class _NoteViewState extends State<_NoteView> {
 
   late bool _editing = widget.editing;
 
+  /// 마크다운 문법 도움말 펼침 상태
+  bool _help = false;
+
+  /// 명령어 메뉴를 연 '/'의 위치 (닫혀 있으면 null)
+  int? _slash;
+
+  /// '/' 뒤에 이어 친 검색어
+  String _query = '';
+
+  /// 본문 글꼴 — 커서 위치 계산에도 같은 값을 쓴다
+  TextStyle get _bodyStyle => AppTextStyles.body2.copyWith(height: 1.7);
+
   @override
   void initState() {
     super.initState();
@@ -476,6 +488,84 @@ class _NoteViewState extends State<_NoteView> {
     _sync();
   }
 
+  // ── 슬래시 명령어 ──
+
+  /// 입력이 바뀔 때마다 커서 앞을 훑어 '/' 명령어 상태를 갱신한다.
+  /// 줄 맨 앞이나 공백 뒤의 '/'만 명령어로 본다.
+  void _updateSlash() {
+    final text = _body.text;
+    final cursor = _body.selection.baseOffset;
+    if (cursor <= 0 || cursor > text.length) {
+      _slash = null;
+      return;
+    }
+
+    var i = cursor - 1;
+    while (i >= 0) {
+      final char = text[i];
+      if (char == '/') break;
+      // 공백·줄바꿈을 만나면 명령어가 아니다
+      if (char == '\n' || char == ' ') {
+        _slash = null;
+        return;
+      }
+      i--;
+    }
+    if (i < 0 || (i > 0 && text[i - 1] != '\n' && text[i - 1] != ' ')) {
+      _slash = null;
+      return;
+    }
+
+    _slash = i;
+    _query = text.substring(i + 1, cursor);
+  }
+
+  List<_Command> get _matches => _query.isEmpty
+      ? _commands
+      : _commands
+            .where(
+              (c) =>
+                  c.label.contains(_query) ||
+                  c.token.startsWith(_query) ||
+                  c.keyword.contains(_query.toLowerCase()),
+            )
+            .toList();
+
+  /// 고른 명령어를 넣는다 — '/검색어'는 지우고 그 자리에 문법을 적용한다
+  void _run(_Command command) {
+    final start = _slash!;
+    final cursor = _body.selection.baseOffset;
+    _body.value = TextEditingValue(
+      text: _body.text.replaceRange(start, cursor, ''),
+      selection: TextSelection.collapsed(offset: start),
+    );
+    setState(() => _slash = null);
+
+    switch (command.type) {
+      case _Type.prefix:
+        _prefix(command.token);
+      case _Type.wrap:
+        _wrap(command.token);
+      case _Type.line:
+        _insertLine(command.token);
+    }
+  }
+
+  /// 커서가 화면 어디에 있는지 재서 명령어 메뉴를 그 아래에 띄운다
+  Offset _caret(double width) {
+    final text = _body.text;
+    final cursor = _body.selection.baseOffset.clamp(0, text.length);
+    final painter = TextPainter(
+      text: TextSpan(text: text.substring(0, cursor), style: _bodyStyle),
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: width - 32);
+    final offset = painter.getOffsetForCaret(
+      TextPosition(offset: cursor),
+      Rect.zero,
+    );
+    return Offset(offset.dx + 16, offset.dy + 16 + painter.preferredLineHeight);
+  }
+
   @override
   Widget build(BuildContext context) {
     final note = widget.note;
@@ -588,8 +678,44 @@ class _NoteViewState extends State<_NoteView> {
                   ],
                 ),
               ),
+              SizedBox(width: 6),
+              // 달력 옆 마크다운 문법 도움말 (펼침)
+              Pressable(
+                onTap: () => setState(() => _help = !_help),
+                scale: 0.97,
+                pressedColor: AppColors.gray100,
+                borderRadius: BorderRadius.circular(10),
+                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.help_outline_rounded,
+                      size: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                    SizedBox(width: 6),
+                    Text(
+                      '마크다운 문법',
+                      style: AppTextStyles.body2.copyWith(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(width: 2),
+                    Icon(
+                      _help
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      size: 16,
+                      color: AppColors.textSecondary,
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
+          if (_help) ...[SizedBox(height: 10), _HelpPanel()],
           SizedBox(height: 10),
           Wrap(
             spacing: 6,
@@ -626,42 +752,65 @@ class _NoteViewState extends State<_NoteView> {
         SizedBox(height: 14),
         Container(height: 1, color: AppColors.gray100),
         SizedBox(height: 14),
-        if (_editing) ...[
-          _Toolbar(onPrefix: _prefix, onWrap: _wrap, onInsert: _insertLine),
-          SizedBox(height: 10),
-          TextField(
-            controller: _body,
-            focusNode: _bodyFocus,
-            style: AppTextStyles.body2.copyWith(height: 1.7),
-            cursorColor: AppColors.primary,
-            maxLines: null,
-            minLines: 16,
-            keyboardType: TextInputType.multiline,
-            onChanged: (_) => _sync(),
-            decoration: InputDecoration(
-              hintText: '# 안건\n- 논의 내용\n- [ ] 할 일\n\n마크다운으로 적을 수 있어요',
-              hintStyle: AppTextStyles.body2.copyWith(
-                color: AppColors.gray400,
-                height: 1.7,
-              ),
-              filled: true,
-              fillColor: AppColors.gray20,
-              contentPadding: EdgeInsets.all(16),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide(color: AppColors.gray100),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide(color: AppColors.gray100),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide(color: AppColors.primary),
-              ),
+        if (_editing)
+          LayoutBuilder(
+            builder: (context, constraints) => Stack(
+              children: [
+                TextField(
+                  controller: _body,
+                  focusNode: _bodyFocus,
+                  style: _bodyStyle,
+                  cursorColor: AppColors.primary,
+                  maxLines: null,
+                  minLines: 16,
+                  keyboardType: TextInputType.multiline,
+                  onChanged: (_) => setState(() {
+                    _updateSlash();
+                    _sync();
+                  }),
+                  onTap: () => setState(() => _slash = null),
+                  decoration: InputDecoration(
+                    hintText: "'/'를 입력하면 명령어가 나와요",
+                    hintStyle: _bodyStyle.copyWith(color: AppColors.gray400),
+                    filled: true,
+                    fillColor: AppColors.gray20,
+                    contentPadding: EdgeInsets.all(16),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: AppColors.gray100),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: AppColors.gray100),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: AppColors.primary),
+                    ),
+                  ),
+                ),
+                // 커서 바로 아래에 뜨는 명령어 메뉴
+                if (_slash != null && _matches.isNotEmpty)
+                  Builder(
+                    builder: (context) {
+                      final caret = _caret(constraints.maxWidth);
+                      return Positioned(
+                        left: caret.dx.clamp(
+                          0,
+                          (constraints.maxWidth - 260).clamp(
+                            0,
+                            constraints.maxWidth,
+                          ),
+                        ),
+                        top: caret.dy + 4,
+                        child: _SlashMenu(commands: _matches, onPick: _run),
+                      );
+                    },
+                  ),
+              ],
             ),
-          ),
-        ] else if (note.body.trim().isEmpty)
+          )
+        else if (note.body.trim().isEmpty)
           Text(
             '아직 내용이 없어요. 편집을 눌러 적어보세요',
             style: AppTextStyles.body2.copyWith(color: AppColors.textTertiary),
@@ -673,80 +822,186 @@ class _NoteViewState extends State<_NoteView> {
   }
 }
 
-/// 편집 보조 버튼 줄 — 커서 있는 줄에 마크다운 기호를 붙인다
-class _Toolbar extends StatelessWidget {
-  _Toolbar({
-    required this.onPrefix,
-    required this.onWrap,
-    required this.onInsert,
-  });
+/// 커서 아래에 뜨는 '/' 명령어 메뉴
+class _SlashMenu extends StatelessWidget {
+  _SlashMenu({required this.commands, required this.onPick});
 
-  final ValueChanged<String> onPrefix;
-  final ValueChanged<String> onWrap;
-  final ValueChanged<String> onInsert;
+  final List<_Command> commands;
+  final ValueChanged<_Command> onPick;
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 6,
-      runSpacing: 6,
-      children: [
-        _ToolButton(label: '제목', onTap: () => onPrefix('# ')),
-        _ToolButton(label: '소제목', onTap: () => onPrefix('## ')),
-        _ToolButton(
-          icon: Icons.format_list_bulleted_rounded,
-          onTap: () => onPrefix('- '),
+    return Material(
+      type: MaterialType.transparency,
+      child: Container(
+        width: 260,
+        constraints: BoxConstraints(maxHeight: 300),
+        padding: EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.gray100),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 24,
+              offset: Offset(0, 8),
+            ),
+          ],
         ),
-        _ToolButton(
-          icon: Icons.checklist_rounded,
-          onTap: () => onPrefix('- [ ] '),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final command in commands)
+                _CommandRow(command: command, onTap: () => onPick(command)),
+            ],
+          ),
         ),
-        _ToolButton(
-          icon: Icons.format_quote_rounded,
-          onTap: () => onPrefix('> '),
-        ),
-        _ToolButton(icon: Icons.format_bold_rounded, onTap: () => onWrap('**')),
-        _ToolButton(icon: Icons.code_rounded, onTap: () => onWrap('`')),
-        _ToolButton(
-          icon: Icons.horizontal_rule_rounded,
-          onTap: () => onInsert('---'),
-        ),
-      ],
+      ),
     );
   }
 }
 
-class _ToolButton extends StatelessWidget {
-  _ToolButton({this.label, this.icon, required this.onTap});
+class _CommandRow extends StatefulWidget {
+  _CommandRow({required this.command, required this.onTap});
 
-  final String? label;
-  final IconData? icon;
+  final _Command command;
   final VoidCallback onTap;
 
   @override
+  State<_CommandRow> createState() => _CommandRowState();
+}
+
+class _CommandRowState extends State<_CommandRow> {
+  bool _hover = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Pressable(
-      onTap: onTap,
-      scale: 0.94,
-      borderRadius: BorderRadius.circular(9),
-      child: Container(
-        height: 32,
-        padding: EdgeInsets.symmetric(horizontal: 10),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: AppColors.gray50,
-          borderRadius: BorderRadius.circular(9),
-        ),
-        child: label != null
-            ? Text(
-                label!,
-                style: AppTextStyles.caption.copyWith(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w700,
+    final command = widget.command;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+          decoration: BoxDecoration(
+            color: _hover ? AppColors.gray50 : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 26,
+                height: 26,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.gray50,
+                  borderRadius: BorderRadius.circular(7),
                 ),
-              )
-            : Icon(icon, size: 16, color: AppColors.textSecondary),
+                child: Icon(
+                  command.icon,
+                  size: 15,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  command.label,
+                  style: AppTextStyles.body2.copyWith(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Text(
+                command.hint,
+                style: AppTextStyles.caption.copyWith(
+                  fontSize: 11,
+                  fontFamily: 'Menlo',
+                  fontFamilyFallback: ['monospace'],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 마크다운 문법 도움말 (달력 옆 버튼으로 펼친다)
+class _HelpPanel extends StatelessWidget {
+  _HelpPanel();
+
+  static const _rows = [
+    ('/', '명령어 메뉴 열기'),
+    ('# ', '제목'),
+    ('## ', '소제목'),
+    ('### ', '작은 제목'),
+    ('- ', '글머리 목록'),
+    ('1. ', '번호 목록'),
+    ('- [ ] ', '체크박스'),
+    ('> ', '인용'),
+    ('---', '구분선'),
+    ('**굵게**', '굵은 글씨'),
+    ('*기울임*', '기울임'),
+    ('`코드`', '인라인 코드'),
+    ('~~취소~~', '취소선'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        color: AppColors.gray20,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.gray100),
+      ),
+      child: Wrap(
+        spacing: 20,
+        runSpacing: 10,
+        children: [
+          for (final (token, label) in _rows)
+            SizedBox(
+              width: 190,
+              child: Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: AppColors.gray100),
+                    ),
+                    child: Text(
+                      token,
+                      style: TextStyle(
+                        fontFamily: 'Menlo',
+                        fontFamilyFallback: ['monospace'],
+                        fontSize: 12,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: AppTextStyles.caption.copyWith(fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -791,6 +1046,125 @@ class _PersonChip extends StatelessWidget {
     );
   }
 }
+
+// ── 슬래시 명령어 목록 ──
+
+/// 명령어가 본문에 들어가는 방식
+enum _Type {
+  /// 줄 앞에 기호를 붙인다
+  prefix,
+
+  /// 선택한 글자를 감싼다
+  wrap,
+
+  /// 한 줄을 통째로 넣는다
+  line,
+}
+
+class _Command {
+  const _Command({
+    required this.label,
+    required this.hint,
+    required this.keyword,
+    required this.icon,
+    required this.token,
+    required this.type,
+  });
+
+  final String label;
+
+  /// 오른쪽에 보여줄 마크다운 기호
+  final String hint;
+
+  /// 영문으로 쳐도 걸리게 하는 검색어
+  final String keyword;
+  final IconData icon;
+  final String token;
+  final _Type type;
+}
+
+const _commands = [
+  _Command(
+    label: '제목',
+    hint: '#',
+    keyword: 'h1 title',
+    icon: Icons.title_rounded,
+    token: '# ',
+    type: _Type.prefix,
+  ),
+  _Command(
+    label: '소제목',
+    hint: '##',
+    keyword: 'h2',
+    icon: Icons.title_rounded,
+    token: '## ',
+    type: _Type.prefix,
+  ),
+  _Command(
+    label: '작은 제목',
+    hint: '###',
+    keyword: 'h3',
+    icon: Icons.title_rounded,
+    token: '### ',
+    type: _Type.prefix,
+  ),
+  _Command(
+    label: '글머리 목록',
+    hint: '-',
+    keyword: 'list bullet',
+    icon: Icons.format_list_bulleted_rounded,
+    token: '- ',
+    type: _Type.prefix,
+  ),
+  _Command(
+    label: '번호 목록',
+    hint: '1.',
+    keyword: 'number ol',
+    icon: Icons.format_list_numbered_rounded,
+    token: '1. ',
+    type: _Type.prefix,
+  ),
+  _Command(
+    label: '체크박스',
+    hint: '- [ ]',
+    keyword: 'todo check',
+    icon: Icons.checklist_rounded,
+    token: '- [ ] ',
+    type: _Type.prefix,
+  ),
+  _Command(
+    label: '인용',
+    hint: '>',
+    keyword: 'quote',
+    icon: Icons.format_quote_rounded,
+    token: '> ',
+    type: _Type.prefix,
+  ),
+  _Command(
+    label: '굵게',
+    hint: '**',
+    keyword: 'bold',
+    icon: Icons.format_bold_rounded,
+    token: '**',
+    type: _Type.wrap,
+  ),
+  _Command(
+    label: '인라인 코드',
+    hint: '`',
+    keyword: 'code',
+    icon: Icons.code_rounded,
+    token: '`',
+    type: _Type.wrap,
+  ),
+  _Command(
+    label: '구분선',
+    hint: '---',
+    keyword: 'divider line hr',
+    icon: Icons.horizontal_rule_rounded,
+    token: '---',
+    type: _Type.line,
+  ),
+];
 
 // ── 데이터 (목업) ──
 
