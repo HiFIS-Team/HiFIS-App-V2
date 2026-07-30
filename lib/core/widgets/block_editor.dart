@@ -28,6 +28,13 @@ class BlockEditorState extends State<BlockEditor> {
   _Block? _menuBlock;
   String _query = '';
 
+  /// 방향키로 고르고 있는 명령어 번호
+  int _menuIndex = 0;
+  final _menuScroll = ScrollController();
+
+  /// 고른 줄이 메뉴 밖으로 나가면 따라 스크롤하려고 잡아둔다
+  final _menuRowKey = GlobalKey();
+
   final _link = LayerLink();
 
   @override
@@ -35,6 +42,7 @@ class BlockEditorState extends State<BlockEditor> {
     for (final block in _blocks) {
       block.dispose();
     }
+    _menuScroll.dispose();
     super.dispose();
   }
 
@@ -139,10 +147,8 @@ class BlockEditorState extends State<BlockEditor> {
 
     final previous = _blocks[index - 1];
     if (previous.type == _BlockType.divider) {
-      setState(() {
-        _blocks.removeAt(index - 1);
-        previous.dispose();
-      });
+      setState(() => _blocks.removeAt(index - 1));
+      _retire(previous);
       _emit();
       return;
     }
@@ -154,13 +160,29 @@ class BlockEditorState extends State<BlockEditor> {
       _blocks.removeAt(index);
     });
     _focus(previous, offset: offset);
-    block.dispose();
+    _retire(block);
     _emit();
+  }
+
+  /// 목록에서 빠진 블록 정리
+  ///
+  /// 바로 dispose하면 아직 화면에 남아 있는 TextField가 죽은 컨트롤러·포커스를
+  /// 붙들고 있다가 깨져서, 앞줄로 커서가 안 넘어간다. 화면에서 지워진 뒤에 버린다.
+  void _retire(_Block block) {
+    WidgetsBinding.instance.addPostFrameCallback((_) => block.dispose());
   }
 
   // ── 슬래시 명령어 ──
 
   void _updateMenu(_Block block) {
+    final wasOpen = _menuBlock != null;
+    final before = _query;
+    _refreshMenu(block);
+    // 새로 열렸거나 검색어가 바뀌면 첫 줄부터 다시 고른다
+    if (!wasOpen || _query != before) _menuIndex = 0;
+  }
+
+  void _refreshMenu(_Block block) {
     final text = block.controller.text;
     final cursor = block.controller.selection.baseOffset;
     if (cursor <= 0 || cursor > text.length) {
@@ -197,6 +219,31 @@ class BlockEditorState extends State<BlockEditor> {
                   c.keyword.contains(_query.toLowerCase()),
             )
             .toList();
+
+  /// 방향키로 위아래 이동 — 끝에서 한 번 더 누르면 반대쪽으로 돈다
+  void _moveMenu(int delta) {
+    final commands = _matches;
+    if (commands.isEmpty) return;
+    setState(() => _menuIndex = (_menuIndex + delta) % commands.length);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final target = _menuRowKey.currentContext?.findRenderObject();
+      if (target == null || !_menuScroll.hasClients) return;
+      _menuScroll.position.ensureVisible(
+        target,
+        alignment: 0.5,
+        duration: Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  /// 엔터로 지금 고른 명령어를 실행한다
+  void _pickMenu() {
+    final commands = _matches;
+    final block = _menuBlock;
+    if (block == null || commands.isEmpty) return;
+    _run(block, commands[_menuIndex.clamp(0, commands.length - 1)]);
+  }
 
   /// 고른 명령어 적용 — '/검색어'는 지우고 블록 종류를 바꾼다
   void _run(_Block block, _Command command) {
@@ -241,6 +288,10 @@ class BlockEditorState extends State<BlockEditor> {
   Widget build(BuildContext context) {
     if (_blocks.isEmpty) _blocks.add(_Block());
 
+    final commands = _matches;
+    final menuOpen = _menuBlock != null && commands.isNotEmpty;
+    final menuIndex = menuOpen ? _menuIndex.clamp(0, commands.length - 1) : 0;
+
     return Container(
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -254,6 +305,8 @@ class BlockEditorState extends State<BlockEditor> {
         children: [
           for (var i = 0; i < _blocks.length; i++)
             _BlockRow(
+              // 줄이 지워지거나 끼어들어도 칸과 커서가 서로 엉키지 않게 한다
+              key: ValueKey(_blocks[i]),
               block: _blocks[i],
               number: _numberOf(i),
               // 처음이자 비어 있는 블록에만 안내를 띄운다
@@ -261,6 +314,10 @@ class BlockEditorState extends State<BlockEditor> {
                   ? "'/'를 입력하면 명령어가 나와요"
                   : null,
               link: _blocks[i] == _menuBlock ? _link : null,
+              menuOpen: menuOpen && _blocks[i] == _menuBlock,
+              onMenuMove: _moveMenu,
+              onMenuPick: _pickMenu,
+              onMenuClose: () => setState(() => _menuBlock = null),
               onChanged: () => _onChanged(i),
               onBackspace: () => _backspace(i),
               onCheck: () {
@@ -275,7 +332,7 @@ class BlockEditorState extends State<BlockEditor> {
             onTap: () => _focus(_blocks.last),
             child: SizedBox(height: 120, width: double.infinity),
           ),
-          if (_menuBlock != null && _matches.isNotEmpty)
+          if (menuOpen)
             CompositedTransformFollower(
               link: _link,
               targetAnchor: Alignment.bottomLeft,
@@ -284,7 +341,12 @@ class BlockEditorState extends State<BlockEditor> {
               child: Align(
                 alignment: Alignment.topLeft,
                 child: _SlashMenu(
-                  commands: _matches,
+                  commands: commands,
+                  selected: menuIndex,
+                  selectedKey: _menuRowKey,
+                  controller: _menuScroll,
+                  // 마우스를 올린 줄이 곧 엔터로 실행될 줄이 되게 맞춘다
+                  onHover: (i) => setState(() => _menuIndex = i),
                   onPick: (command) => _run(_menuBlock!, command),
                 ),
               ),
@@ -309,10 +371,15 @@ class BlockEditorState extends State<BlockEditor> {
 /// 블록 한 줄 — 종류에 맞는 글꼴과 앞머리(글머리표·번호·체크박스)를 붙인다
 class _BlockRow extends StatelessWidget {
   _BlockRow({
+    super.key,
     required this.block,
     required this.number,
     required this.hint,
     required this.link,
+    required this.menuOpen,
+    required this.onMenuMove,
+    required this.onMenuPick,
+    required this.onMenuClose,
     required this.onChanged,
     required this.onBackspace,
     required this.onCheck,
@@ -325,6 +392,12 @@ class _BlockRow extends StatelessWidget {
 
   /// 명령어 메뉴가 이 블록에 붙어 있으면 위치 기준을 잡아준다
   final LayerLink? link;
+
+  /// 이 줄에 명령어 메뉴가 떠 있으면 방향키·엔터를 메뉴가 먼저 가져간다
+  final bool menuOpen;
+  final ValueChanged<int> onMenuMove;
+  final VoidCallback onMenuPick;
+  final VoidCallback onMenuClose;
   final VoidCallback onChanged;
   final VoidCallback onBackspace;
   final VoidCallback onCheck;
@@ -359,8 +432,35 @@ class _BlockRow extends StatelessWidget {
     };
 
     final field = Focus(
-      // 줄 맨 앞에서 백스페이스를 누르면 종류를 풀거나 앞줄과 합친다
       onKeyEvent: (node, event) {
+        if (event is KeyUpEvent) return KeyEventResult.ignored;
+
+        // 명령어 메뉴가 떠 있으면 방향키로 고르고 엔터로 실행한다.
+        // 여기서 handled로 끊어야 엔터가 줄바꿈으로 들어가지 않는다.
+        if (menuOpen) {
+          if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+            onMenuMove(1);
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+            onMenuMove(-1);
+            return KeyEventResult.handled;
+          }
+          if (event is KeyDownEvent) {
+            if (event.logicalKey == LogicalKeyboardKey.enter ||
+                event.logicalKey == LogicalKeyboardKey.numpadEnter) {
+              onMenuPick();
+              return KeyEventResult.handled;
+            }
+            if (event.logicalKey == LogicalKeyboardKey.escape) {
+              onMenuClose();
+              return KeyEventResult.handled;
+            }
+          }
+        }
+
+        // 줄 맨 앞에서 백스페이스를 누르면 종류를 풀거나 앞줄과 합친다.
+        // 누르고 있는 동안 오는 반복 신호는 무시한다 (한 번에 여러 줄이 합쳐진다)
         if (event is! KeyDownEvent) return KeyEventResult.ignored;
         if (event.logicalKey != LogicalKeyboardKey.backspace) {
           return KeyEventResult.ignored;
@@ -613,9 +713,22 @@ String _serialize(List<_Block> blocks) {
 
 /// 커서 아래에 뜨는 '/' 명령어 메뉴
 class _SlashMenu extends StatelessWidget {
-  _SlashMenu({required this.commands, required this.onPick});
+  _SlashMenu({
+    required this.commands,
+    required this.selected,
+    required this.selectedKey,
+    required this.controller,
+    required this.onHover,
+    required this.onPick,
+  });
 
   final List<_Command> commands;
+
+  /// 방향키로 고르고 있는 줄 (마우스를 올려도 여기로 옮겨간다)
+  final int selected;
+  final Key selectedKey;
+  final ScrollController controller;
+  final ValueChanged<int> onHover;
   final ValueChanged<_Command> onPick;
 
   @override
@@ -639,11 +752,18 @@ class _SlashMenu extends StatelessWidget {
           ],
         ),
         child: SingleChildScrollView(
+          controller: controller,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              for (final command in commands)
-                _CommandRow(command: command, onTap: () => onPick(command)),
+              for (var i = 0; i < commands.length; i++)
+                _CommandRow(
+                  key: i == selected ? selectedKey : null,
+                  command: commands[i],
+                  selected: i == selected,
+                  onHover: () => onHover(i),
+                  onTap: () => onPick(commands[i]),
+                ),
             ],
           ),
         ),
@@ -652,34 +772,34 @@ class _SlashMenu extends StatelessWidget {
   }
 }
 
-class _CommandRow extends StatefulWidget {
-  _CommandRow({required this.command, required this.onTap});
+class _CommandRow extends StatelessWidget {
+  _CommandRow({
+    super.key,
+    required this.command,
+    required this.selected,
+    required this.onHover,
+    required this.onTap,
+  });
 
   final _Command command;
+
+  /// 지금 골라져 있는 줄 (방향키·마우스가 같은 표시를 쓴다)
+  final bool selected;
+  final VoidCallback onHover;
   final VoidCallback onTap;
 
   @override
-  State<_CommandRow> createState() => _CommandRowState();
-}
-
-class _CommandRowState extends State<_CommandRow> {
-  bool _hover = false;
-
-  @override
   Widget build(BuildContext context) {
-    final command = widget.command;
-
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
+      onEnter: (_) => onHover(),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: widget.onTap,
+        onTap: onTap,
         child: Container(
           padding: EdgeInsets.symmetric(horizontal: 8, vertical: 7),
           decoration: BoxDecoration(
-            color: _hover ? AppColors.gray50 : Colors.transparent,
+            color: selected ? AppColors.primaryLight : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
           ),
           child: Row(
@@ -689,13 +809,13 @@ class _CommandRowState extends State<_CommandRow> {
                 height: 26,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: AppColors.gray50,
+                  color: selected ? AppColors.surface : AppColors.gray50,
                   borderRadius: BorderRadius.circular(7),
                 ),
                 child: Icon(
                   command.icon,
                   size: 15,
-                  color: AppColors.textSecondary,
+                  color: selected ? AppColors.primary : AppColors.textSecondary,
                 ),
               ),
               SizedBox(width: 10),
@@ -705,6 +825,7 @@ class _CommandRowState extends State<_CommandRow> {
                   style: AppTextStyles.body2.copyWith(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
+                    color: selected ? AppColors.primary : null,
                   ),
                 ),
               ),
