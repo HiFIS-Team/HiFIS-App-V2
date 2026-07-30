@@ -141,6 +141,57 @@ class _DocumentScreenState extends State<DocumentScreen> {
     setState(() => item.starred = !item.starred);
   }
 
+  // ── 우클릭 메뉴 ──
+
+  /// 항목을 우클릭 — 고른 뒤 그 항목에 대한 메뉴를 띄운다
+  void _itemMenu(_Item item, Offset position) {
+    setState(() => _selected = item);
+    _showDocumentMenu(context, position, [
+      _MenuEntry(
+        label: item.isFolder ? '열기' : '미리보기',
+        icon: item.isFolder
+            ? Icons.folder_open_rounded
+            : Icons.visibility_rounded,
+        onTap: () => _open(item),
+      ),
+      _MenuEntry(
+        label: '이름 바꾸기',
+        icon: Icons.drive_file_rename_outline_rounded,
+        onTap: () => _rename(item),
+      ),
+      _MenuEntry(
+        label: item.starred ? '즐겨찾기 해제' : '즐겨찾기에 추가',
+        icon: item.starred ? Icons.star_rounded : Icons.star_border_rounded,
+        onTap: () => _toggleStar(item),
+      ),
+      _MenuEntry.divider(),
+      _MenuEntry(
+        label: '삭제',
+        icon: Icons.delete_outline_rounded,
+        danger: true,
+        onTap: () => _delete(item),
+      ),
+    ]);
+  }
+
+  /// 빈 곳을 우클릭 — 폴더 만들기와 보기 전환
+  void _blankMenu(Offset position) {
+    setState(() => _selected = null);
+    _showDocumentMenu(context, position, [
+      _MenuEntry(
+        label: '새 폴더',
+        icon: Icons.create_new_folder_rounded,
+        onTap: _newFolder,
+      ),
+      _MenuEntry.divider(),
+      _MenuEntry(
+        label: _listView ? '아이콘 보기' : '목록 보기',
+        icon: _listView ? Icons.grid_view_rounded : Icons.list_rounded,
+        onTap: () => setState(() => _listView = !_listView),
+      ),
+    ]);
+  }
+
   // ── 보여줄 목록 ──
 
   List<_Item> get _visible {
@@ -217,6 +268,7 @@ class _DocumentScreenState extends State<DocumentScreen> {
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () => setState(() => _selected = null),
+                    onSecondaryTapDown: (d) => _blankMenu(d.globalPosition),
                     child: items.isEmpty
                         ? _Empty(place: _place, searching: _query.isNotEmpty)
                         : _listView
@@ -228,6 +280,7 @@ class _DocumentScreenState extends State<DocumentScreen> {
                             onStar: _toggleStar,
                             onRename: _rename,
                             onDelete: _delete,
+                            onMenu: _itemMenu,
                           )
                         : _GridBody(
                             items: items,
@@ -237,6 +290,7 @@ class _DocumentScreenState extends State<DocumentScreen> {
                             onStar: _toggleStar,
                             onRename: _rename,
                             onDelete: _delete,
+                            onMenu: _itemMenu,
                           ),
                   ),
                 ),
@@ -654,8 +708,10 @@ class _RoundButton extends StatelessWidget {
         height: 34,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: AppColors.gray50,
+          // 화면 배경이 gray50과 같은 색이라 흰 면 + 테두리로 띄운다
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.gray200),
         ),
         child: Icon(icon, size: 15, color: color),
       ),
@@ -699,8 +755,10 @@ class _SearchBoxState extends State<_SearchBox> {
       height: 34,
       padding: EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        color: AppColors.gray50,
+        // 화면 배경이 gray50과 같은 색이라 흰 면 + 테두리로 띄운다
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.gray200),
       ),
       child: Row(
         children: [
@@ -740,6 +798,7 @@ class _GridBody extends StatelessWidget {
     required this.onStar,
     required this.onRename,
     required this.onDelete,
+    required this.onMenu,
   });
 
   final List<_Item> items;
@@ -749,6 +808,9 @@ class _GridBody extends StatelessWidget {
   final ValueChanged<_Item> onStar;
   final ValueChanged<_Item> onRename;
   final ValueChanged<_Item> onDelete;
+
+  /// 우클릭한 항목과 커서 위치
+  final void Function(_Item item, Offset position) onMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -773,6 +835,7 @@ class _GridBody extends StatelessWidget {
             onStar: () => onStar(items[index]),
             onRename: () => onRename(items[index]),
             onDelete: () => onDelete(items[index]),
+            onMenu: (position) => onMenu(items[index], position),
           ),
         );
       },
@@ -790,6 +853,7 @@ class _GridTile extends StatefulWidget {
     required this.onStar,
     required this.onRename,
     required this.onDelete,
+    required this.onMenu,
   });
 
   final _Item item;
@@ -799,6 +863,9 @@ class _GridTile extends StatefulWidget {
   final VoidCallback onStar;
   final VoidCallback onRename;
   final VoidCallback onDelete;
+
+  /// 우클릭한 커서 위치
+  final ValueChanged<Offset> onMenu;
 
   @override
   State<_GridTile> createState() => _GridTileState();
@@ -826,6 +893,7 @@ class _GridTileState extends State<_GridTile> {
             widget.onSelect();
           }
         },
+        onSecondaryTapDown: (d) => widget.onMenu(d.globalPosition),
         child: Container(
           padding: EdgeInsets.fromLTRB(8, 12, 8, 10),
           decoration: BoxDecoration(
@@ -909,6 +977,7 @@ class _ListBody extends StatelessWidget {
     required this.onStar,
     required this.onRename,
     required this.onDelete,
+    required this.onMenu,
   });
 
   final List<_Item> items;
@@ -918,6 +987,9 @@ class _ListBody extends StatelessWidget {
   final ValueChanged<_Item> onStar;
   final ValueChanged<_Item> onRename;
   final ValueChanged<_Item> onDelete;
+
+  /// 우클릭한 항목과 커서 위치
+  final void Function(_Item item, Offset position) onMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -949,6 +1021,7 @@ class _ListBody extends StatelessWidget {
               onStar: () => onStar(items[index]),
               onRename: () => onRename(items[index]),
               onDelete: () => onDelete(items[index]),
+              onMenu: (position) => onMenu(items[index], position),
             ),
           ),
         ),
@@ -976,6 +1049,7 @@ class _ListRow extends StatefulWidget {
     required this.onStar,
     required this.onRename,
     required this.onDelete,
+    required this.onMenu,
   });
 
   final _Item item;
@@ -985,6 +1059,9 @@ class _ListRow extends StatefulWidget {
   final VoidCallback onStar;
   final VoidCallback onRename;
   final VoidCallback onDelete;
+
+  /// 우클릭한 커서 위치
+  final ValueChanged<Offset> onMenu;
 
   @override
   State<_ListRow> createState() => _ListRowState();
@@ -1011,6 +1088,7 @@ class _ListRowState extends State<_ListRow> {
             widget.onSelect();
           }
         },
+        onSecondaryTapDown: (d) => widget.onMenu(d.globalPosition),
         child: Container(
           padding: EdgeInsets.symmetric(horizontal: 16, vertical: 9),
           decoration: BoxDecoration(
@@ -1377,6 +1455,176 @@ class _NameDialogState extends State<_NameDialog> {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── 우클릭 메뉴 ──
+
+/// 메뉴 한 줄 (label이 null이면 구분선)
+class _MenuEntry {
+  _MenuEntry({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+    this.danger = false,
+  });
+
+  _MenuEntry.divider()
+    : label = null,
+      icon = null,
+      onTap = null,
+      danger = false;
+
+  final String? label;
+  final IconData? icon;
+  final VoidCallback? onTap;
+  final bool danger;
+
+  bool get isDivider => label == null;
+}
+
+/// 누른 자리에 메뉴를 띄운다 (맥 우클릭 메뉴와 같은 결)
+///
+/// 화면 밖으로 나가지 않게 [_MenuLayout]이 위치를 잡아주고,
+/// 바깥을 누르면 닫힌다.
+Future<void> _showDocumentMenu(
+  BuildContext context,
+  Offset position,
+  List<_MenuEntry> entries,
+) {
+  return showDialog<void>(
+    context: context,
+    barrierColor: Colors.transparent,
+    builder: (context) => CustomSingleChildLayout(
+      delegate: _MenuLayout(position),
+      child: _ContextMenu(entries: entries),
+    ),
+  );
+}
+
+/// 누른 지점 근처에 두되, 화면 밖으로 넘어가면 안쪽으로 당긴다
+class _MenuLayout extends SingleChildLayoutDelegate {
+  _MenuLayout(this.position);
+
+  final Offset position;
+
+  static const _margin = 8.0;
+
+  @override
+  BoxConstraints getConstraintsForChild(BoxConstraints constraints) =>
+      BoxConstraints.loose(constraints.biggest);
+
+  @override
+  Offset getPositionForChild(Size size, Size childSize) {
+    final x = position.dx.clamp(
+      _margin,
+      (size.width - childSize.width - _margin).clamp(_margin, size.width),
+    );
+    final y = position.dy.clamp(
+      _margin,
+      (size.height - childSize.height - _margin).clamp(_margin, size.height),
+    );
+    return Offset(x, y);
+  }
+
+  @override
+  bool shouldRelayout(_MenuLayout oldDelegate) =>
+      oldDelegate.position != position;
+}
+
+class _ContextMenu extends StatelessWidget {
+  _ContextMenu({required this.entries});
+
+  final List<_MenuEntry> entries;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      type: MaterialType.transparency,
+      child: Container(
+        width: 190,
+        padding: EdgeInsets.all(5),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.gray100),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.16),
+              blurRadius: 28,
+              offset: Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final entry in entries)
+              if (entry.isDivider)
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: 4),
+                  child: Container(height: 1, color: AppColors.gray100),
+                )
+              else
+                _MenuRow(entry: entry),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MenuRow extends StatefulWidget {
+  _MenuRow({required this.entry});
+
+  final _MenuEntry entry;
+
+  @override
+  State<_MenuRow> createState() => _MenuRowState();
+}
+
+class _MenuRowState extends State<_MenuRow> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final entry = widget.entry;
+    final color = entry.danger ? AppColors.error : AppColors.textPrimary;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          // 메뉴를 먼저 닫아야 팝업이 겹쳐 뜨지 않는다
+          Navigator.pop(context);
+          entry.onTap!();
+        },
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 9, vertical: 8),
+          decoration: BoxDecoration(
+            color: _hover
+                ? (entry.danger
+                      ? AppColors.error.withValues(alpha: 0.1)
+                      : AppColors.primaryLight)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(entry.icon, size: 15, color: color),
+              SizedBox(width: 9),
+              Text(
+                entry.label!,
+                style: AppTextStyles.body2.copyWith(fontSize: 13, color: color),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
