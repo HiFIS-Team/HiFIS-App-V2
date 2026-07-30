@@ -56,13 +56,18 @@ class PhoneDetailScaffold extends StatefulWidget {
 
 class _PhoneDetailScaffoldState extends State<PhoneDetailScaffold> {
   /// 0(펼침) ~ 1(접힘). 스크롤에 따른 상단 블러 강도.
-  double _collapse = 0;
+  final _collapse = ScrollCollapse();
+
+  @override
+  void dispose() {
+    _collapse.dispose();
+    super.dispose();
+  }
 
   /// 본문 스크롤 컨트롤러를 넘겨받지 않아도 되도록 알림으로 오프셋을 읽는다
   bool _onScroll(ScrollNotification notification) {
     if (notification.metrics.axis != Axis.vertical) return false;
-    final t = ((notification.metrics.pixels - 30) / 30).clamp(0.0, 1.0);
-    if (t != _collapse) setState(() => _collapse = t);
+    _collapse.update(notification.metrics.pixels);
     return false;
   }
 

@@ -40,7 +40,7 @@ class _MessageScreenState extends State<MessageScreen> {
   final _scrollController = ScrollController();
 
   /// 0(펼침) ~ 1(접힘). 큰 타이틀이 스크롤로 사라지는 정도.
-  double _collapse = 0;
+  final _collapse = ScrollCollapse();
 
   @override
   void initState() {
@@ -48,14 +48,12 @@ class _MessageScreenState extends State<MessageScreen> {
     _scrollController.addListener(_onScroll);
   }
 
-  void _onScroll() {
-    final t = ((_scrollController.offset - 30) / 30).clamp(0.0, 1.0);
-    if (t != _collapse) setState(() => _collapse = t);
-  }
+  void _onScroll() => _collapse.update(_scrollController.offset);
 
   @override
   void dispose() {
     _scrollController.dispose();
+    _collapse.dispose();
     super.dispose();
   }
 

@@ -28,7 +28,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
   final _groupNameController = TextEditingController();
 
   /// 0(펼침) ~ 1(접힘). 스크롤 시 상단 블러 정도.
-  double _collapse = 0;
+  final _collapse = ScrollCollapse(start: 10);
 
   String _query = '';
   final Set<String> _selected = {};
@@ -48,14 +48,12 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
     _scrollController.addListener(_onScroll);
   }
 
-  void _onScroll() {
-    final t = ((_scrollController.offset - 10) / 30).clamp(0.0, 1.0);
-    if (t != _collapse) setState(() => _collapse = t);
-  }
+  void _onScroll() => _collapse.update(_scrollController.offset);
 
   @override
   void dispose() {
     _scrollController.dispose();
+    _collapse.dispose();
     _groupNameController.dispose();
     super.dispose();
   }

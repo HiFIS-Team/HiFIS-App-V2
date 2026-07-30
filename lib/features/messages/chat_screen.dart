@@ -383,7 +383,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
           // 상단 고정 프로스트 — 대화가 헤더 뒤로 흐려진다
-          TopFrost(collapse: 1, color: AppColors.surface),
+          TopFrost(collapse: TopFrost.always, color: AppColors.surface),
           // 상단 헤더: 뒤로가기 + 아바타 + 이름 (인스타 DM 스타일 좌측 정렬)
           SafeArea(
             bottom: false,

@@ -39,7 +39,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final _scrollController = ScrollController();
 
   /// 0(펼침) ~ 1(접힘). 스크롤 시 상단 블러 정도.
-  double _collapse = 0;
+  final _collapse = ScrollCollapse(start: 10);
 
   int _shareTab = 0;
 
@@ -57,14 +57,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     _scrollController.addListener(_onScroll);
   }
 
-  void _onScroll() {
-    final t = ((_scrollController.offset - 10) / 30).clamp(0.0, 1.0);
-    if (t != _collapse) setState(() => _collapse = t);
-  }
+  void _onScroll() => _collapse.update(_scrollController.offset);
 
   @override
   void dispose() {
     _scrollController.dispose();
+    _collapse.dispose();
     _nameController.dispose();
     super.dispose();
   }
