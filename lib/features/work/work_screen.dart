@@ -654,6 +654,12 @@ class _ChecklistCard extends StatelessWidget {
               final columns = isDesktop
                   ? (constraints.maxWidth / 220).floor().clamp(2, 4)
                   : 2;
+              // 안드로이드는 화면이 좁아 칩마다 글자가 제각각 줄어들었다
+              // ('화장실청소'만 작아 보이는 문제). 제일 긴 라벨에 맞춘
+              // 한 가지 크기를 모든 칩이 같이 쓴다.
+              final chipWidth =
+                  (constraints.maxWidth - 10 * (columns - 1)) / columns;
+              final fontSize = isApple ? null : _chipFontSize(items, chipWidth);
               return Column(
                 children: [
                   for (var i = 0; i < items.length; i += columns) ...[
@@ -667,6 +673,7 @@ class _ChecklistCard extends StatelessWidget {
                                 ? _CountChip(
                                     label: items[i + col],
                                     count: counts[items[i + col]] ?? 0,
+                                    fontSize: fontSize,
                                     onAdjust: (delta) =>
                                         onAdjust(items[i + col], delta),
                                   )
@@ -687,16 +694,53 @@ class _ChecklistCard extends StatelessWidget {
 }
 
 /// 좌 − / 우 + 버튼이 달린 횟수 칩
+/// 칩 안에서 글자가 쓸 수 있는 폭에 맞춰, 모든 라벨이 함께 쓸 글자 크기를 구한다.
+///
+/// 제일 긴 라벨이 들어가는 크기를 찾아 전부에 같은 값을 준다.
+/// 굵은 글씨(수행한 칩)를 기준으로 재서, 눌렀을 때 글자 크기가 흔들리지 않는다.
+double _chipFontSize(List<String> items, double chipWidth) {
+  const base = 14.0;
+  final available = chipWidth - _CountChip.buttonWidth * 2 - 6;
+  if (available <= 0) return base;
+
+  var size = base;
+  for (final label in items) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: AppTextStyles.body2.copyWith(
+          fontSize: base,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      maxLines: 1,
+      textDirection: TextDirection.ltr,
+    )..layout();
+    if (painter.width > available) {
+      final fit = base * available / painter.width;
+      if (fit < size) size = fit;
+    }
+  }
+  return size.clamp(10.0, base);
+}
+
 class _CountChip extends StatelessWidget {
   _CountChip({
     required this.label,
     required this.count,
     required this.onAdjust,
+    this.fontSize,
   });
 
   final String label;
   final int count;
   final ValueChanged<int> onAdjust;
+
+  /// 모든 칩이 함께 쓰는 글자 크기 (없으면 기본 14)
+  final double? fontSize;
+
+  /// 좌우 −/+ 버튼 한 개의 폭
+  static const double buttonWidth = 42;
 
   @override
   Widget build(BuildContext context) {
@@ -734,7 +778,7 @@ class _CountChip extends StatelessWidget {
                     label,
                     maxLines: 1,
                     style: AppTextStyles.body2.copyWith(
-                      fontSize: 14,
+                      fontSize: fontSize ?? 14,
                       color: active ? AppColors.primary : AppColors.textPrimary,
                       fontWeight: active ? FontWeight.w700 : FontWeight.w500,
                     ),
@@ -782,7 +826,7 @@ class _AdjustButtonState extends State<_AdjustButton> {
       onTapCancel: () => _setPressed(false),
       onTap: widget.onTap,
       child: SizedBox(
-        width: 42,
+        width: _CountChip.buttonWidth,
         height: 48,
         child: Center(
           child: AnimatedScale(
