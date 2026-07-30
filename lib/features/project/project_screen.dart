@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../core/data/staff.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
 import '../../core/widgets/app_toast.dart';
+import '../../core/widgets/avatar.dart';
 import '../../core/widgets/placeholder_screen.dart';
 import '../../core/widgets/pressable.dart';
 
@@ -323,7 +325,7 @@ class _ProjectTileState extends State<_ProjectTile> {
               SizedBox(height: 8),
               Row(
                 children: [
-                  _AvatarStack(names: project.members, size: 20),
+                  AvatarStack(names: project.members, size: 20),
                   Spacer(),
                   Text(
                     '할 일 ${project.doneCount}/${project.todos.length}',
@@ -395,7 +397,7 @@ class _ProjectDetail extends StatelessWidget {
   void _log(String text) {
     project.events.insert(
       0,
-      _Event(author: _me, text: text, time: DateTime.now()),
+      _Event(author: me, text: text, time: DateTime.now()),
     );
   }
 
@@ -425,7 +427,7 @@ class _ProjectDetail extends StatelessWidget {
   void _comment(String text) {
     project.events.insert(
       0,
-      _Event(author: _me, text: text, time: DateTime.now(), comment: true),
+      _Event(author: me, text: text, time: DateTime.now(), comment: true),
     );
     onChanged();
   }
@@ -722,7 +724,7 @@ class _MemberBar extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _AvatarStack(names: project.members, size: 28),
+          AvatarStack(names: project.members, size: 28),
           SizedBox(width: 6),
           Container(
             width: 28,
@@ -906,7 +908,7 @@ class _AssigneeChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (assigned) ...[_Avatar(name: name!, size: 20), SizedBox(width: 5)],
+          if (assigned) ...[Avatar(name: name!, size: 20), SizedBox(width: 5)],
           Text(
             assigned ? name! : '담당자',
             style: AppTextStyles.caption.copyWith(
@@ -1079,7 +1081,7 @@ class _ActivityCardState extends State<_ActivityCard> {
           // 댓글 입력
           Row(
             children: [
-              _Avatar(name: _me, size: 34),
+              Avatar(name: me, size: 34),
               SizedBox(width: 10),
               Expanded(
                 child: Container(
@@ -1146,7 +1148,7 @@ class _ActivityCardState extends State<_ActivityCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (event.comment)
-                      _Avatar(name: event.author, size: 28)
+                      Avatar(name: event.author, size: 28)
                     else
                       // 시스템 기록은 아바타 대신 점으로 구분한다
                       Container(
@@ -1292,98 +1294,6 @@ class _ProgressBar extends StatelessWidget {
   }
 }
 
-/// 이름 첫 글자 동그라미
-class _Avatar extends StatelessWidget {
-  _Avatar({required this.name, this.size = 24});
-
-  final String name;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: _staffOf(name).color,
-        shape: BoxShape.circle,
-      ),
-      child: Text(
-        name.characters.first,
-        style: TextStyle(
-          fontFamily: AppTextStyles.fontFamily,
-          fontSize: size * 0.42,
-          fontWeight: FontWeight.w600,
-          color: Colors.white,
-        ),
-      ),
-    );
-  }
-}
-
-/// 참여자 아바타 겹쳐 보이기 (넘치면 +N)
-class _AvatarStack extends StatelessWidget {
-  _AvatarStack({required this.names, this.size = 22});
-
-  final List<String> names;
-  final double size;
-
-  /// 이보다 많으면 나머지는 +N으로 접는다
-  static const _max = 4;
-
-  @override
-  Widget build(BuildContext context) {
-    final shown = names.take(_max).toList();
-    final rest = names.length - shown.length;
-    final step = size * 0.72;
-
-    return SizedBox(
-      height: size,
-      width: shown.length * step + (rest > 0 ? step + size * 0.4 : size - step),
-      child: Stack(
-        children: [
-          for (var i = 0; i < shown.length; i++)
-            Positioned(
-              left: i * step,
-              child: Container(
-                padding: EdgeInsets.all(1.5),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  shape: BoxShape.circle,
-                ),
-                child: _Avatar(name: shown[i], size: size - 3),
-              ),
-            ),
-          if (rest > 0)
-            Positioned(
-              left: shown.length * step,
-              child: Container(
-                width: size,
-                height: size,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppColors.gray100,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.surface, width: 1.5),
-                ),
-                child: Text(
-                  '+$rest',
-                  style: TextStyle(
-                    fontFamily: AppTextStyles.fontFamily,
-                    fontSize: size * 0.38,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
 // ── 팝업 ──
 
 /// 담당자 고르기 — 고르면 이름, '담당자 없음'이면 빈 문자열, 취소면 null
@@ -1417,7 +1327,7 @@ Future<String?> _pickMember(
               for (final name in names)
                 _PickRow(
                   name: name,
-                  role: _staffOf(name).role,
+                  role: staffOf(name).role,
                   selected: name == current,
                   onTap: () => Navigator.pop(context, name),
                 ),
@@ -1467,7 +1377,7 @@ class _PickRow extends StatelessWidget {
       padding: EdgeInsets.symmetric(horizontal: 6, vertical: 7),
       child: Row(
         children: [
-          _Avatar(name: name, size: 30),
+          Avatar(name: name, size: 30),
           SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -1748,7 +1658,7 @@ class _ExtensionDialogState extends State<_ExtensionDialog> {
     Navigator.pop(
       context,
       _Extension(
-        requester: _me,
+        requester: me,
         due: _due,
         reason: reason,
         time: DateTime.now(),
@@ -1923,12 +1833,12 @@ class _ProjectComposerState extends State<_ProjectComposer> {
   late DateTime _due = DateTime.now().add(Duration(days: 14));
 
   /// 나는 항상 참여한다 (담당자 기본값이라 뺄 수 없게 둔다)
-  final _members = <String>[_me];
+  final _members = <String>[me];
 
   /// 만들면서 같이 등록할 할 일
   final _todos = <_Todo>[];
 
-  String _owner = _me;
+  String _owner = me;
   Color _color = AppColors.primary;
 
   /// 프로젝트를 구분하는 색 — 빨강은 D-day 배지와 헷갈려서 뺐다
@@ -1986,7 +1896,7 @@ class _ProjectComposerState extends State<_ProjectComposer> {
       if (_members.contains(name)) {
         _members.remove(name);
         // 빠진 사람이 맡기로 한 자리는 비워둔다
-        if (_owner == name) _owner = _me;
+        if (_owner == name) _owner = me;
         for (final todo in _todos) {
           if (todo.assignee == name) todo.assignee = null;
         }
@@ -2015,11 +1925,11 @@ class _ProjectComposerState extends State<_ProjectComposer> {
         due: _due,
         // 명단 순서대로 정렬해 두면 아바타 줄이 화면마다 같은 순서로 보인다
         members: [
-          for (final staff in _staff)
+          for (final staff in staffList)
             if (_members.contains(staff.name)) staff.name,
         ],
         todos: _todos,
-        events: [_Event(author: _me, text: '프로젝트 생성', time: now)],
+        events: [_Event(author: me, text: '프로젝트 생성', time: now)],
       ),
     );
   }
@@ -2162,12 +2072,12 @@ class _ProjectComposerState extends State<_ProjectComposer> {
                       spacing: 6,
                       runSpacing: 6,
                       children: [
-                        for (final staff in _staff)
+                        for (final staff in staffList)
                           _MemberChip(
                             staff: staff,
                             joined: _members.contains(staff.name),
                             // 나는 담당 기본값이라 빼지 않는다
-                            onTap: staff.name == _me
+                            onTap: staff.name == me
                                 ? null
                                 : () => _toggleMember(staff.name),
                           ),
@@ -2216,7 +2126,7 @@ class _ProjectComposerState extends State<_ProjectComposer> {
                               ),
                             ),
                             if (todo.assignee != null) ...[
-                              _Avatar(name: todo.assignee!, size: 20),
+                              Avatar(name: todo.assignee!, size: 20),
                               SizedBox(width: 6),
                               Text(
                                 todo.assignee!,
@@ -2350,7 +2260,7 @@ class _Field extends StatelessWidget {
 class _MemberChip extends StatelessWidget {
   _MemberChip({required this.staff, required this.joined, this.onTap});
 
-  final _Staff staff;
+  final Staff staff;
   final bool joined;
   final VoidCallback? onTap;
 
@@ -2369,10 +2279,10 @@ class _MemberChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _Avatar(name: staff.name, size: 22),
+            Avatar(name: staff.name, size: 22),
             SizedBox(width: 6),
             Text(
-              staff.name == _me ? '나' : staff.name,
+              staff.name == me ? '나' : staff.name,
               style: AppTextStyles.caption.copyWith(
                 fontSize: 12,
                 color: joined ? AppColors.primary : AppColors.textSecondary,
@@ -2415,7 +2325,7 @@ void _showMemberManager(
                   child: Text('참여 멤버', style: AppTextStyles.title3),
                 ),
                 SizedBox(height: 8),
-                for (final staff in _staff)
+                for (final staff in staffList)
                   _MemberToggleRow(
                     staff: staff,
                     joined: project.members.contains(staff.name),
@@ -2453,7 +2363,7 @@ class _MemberToggleRow extends StatelessWidget {
     required this.onTap,
   });
 
-  final _Staff staff;
+  final Staff staff;
   final bool joined;
   final VoidCallback onTap;
 
@@ -2467,11 +2377,11 @@ class _MemberToggleRow extends StatelessWidget {
       padding: EdgeInsets.symmetric(horizontal: 6, vertical: 7),
       child: Row(
         children: [
-          _Avatar(name: staff.name, size: 32),
+          Avatar(name: staff.name, size: 32),
           SizedBox(width: 10),
           Expanded(
             child: Text(
-              staff.name == _me ? '${staff.name} (나)' : staff.name,
+              staff.name == me ? '${staff.name} (나)' : staff.name,
               style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w600),
             ),
           ),
@@ -2500,32 +2410,6 @@ class _MemberToggleRow extends StatelessWidget {
 }
 
 // ── 데이터 (목업) ──
-
-const _me = '김은후';
-
-/// 직원 명단 — 아바타 색은 사내톡·동료 평가와 같은 색을 쓴다
-class _Staff {
-  const _Staff(this.name, this.role, this.color);
-
-  final String name;
-  final String role;
-  final Color color;
-}
-
-const _staff = [
-  _Staff(_me, '트레이너', AppColors.primary),
-  _Staff('이준승', '대표', Color(0xFF7C5CFC)),
-  _Staff('김피스', '개발', Color(0xFF00A8B5)),
-  _Staff('민중기', '점장', AppColors.success),
-  _Staff('박준현', '트레이너', AppColors.warning),
-  _Staff('유찬빈', '트레이너', Color(0xFF5C7CFA)),
-  _Staff('전상현', 'FC', Color(0xFFE0447C)),
-];
-
-_Staff _staffOf(String name) => _staff.firstWhere(
-  (s) => s.name == name,
-  orElse: () => _Staff(name, '', AppColors.gray400),
-);
 
 /// 할 일 한 건
 class _Todo {
@@ -2640,12 +2524,12 @@ List<_Project> _seedProjects() {
       owner: '민중기',
       start: day(-12),
       due: day(2),
-      members: [_me, '민중기', '이준승', '전상현', '박준현'],
+      members: [me, '민중기', '이준승', '전상현', '박준현'],
       todos: [
         _Todo(text: '포스터 시안 확정', assignee: '이준승', done: true),
         _Todo(text: '경품 업체 선정', assignee: '박준현', done: true),
         _Todo(text: '인스타 예약 발행', assignee: '전상현'),
-        _Todo(text: '현수막 설치', assignee: _me),
+        _Todo(text: '현수막 설치', assignee: me),
         _Todo(text: '이벤트 안내 문자 발송', assignee: '민중기'),
       ],
       events: [
@@ -2666,12 +2550,12 @@ List<_Project> _seedProjects() {
       owner: '박준현',
       start: day(-6),
       due: day(5),
-      members: [_me, '박준현', '유찬빈'],
+      members: [me, '박준현', '유찬빈'],
       todos: [
         _Todo(text: '교체 대상 목록 정리', assignee: '박준현', done: true),
         _Todo(text: '견적 3곳 비교', assignee: '유찬빈', done: true),
         _Todo(text: '예산 결재 올리기', assignee: '박준현'),
-        _Todo(text: '기존 장비 처분', assignee: _me),
+        _Todo(text: '기존 장비 처분', assignee: me),
         _Todo(text: '반입 일정 공지', assignee: '유찬빈'),
       ],
       events: [
@@ -2691,10 +2575,10 @@ List<_Project> _seedProjects() {
       owner: '민중기',
       start: day(-3),
       due: day(12),
-      members: [_me, '민중기', '유찬빈', '전상현'],
+      members: [me, '민중기', '유찬빈', '전상현'],
       todos: [
         _Todo(text: '교육 자료 최신화', assignee: '민중기', done: true),
-        _Todo(text: '멘토 배정', assignee: _me),
+        _Todo(text: '멘토 배정', assignee: me),
         _Todo(text: '첫 주 스케줄 편성', assignee: '유찬빈'),
         _Todo(text: '사내 계정 발급 요청', assignee: '전상현'),
       ],
@@ -2707,10 +2591,10 @@ List<_Project> _seedProjects() {
       owner: '유찬빈',
       start: day(-1),
       due: day(16),
-      members: [_me, '유찬빈'],
+      members: [me, '유찬빈'],
       todos: [
         _Todo(text: '회원 선호 시간대 조사', assignee: '유찬빈'),
-        _Todo(text: '신규 프로그램 후보 정리', assignee: _me),
+        _Todo(text: '신규 프로그램 후보 정리', assignee: me),
         _Todo(text: '강사 일정 조율'),
       ],
       events: [],
@@ -2722,11 +2606,11 @@ List<_Project> _seedProjects() {
       owner: '이준승',
       start: day(2),
       due: day(23),
-      members: [_me, '이준승', '민중기', '김피스', '박준현', '전상현'],
+      members: [me, '이준승', '민중기', '김피스', '박준현', '전상현'],
       todos: [
         _Todo(text: '공사 업체 선정', assignee: '이준승'),
         _Todo(text: '공사 기간 회원 안내문', assignee: '민중기'),
-        _Todo(text: '임시 락커 배치도', assignee: _me),
+        _Todo(text: '임시 락커 배치도', assignee: me),
       ],
       events: [
         _Event(
@@ -2745,11 +2629,11 @@ List<_Project> _seedProjects() {
       owner: '민중기',
       start: day(-25),
       due: day(-4),
-      members: [_me, '민중기', '김피스'],
+      members: [me, '민중기', '김피스'],
       todos: [
         _Todo(text: '소방 설비 점검', assignee: '민중기', done: true),
         _Todo(text: '전기 안전 진단', assignee: '김피스'),
-        _Todo(text: '점검 결과 보고서 제출', assignee: _me),
+        _Todo(text: '점검 결과 보고서 제출', assignee: me),
       ],
       events: [_Event(author: '민중기', text: "'소방 설비 점검' 완료", time: ago(120))],
       request: _Extension(
@@ -2767,11 +2651,11 @@ List<_Project> _seedProjects() {
       owner: '이준승',
       start: day(-40),
       due: day(-6),
-      members: [_me, '이준승', '민중기'],
+      members: [me, '이준승', '민중기'],
       todos: [
         _Todo(text: '경쟁사 가격 조사', assignee: '민중기', done: true),
         _Todo(text: '신규 가격표 확정', assignee: '이준승', done: true),
-        _Todo(text: '환불 규정 문구 수정', assignee: _me, done: true),
+        _Todo(text: '환불 규정 문구 수정', assignee: me, done: true),
       ],
       events: [_Event(author: '이준승', text: "'신규 가격표 확정' 완료", time: ago(150))],
     ),
