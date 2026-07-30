@@ -578,11 +578,12 @@ class _ProjectDetail extends StatelessWidget {
               ),
             ),
             SizedBox(width: 16),
-            Expanded(flex: 2, child: _FileCard(project: project)),
+            Expanded(
+              flex: 2,
+              child: _ActivityCard(project: project, onComment: _comment),
+            ),
           ],
         ),
-        SizedBox(height: 16),
-        _ActivityCard(project: project, onComment: _comment),
       ],
     );
   }
@@ -1015,118 +1016,6 @@ class _TodoComposerState extends State<_TodoComposer> {
   }
 }
 
-/// 첨부 파일 카드 (업로드 연동 전 목업)
-class _FileCard extends StatelessWidget {
-  _FileCard({required this.project});
-
-  final _Project project;
-
-  IconData _icon(String name) {
-    final ext = name.split('.').last.toLowerCase();
-    return switch (ext) {
-      'pdf' => Icons.picture_as_pdf_rounded,
-      'xlsx' || 'csv' => Icons.table_chart_rounded,
-      'png' || 'jpg' || 'jpeg' => Icons.image_rounded,
-      _ => Icons.insert_drive_file_rounded,
-    };
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.fromLTRB(20, 18, 20, 16),
-      decoration: AppDecorations.card(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text('파일', style: AppTextStyles.label),
-              SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  '${project.files.length}',
-                  style: AppTextStyles.label.copyWith(
-                    color: AppColors.textTertiary,
-                  ),
-                ),
-              ),
-              // TODO: 파일 업로드 연동
-              Pressable(
-                onTap: () => AppToast.show(context, '파일 업로드는 준비 중이에요'),
-                scale: 0.92,
-                pressedColor: AppColors.gray100,
-                borderRadius: BorderRadius.circular(100),
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                child: Text(
-                  '올리기',
-                  style: AppTextStyles.caption.copyWith(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 8),
-          if (project.files.isEmpty)
-            Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                '첨부된 파일이 없어요',
-                style: AppTextStyles.body2.copyWith(
-                  color: AppColors.textTertiary,
-                ),
-              ),
-            ),
-          for (final file in project.files)
-            Padding(
-              padding: EdgeInsets.symmetric(vertical: 5),
-              child: Row(
-                children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: AppColors.gray50,
-                      borderRadius: BorderRadius.circular(9),
-                    ),
-                    child: Icon(
-                      _icon(file.name),
-                      size: 17,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          file.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.body2.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Text(
-                          '${file.size} · ${file.uploader}',
-                          style: AppTextStyles.caption.copyWith(fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
 /// 댓글·활동 타임라인
 class _ActivityCard extends StatefulWidget {
   _ActivityCard({required this.project, required this.onComment});
@@ -1173,8 +1062,6 @@ class _ActivityCardState extends State<_ActivityCard> {
           // 댓글 입력
           Row(
             children: [
-              _Avatar(name: _me, size: 32),
-              SizedBox(width: 10),
               Expanded(
                 child: Container(
                   padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -1921,7 +1808,6 @@ class _ProjectComposerState extends State<_ProjectComposer> {
             if (_members.contains(staff.name)) staff.name,
         ],
         todos: _todos,
-        files: [],
         events: [_Event(author: _me, text: '프로젝트 생성', time: now)],
       ),
     );
@@ -2439,15 +2325,6 @@ class _Todo {
   bool done;
 }
 
-/// 첨부 파일 한 건
-class _File {
-  const _File(this.name, this.size, this.uploader);
-
-  final String name;
-  final String size;
-  final String uploader;
-}
-
 /// 활동 기록 한 줄 (댓글이면 comment = true)
 class _Event {
   _Event({
@@ -2502,7 +2379,6 @@ class _Project {
     required this.due,
     required this.members,
     required this.todos,
-    required this.files,
     required this.events,
     this.request,
   });
@@ -2518,7 +2394,6 @@ class _Project {
 
   final List<String> members;
   final List<_Todo> todos;
-  final List<_File> files;
   final List<_Event> events;
 
   /// 결재를 기다리는 기한 연장 신청 (없으면 null)
@@ -2562,10 +2437,6 @@ List<_Project> _seedProjects() {
         _Todo(text: '현수막 설치', assignee: _me),
         _Todo(text: '이벤트 안내 문자 발송', assignee: '민중기'),
       ],
-      files: [
-        _File('여름_이벤트_포스터_시안.pdf', '2.4MB', '이준승'),
-        _File('경품_견적서.xlsx', '88KB', '박준현'),
-      ],
       events: [
         _Event(
           author: '민중기',
@@ -2592,7 +2463,6 @@ List<_Project> _seedProjects() {
         _Todo(text: '기존 장비 처분', assignee: _me),
         _Todo(text: '반입 일정 공지', assignee: '유찬빈'),
       ],
-      files: [_File('장비_견적_비교.xlsx', '124KB', '유찬빈')],
       events: [
         _Event(author: '유찬빈', text: "'견적 3곳 비교' 완료", time: ago(30)),
         _Event(
@@ -2617,7 +2487,6 @@ List<_Project> _seedProjects() {
         _Todo(text: '첫 주 스케줄 편성', assignee: '유찬빈'),
         _Todo(text: '사내 계정 발급 요청', assignee: '전상현'),
       ],
-      files: [_File('온보딩_체크리스트.pdf', '640KB', '민중기')],
       events: [_Event(author: '민중기', text: "'교육 자료 최신화' 완료", time: ago(8))],
     ),
     _Project(
@@ -2633,7 +2502,6 @@ List<_Project> _seedProjects() {
         _Todo(text: '신규 프로그램 후보 정리', assignee: _me),
         _Todo(text: '강사 일정 조율'),
       ],
-      files: [],
       events: [],
     ),
     _Project(
@@ -2649,7 +2517,6 @@ List<_Project> _seedProjects() {
         _Todo(text: '공사 기간 회원 안내문', assignee: '민중기'),
         _Todo(text: '임시 락커 배치도', assignee: _me),
       ],
-      files: [_File('락커룸_도면.png', '1.8MB', '이준승')],
       events: [
         _Event(
           author: '이준승',
@@ -2673,7 +2540,6 @@ List<_Project> _seedProjects() {
         _Todo(text: '전기 안전 진단', assignee: '김피스'),
         _Todo(text: '점검 결과 보고서 제출', assignee: _me),
       ],
-      files: [_File('안전점검_체크리스트.pdf', '410KB', '민중기')],
       events: [_Event(author: '민중기', text: "'소방 설비 점검' 완료", time: ago(120))],
       request: _Extension(
         requester: '민중기',
@@ -2696,7 +2562,6 @@ List<_Project> _seedProjects() {
         _Todo(text: '신규 가격표 확정', assignee: '이준승', done: true),
         _Todo(text: '환불 규정 문구 수정', assignee: _me, done: true),
       ],
-      files: [_File('회원권_정책_최종.pdf', '320KB', '이준승')],
       events: [_Event(author: '이준승', text: "'신규 가격표 확정' 완료", time: ago(150))],
     ),
   ];
