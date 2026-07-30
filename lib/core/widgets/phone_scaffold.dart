@@ -3,50 +3,23 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import 'glass_icon_button.dart';
-import 'pressable.dart';
 import 'top_frost.dart';
 
-/// 화면 우상단 주요 동작 알약 (새 프로젝트·새 회의록·공지 작성)
+/// 폰 목록 화면 좌측 상단 만들기 버튼
 ///
-/// 폰 목록 화면들이 같은 자리에 같은 모양으로 쓴다.
-class ActionPill extends StatelessWidget {
-  ActionPill({
-    super.key,
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
+/// 우측의 공용 헤더 버튼(바코드·사내톡·알림·프로필)과 같은 높이·크기로 둔다.
+class PhoneCreateButton extends StatelessWidget {
+  PhoneCreateButton({super.key, required this.onTap});
 
-  final IconData icon;
-  final String label;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Pressable(
-      onTap: onTap,
-      scale: 0.95,
-      child: Container(
-        padding: EdgeInsets.fromLTRB(12, 9, 15, 9),
-        decoration: BoxDecoration(
-          color: AppColors.primary,
-          borderRadius: BorderRadius.circular(100),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16, color: Colors.white),
-            SizedBox(width: 4),
-            Text(
-              label,
-              style: AppTextStyles.caption.copyWith(
-                fontSize: 13,
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: EdgeInsets.only(top: 8, left: 16),
+        child: GlassIconButton(symbol: 'plus', onPressed: onTap),
       ),
     );
   }

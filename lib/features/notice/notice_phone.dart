@@ -74,66 +74,66 @@ class _NoticePhone extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            // 상단 글래스 헤더 버튼 영역만큼 비워둔다
-            SizedBox(height: 64),
-            Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 14),
-              child: Row(
-                children: [
-                  Text('공지', style: AppTextStyles.title1),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '${notices.length}',
-                      style: AppTextStyles.title2.copyWith(
-                        color: AppColors.textTertiary,
+      body: Stack(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                // 상단 글래스 헤더 버튼 영역만큼 비워둔다
+                SizedBox(height: 64),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(20, 0, 20, 14),
+                  child: Row(
+                    children: [
+                      Text('공지', style: AppTextStyles.title1),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '${notices.length}',
+                          style: AppTextStyles.title2.copyWith(
+                            color: AppColors.textTertiary,
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
-                  ActionPill(
-                    icon: Icons.add_rounded,
-                    label: '공지 작성',
-                    onTap: () => _create(context),
+                ),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(20, 0, 20, 16),
+                  child: ModeSwitch(
+                    left: '전체',
+                    right: unread > 0 ? '안읽음 $unread' : '안읽음',
+                    value: unreadOnly,
+                    onChanged: onFilter,
                   ),
-                ],
-              ),
+                ),
+                Expanded(
+                  child: notices.isEmpty
+                      ? _emptyCard(
+                          icon: Icons.campaign_rounded,
+                          text: unreadOnly ? '안 읽은 공지가 없어요' : '올라온 공지가 없어요',
+                        )
+                      : ListView.separated(
+                          padding: EdgeInsets.fromLTRB(
+                            20,
+                            0,
+                            20,
+                            bottomBarInset(context),
+                          ),
+                          itemCount: notices.length,
+                          separatorBuilder: (_, _) => SizedBox(height: 12),
+                          itemBuilder: (context, i) => _NoticeCard(
+                            notice: notices[i],
+                            onTap: () => _open(context, notices[i]),
+                          ),
+                        ),
+                ),
+              ],
             ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 16),
-              child: ModeSwitch(
-                left: '전체',
-                right: unread > 0 ? '안읽음 $unread' : '안읽음',
-                value: unreadOnly,
-                onChanged: onFilter,
-              ),
-            ),
-            Expanded(
-              child: notices.isEmpty
-                  ? _emptyCard(
-                      icon: Icons.campaign_rounded,
-                      text: unreadOnly ? '안 읽은 공지가 없어요' : '올라온 공지가 없어요',
-                    )
-                  : ListView.separated(
-                      padding: EdgeInsets.fromLTRB(
-                        20,
-                        0,
-                        20,
-                        bottomBarInset(context),
-                      ),
-                      itemCount: notices.length,
-                      separatorBuilder: (_, _) => SizedBox(height: 12),
-                      itemBuilder: (context, i) => _NoticeCard(
-                        notice: notices[i],
-                        onTap: () => _open(context, notices[i]),
-                      ),
-                    ),
-            ),
-          ],
-        ),
+          ),
+          PhoneCreateButton(onTap: () => _create(context)),
+        ],
       ),
     );
   }

@@ -24,6 +24,7 @@ const _icons = <String, IconData>{
   'line.3.horizontal.decrease': Icons.filter_list_rounded,
   'message': Icons.chat_bubble_outline_rounded,
   'person': Icons.person_outline_rounded,
+  'plus': Icons.add_rounded,
   'square.and.pencil': Icons.edit_rounded,
   'trash': Icons.delete_outline_rounded,
   'xmark': Icons.close_rounded,

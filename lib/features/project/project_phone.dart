@@ -43,61 +43,61 @@ class _ProjectPhone extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            // 상단 글래스 헤더 버튼 영역만큼 비워둔다
-            SizedBox(height: 64),
-            Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 14),
-              child: Row(
-                children: [
-                  Text('프로젝트', style: AppTextStyles.title1),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '${projects.length}',
-                      style: AppTextStyles.title2.copyWith(
-                        color: AppColors.textTertiary,
+      body: Stack(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                // 상단 글래스 헤더 버튼 영역만큼 비워둔다
+                SizedBox(height: 64),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(20, 0, 20, 14),
+                  child: Row(
+                    children: [
+                      Text('프로젝트', style: AppTextStyles.title1),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '${projects.length}',
+                          style: AppTextStyles.title2.copyWith(
+                            color: AppColors.textTertiary,
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
-                  ActionPill(
-                    icon: Icons.add_rounded,
-                    label: '새 프로젝트',
-                    onTap: onCreate,
-                  ),
-                ],
-              ),
+                ),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(20, 0, 20, 16),
+                  child: _PhaseTabs(selected: phase, onSelect: onFilter),
+                ),
+                Expanded(
+                  child: projects.isEmpty
+                      ? _emptyCard(
+                          icon: Icons.folder_rounded,
+                          text: '${phase.label} 프로젝트가 없어요',
+                        )
+                      : ListView.separated(
+                          padding: EdgeInsets.fromLTRB(
+                            20,
+                            0,
+                            20,
+                            bottomBarInset(context),
+                          ),
+                          itemCount: projects.length,
+                          separatorBuilder: (_, _) => SizedBox(height: 12),
+                          itemBuilder: (context, i) => _ProjectCard(
+                            project: projects[i],
+                            onTap: () => _open(context, projects[i]),
+                          ),
+                        ),
+                ),
+              ],
             ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 16),
-              child: _PhaseTabs(selected: phase, onSelect: onFilter),
-            ),
-            Expanded(
-              child: projects.isEmpty
-                  ? _emptyCard(
-                      icon: Icons.folder_rounded,
-                      text: '${phase.label} 프로젝트가 없어요',
-                    )
-                  : ListView.separated(
-                      padding: EdgeInsets.fromLTRB(
-                        20,
-                        0,
-                        20,
-                        bottomBarInset(context),
-                      ),
-                      itemCount: projects.length,
-                      separatorBuilder: (_, _) => SizedBox(height: 12),
-                      itemBuilder: (context, i) => _ProjectCard(
-                        project: projects[i],
-                        onTap: () => _open(context, projects[i]),
-                      ),
-                    ),
-            ),
-          ],
-        ),
+          ),
+          PhoneCreateButton(onTap: onCreate),
+        ],
       ),
     );
   }

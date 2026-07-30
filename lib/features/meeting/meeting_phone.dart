@@ -59,57 +59,57 @@ class _MeetingPhone extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            // 상단 글래스 헤더 버튼 영역만큼 비워둔다
-            SizedBox(height: 64),
-            Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 16),
-              child: Row(
-                children: [
-                  Text('회의록', style: AppTextStyles.title1),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '${notes.length}',
-                      style: AppTextStyles.title2.copyWith(
-                        color: AppColors.textTertiary,
+      body: Stack(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                // 상단 글래스 헤더 버튼 영역만큼 비워둔다
+                SizedBox(height: 64),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(20, 0, 20, 16),
+                  child: Row(
+                    children: [
+                      Text('회의록', style: AppTextStyles.title1),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '${notes.length}',
+                          style: AppTextStyles.title2.copyWith(
+                            color: AppColors.textTertiary,
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
-                  ActionPill(
-                    icon: Icons.add_rounded,
-                    label: '새 회의록',
-                    onTap: () => _create(context),
-                  ),
-                ],
-              ),
+                ),
+                Expanded(
+                  child: notes.isEmpty
+                      ? _emptyCard(
+                          icon: Icons.description_outlined,
+                          text: '작성된 회의록이 없어요',
+                        )
+                      : ListView.separated(
+                          padding: EdgeInsets.fromLTRB(
+                            20,
+                            0,
+                            20,
+                            bottomBarInset(context),
+                          ),
+                          itemCount: notes.length,
+                          separatorBuilder: (_, _) => SizedBox(height: 12),
+                          itemBuilder: (context, i) => _NoteCard(
+                            note: notes[i],
+                            onTap: () => _open(context, notes[i]),
+                          ),
+                        ),
+                ),
+              ],
             ),
-            Expanded(
-              child: notes.isEmpty
-                  ? _emptyCard(
-                      icon: Icons.description_outlined,
-                      text: '작성된 회의록이 없어요',
-                    )
-                  : ListView.separated(
-                      padding: EdgeInsets.fromLTRB(
-                        20,
-                        0,
-                        20,
-                        bottomBarInset(context),
-                      ),
-                      itemCount: notes.length,
-                      separatorBuilder: (_, _) => SizedBox(height: 12),
-                      itemBuilder: (context, i) => _NoteCard(
-                        note: notes[i],
-                        onTap: () => _open(context, notes[i]),
-                      ),
-                    ),
-            ),
-          ],
-        ),
+          ),
+          PhoneCreateButton(onTap: () => _create(context)),
+        ],
       ),
     );
   }
