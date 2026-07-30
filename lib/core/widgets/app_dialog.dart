@@ -2,7 +2,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
+import '../theme/app_text_styles.dart';
 import '../util/platform.dart';
+import 'pressable.dart';
 
 /// '전체 보기'처럼 목록을 통째로 여는 화면 띄우기
 ///
@@ -105,4 +107,132 @@ Future<T?> showAppDialog<T>(BuildContext context, WidgetBuilder builder) {
 double dialogWidth(BuildContext context, double design) {
   final fit = MediaQuery.sizeOf(context).width - 40;
   return fit < design ? fit : design;
+}
+
+/// 한 번 더 묻는 팝업 — 되돌리기 어려운 동작 앞에 쓴다
+///
+/// 눌렀는지(true) 여부를 돌려준다. 바깥을 눌러 닫으면 false다.
+/// [destructive]를 켜면 확인 버튼이 빨간색이 된다.
+Future<bool> showConfirmDialog(
+  BuildContext context, {
+  required String title,
+  String? message,
+  String confirmLabel = '확인',
+  String cancelLabel = '취소',
+  bool destructive = false,
+}) async {
+  final result = await showAppDialog<bool>(
+    context,
+    (context) => _ConfirmCard(
+      title: title,
+      message: message,
+      confirmLabel: confirmLabel,
+      cancelLabel: cancelLabel,
+      destructive: destructive,
+    ),
+  );
+  return result ?? false;
+}
+
+class _ConfirmCard extends StatelessWidget {
+  _ConfirmCard({
+    required this.title,
+    required this.message,
+    required this.confirmLabel,
+    required this.cancelLabel,
+    required this.destructive,
+  });
+
+  final String title;
+  final String? message;
+  final String confirmLabel;
+  final String cancelLabel;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: dialogWidth(context, 320),
+      padding: EdgeInsets.fromLTRB(24, 26, 24, 20),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(title, textAlign: TextAlign.center, style: AppTextStyles.title3),
+          if (message != null) ...[
+            SizedBox(height: 10),
+            Text(
+              message!,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.body2.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+          SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: _ConfirmButton(
+                  label: cancelLabel,
+                  color: AppColors.gray100,
+                  textColor: AppColors.textSecondary,
+                  onTap: () => Navigator.pop(context, false),
+                ),
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                child: _ConfirmButton(
+                  label: confirmLabel,
+                  color: destructive ? AppColors.error : AppColors.primary,
+                  textColor: Colors.white,
+                  onTap: () => Navigator.pop(context, true),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ConfirmButton extends StatelessWidget {
+  _ConfirmButton({
+    required this.label,
+    required this.color,
+    required this.textColor,
+    required this.onTap,
+  });
+
+  final String label;
+  final Color color;
+  final Color textColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      scale: 0.96,
+      child: Container(
+        height: 50,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Text(
+          label,
+          style: AppTextStyles.body2.copyWith(
+            color: textColor,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
 }

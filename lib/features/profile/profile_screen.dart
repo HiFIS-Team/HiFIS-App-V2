@@ -5,7 +5,9 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/theme/theme_controller.dart';
+import '../auth/auth_session.dart';
 import '../../core/util/platform.dart';
+import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/pressable.dart';
 import '../../core/widgets/top_frost.dart';
@@ -51,6 +53,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _ThemeCard(),
     SizedBox(height: 16),
     _PasswordCard(),
+    SizedBox(height: 16),
+    // 되돌릴 수 있는 것(로그아웃) 다음에 되돌릴 수 없는 것(탈퇴)
+    _LogoutCard(),
     SizedBox(height: 16),
     _WithdrawCard(),
   ];
@@ -815,6 +820,73 @@ class _PasswordCard extends StatelessWidget {
           Align(
             alignment: Alignment.centerRight,
             child: _SmallPrimaryButton(label: '비밀번호 변경'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 로그아웃 — 확인을 한 번 받고 로그인 화면으로 돌아간다
+class _LogoutCard extends StatelessWidget {
+  _LogoutCard();
+
+  Future<void> _logout(BuildContext context) async {
+    final ok = await showConfirmDialog(
+      context,
+      title: '로그아웃할까요?',
+      message: '다음에 들어올 때 다시 로그인해야 해요.',
+      confirmLabel: '로그아웃',
+    );
+    if (!ok || !context.mounted) return;
+
+    // 프로필 화면은 메인 위에 얹혀 있다. 먼저 걷어내야 화면이
+    // 남은 채로 로그인 화면이 갈아 끼워지는 일이 없다.
+    Navigator.of(context, rootNavigator: true).popUntil((r) => r.isFirst);
+    await AuthSession.instance.signOut();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.all(24),
+      decoration: AppDecorations.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('로그아웃', style: AppTextStyles.title3),
+          SizedBox(height: 8),
+          Text(
+            '이 기기에서 로그아웃해요. 자동 로그인을 켜 뒀더라도 '
+            '다음에 들어올 때는 다시 로그인해야 해요.',
+            style: AppTextStyles.caption,
+          ),
+          SizedBox(height: 16),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Pressable(
+              onTap: () => _logout(context),
+              scale: 0.94,
+              child: Container(
+                height: 48,
+                padding: EdgeInsets.symmetric(horizontal: 18),
+                decoration: BoxDecoration(
+                  color: AppColors.gray50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.gray200),
+                ),
+                child: Center(
+                  widthFactor: 1,
+                  child: Text(
+                    '로그아웃',
+                    style: AppTextStyles.label.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),
