@@ -170,6 +170,12 @@ class _MonthSummary extends StatelessWidget {
     final total = days.fold(Duration.zero, (sum, d) => sum + d.worked);
     final late = days.where((d) => d.status == _DayStatus.late).length;
     final absent = days.where((d) => d.status == _DayStatus.absent).length;
+    final early = days.where((d) => d.status == _DayStatus.early).length;
+    final leave = days.where((d) => d.status == _DayStatus.leave).length;
+    final off = days.where((d) => d.status == _DayStatus.off).length;
+    final average = worked == 0
+        ? Duration.zero
+        : Duration(minutes: total.inMinutes ~/ worked);
     final now = DateTime.now();
     final thisMonth = month.year == now.year && month.month == now.month;
 
@@ -212,6 +218,33 @@ class _MonthSummary extends StatelessWidget {
               ),
             ],
           ),
+          // 데스크톱은 옆 월차 카드에 높이를 맞추느라 아래가 비어서,
+          // 그 자리를 한 줄 더 채운다 (폰은 카드가 세로로 쌓여 필요 없다)
+          if (isDesktop) ...[
+            SizedBox(height: 16),
+            Spacer(),
+            Container(height: 1, color: AppColors.gray100),
+            SizedBox(height: 16),
+            Row(
+              children: [
+                _stat('평균 근무', _duration(average), AppColors.textPrimary),
+                _divider(),
+                _stat(
+                  '조기 퇴근',
+                  '$early회',
+                  early > 0 ? AppColors.warning : AppColors.textPrimary,
+                ),
+                _divider(),
+                _stat(
+                  '월차',
+                  '$leave일',
+                  leave > 0 ? AppColors.primary : AppColors.textPrimary,
+                ),
+                _divider(),
+                _stat('휴무', '$off일', AppColors.textPrimary),
+              ],
+            ),
+          ],
         ],
       ),
     );
