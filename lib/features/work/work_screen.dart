@@ -86,12 +86,13 @@ class _WorkScreenState extends State<WorkScreen> {
   }
 
   /// 오늘 수행 내역 — 폰은 밀려 들어오는 화면, PC는 모달로 열린다
-  void _showHistory() {
+  void _showHistory({bool all = false}) {
     showFullPage<void>(
       context,
       (_) => _HistoryScreen(
         myLogs: List.of(_logs),
         allLogs: [..._logs, ..._teamLogs],
+        initialAll: all,
       ),
     );
   }
@@ -285,6 +286,37 @@ class _WorkScreenState extends State<WorkScreen> {
                 onShowHistory: _showHistory,
               ),
             ),
+            // 데스크톱: 내 내역 / 전체 내역을 양쪽에 상시 표시
+            if (isDesktop) ...[
+              SizedBox(height: 16),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: _HistoryCard(
+                        title: '내 내역',
+                        logs: _logs,
+                        showName: false,
+                        emptyText: '오늘 완료한 항목이 없어요',
+                        onOpenAll: () => _showHistory(all: false),
+                      ),
+                    ),
+                    SizedBox(width: 16),
+                    Expanded(
+                      child: _HistoryCard(
+                        title: '전체 내역',
+                        logs: [..._logs, ..._teamLogs],
+                        showName: true,
+                        emptyText: '오늘 완료된 항목이 없어요',
+                        onOpenAll: () => _showHistory(all: true),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ] else if (item.label == '동료 평가')
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 20),
@@ -574,32 +606,45 @@ class _ChecklistCard extends StatelessWidget {
             child: Row(
               children: [
                 Expanded(child: Text('오늘 점검 항목', style: AppTextStyles.label)),
-                // 누르면 오늘 수행 내역(내 내역 / 전체 내역)이 열린다
-                Pressable(
-                  onTap: onShowHistory,
-                  scale: 0.92,
-                  pressedColor: AppColors.gray100,
-                  borderRadius: BorderRadius.circular(100),
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '총 $total회',
-                        style: AppTextStyles.caption.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      SizedBox(width: 2),
-                      Icon(
-                        CupertinoIcons.chevron_right,
-                        size: 11,
+                // 데스크톱은 아래에 내역 카드가 있어 총 횟수만 적고,
+                // 폰은 누르면 오늘 수행 내역이 열린다
+                if (isDesktop)
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: Text(
+                      '총 $total회',
+                      style: AppTextStyles.caption.copyWith(
                         color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
                       ),
-                    ],
+                    ),
+                  )
+                else
+                  Pressable(
+                    onTap: onShowHistory,
+                    scale: 0.92,
+                    pressedColor: AppColors.gray100,
+                    borderRadius: BorderRadius.circular(100),
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '총 $total회',
+                          style: AppTextStyles.caption.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        SizedBox(width: 2),
+                        Icon(
+                          CupertinoIcons.chevron_right,
+                          size: 11,
+                          color: AppColors.primary,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -884,12 +929,16 @@ class _HistoryCard extends StatefulWidget {
     required this.logs,
     required this.showName,
     required this.emptyText,
+    required this.onOpenAll,
   });
 
   final String title;
   final List<_WorkLog> logs;
   final bool showName;
   final String emptyText;
+
+  /// 카드에는 다섯 줄만 보이므로 나머지는 모달에서 본다
+  final VoidCallback onOpenAll;
 
   @override
   State<_HistoryCard> createState() => _HistoryCardState();
@@ -923,12 +972,40 @@ class _HistoryCardState extends State<_HistoryCard> {
             padding: EdgeInsets.symmetric(horizontal: 4),
             child: Row(
               children: [
-                Expanded(child: Text(widget.title, style: AppTextStyles.label)),
-                Text(
-                  '총 ${sorted.length}회',
-                  style: AppTextStyles.caption.copyWith(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w700,
+                Text(widget.title, style: AppTextStyles.label),
+                SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    '총 ${sorted.length}회',
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                Pressable(
+                  onTap: widget.onOpenAll,
+                  scale: 0.92,
+                  pressedColor: AppColors.gray100,
+                  borderRadius: BorderRadius.circular(100),
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '전체 보기',
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(width: 2),
+                      Icon(
+                        CupertinoIcons.chevron_right,
+                        size: 11,
+                        color: AppColors.primary,
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -972,10 +1049,17 @@ class _HistoryCardState extends State<_HistoryCard> {
 /// 오늘 수행 내역 화면 — 옆에서 슬라이드되어 열리고,
 /// 내 내역/전체 내역 탭을 전환하며 최근 기록이 위로 오도록 보여준다
 class _HistoryScreen extends StatefulWidget {
-  _HistoryScreen({required this.myLogs, required this.allLogs});
+  _HistoryScreen({
+    required this.myLogs,
+    required this.allLogs,
+    this.initialAll = false,
+  });
 
   final List<_WorkLog> myLogs;
   final List<_WorkLog> allLogs;
+
+  /// 어느 탭으로 열지 (데스크톱은 누른 카드에 맞춰 연다)
+  final bool initialAll;
 
   @override
   State<_HistoryScreen> createState() => _HistoryScreenState();
@@ -983,7 +1067,7 @@ class _HistoryScreen extends StatefulWidget {
 
 class _HistoryScreenState extends State<_HistoryScreen> {
   /// true면 전체 내역 탭
-  bool _all = false;
+  late bool _all = widget.initialAll;
 
   static const _weekdays = ['월', '화', '수', '목', '금', '토', '일'];
 
