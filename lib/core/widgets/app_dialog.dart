@@ -1,4 +1,57 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+
+import '../theme/app_colors.dart';
+import '../util/platform.dart';
+
+/// '전체 보기'처럼 목록을 통째로 여는 화면 띄우기
+///
+/// 폰은 오른쪽에서 밀려 들어오는 페이지로 연다.
+/// 데스크톱은 콘텐츠를 통째로 덮으면 사이드바 맥락이 끊겨서, 가운데 큰 모달로 띄운다.
+Future<T?> showFullPage<T>(BuildContext context, WidgetBuilder builder) {
+  if (!isDesktop) {
+    return Navigator.push<T>(context, CupertinoPageRoute(builder: builder));
+  }
+  return showDialog<T>(
+    context: context,
+    barrierColor: Colors.black.withValues(alpha: 0.45),
+    builder: (context) => Center(child: _ModalFrame(builder: builder)),
+  );
+}
+
+/// 데스크톱 모달 틀 — 창 크기에 맞춰 줄어드는 둥근 상자
+class _ModalFrame extends StatelessWidget {
+  _ModalFrame({required this.builder});
+
+  final WidgetBuilder builder;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final width = size.width - 160;
+    final height = size.height - 120;
+
+    return Container(
+      width: width < 880 ? width : 880,
+      height: height < 720 ? height : 720,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.24),
+            blurRadius: 40,
+            offset: Offset(0, 16),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        // 안에 들어오는 화면은 자기 Scaffold를 그대로 쓴다
+        child: ColoredBox(color: AppColors.background, child: builder(context)),
+      ),
+    );
+  }
+}
 
 /// 앱 공통 팝업 띄우기
 ///

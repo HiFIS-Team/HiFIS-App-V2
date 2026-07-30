@@ -113,16 +113,25 @@ class _LeaveBalance extends StatelessWidget {
   }
 }
 
-/// 신청 내역 — 대기 중인 건만 취소할 수 있다
+/// 신청 내역 — 다가오는 순으로 최근 5건만. 나머지는 전체 보기에서
 class _LeaveList extends StatelessWidget {
-  _LeaveList({required this.leaves, required this.onCancel});
+  _LeaveList({
+    required this.leaves,
+    required this.onCancel,
+    required this.onOpenAll,
+  });
 
   final List<_Leave> leaves;
   final ValueChanged<_Leave> onCancel;
+  final VoidCallback onOpenAll;
+
+  /// 카드에 보여줄 개수 — 신청이 쌓여도 화면이 길어지지 않게 끊는다
+  static const _preview = 5;
 
   @override
   Widget build(BuildContext context) {
     final sorted = [...leaves]..sort((a, b) => b.date.compareTo(a.date));
+    final recent = sorted.take(_preview).toList();
 
     return Container(
       width: double.infinity,
@@ -137,17 +146,44 @@ class _LeaveList extends StatelessWidget {
               children: [
                 Text('신청 내역', style: AppTextStyles.label),
                 SizedBox(width: 6),
-                Text(
-                  '${sorted.length}',
-                  style: AppTextStyles.label.copyWith(
-                    color: AppColors.textTertiary,
+                Expanded(
+                  child: Text(
+                    '${sorted.length}',
+                    style: AppTextStyles.label.copyWith(
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                ),
+                Pressable(
+                  onTap: onOpenAll,
+                  scale: 0.92,
+                  pressedColor: AppColors.gray100,
+                  borderRadius: BorderRadius.circular(100),
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '전체 보기',
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(width: 2),
+                      Icon(
+                        CupertinoIcons.chevron_right,
+                        size: 11,
+                        color: AppColors.primary,
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
           SizedBox(height: 6),
-          if (sorted.isEmpty)
+          if (recent.isEmpty)
             Padding(
               padding: EdgeInsets.fromLTRB(4, 16, 4, 24),
               child: Text(
@@ -158,10 +194,104 @@ class _LeaveList extends StatelessWidget {
               ),
             )
           else
-            for (var i = 0; i < sorted.length; i++) ...[
+            for (var i = 0; i < recent.length; i++) ...[
               if (i > 0) Divider(height: 1, color: AppColors.divider),
-              _LeaveRow(leave: sorted[i], onCancel: () => onCancel(sorted[i])),
+              _LeaveRow(leave: recent[i], onCancel: () => onCancel(recent[i])),
             ],
+        ],
+      ),
+    );
+  }
+}
+
+/// 월차 신청 전체 목록 — 상태로 거르고 달별로 묶어 본다
+class _LeaveHistoryScreen extends StatefulWidget {
+  _LeaveHistoryScreen();
+
+  @override
+  State<_LeaveHistoryScreen> createState() => _LeaveHistoryScreenState();
+}
+
+class _LeaveHistoryScreenState extends State<_LeaveHistoryScreen> {
+  /// 0 전체 · 1 대기 · 2 승인 · 3 반려
+  int _filter = 0;
+
+  bool _matches(_Leave leave) => switch (_filter) {
+    1 => leave.status == _LeaveStatus.pending,
+    2 => leave.status == _LeaveStatus.approved,
+    3 => leave.status == _LeaveStatus.rejected,
+    _ => true,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final sorted = _leaves.where(_matches).toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+
+    // 달이 바뀌는 지점마다 머리말을 끼워 넣는다
+    final children = <Widget>[];
+    String? label;
+    for (final leave in sorted) {
+      final monthLabel = '${leave.date.year}년 ${leave.date.month}월';
+      if (monthLabel != label) {
+        children.add(
+          Padding(
+            padding: EdgeInsets.fromLTRB(4, label == null ? 4 : 20, 4, 6),
+            child: Text(
+              monthLabel,
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        );
+        label = monthLabel;
+      } else {
+        children.add(Divider(height: 1, color: AppColors.divider));
+      }
+      children.add(
+        _LeaveRow(
+          leave: leave,
+          onCancel: () => setState(() => _leaves.remove(leave)),
+        ),
+      );
+    }
+
+    return PhoneDetailScaffold(
+      title: '월차 신청 내역',
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          PhoneDetailScaffold.topPadding,
+          20,
+          MediaQuery.paddingOf(context).bottom + 32,
+        ),
+        children: [
+          SegmentedTabs(
+            labels: ['전체', '대기', '승인', '반려'],
+            selected: _filter,
+            onSelect: (i) => setState(() => _filter = i),
+          ),
+          SizedBox(height: 16),
+          if (children.isEmpty)
+            Padding(
+              padding: EdgeInsets.only(top: 40),
+              child: Center(
+                child: Text(
+                  '해당하는 신청이 없어요',
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.textTertiary,
+                  ),
+                ),
+              ),
+            )
+          else
+            Container(
+              padding: EdgeInsets.fromLTRB(16, 12, 16, 12),
+              decoration: AppDecorations.card(),
+              child: Column(children: children),
+            ),
         ],
       ),
     );

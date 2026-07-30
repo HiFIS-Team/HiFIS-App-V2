@@ -7,6 +7,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
 import '../../core/util/sf_symbols.dart';
+import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/mode_switch.dart';
@@ -84,15 +85,13 @@ class _WorkScreenState extends State<WorkScreen> {
     if (delta > 0) AppToast.show(context, '${_withJosa(task)} 완료했습니다');
   }
 
-  /// 폰 전용 — 데스크톱은 점검 항목 아래에 내역이 상시 떠 있다
+  /// 오늘 수행 내역 — 폰은 밀려 들어오는 화면, PC는 모달로 열린다
   void _showHistory() {
-    Navigator.push(
+    showFullPage<void>(
       context,
-      CupertinoPageRoute(
-        builder: (_) => _HistoryScreen(
-          myLogs: List.of(_logs),
-          allLogs: [..._logs, ..._teamLogs],
-        ),
+      (_) => _HistoryScreen(
+        myLogs: List.of(_logs),
+        allLogs: [..._logs, ..._teamLogs],
       ),
     );
   }
@@ -286,35 +285,6 @@ class _WorkScreenState extends State<WorkScreen> {
                 onShowHistory: _showHistory,
               ),
             ),
-            // 데스크톱: 내 내역 / 전체 내역을 양쪽에 상시 표시
-            if (isDesktop) ...[
-              SizedBox(height: 16),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: _HistoryCard(
-                        title: '내 내역',
-                        logs: _logs,
-                        showName: false,
-                        emptyText: '오늘 완료한 항목이 없어요',
-                      ),
-                    ),
-                    SizedBox(width: 16),
-                    Expanded(
-                      child: _HistoryCard(
-                        title: '전체 내역',
-                        logs: [..._logs, ..._teamLogs],
-                        showName: true,
-                        emptyText: '오늘 완료된 항목이 없어요',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
           ] else if (item.label == '동료 평가')
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 20),
@@ -604,45 +574,32 @@ class _ChecklistCard extends StatelessWidget {
             child: Row(
               children: [
                 Expanded(child: Text('오늘 점검 항목', style: AppTextStyles.label)),
-                // 데스크톱은 아래에 내역이 상시 떠 있어 총 횟수만 표시하고,
-                // 폰은 누르면 오늘 수행 내역 화면이 열린다
-                if (isDesktop)
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    child: Text(
-                      '총 $total회',
-                      style: AppTextStyles.caption.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  )
-                else
-                  Pressable(
-                    onTap: onShowHistory,
-                    scale: 0.92,
-                    pressedColor: AppColors.gray100,
-                    borderRadius: BorderRadius.circular(100),
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          '총 $total회',
-                          style: AppTextStyles.caption.copyWith(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        SizedBox(width: 2),
-                        Icon(
-                          CupertinoIcons.chevron_right,
-                          size: 11,
+                // 누르면 오늘 수행 내역(내 내역 / 전체 내역)이 열린다
+                Pressable(
+                  onTap: onShowHistory,
+                  scale: 0.92,
+                  pressedColor: AppColors.gray100,
+                  borderRadius: BorderRadius.circular(100),
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '총 $total회',
+                        style: AppTextStyles.caption.copyWith(
                           color: AppColors.primary,
+                          fontWeight: FontWeight.w700,
                         ),
-                      ],
-                    ),
+                      ),
+                      SizedBox(width: 2),
+                      Icon(
+                        CupertinoIcons.chevron_right,
+                        size: 11,
+                        color: AppColors.primary,
+                      ),
+                    ],
                   ),
+                ),
               ],
             ),
           ),

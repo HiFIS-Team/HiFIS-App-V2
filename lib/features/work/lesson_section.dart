@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/glass_bottom_button.dart';
 import '../../core/widgets/glass_icon_button.dart';
@@ -243,10 +244,7 @@ class _LessonSectionState extends State<LessonSection> {
 
   /// 세션 기록 전체 화면을 연다
   void _openHistory() {
-    Navigator.push(
-      context,
-      CupertinoPageRoute(builder: (_) => _SignHistoryScreen()),
-    );
+    showFullPage<void>(context, (_) => _SignHistoryScreen());
   }
 
   @override

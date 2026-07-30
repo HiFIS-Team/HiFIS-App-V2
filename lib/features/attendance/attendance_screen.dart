@@ -80,6 +80,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     AppToast.show(context, '신청을 취소했어요');
   }
 
+  /// 전체 목록에서 취소하고 돌아올 수 있어 다녀오면 다시 그린다
+  Future<void> _openLeaveHistory() async {
+    await showFullPage<void>(context, (_) => _LeaveHistoryScreen());
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final calendar = _MonthCalendar(
@@ -100,7 +106,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           SizedBox(height: 12),
           calendar,
           SizedBox(height: 12),
-          _LeaveList(leaves: _leaves, onCancel: _cancelLeave),
+          _LeaveList(
+            leaves: _leaves,
+            onCancel: _cancelLeave,
+            onOpenAll: _openLeaveHistory,
+          ),
         ],
       );
     }
@@ -133,7 +143,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             SizedBox(height: 16),
             calendar,
             SizedBox(height: 16),
-            _LeaveList(leaves: _leaves, onCancel: _cancelLeave),
+            _LeaveList(
+              leaves: _leaves,
+              onCancel: _cancelLeave,
+              onOpenAll: _openLeaveHistory,
+            ),
           ],
         ),
       ),

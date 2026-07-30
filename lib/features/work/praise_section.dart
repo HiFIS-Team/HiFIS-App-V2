@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
+import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/glass_search_bar.dart';
 import '../../core/widgets/mode_switch.dart';
@@ -28,19 +29,14 @@ class _PraiseSectionState extends State<PraiseSection> {
   bool get _complaint => _tab == 1;
 
   void _openHistory() {
-    Navigator.push(
+    showFullPage<void>(
       context,
-      CupertinoPageRoute(
-        builder: (_) => _FeedbackHistoryScreen(complaint: _complaint),
-      ),
+      (_) => _FeedbackHistoryScreen(complaint: _complaint),
     );
   }
 
   void _openSurveys() {
-    Navigator.push(
-      context,
-      CupertinoPageRoute(builder: (_) => _SurveyHistoryScreen()),
-    );
+    showFullPage<void>(context, (_) => _SurveyHistoryScreen());
   }
 
   /// 세그먼트 — '전체'는 누구에게 온 건지 가리지 않고 설문 원본을 그대로 본다
