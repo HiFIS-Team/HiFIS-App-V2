@@ -2,15 +2,6 @@ part of 'project_screen.dart';
 
 // ── 폰 화면 ──
 
-/// 폰 목록이 비었을 때 — 알림 화면과 같은 빈 카드를 목록 자리에 올린다
-Widget _emptyCard({required IconData icon, required String text}) => Align(
-  alignment: Alignment.topCenter,
-  child: Padding(
-    padding: EdgeInsets.symmetric(horizontal: 20),
-    child: EmptyCard(icon: icon, text: text),
-  ),
-);
-
 /// 폰: 단계 탭 + 프로젝트 카드 목록.
 /// 카드를 누르면 상세가 옆에서 밀려 들어온다 (2단 대신 두 화면으로 나눈다).
 class _ProjectPhone extends StatelessWidget {
@@ -45,14 +36,15 @@ class _ProjectPhone extends StatelessWidget {
     return Scaffold(
       body: Stack(
         children: [
+          // 홈처럼 화면 전체가 한 번에 스크롤된다.
+          // 타이틀·단계 탭도 같이 올라가야 위쪽 글래스 버튼에 콘텐츠가 비친다.
           SafeArea(
             bottom: false,
-            child: Column(
+            child: ListView(
+              padding: EdgeInsets.fromLTRB(20, 64, 20, bottomBarInset(context)),
               children: [
-                // 상단 글래스 헤더 버튼 영역만큼 비워둔다
-                SizedBox(height: 64),
                 Padding(
-                  padding: EdgeInsets.fromLTRB(20, 0, 20, 14),
+                  padding: EdgeInsets.only(bottom: 14),
                   child: Row(
                     children: [
                       Text('프로젝트', style: AppTextStyles.title1),
@@ -68,31 +60,21 @@ class _ProjectPhone extends StatelessWidget {
                     ],
                   ),
                 ),
-                Padding(
-                  padding: EdgeInsets.fromLTRB(20, 0, 20, 16),
-                  child: _PhaseTabs(selected: phase, onSelect: onFilter),
-                ),
-                Expanded(
-                  child: projects.isEmpty
-                      ? _emptyCard(
-                          icon: Icons.folder_rounded,
-                          text: '${phase.label} 프로젝트가 없어요',
-                        )
-                      : ListView.separated(
-                          padding: EdgeInsets.fromLTRB(
-                            20,
-                            0,
-                            20,
-                            bottomBarInset(context),
-                          ),
-                          itemCount: projects.length,
-                          separatorBuilder: (_, _) => SizedBox(height: 12),
-                          itemBuilder: (context, i) => _ProjectCard(
-                            project: projects[i],
-                            onTap: () => _open(context, projects[i]),
-                          ),
-                        ),
-                ),
+                _PhaseTabs(selected: phase, onSelect: onFilter),
+                SizedBox(height: 16),
+                if (projects.isEmpty)
+                  EmptyCard(
+                    icon: Icons.folder_rounded,
+                    text: '${phase.label} 프로젝트가 없어요',
+                  )
+                else
+                  for (var i = 0; i < projects.length; i++) ...[
+                    if (i > 0) SizedBox(height: 12),
+                    _ProjectCard(
+                      project: projects[i],
+                      onTap: () => _open(context, projects[i]),
+                    ),
+                  ],
               ],
             ),
           ),

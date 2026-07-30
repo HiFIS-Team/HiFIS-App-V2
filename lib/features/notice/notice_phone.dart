@@ -2,15 +2,6 @@ part of 'notice_screen.dart';
 
 // ── 폰 화면 ──
 
-/// 폰 목록이 비었을 때 — 알림 화면과 같은 빈 카드를 목록 자리에 올린다
-Widget _emptyCard({required IconData icon, required String text}) => Align(
-  alignment: Alignment.topCenter,
-  child: Padding(
-    padding: EdgeInsets.symmetric(horizontal: 20),
-    child: EmptyCard(icon: icon, text: text),
-  ),
-);
-
 /// 폰: 전체·안읽음 필터 + 공지 카드 목록.
 /// 카드를 누르면 읽음 처리되고 본문이 옆에서 밀려 들어온다.
 class _NoticePhone extends StatelessWidget {
@@ -76,14 +67,15 @@ class _NoticePhone extends StatelessWidget {
     return Scaffold(
       body: Stack(
         children: [
+          // 홈처럼 화면 전체가 한 번에 스크롤된다.
+          // 타이틀·필터도 같이 올라가야 위쪽 글래스 버튼에 콘텐츠가 비친다.
           SafeArea(
             bottom: false,
-            child: Column(
+            child: ListView(
+              padding: EdgeInsets.fromLTRB(20, 64, 20, bottomBarInset(context)),
               children: [
-                // 상단 글래스 헤더 버튼 영역만큼 비워둔다
-                SizedBox(height: 64),
                 Padding(
-                  padding: EdgeInsets.fromLTRB(20, 0, 20, 14),
+                  padding: EdgeInsets.only(bottom: 14),
                   child: Row(
                     children: [
                       Text('공지', style: AppTextStyles.title1),
@@ -99,36 +91,26 @@ class _NoticePhone extends StatelessWidget {
                     ],
                   ),
                 ),
-                Padding(
-                  padding: EdgeInsets.fromLTRB(20, 0, 20, 16),
-                  child: ModeSwitch(
-                    left: '전체',
-                    right: unread > 0 ? '안읽음 $unread' : '안읽음',
-                    value: unreadOnly,
-                    onChanged: onFilter,
-                  ),
+                ModeSwitch(
+                  left: '전체',
+                  right: unread > 0 ? '안읽음 $unread' : '안읽음',
+                  value: unreadOnly,
+                  onChanged: onFilter,
                 ),
-                Expanded(
-                  child: notices.isEmpty
-                      ? _emptyCard(
-                          icon: Icons.campaign_rounded,
-                          text: unreadOnly ? '안 읽은 공지가 없어요' : '올라온 공지가 없어요',
-                        )
-                      : ListView.separated(
-                          padding: EdgeInsets.fromLTRB(
-                            20,
-                            0,
-                            20,
-                            bottomBarInset(context),
-                          ),
-                          itemCount: notices.length,
-                          separatorBuilder: (_, _) => SizedBox(height: 12),
-                          itemBuilder: (context, i) => _NoticeCard(
-                            notice: notices[i],
-                            onTap: () => _open(context, notices[i]),
-                          ),
-                        ),
-                ),
+                SizedBox(height: 16),
+                if (notices.isEmpty)
+                  EmptyCard(
+                    icon: Icons.campaign_rounded,
+                    text: unreadOnly ? '안 읽은 공지가 없어요' : '올라온 공지가 없어요',
+                  )
+                else
+                  for (var i = 0; i < notices.length; i++) ...[
+                    if (i > 0) SizedBox(height: 12),
+                    _NoticeCard(
+                      notice: notices[i],
+                      onTap: () => _open(context, notices[i]),
+                    ),
+                  ],
               ],
             ),
           ),
