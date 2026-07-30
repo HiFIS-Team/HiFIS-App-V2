@@ -1,6 +1,7 @@
 import 'package:cupertino_native/cupertino_native.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
@@ -12,7 +13,8 @@ import '../../core/widgets/pressable.dart';
 /// 동료 평가 탭 콘텐츠 (목업)
 ///
 /// 사람마다 한 줄씩 나열되고, 줄을 누르면 평가 화면으로 이동한다.
-/// 본인은 항목당 최대 5점, 동료는 항목당 최대 20점.
+/// 점수는 항목마다 별 5개로 매기고, 별 하나의 가치가 대상에 따라 다르다
+/// (본인 1점 → 항목 최대 5점 / 동료 5점 → 항목 최대 25점).
 class PeerReviewSection extends StatelessWidget {
   PeerReviewSection({super.key});
 
@@ -57,6 +59,9 @@ class PeerReviewSection extends StatelessWidget {
 
 const _categories = ['업무 역량', '협업 소통', '성과 기여도', '태도·규정 준수', '리더십'];
 
+/// 항목마다 매길 수 있는 별 개수 (대상과 무관하게 5개)
+const _starCount = 5;
+
 const _me = '김은후';
 
 /// 평가 대상 목록 — 본인이 맨 앞. 아바타 색은 사내톡 멤버 목록과 동일.
@@ -81,7 +86,11 @@ class _Person {
   final Color color;
   final bool isSelf;
 
-  int get maxScore => isSelf ? 5 : 20;
+  /// 별 하나의 점수 — 본인 평가보다 동료 평가의 비중이 크다
+  int get pointsPerStar => isSelf ? 1 : 5;
+
+  /// 항목 하나의 만점
+  int get maxScore => pointsPerStar * _starCount;
 }
 
 /// 사람 한 줄 — 아바타·이름·소속과 끝의 이동 화살표
@@ -180,7 +189,7 @@ class _PersonRow extends StatelessWidget {
 }
 
 /// 평가 작성 화면 — 사람 줄을 누르면 옆에서 슬라이드되어 열린다.
-/// 5개 항목에 점수(본인 5점/동료 20점)와 사유를 적고 제출한다.
+/// 5개 항목에 별점과 사유를 적고 제출한다.
 class _PeerReviewFormScreen extends StatefulWidget {
   _PeerReviewFormScreen({required this.person});
 
@@ -191,19 +200,22 @@ class _PeerReviewFormScreen extends StatefulWidget {
 }
 
 class _PeerReviewFormScreenState extends State<_PeerReviewFormScreen> {
-  final Map<String, int> _scores = {};
+  /// 항목별 별 개수 (점수가 아니라 별 개수를 담는다)
+  final Map<String, int> _stars = {};
 
   late final Map<String, TextEditingController> _reasons = {
     for (final category in _categories) category: TextEditingController(),
   };
 
-  int get _max => widget.person.maxScore;
+  int get _perStar => widget.person.pointsPerStar;
 
-  int get _total => _scores.values.fold(0, (sum, v) => sum + v);
+  int get _total => _stars.values.fold(0, (sum, v) => sum + v) * _perStar;
 
-  /// 모든 항목에 점수와 사유가 채워져야 제출이 열린다
+  int get _maxTotal => widget.person.maxScore * _categories.length;
+
+  /// 모든 항목에 별점과 사유가 채워져야 제출이 열린다
   bool get _complete => _categories.every(
-    (c) => (_scores[c] ?? 0) > 0 && _reasons[c]!.text.trim().isNotEmpty,
+    (c) => (_stars[c] ?? 0) > 0 && _reasons[c]!.text.trim().isNotEmpty,
   );
 
   @override
@@ -223,9 +235,11 @@ class _PeerReviewFormScreenState extends State<_PeerReviewFormScreen> {
     super.dispose();
   }
 
-  void _adjust(String category, int delta) {
-    final next = ((_scores[category] ?? 0) + delta).clamp(0, _max);
-    setState(() => _scores[category] = next);
+  void _setStars(String category, int stars) {
+    if ((_stars[category] ?? 0) == stars) return;
+    // 드래그로 별을 훑을 때 한 칸씩 걸리는 느낌을 준다
+    HapticFeedback.selectionClick();
+    setState(() => _stars[category] = stars);
   }
 
   void _submit() {
@@ -264,12 +278,12 @@ class _PeerReviewFormScreenState extends State<_PeerReviewFormScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          person.caption,
+                          '${person.caption} · 별 1개 $_perStar점',
                           style: AppTextStyles.caption,
                         ),
                       ),
                       Text(
-                        '총 $_total / ${_max * _categories.length}점',
+                        '총 $_total / $_maxTotal점',
                         style: AppTextStyles.body2.copyWith(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w700,
@@ -290,13 +304,13 @@ class _PeerReviewFormScreenState extends State<_PeerReviewFormScreen> {
                     ),
                     children: [
                       for (final category in _categories) ...[
-                        _ScoreRow(
+                        _StarRow(
                           label: category,
-                          score: _scores[category] ?? 0,
-                          maxScore: _max,
-                          onAdjust: (delta) => _adjust(category, delta),
+                          stars: _stars[category] ?? 0,
+                          pointsPerStar: _perStar,
+                          onChanged: (v) => _setStars(category, v),
                         ),
-                        SizedBox(height: 8),
+                        SizedBox(height: 12),
                         // 왜 이 점수인지 사유를 적는 칸 — 여러 줄 입력
                         Container(
                           padding: EdgeInsets.symmetric(
@@ -395,51 +409,48 @@ class _PeerReviewFormScreenState extends State<_PeerReviewFormScreen> {
   }
 }
 
-/// 항목 라벨 + −/+ 점수 스테퍼 줄
-class _ScoreRow extends StatelessWidget {
-  _ScoreRow({
+/// 항목 한 칸 — 라벨·환산 점수 줄 + 별점 줄
+class _StarRow extends StatelessWidget {
+  _StarRow({
     required this.label,
-    required this.score,
-    required this.maxScore,
-    required this.onAdjust,
+    required this.stars,
+    required this.pointsPerStar,
+    required this.onChanged,
   });
 
   final String label;
-  final int score;
-  final int maxScore;
-  final ValueChanged<int> onAdjust;
+  final int stars;
+  final int pointsPerStar;
+  final ValueChanged<int> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    final active = score > 0;
+    final active = stars > 0;
 
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Text(
-            label,
-            maxLines: 1,
-            style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w600),
-          ),
-        ),
-        _StepButton(
-          icon: CupertinoIcons.minus,
-          color: active ? AppColors.error : AppColors.gray300,
-          onTap: () => onAdjust(-1),
-        ),
-        SizedBox(
-          width: 58,
-          child: Center(
-            child: Text.rich(
-              TextSpan(
-                text: '$score',
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
                 style: AppTextStyles.body2.copyWith(
-                  color: active ? AppColors.primary : AppColors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            Text.rich(
+              TextSpan(
+                text: '${stars * pointsPerStar}',
+                style: AppTextStyles.body2.copyWith(
+                  color: active ? AppColors.primary : AppColors.gray400,
                   fontWeight: FontWeight.w700,
                 ),
                 children: [
                   TextSpan(
-                    text: ' / $maxScore',
+                    text: ' / ${_starCount * pointsPerStar}점',
                     style: AppTextStyles.caption.copyWith(
                       color: AppColors.gray400,
                       fontWeight: FontWeight.w500,
@@ -448,67 +459,58 @@ class _ScoreRow extends StatelessWidget {
                 ],
               ),
             ),
-          ),
+          ],
         ),
-        _StepButton(
-          icon: CupertinoIcons.plus,
-          color: score < maxScore ? AppColors.primary : AppColors.gray300,
-          onTap: () => onAdjust(1),
-        ),
+        SizedBox(height: 6),
+        _StarPicker(stars: stars, onChanged: onChanged),
       ],
     );
   }
 }
 
-/// 점수 스테퍼 버튼 — 누르는 동안 원이 줄어들며 버튼 색으로 물든다
-class _StepButton extends StatefulWidget {
-  _StepButton({required this.icon, required this.color, required this.onTap});
+/// 별 5개 선택기 — 누르거나 가로로 쭉 그어서 한 번에 매긴다.
+/// 이미 선택된 별을 다시 누르면 0으로 지워진다.
+class _StarPicker extends StatelessWidget {
+  _StarPicker({required this.stars, required this.onChanged});
 
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
+  final int stars;
+  final ValueChanged<int> onChanged;
 
-  @override
-  State<_StepButton> createState() => _StepButtonState();
-}
+  /// 별 하나가 차지하는 가로 칸 (아이콘 + 여백) — 이 값으로 좌표를 나눠 인덱스를 구한다
+  static const _slot = 40.0;
+  static const _icon = 32.0;
+  static const _height = 40.0;
 
-class _StepButtonState extends State<_StepButton> {
-  bool _pressed = false;
+  int _starsAt(double dx) => (dx / _slot).floor().clamp(0, _starCount - 1) + 1;
 
-  void _setPressed(bool value) {
-    if (_pressed != value) setState(() => _pressed = value);
+  void _tap(double dx) {
+    final next = _starsAt(dx);
+    // 같은 별을 다시 누르면 해제 (잘못 준 점수를 지울 방법)
+    onChanged(next == stars ? 0 : next);
   }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => _setPressed(true),
-      onTapUp: (_) => _setPressed(false),
-      onTapCancel: () => _setPressed(false),
-      onTap: widget.onTap,
+      onTapUp: (d) => _tap(d.localPosition.dx),
+      onHorizontalDragStart: (d) => onChanged(_starsAt(d.localPosition.dx)),
+      onHorizontalDragUpdate: (d) => onChanged(_starsAt(d.localPosition.dx)),
       child: SizedBox(
-        width: 38,
-        height: 40,
-        child: Center(
-          child: AnimatedScale(
-            scale: _pressed ? 0.82 : 1.0,
-            duration: Duration(milliseconds: 110),
-            curve: Curves.easeOut,
-            child: AnimatedContainer(
-              duration: Duration(milliseconds: 110),
-              width: 26,
-              height: 26,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: _pressed
-                    ? widget.color.withValues(alpha: 0.18)
-                    : AppColors.gray50,
-                shape: BoxShape.circle,
+        width: _slot * _starCount,
+        height: _height,
+        child: Row(
+          children: [
+            for (var i = 0; i < _starCount; i++)
+              SizedBox(
+                width: _slot,
+                child: Icon(
+                  Icons.star_rounded,
+                  size: _icon,
+                  color: i < stars ? AppColors.primary : AppColors.gray200,
+                ),
               ),
-              child: Icon(widget.icon, size: 13, color: widget.color),
-            ),
-          ),
+          ],
         ),
       ),
     );
