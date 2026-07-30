@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/theme/theme_controller.dart';
+import '../../core/util/platform.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/pressable.dart';
 import '../../core/widgets/top_frost.dart';
@@ -43,8 +44,79 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.dispose();
   }
 
+  /// 프로필 요약 아래로 이어지는 설정 카드들 (폰·PC 공통)
+  List<Widget> get _settingCards => [
+    _BasicInfoCard(),
+    SizedBox(height: 16),
+    _WorkStatusCard(),
+    SizedBox(height: 16),
+    _ThemeCard(),
+    SizedBox(height: 16),
+    _PasswordCard(),
+    SizedBox(height: 16),
+    _WithdrawCard(),
+  ];
+
   @override
   Widget build(BuildContext context) {
+    return isDesktop ? _buildDesktop() : _buildMobile();
+  }
+
+  /// 데스크톱: 왼쪽에 프로필 요약을 두고 오른쪽 설정만 스크롤한다.
+  /// 요약 카드는 스크롤 영역 밖이라 스크롤해도 제자리에 남는다.
+  Widget _buildDesktop() {
+    return Scaffold(
+      body: Stack(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(28, 68, 20, 0),
+                  child: SizedBox(width: 320, child: _ProfileSummaryCard()),
+                ),
+                Expanded(
+                  child: ListView(
+                    controller: _scrollController,
+                    padding: EdgeInsets.fromLTRB(0, 68, 28, 40),
+                    children: _settingCards,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TopFrost(collapse: _collapse, color: AppColors.background),
+          // 상단 중앙 고정 타이틀 (터치는 아래 리스트로 통과)
+          IgnorePointer(
+            child: SafeArea(
+              bottom: false,
+              child: SizedBox(
+                height: 56,
+                child: Center(
+                  child: Text('내 프로필', style: AppTextStyles.title3),
+                ),
+              ),
+            ),
+          ),
+          // 좌측 상단 고정 뒤로가기 글래스 버튼
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: EdgeInsets.only(top: 8, left: 16),
+              child: GlassIconButton(
+                symbol: 'chevron.backward',
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobile() {
     return Scaffold(
       body: Stack(
         children: [
@@ -56,15 +128,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 _ProfileSummaryCard(),
                 SizedBox(height: 16),
-                _BasicInfoCard(),
-                SizedBox(height: 16),
-                _WorkStatusCard(),
-                SizedBox(height: 16),
-                _ThemeCard(),
-                SizedBox(height: 16),
-                _PasswordCard(),
-                SizedBox(height: 16),
-                _WithdrawCard(),
+                ..._settingCards,
               ],
             ),
           ),
