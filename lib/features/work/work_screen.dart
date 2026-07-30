@@ -867,8 +867,9 @@ class _HistoryCard extends StatefulWidget {
 class _HistoryCardState extends State<_HistoryCard> {
   final _scrollController = ScrollController();
 
-  /// 한 줄 높이(위아래 여백 13 + 본문 22.5)에 구분선을 더한 다섯 줄 높이
-  static const _maxListHeight = 5 * 48.5 + 4;
+  /// 한 줄 높이(위아래 여백 13 + 본문 22.5)에 구분선을 더한 다섯 줄 높이.
+  /// 기록이 적어도 이 높이를 유지해 좌우 카드가 같은 크기로 보인다.
+  static const _listHeight = 5 * 48.5 + 4;
 
   @override
   void dispose() {
@@ -902,34 +903,35 @@ class _HistoryCardState extends State<_HistoryCard> {
               ],
             ),
           ),
-          if (sorted.isEmpty)
-            Padding(
-              padding: EdgeInsets.fromLTRB(4, 20, 4, 20),
-              child: Text(
-                widget.emptyText,
-                style: AppTextStyles.body2.copyWith(
-                  color: AppColors.textTertiary,
-                ),
-              ),
-            )
-          else
-            ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: _maxListHeight),
-              child: Scrollbar(
-                controller: _scrollController,
-                child: SingleChildScrollView(
-                  controller: _scrollController,
-                  child: Column(
-                    children: [
-                      for (var i = 0; i < sorted.length; i++) ...[
-                        if (i > 0) Divider(height: 1, color: AppColors.divider),
-                        _LogRow(log: sorted[i], showName: widget.showName),
-                      ],
-                    ],
+          // 기록 수가 달라도 좌우 카드 높이가 어긋나지 않게 높이를 고정한다
+          SizedBox(
+            height: _listHeight,
+            child: sorted.isEmpty
+                ? Padding(
+                    padding: EdgeInsets.fromLTRB(4, 20, 4, 20),
+                    child: Text(
+                      widget.emptyText,
+                      style: AppTextStyles.body2.copyWith(
+                        color: AppColors.textTertiary,
+                      ),
+                    ),
+                  )
+                : Scrollbar(
+                    controller: _scrollController,
+                    child: SingleChildScrollView(
+                      controller: _scrollController,
+                      child: Column(
+                        children: [
+                          for (var i = 0; i < sorted.length; i++) ...[
+                            if (i > 0)
+                              Divider(height: 1, color: AppColors.divider),
+                            _LogRow(log: sorted[i], showName: widget.showName),
+                          ],
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            ),
+          ),
         ],
       ),
     );
