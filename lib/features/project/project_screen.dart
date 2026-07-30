@@ -6,7 +6,6 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
 import '../../core/widgets/app_toast.dart';
-import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/placeholder_screen.dart';
 import '../../core/widgets/pressable.dart';
 
@@ -23,14 +22,14 @@ class ProjectScreen extends StatefulWidget {
 }
 
 class _ProjectScreenState extends State<ProjectScreen> {
-  /// true면 완료 목록
-  bool _finished = false;
+  /// 보고 있는 단계 (진행 중 / 완료 / 누락)
+  _Phase _phase = _Phase.running;
 
   /// 선택한 프로젝트 (목록이 바뀌면 첫 항목으로 되돌린다)
   _Project? _selected;
 
   List<_Project> get _visible {
-    final list = _projects.where((p) => p.finished == _finished).toList()
+    final list = _projects.where((p) => p.phase == _phase).toList()
       ..sort((a, b) => a.due.compareTo(b.due));
     return list;
   }
@@ -47,8 +46,8 @@ class _ProjectScreenState extends State<ProjectScreen> {
     if (created == null || !mounted) return;
     setState(() {
       _projects.add(created);
-      // 새 프로젝트는 할 일이 없어 늘 진행 중 — 만든 걸 바로 열어준다
-      _finished = false;
+      // 만든 건 바로 열어준다 (마감이 남아 있으니 진행 중)
+      _phase = _Phase.running;
       _selected = created;
     });
     AppToast.show(context, '프로젝트를 만들었어요');
@@ -70,9 +69,9 @@ class _ProjectScreenState extends State<ProjectScreen> {
             child: _ProjectList(
               projects: list,
               selected: selected,
-              finished: _finished,
+              phase: _phase,
               onFilter: (v) => setState(() {
-                _finished = v;
+                _phase = v;
                 _selected = null;
               }),
               onSelect: (p) => setState(() => _selected = p),
@@ -82,7 +81,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
           Container(width: 1, color: AppColors.gray100),
           Expanded(
             child: selected == null
-                ? _EmptyDetail(finished: _finished)
+                ? _EmptyDetail(phase: _phase)
                 : _ProjectDetail(
                     // 프로젝트를 바꾸면 상세를 새로 그린다 (스크롤·입력 초기화)
                     key: ValueKey(selected.name),
@@ -102,7 +101,7 @@ class _ProjectList extends StatelessWidget {
   _ProjectList({
     required this.projects,
     required this.selected,
-    required this.finished,
+    required this.phase,
     required this.onFilter,
     required this.onSelect,
     required this.onCreate,
@@ -110,8 +109,8 @@ class _ProjectList extends StatelessWidget {
 
   final List<_Project> projects;
   final _Project? selected;
-  final bool finished;
-  final ValueChanged<bool> onFilter;
+  final _Phase phase;
+  final ValueChanged<_Phase> onFilter;
   final ValueChanged<_Project> onSelect;
   final VoidCallback onCreate;
 
@@ -162,19 +161,14 @@ class _ProjectList extends StatelessWidget {
         ),
         Padding(
           padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
-          child: ModeSwitch(
-            left: '진행 중',
-            right: '완료',
-            value: finished,
-            onChanged: onFilter,
-          ),
+          child: _PhaseTabs(selected: phase, onSelect: onFilter),
         ),
         Expanded(
           child: projects.isEmpty
               ? Padding(
                   padding: EdgeInsets.fromLTRB(20, 24, 20, 0),
                   child: Text(
-                    finished ? '완료한 프로젝트가 없어요' : '진행 중인 프로젝트가 없어요',
+                    '${phase.label} 프로젝트가 없어요',
                     style: AppTextStyles.body2.copyWith(
                       color: AppColors.textTertiary,
                     ),
@@ -192,6 +186,66 @@ class _ProjectList extends StatelessWidget {
                 ),
         ),
       ],
+    );
+  }
+}
+
+/// 진행 중 / 완료 / 누락 세그먼트 (ModeSwitch와 같은 결의 3단 버전)
+class _PhaseTabs extends StatelessWidget {
+  _PhaseTabs({required this.selected, required this.onSelect});
+
+  final _Phase selected;
+  final ValueChanged<_Phase> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 44,
+      padding: EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.gray50,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          for (final phase in _Phase.values)
+            Expanded(
+              child: Pressable(
+                onTap: () => onSelect(phase),
+                scale: 0.97,
+                // 배경은 애니메이션 없이 즉시 바꾼다 (페이드가 있으면 두 칸이
+                // 같이 눌린 것처럼 보인다)
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: phase == selected
+                        ? AppColors.surface
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: phase == selected
+                          ? AppColors.gray100
+                          : Colors.transparent,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      phase.label,
+                      style: AppTextStyles.body2.copyWith(
+                        fontSize: 13,
+                        color: phase == selected
+                            ? AppColors.textPrimary
+                            : AppColors.gray500,
+                        fontWeight: phase == selected
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -261,7 +315,7 @@ class _ProjectTileState extends State<_ProjectTile> {
                     ),
                   ),
                   SizedBox(width: 6),
-                  _DdayBadge(dday: dday, finished: project.finished),
+                  _DdayBadge(dday: dday, phase: project.phase),
                 ],
               ),
               SizedBox(height: 10),
@@ -287,9 +341,9 @@ class _ProjectTileState extends State<_ProjectTile> {
 
 /// 고른 프로젝트가 없을 때의 우측 안내
 class _EmptyDetail extends StatelessWidget {
-  _EmptyDetail({required this.finished});
+  _EmptyDetail({required this.phase});
 
-  final bool finished;
+  final _Phase phase;
 
   @override
   Widget build(BuildContext context) {
@@ -316,7 +370,9 @@ class _EmptyDetail extends StatelessWidget {
           Text('프로젝트', style: AppTextStyles.title2),
           SizedBox(height: 6),
           Text(
-            finished ? '완료한 프로젝트가 아직 없어요' : '왼쪽에서 프로젝트를 골라주세요',
+            phase == _Phase.running
+                ? '왼쪽에서 프로젝트를 골라주세요'
+                : '${phase.label} 프로젝트가 아직 없어요',
             style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
           ),
         ],
@@ -374,6 +430,31 @@ class _ProjectDetail extends StatelessWidget {
     onChanged();
   }
 
+  /// 기한 연장 신청 — 승인 전까지 마감일은 그대로다
+  Future<void> _requestExtension(BuildContext context) async {
+    final request = await _showExtensionDialog(context, project);
+    if (request == null) return;
+    project.request = request;
+    _log('기한 연장 신청 (${_date(project.due)} → ${_date(request.due)})');
+    onChanged();
+  }
+
+  void _approve(BuildContext context) {
+    final request = project.request!;
+    _log('기한 연장 승인 (${_date(project.due)} → ${_date(request.due)})');
+    project.due = request.due;
+    project.request = null;
+    onChanged();
+    AppToast.show(context, '기한 연장을 승인했어요');
+  }
+
+  void _reject(BuildContext context) {
+    _log('기한 연장 반려 (마감일 ${_date(project.due)} 유지)');
+    project.request = null;
+    onChanged();
+    AppToast.show(context, '기한 연장을 반려했어요');
+  }
+
   @override
   Widget build(BuildContext context) {
     final dday = _dday(project.due);
@@ -405,7 +486,7 @@ class _ProjectDetail extends StatelessWidget {
                     ),
                   ),
                   SizedBox(width: 10),
-                  _DdayBadge(dday: dday, finished: project.finished),
+                  _DdayBadge(dday: dday, phase: project.phase),
                 ],
               ),
             ),
@@ -414,15 +495,45 @@ class _ProjectDetail extends StatelessWidget {
           ],
         ),
         SizedBox(height: 6),
-        Text(
-          '${_date(project.start)} ~ ${_date(project.due)} · 담당 ${project.owner}',
-          style: AppTextStyles.caption,
+        Row(
+          children: [
+            Text(
+              '${_date(project.start)} ~ ${_date(project.due)} · 담당 ${project.owner}',
+              style: AppTextStyles.caption,
+            ),
+            // 끝난 프로젝트나 이미 올린 신청이 있으면 연장 버튼을 감춘다
+            if (project.phase != _Phase.done && project.request == null) ...[
+              SizedBox(width: 8),
+              Pressable(
+                onTap: () => _requestExtension(context),
+                scale: 0.94,
+                pressedColor: AppColors.gray100,
+                borderRadius: BorderRadius.circular(100),
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                child: Text(
+                  '기한 연장',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
         if (project.desc.isNotEmpty) ...[
           SizedBox(height: 10),
           Text(
             project.desc,
             style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
+          ),
+        ],
+        if (project.request != null) ...[
+          SizedBox(height: 14),
+          _ExtensionCard(
+            project: project,
+            onApprove: () => _approve(context),
+            onReject: () => _reject(context),
           ),
         ],
         SizedBox(height: 18),
@@ -441,7 +552,9 @@ class _ProjectDetail extends StatelessWidget {
               '${(project.progress * 100).round()}%',
               style: AppTextStyles.body2.copyWith(
                 fontWeight: FontWeight.w700,
-                color: project.finished ? AppColors.success : project.color,
+                color: project.phase == _Phase.done
+                    ? AppColors.success
+                    : project.color,
               ),
             ),
             SizedBox(width: 8),
@@ -471,6 +584,121 @@ class _ProjectDetail extends StatelessWidget {
         SizedBox(height: 16),
         _ActivityCard(project: project, onComment: _comment),
       ],
+    );
+  }
+}
+
+/// 기한 연장 결재 카드 — 승인하면 마감일이 늘어나고, 반려하면 그대로 간다
+class _ExtensionCard extends StatelessWidget {
+  _ExtensionCard({
+    required this.project,
+    required this.onApprove,
+    required this.onReject,
+  });
+
+  final _Project project;
+  final VoidCallback onApprove;
+  final VoidCallback onReject;
+
+  @override
+  Widget build(BuildContext context) {
+    final request = project.request!;
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(16, 14, 14, 14),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.hourglass_empty_rounded,
+            size: 18,
+            color: AppColors.warning,
+          ),
+          SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      '기한 연장 승인 대기',
+                      style: AppTextStyles.body2.copyWith(
+                        color: AppColors.warning,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      '${_date(project.due)} → ${_date(request.due)}',
+                      style: AppTextStyles.body2.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 4),
+                Text(
+                  request.reason,
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  '${request.requester} · ${_relative(request.time)} 신청',
+                  style: AppTextStyles.caption.copyWith(fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(width: 12),
+          Pressable(
+            onTap: onReject,
+            scale: 0.96,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.gray200),
+              ),
+              child: Text(
+                '반려',
+                style: AppTextStyles.body2.copyWith(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+          SizedBox(width: 6),
+          Pressable(
+            onTap: onApprove,
+            scale: 0.96,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '승인',
+                style: AppTextStyles.body2.copyWith(
+                  fontSize: 14,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1075,29 +1303,28 @@ class _ActivityCardState extends State<_ActivityCard> {
 
 // ── 공통 조각 ──
 
-/// D-day 배지 — 임박할수록 빨개진다
+/// D-day 배지 — 임박할수록 빨개지고, 끝난 프로젝트는 단계를 그대로 보여준다
 class _DdayBadge extends StatelessWidget {
-  _DdayBadge({required this.dday, required this.finished});
+  _DdayBadge({required this.dday, required this.phase});
 
   final int dday;
-  final bool finished;
+  final _Phase phase;
 
   @override
   Widget build(BuildContext context) {
-    final color = finished
-        ? AppColors.success
-        : dday <= 2
-        ? AppColors.error
-        : dday <= 7
-        ? AppColors.warning
-        : AppColors.primary;
-    final label = finished
-        ? '완료'
-        : dday == 0
-        ? 'D-DAY'
-        : dday > 0
-        ? 'D-$dday'
-        : 'D+${-dday}';
+    final color = switch (phase) {
+      _Phase.done => AppColors.success,
+      _Phase.missed => AppColors.error,
+      _Phase.running when dday <= 2 => AppColors.error,
+      _Phase.running when dday <= 7 => AppColors.warning,
+      _Phase.running => AppColors.primary,
+    };
+    final label = switch (phase) {
+      _Phase.done => '완료',
+      _Phase.missed => '누락 ${-dday}일',
+      _Phase.running when dday == 0 => 'D-DAY',
+      _Phase.running => 'D-$dday',
+    };
 
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -1335,6 +1562,239 @@ class _PickRow extends StatelessWidget {
   }
 }
 
+/// 기한 연장 신청 폼 — 새 마감일과 사유를 받아 신청을 돌려준다
+Future<_Extension?> _showExtensionDialog(
+  BuildContext context,
+  _Project project,
+) {
+  return showDialog<_Extension>(
+    context: context,
+    barrierColor: Colors.black.withValues(alpha: 0.45),
+    builder: (context) => Center(
+      child: Material(
+        type: MaterialType.transparency,
+        child: _ExtensionDialog(project: project),
+      ),
+    ),
+  );
+}
+
+class _ExtensionDialog extends StatefulWidget {
+  _ExtensionDialog({required this.project});
+
+  final _Project project;
+
+  @override
+  State<_ExtensionDialog> createState() => _ExtensionDialogState();
+}
+
+class _ExtensionDialogState extends State<_ExtensionDialog> {
+  final _reason = TextEditingController();
+  final _reasonFocus = FocusNode();
+
+  /// 기본은 기존 마감에서 일주일 뒤 (이미 지났으면 오늘부터 일주일)
+  late DateTime _due = _later(widget.project.due).add(Duration(days: 7));
+
+  static DateTime _later(DateTime due) {
+    final now = DateTime.now();
+    return due.isAfter(now) ? due : now;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _reason.addListener(() => setState(() {}));
+    _reasonFocus.requestFocus();
+  }
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    _reasonFocus.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDue() async {
+    // 연장이므로 기존 마감(또는 오늘) 다음 날부터 고를 수 있다
+    final first = _later(widget.project.due).add(Duration(days: 1));
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _due,
+      firstDate: first,
+      lastDate: DateTime(first.year + 3),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme:
+              (AppColors.isDark
+                      ? ColorScheme.dark(surface: AppColors.surface)
+                      : ColorScheme.light(surface: AppColors.surface))
+                  .copyWith(
+                    primary: AppColors.primary,
+                    onPrimary: Colors.white,
+                    onSurface: AppColors.textPrimary,
+                  ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) setState(() => _due = picked);
+  }
+
+  void _submit() {
+    final reason = _reason.text.trim();
+    if (reason.isEmpty) {
+      AppToast.show(context, '연장 사유를 입력해주세요');
+      _reasonFocus.requestFocus();
+      return;
+    }
+    Navigator.pop(
+      context,
+      _Extension(
+        requester: _me,
+        due: _due,
+        reason: reason,
+        time: DateTime.now(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final project = widget.project;
+    final overdue = _dday(project.due) < 0;
+
+    return Container(
+      width: 400,
+      padding: EdgeInsets.fromLTRB(24, 22, 24, 18),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('기한 연장 신청', style: AppTextStyles.title2),
+          SizedBox(height: 6),
+          Text(
+            '승인되면 마감일이 바뀌고, 반려되면 지금 마감일 그대로 갑니다',
+            style: AppTextStyles.caption,
+          ),
+          SizedBox(height: 16),
+          Row(
+            children: [
+              SizedBox(
+                width: 72,
+                child: Text('현재 마감', style: AppTextStyles.label),
+              ),
+              Text(
+                _date(project.due),
+                style: AppTextStyles.body2.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: overdue ? AppColors.error : AppColors.textPrimary,
+                ),
+              ),
+              if (overdue) ...[
+                SizedBox(width: 6),
+                Text(
+                  '${-_dday(project.due)}일 지남',
+                  style: AppTextStyles.caption.copyWith(color: AppColors.error),
+                ),
+              ],
+            ],
+          ),
+          SizedBox(height: 10),
+          Row(
+            children: [
+              SizedBox(
+                width: 72,
+                child: Text('연장 마감', style: AppTextStyles.label),
+              ),
+              Pressable(
+                onTap: _pickDue,
+                scale: 0.97,
+                pressedColor: AppColors.gray100,
+                borderRadius: BorderRadius.circular(10),
+                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.calendar_today_rounded,
+                      size: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                    SizedBox(width: 6),
+                    Text(
+                      '${_due.year}.${_due.month}.${_due.day}',
+                      style: AppTextStyles.body2.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(width: 6),
+              _DdayBadge(dday: _dday(_due), phase: _Phase.running),
+            ],
+          ),
+          SizedBox(height: 14),
+          _Field(
+            controller: _reason,
+            focusNode: _reasonFocus,
+            hint: '왜 연장이 필요한가요?',
+            lines: 3,
+          ),
+          SizedBox(height: 18),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Pressable(
+                onTap: () => Navigator.pop(context),
+                scale: 0.97,
+                pressedColor: AppColors.gray100,
+                borderRadius: BorderRadius.circular(12),
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                child: Text(
+                  '취소',
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              SizedBox(width: 8),
+              Pressable(
+                onTap: _submit,
+                scale: 0.97,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  decoration: BoxDecoration(
+                    // 사유를 적기 전에는 흐리게 — 눌러도 안내만 뜬다
+                    color: _reason.text.trim().isEmpty
+                        ? AppColors.gray200
+                        : AppColors.primary,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '신청',
+                    style: AppTextStyles.body2.copyWith(
+                      color: _reason.text.trim().isEmpty
+                          ? AppColors.gray500
+                          : Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// 새 프로젝트 만들기 — 만들면 그 프로젝트를 돌려준다
 Future<_Project?> _showProjectComposer(BuildContext context) {
   return showDialog<_Project>(
@@ -1542,7 +2002,7 @@ class _ProjectComposerState extends State<_ProjectComposer> {
                           ),
                         ),
                         SizedBox(width: 6),
-                        _DdayBadge(dday: dday, finished: false),
+                        _DdayBadge(dday: dday, phase: _Phase.running),
                       ],
                     ),
                     SizedBox(height: 10),
@@ -2003,6 +2463,34 @@ class _Event {
   final bool comment;
 }
 
+/// 프로젝트가 놓인 단계 — 목록 탭 순서와 같다
+enum _Phase {
+  running('진행 중'),
+  done('완료'),
+  missed('누락');
+
+  const _Phase(this.label);
+
+  final String label;
+}
+
+/// 기한 연장 신청 한 건 (승인 전까지 마감일은 그대로다)
+class _Extension {
+  _Extension({
+    required this.requester,
+    required this.due,
+    required this.reason,
+    required this.time,
+  });
+
+  final String requester;
+
+  /// 신청한 새 마감일
+  final DateTime due;
+  final String reason;
+  final DateTime time;
+}
+
 /// 프로젝트 한 건 — 진행률은 할 일에서 계산한다
 class _Project {
   _Project({
@@ -2016,6 +2504,7 @@ class _Project {
     required this.todos,
     required this.files,
     required this.events,
+    this.request,
   });
 
   final String name;
@@ -2023,18 +2512,29 @@ class _Project {
   final Color color;
   final String owner;
   final DateTime start;
-  final DateTime due;
+
+  /// 마감일 — 기한 연장이 승인되면 늘어난다
+  DateTime due;
+
   final List<String> members;
   final List<_Todo> todos;
   final List<_File> files;
   final List<_Event> events;
 
+  /// 결재를 기다리는 기한 연장 신청 (없으면 null)
+  _Extension? request;
+
   int get doneCount => todos.where((t) => t.done).length;
 
   double get progress => todos.isEmpty ? 0 : doneCount / todos.length;
 
-  /// 할 일을 다 끝냈으면 완료로 본다 (상태를 따로 관리하지 않는다)
-  bool get finished => todos.isNotEmpty && doneCount == todos.length;
+  /// 단계는 따로 관리하지 않고 할 일과 마감일에서 끌어낸다.
+  /// 할 일을 다 끝내면 완료, 못 끝낸 채 마감이 지나면 누락.
+  _Phase get phase {
+    if (todos.isNotEmpty && doneCount == todos.length) return _Phase.done;
+    if (_dday(due) < 0) return _Phase.missed;
+    return _Phase.running;
+  }
 }
 
 /// 목업 프로젝트. 탭을 오가도 유지되도록 모듈 전역으로 둔다.
@@ -2158,6 +2658,29 @@ List<_Project> _seedProjects() {
           comment: true,
         ),
       ],
+    ),
+    // 누락 탭 확인용 — 마감이 지났는데 할 일이 남은 프로젝트 (연장 신청이 올라와 있다)
+    _Project(
+      name: '상반기 시설 안전 점검',
+      desc: '소방·전기 설비 정기 점검과 보수. 업체 일정이 밀려 마감을 넘겼습니다.',
+      color: AppColors.warning,
+      owner: '민중기',
+      start: day(-25),
+      due: day(-4),
+      members: [_me, '민중기', '김피스'],
+      todos: [
+        _Todo(text: '소방 설비 점검', assignee: '민중기', done: true),
+        _Todo(text: '전기 안전 진단', assignee: '김피스'),
+        _Todo(text: '점검 결과 보고서 제출', assignee: _me),
+      ],
+      files: [_File('안전점검_체크리스트.pdf', '410KB', '민중기')],
+      events: [_Event(author: '민중기', text: "'소방 설비 점검' 완료", time: ago(120))],
+      request: _Extension(
+        requester: '민중기',
+        due: day(7),
+        reason: '전기 진단 업체 일정이 밀려서 다음 주까지 연장이 필요합니다',
+        time: ago(5),
+      ),
     ),
     // 완료 탭 확인용 — 할 일이 모두 체크된 프로젝트
     _Project(
