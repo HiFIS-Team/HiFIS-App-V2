@@ -63,11 +63,39 @@ class _MainShellState extends State<MainShell> {
   // static으로 두면 핫 리로드 시 페이지 교체가 반영되지 않아 getter로 만든다.
   // IndexedStack이 타입/위치 기준으로 상태를 유지하므로 매 빌드 생성해도 안전하다.
   List<Widget> get _mainPages => [
-    HomeScreen(),
+    HomeScreen(onOpenProjects: _goProjects, onOpenNotices: _goNotices),
     WorkScreen(),
     ProjectScreen(),
     MeetingScreen(),
   ];
+
+  /// 홈 카드에서 프로젝트로 — 플랫폼마다 탭을 세는 방식이 달라 여기서 나눈다
+  void _goProjects() {
+    if (isDesktop) {
+      _paneIndex.value = 2;
+    } else if (!isApple) {
+      setState(() => _androidTab = 2);
+    } else {
+      setState(() {
+        _subMenu = false;
+        _mainIndex = 2;
+      });
+    }
+  }
+
+  /// 홈 카드에서 공지로 (폰은 서브 바 안에 있다)
+  void _goNotices() {
+    if (isDesktop) {
+      _paneIndex.value = 10;
+    } else if (!isApple) {
+      setState(() => _androidTab = 6);
+    } else {
+      setState(() {
+        _subMenu = true;
+        _subIndex = 3;
+      });
+    }
+  }
 
   List<Widget> get _subPages => [
     PlaceholderScreen(emoji: '🗓️', title: '근태·월차'),
@@ -105,7 +133,7 @@ class _MainShellState extends State<MainShell> {
 
   /// 데스크톱 전용 페이지 목록 — DesktopSidebar의 섹션 펼친 순서와 일치해야 한다
   List<Widget> get _desktopPages => [
-    HomeScreen(),
+    HomeScreen(onOpenProjects: _goProjects, onOpenNotices: _goNotices),
     WorkScreen(),
     ProjectScreen(),
     ScheduleScreen(),

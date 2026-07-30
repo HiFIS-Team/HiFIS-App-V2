@@ -41,6 +41,39 @@ class _NoticeScreenState extends State<NoticeScreen> {
   /// 새로 쓴 공지는 바로 편집 모드로 연다
   bool _startEditing = false;
 
+  @override
+  void initState() {
+    super.initState();
+    // 홈에서 넘어오며 걸어둔 요청은 첫 빌드 전에 반영한다 (setState 필요 없음)
+    _consumeRequest();
+    requestedNotice.addListener(_onRequest);
+  }
+
+  @override
+  void dispose() {
+    requestedNotice.removeListener(_onRequest);
+    super.dispose();
+  }
+
+  void _onRequest() {
+    if (_consumeRequest()) setState(() {});
+  }
+
+  /// 대기 중인 요청이 있으면 선택에 반영한다.
+  /// 비우면서 리스너가 한 번 더 돌지만 값이 null이라 바로 빠져나온다.
+  bool _consumeRequest() {
+    final brief = requestedNotice.value;
+    if (brief == null) return false;
+    requestedNotice.value = null;
+    final notice = brief._notice;
+    // 홈에서 열었으니 읽음 처리도 같이 한다
+    notice.readers.add(me);
+    _unreadOnly = false;
+    _startEditing = false;
+    _selected = notice;
+    return true;
+  }
+
   List<_Notice> get _visible {
     final list = _notices
         .where((n) => !_unreadOnly || !n.readers.contains(me))
@@ -970,3 +1003,63 @@ List<_Notice> _seed() {
 
 /// '7.30' 형태
 String _date(DateTime time) => '${time.month}.${time.day}';
+
+// ── 홈 카드 연결 ──
+
+/// 홈 카드에서 열어달라고 요청한 공지
+///
+/// 폰은 홈에서 바로 본문을 밀어 올리지만, 데스크톱은 2단 구조라
+/// 공지 화면으로 옮긴 뒤 이걸 보고 선택을 맞춘다.
+final requestedNotice = ValueNotifier<NoticeBrief?>(null);
+
+/// 홈 카드에 내보내는 공지 요약
+///
+/// 내부 모델(`_Notice`)은 이 라이브러리 밖으로 나가지 않는다.
+class NoticeBrief {
+  NoticeBrief._(this._notice);
+
+  final _Notice _notice;
+
+  String get title => _notice.displayTitle;
+  String get author => _notice.author;
+  bool get pinned => _notice.pinned;
+  bool get unread => !_notice.readers.contains(me);
+
+  /// '오늘' · '어제' · '3일 전' · '7.12'
+  String get time {
+    final now = DateTime.now();
+    final days = DateTime(now.year, now.month, now.day)
+        .difference(
+          DateTime(_notice.date.year, _notice.date.month, _notice.date.day),
+        )
+        .inDays;
+    if (days <= 0) return '오늘';
+    if (days == 1) return '어제';
+    if (days < 7) return '$days일 전';
+    return _date(_notice.date);
+  }
+
+  /// 폰: 읽음 처리하고 본문을 옆에서 밀어 연다
+  Future<void> open(BuildContext context) {
+    _notice.readers.add(me);
+    return Navigator.push(
+      context,
+      CupertinoPageRoute(
+        builder: (_) => _NoticePage(notice: _notice, editing: false),
+      ),
+    );
+  }
+}
+
+/// 홈 카드용 — 고정 공지가 위, 그다음 최신순으로 [count]개까지
+List<NoticeBrief> noticeBriefs(int count) {
+  final list = [..._notices]
+    ..sort((a, b) {
+      if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
+      return b.date.compareTo(a.date);
+    });
+  return list.take(count).map(NoticeBrief._).toList();
+}
+
+/// 올라온 공지 수 (홈 카드 머리말)
+int get noticeCount => _notices.length;

@@ -38,6 +38,35 @@ class _ProjectScreenState extends State<ProjectScreen> {
   /// 선택한 프로젝트 (목록이 바뀌면 첫 항목으로 되돌린다)
   _Project? _selected;
 
+  @override
+  void initState() {
+    super.initState();
+    // 홈에서 넘어오며 걸어둔 요청은 첫 빌드 전에 반영한다 (setState 필요 없음)
+    _consumeRequest();
+    requestedProject.addListener(_onRequest);
+  }
+
+  @override
+  void dispose() {
+    requestedProject.removeListener(_onRequest);
+    super.dispose();
+  }
+
+  void _onRequest() {
+    if (_consumeRequest()) setState(() {});
+  }
+
+  /// 대기 중인 요청이 있으면 선택에 반영한다.
+  /// 비우면서 리스너가 한 번 더 돌지만 값이 null이라 바로 빠져나온다.
+  bool _consumeRequest() {
+    final brief = requestedProject.value;
+    if (brief == null) return false;
+    requestedProject.value = null;
+    _phase = brief._project.phase;
+    _selected = brief._project;
+    return true;
+  }
+
   List<_Project> get _visible {
     final list = _projects.where((p) => p.phase == _phase).toList()
       ..sort((a, b) => a.due.compareTo(b.due));
@@ -2798,4 +2827,67 @@ String _relative(DateTime time) {
   if (diff.inHours < 24) return '${diff.inHours}시간 전';
   if (diff.inDays < 7) return '${diff.inDays}일 전';
   return _date(time);
+}
+
+// ── 홈 카드 연결 ──
+
+/// 홈 카드에서 열어달라고 요청한 프로젝트
+///
+/// 폰은 홈에서 바로 상세를 밀어 올리지만, 데스크톱은 2단 구조라
+/// 프로젝트 화면으로 옮긴 뒤 이걸 보고 선택을 맞춘다.
+final requestedProject = ValueNotifier<ProjectBrief?>(null);
+
+/// 홈 카드에 내보내는 프로젝트 요약
+///
+/// 내부 모델(`_Project`)은 이 라이브러리 밖으로 나가지 않는다.
+class ProjectBrief {
+  ProjectBrief._(this._project);
+
+  final _Project _project;
+
+  String get name => _project.name;
+
+  /// 목록 앞의 세로 막대에 쓰는 프로젝트 색
+  Color get color => _project.color;
+
+  /// '나' / '나 외 3명'
+  String get members => _project.members.length <= 1
+      ? '나'
+      : '나 외 ${_project.members.length - 1}명';
+
+  /// 'D-3' · 'D-DAY' · '누락 2일' · '완료'
+  String get dday {
+    final days = _dday(_project.due);
+    return switch (_project.phase) {
+      _Phase.done => '완료',
+      _Phase.missed => '누락 ${-days}일',
+      _Phase.running when days == 0 => 'D-DAY',
+      _Phase.running => 'D-$days',
+    };
+  }
+
+  /// 임박할수록 빨개진다 (목록의 D-day 배지와 같은 기준)
+  Color get ddayColor {
+    final days = _dday(_project.due);
+    return switch (_project.phase) {
+      _Phase.done => AppColors.success,
+      _Phase.missed => AppColors.error,
+      _Phase.running when days <= 2 => AppColors.error,
+      _Phase.running when days <= 7 => AppColors.warning,
+      _Phase.running => AppColors.primary,
+    };
+  }
+
+  /// 폰: 상세 화면을 옆에서 밀어 연다
+  Future<void> open(BuildContext context) => Navigator.push(
+    context,
+    CupertinoPageRoute(builder: (_) => _ProjectDetailScreen(project: _project)),
+  );
+}
+
+/// 홈 카드용 — 진행 중인 프로젝트를 마감 임박순으로 [count]개까지
+List<ProjectBrief> projectBriefs(int count) {
+  final list = _projects.where((p) => p.phase == _Phase.running).toList()
+    ..sort((a, b) => a.due.compareTo(b.due));
+  return list.take(count).map(ProjectBrief._).toList();
 }

@@ -8,12 +8,29 @@ import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
+import '../../core/widgets/pressable.dart';
+import '../notice/notice_screen.dart';
+import '../project/project_screen.dart';
 
 /// 홈 화면 (디자인 시스템 데모용 샘플)
 ///
 /// 데이터는 전부 하드코딩된 목업이며, 기능 개발 시 실제 데이터로 교체한다.
-class HomeScreen extends StatelessWidget {
-  HomeScreen({super.key});
+class HomeScreen extends StatefulWidget {
+  HomeScreen({super.key, this.onOpenProjects, this.onOpenNotices});
+
+  /// 카드의 '전체'를 눌렀을 때 해당 탭으로 옮겨달라고 셸에 알린다
+  final VoidCallback? onOpenProjects;
+  final VoidCallback? onOpenNotices;
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  /// 상세를 보고 돌아오면 진행률·읽음 표시가 바뀌어 있을 수 있다
+  void _refresh() {
+    if (mounted) setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,16 +54,34 @@ class HomeScreen extends StatelessWidget {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Expanded(child: _ProjectsCard(count: 5, fill: true)),
+                        Expanded(
+                          child: _ProjectsCard(
+                            count: 5,
+                            fill: true,
+                            onOpenAll: widget.onOpenProjects,
+                            onChanged: _refresh,
+                          ),
+                        ),
                         SizedBox(width: 16),
-                        Expanded(child: _NoticeCard()),
+                        Expanded(
+                          child: _NoticeCard(
+                            onOpenAll: widget.onOpenNotices,
+                            onChanged: _refresh,
+                          ),
+                        ),
                       ],
                     ),
                   )
                 else ...[
-                  _ProjectsCard(),
+                  _ProjectsCard(
+                    onOpenAll: widget.onOpenProjects,
+                    onChanged: _refresh,
+                  ),
                   SizedBox(height: 16),
-                  _NoticeCard(),
+                  _NoticeCard(
+                    onOpenAll: widget.onOpenNotices,
+                    onChanged: _refresh,
+                  ),
                 ],
               ],
             ),
@@ -322,10 +357,13 @@ class _WorkGauge extends StatelessWidget {
 }
 
 class _CardHeader extends StatelessWidget {
-  _CardHeader({required this.title, required this.count});
+  _CardHeader({required this.title, required this.count, this.onOpenAll});
 
   final String title;
   final int count;
+
+  /// 눌리면 해당 탭으로 이동한다
+  final VoidCallback? onOpenAll;
 
   @override
   Widget build(BuildContext context) {
@@ -338,9 +376,8 @@ class _CardHeader extends StatelessWidget {
           style: AppTextStyles.title3.copyWith(color: AppColors.gray400),
         ),
         Spacer(),
-        // TODO: 목록 페이지 연결
         InkWell(
-          onTap: () {},
+          onTap: onOpenAll,
           borderRadius: BorderRadius.circular(8),
           child: Padding(
             padding: EdgeInsets.all(4),
@@ -363,7 +400,12 @@ class _CardHeader extends StatelessWidget {
 }
 
 class _ProjectsCard extends StatelessWidget {
-  _ProjectsCard({this.count = 3, this.fill = false});
+  _ProjectsCard({
+    this.count = 3,
+    this.fill = false,
+    this.onOpenAll,
+    required this.onChanged,
+  });
 
   /// 표시할 프로젝트 수 (데스크톱은 5개까지)
   final int count;
@@ -371,41 +413,31 @@ class _ProjectsCard extends StatelessWidget {
   /// true면 카드 높이에 맞춰 행 간격을 고르게 벌린다 (데스크톱 나란히 배치용)
   final bool fill;
 
+  final VoidCallback? onOpenAll;
+
+  /// 상세를 보고 돌아왔을 때 홈을 갱신한다
+  final VoidCallback onChanged;
+
+  /// 폰은 상세를 바로 밀어 올리고, 데스크톱은 2단 화면으로 옮겨 선택시킨다
+  Future<void> _open(BuildContext context, ProjectBrief brief) async {
+    if (isDesktop) {
+      requestedProject.value = brief;
+      onOpenAll?.call();
+      return;
+    }
+    await brief.open(context);
+    onChanged();
+  }
+
   @override
   Widget build(BuildContext context) {
-    // 내가 참여 중인 프로젝트만 마감 임박순 (기능 연동 시 실제 데이터로 교체)
+    // 진행 중인 프로젝트를 마감 임박순으로
+    final briefs = projectBriefs(count);
+
     final rows = [
-      _ProjectRow(
-        name: '여름 회원 이벤트 프로모션',
-        members: '나 외 4명',
-        dday: 'D-2',
-        color: AppColors.error,
-      ),
-      _ProjectRow(
-        name: 'PT룸 장비 교체',
-        members: '나 외 2명',
-        dday: 'D-5',
-        color: AppColors.warning,
-      ),
-      _ProjectRow(
-        name: '신규 트레이너 온보딩',
-        members: '나 외 3명',
-        dday: 'D-12',
-        color: AppColors.primary,
-      ),
-      _ProjectRow(
-        name: '가을 시즌 클래스 개편',
-        members: '나 외 1명',
-        dday: 'D-16',
-        color: AppColors.primary,
-      ),
-      _ProjectRow(
-        name: '락커룸 리모델링',
-        members: '나 외 5명',
-        dday: 'D-23',
-        color: AppColors.gray500,
-      ),
-    ].take(count).toList();
+      for (final brief in briefs)
+        _ProjectRow(brief: brief, onTap: () => _open(context, brief)),
+    ];
 
     return Container(
       padding: EdgeInsets.all(20),
@@ -413,9 +445,21 @@ class _ProjectsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _CardHeader(title: '프로젝트', count: rows.length),
+          _CardHeader(title: '프로젝트', count: rows.length, onOpenAll: onOpenAll),
           SizedBox(height: 14),
-          if (fill)
+          if (rows.isEmpty)
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: 22),
+              child: Center(
+                child: Text(
+                  '진행 중인 프로젝트가 없어요',
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.textTertiary,
+                  ),
+                ),
+              ),
+            )
+          else if (fill)
             Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -434,23 +478,16 @@ class _ProjectsCard extends StatelessWidget {
 }
 
 class _ProjectRow extends StatelessWidget {
-  _ProjectRow({
-    required this.name,
-    required this.members,
-    required this.dday,
-    required this.color,
-  });
+  _ProjectRow({required this.brief, required this.onTap});
 
-  final String name;
-  final String members;
-  final String dday;
-  final Color color;
+  final ProjectBrief brief;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    // TODO: 프로젝트 상세 페이지 연결
-    return InkWell(
-      onTap: () {},
+    return Pressable(
+      onTap: onTap,
+      scale: 0.98,
       child: Row(
         children: [
           // 일정 카드 스타일의 세로 색 막대
@@ -458,7 +495,7 @@ class _ProjectRow extends StatelessWidget {
             width: 4,
             height: 40,
             decoration: BoxDecoration(
-              color: color,
+              color: brief.color,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -468,7 +505,7 @@ class _ProjectRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  name,
+                  brief.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: AppTextStyles.body1.copyWith(
@@ -476,7 +513,7 @@ class _ProjectRow extends StatelessWidget {
                   ),
                 ),
                 SizedBox(height: 2),
-                Text(members, style: AppTextStyles.caption),
+                Text(brief.members, style: AppTextStyles.caption),
               ],
             ),
           ),
@@ -484,13 +521,13 @@ class _ProjectRow extends StatelessWidget {
           Container(
             padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
+              color: brief.ddayColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              dday,
+              brief.dday,
               style: AppTextStyles.caption.copyWith(
-                color: color,
+                color: brief.ddayColor,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -502,33 +539,57 @@ class _ProjectRow extends StatelessWidget {
 }
 
 class _NoticeCard extends StatelessWidget {
-  _NoticeCard();
+  _NoticeCard({this.onOpenAll, required this.onChanged});
+
+  final VoidCallback? onOpenAll;
+
+  /// 본문을 보고 돌아왔을 때 홈을 갱신한다 (읽음 표시)
+  final VoidCallback onChanged;
+
+  /// 폰은 본문을 바로 밀어 올리고, 데스크톱은 2단 화면으로 옮겨 선택시킨다
+  Future<void> _open(BuildContext context, NoticeBrief brief) async {
+    if (isDesktop) {
+      requestedNotice.value = brief;
+      onOpenAll?.call();
+      return;
+    }
+    await brief.open(context);
+    onChanged();
+  }
 
   @override
   Widget build(BuildContext context) {
-    // 최신 공지 5개 (기능 연동 시 실제 데이터로 교체)
+    // 고정 공지가 위, 그다음 최신순으로 5개
+    final briefs = noticeBriefs(5);
+
     return Container(
       padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
       decoration: AppDecorations.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _CardHeader(title: '공지', count: 5),
+          _CardHeader(title: '공지', count: noticeCount, onOpenAll: onOpenAll),
           SizedBox(height: 4),
-          _NoticeRow(
-            title: '8월 근무표가 확정되었습니다',
-            author: '민중기',
-            time: '오늘',
-            pinned: true,
-          ),
-          Divider(),
-          _NoticeRow(title: '여름 휴가 신청 안내', author: '이준승', time: '어제'),
-          Divider(),
-          _NoticeRow(title: '센터 청소 일정 변경', author: '전상현', time: '3일 전'),
-          Divider(),
-          _NoticeRow(title: '7월 우수사원 발표', author: '이준승', time: '4일 전'),
-          Divider(),
-          _NoticeRow(title: '정수기 정기 점검 안내', author: '민중기', time: '6일 전'),
+          if (briefs.isEmpty)
+            Padding(
+              padding: EdgeInsets.fromLTRB(0, 18, 0, 26),
+              child: Center(
+                child: Text(
+                  '올라온 공지가 없어요',
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.textTertiary,
+                  ),
+                ),
+              ),
+            )
+          else
+            for (var i = 0; i < briefs.length; i++) ...[
+              if (i > 0) Divider(),
+              _NoticeRow(
+                brief: briefs[i],
+                onTap: () => _open(context, briefs[i]),
+              ),
+            ],
         ],
       ),
     );
@@ -536,23 +597,19 @@ class _NoticeCard extends StatelessWidget {
 }
 
 class _NoticeRow extends StatelessWidget {
-  _NoticeRow({
-    required this.title,
-    required this.author,
-    required this.time,
-    this.pinned = false,
-  });
+  _NoticeRow({required this.brief, required this.onTap});
 
-  final String title;
-  final String author;
-  final String time;
-  final bool pinned;
+  final NoticeBrief brief;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    // TODO: 공지 상세 페이지 연결
-    return InkWell(
-      onTap: () {},
+    final title = brief.title;
+    final pinned = brief.pinned;
+
+    return Pressable(
+      onTap: onTap,
+      scale: 0.99,
       child: Padding(
         padding: EdgeInsets.symmetric(vertical: 14),
         child: Column(
@@ -588,10 +645,25 @@ class _NoticeRow extends StatelessWidget {
                     ),
                   ),
                 ),
+                // 아직 안 읽은 공지는 목록과 같은 파란 점으로 표시한다
+                if (brief.unread) ...[
+                  SizedBox(width: 8),
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ],
               ],
             ),
             SizedBox(height: 4),
-            Text('$author · $time', style: AppTextStyles.caption),
+            Text(
+              '${brief.author} · ${brief.time}',
+              style: AppTextStyles.caption,
+            ),
           ],
         ),
       ),
