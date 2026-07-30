@@ -439,20 +439,29 @@ class _ProjectDetail extends StatelessWidget {
     onChanged();
   }
 
-  void _approve(BuildContext context) {
+  /// 승인·반려 모두 사유를 남겨야 처리된다
+  Future<void> _decide(BuildContext context, {required bool approve}) async {
     final request = project.request!;
-    _log('기한 연장 승인 (${_date(project.due)} → ${_date(request.due)})');
-    project.due = request.due;
-    project.request = null;
-    onChanged();
-    AppToast.show(context, '기한 연장을 승인했어요');
-  }
+    final reason = await _showDecisionDialog(
+      context,
+      project: project,
+      approve: approve,
+    );
+    if (reason == null) return;
 
-  void _reject(BuildContext context) {
-    _log('기한 연장 반려 (마감일 ${_date(project.due)} 유지)');
+    if (approve) {
+      _log(
+        '기한 연장 승인 (${_date(project.due)} → ${_date(request.due)}) · $reason',
+      );
+      project.due = request.due;
+    } else {
+      _log('기한 연장 반려 (마감일 ${_date(project.due)} 유지) · $reason');
+    }
     project.request = null;
     onChanged();
-    AppToast.show(context, '기한 연장을 반려했어요');
+    if (context.mounted) {
+      AppToast.show(context, approve ? '기한 연장을 승인했어요' : '기한 연장을 반려했어요');
+    }
   }
 
   @override
@@ -532,8 +541,8 @@ class _ProjectDetail extends StatelessWidget {
           SizedBox(height: 14),
           _ExtensionCard(
             project: project,
-            onApprove: () => _approve(context),
-            onReject: () => _reject(context),
+            onApprove: () => _decide(context, approve: true),
+            onReject: () => _decide(context, approve: false),
           ),
         ],
         SizedBox(height: 18),
@@ -1471,6 +1480,180 @@ class _PickRow extends StatelessWidget {
             SizedBox(width: 8),
             Icon(Icons.check_rounded, size: 16, color: AppColors.primary),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// 기한 연장 결재 — 승인이든 반려든 사유를 받아 돌려준다 (취소면 null)
+Future<String?> _showDecisionDialog(
+  BuildContext context, {
+  required _Project project,
+  required bool approve,
+}) {
+  return showDialog<String>(
+    context: context,
+    barrierColor: Colors.black.withValues(alpha: 0.45),
+    builder: (context) => Center(
+      child: Material(
+        type: MaterialType.transparency,
+        child: _DecisionDialog(project: project, approve: approve),
+      ),
+    ),
+  );
+}
+
+class _DecisionDialog extends StatefulWidget {
+  _DecisionDialog({required this.project, required this.approve});
+
+  final _Project project;
+  final bool approve;
+
+  @override
+  State<_DecisionDialog> createState() => _DecisionDialogState();
+}
+
+class _DecisionDialogState extends State<_DecisionDialog> {
+  final _reason = TextEditingController();
+  final _reasonFocus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _reason.addListener(() => setState(() {}));
+    _reasonFocus.requestFocus();
+  }
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    _reasonFocus.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final reason = _reason.text.trim();
+    if (reason.isEmpty) {
+      AppToast.show(
+        context,
+        widget.approve ? '승인 사유를 입력해주세요' : '반려 사유를 입력해주세요',
+      );
+      _reasonFocus.requestFocus();
+      return;
+    }
+    Navigator.pop(context, reason);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final approve = widget.approve;
+    final project = widget.project;
+    final request = project.request!;
+    final accent = approve ? AppColors.primary : AppColors.error;
+    final empty = _reason.text.trim().isEmpty;
+
+    return Container(
+      width: 400,
+      padding: EdgeInsets.fromLTRB(24, 22, 24, 18),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(approve ? '기한 연장 승인' : '기한 연장 반려', style: AppTextStyles.title2),
+          SizedBox(height: 6),
+          Text(
+            approve ? '승인하면 마감일이 바로 바뀝니다' : '반려하면 지금 마감일 그대로 갑니다',
+            style: AppTextStyles.caption,
+          ),
+          SizedBox(height: 16),
+          // 무엇을 결재하는지 다시 보여준다
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.fromLTRB(14, 12, 14, 12),
+            decoration: BoxDecoration(
+              color: AppColors.gray50,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      '${_date(project.due)} → ${_date(request.due)}',
+                      style: AppTextStyles.body2.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      '${request.requester} 신청',
+                      style: AppTextStyles.caption,
+                    ),
+                  ],
+                ),
+                SizedBox(height: 4),
+                Text(
+                  request.reason,
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: 12),
+          _Field(
+            controller: _reason,
+            focusNode: _reasonFocus,
+            hint: approve ? '승인 사유를 적어주세요' : '반려 사유를 적어주세요',
+            lines: 3,
+          ),
+          SizedBox(height: 18),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Pressable(
+                onTap: () => Navigator.pop(context),
+                scale: 0.97,
+                pressedColor: AppColors.gray100,
+                borderRadius: BorderRadius.circular(12),
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                child: Text(
+                  '취소',
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              SizedBox(width: 8),
+              Pressable(
+                onTap: _submit,
+                scale: 0.97,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  decoration: BoxDecoration(
+                    // 사유를 적기 전에는 흐리게 — 눌러도 안내만 뜬다
+                    color: empty ? AppColors.gray200 : accent,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    approve ? '승인' : '반려',
+                    style: AppTextStyles.body2.copyWith(
+                      color: empty ? AppColors.gray500 : Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
