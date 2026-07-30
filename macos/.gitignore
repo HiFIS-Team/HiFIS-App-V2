@@ -5,3 +5,7 @@
 # Xcode-related
 **/dgph
 **/xcuserdata/
+
+# Xcode가 만드는 Swift Package Manager 캐시
+# (이 프로젝트는 플러그인을 CocoaPods로 받는다)
+**/xcshareddata/swiftpm/
