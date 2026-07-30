@@ -1,7 +1,11 @@
+import 'dart:ui';
+
 import 'package:cupertino_native/cupertino_native.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
+import '../util/sf_symbols.dart';
+import 'pressable.dart';
 
 /// 리퀴드 글래스 원형 아이콘 버튼 (헤더 아이콘, 뒤로가기 등 공통)
 ///
@@ -42,19 +46,22 @@ class GlassIconButton extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        CNButton.icon(
-          // 패키지의 setBrightness가 아이콘 설정을 유실하는 버그가 있어,
-          // 테마가 바뀌면 네이티브 버튼을 새로 생성한다.
-          key: ValueKey('glass-${stableId ?? symbol}-${AppColors.isDark}'),
-          icon: CNSymbol(
-            symbol,
-            size: size * 0.42,
-            color: symbolColor ?? AppColors.gray700,
-          ),
-          size: size,
-          enabled: enabled,
-          onPressed: onPressed ?? () {},
-        ),
+        if (isApple)
+          CNButton.icon(
+            // 패키지의 setBrightness가 아이콘 설정을 유실하는 버그가 있어,
+            // 테마가 바뀌면 네이티브 버튼을 새로 생성한다.
+            key: ValueKey('glass-${stableId ?? symbol}-${AppColors.isDark}'),
+            icon: CNSymbol(
+              symbol,
+              size: size * 0.42,
+              color: symbolColor ?? AppColors.gray700,
+            ),
+            size: size,
+            enabled: enabled,
+            onPressed: onPressed ?? () {},
+          )
+        else
+          _fallback(),
         if (showBadge)
           Positioned(
             top: 2,
@@ -70,6 +77,47 @@ class GlassIconButton extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+
+  /// 애플이 아닌 플랫폼용 — 네이티브 글래스를 못 쓰므로
+  /// 블러 + 반투명 흰 원으로 최대한 비슷하게 그린다.
+  Widget _fallback() {
+    return Pressable(
+      onTap: enabled ? (onPressed ?? () {}) : () {},
+      scale: 0.9,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 12,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: ClipOval(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: Container(
+              width: size,
+              height: size,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.surface.withValues(alpha: 0.72),
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.gray100),
+              ),
+              child: Icon(
+                iconForSymbol(symbol),
+                size: size * 0.46,
+                color: symbolColor ?? AppColors.gray700,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
