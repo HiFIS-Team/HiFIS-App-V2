@@ -114,6 +114,9 @@ class _MainShellState extends State<MainShell> {
   /// 사이드바 선택 인덱스 (_desktopPages 순서 기준)
   final _paneIndex = ValueNotifier<int>(0);
 
+  /// 헤더 알림 패널 열림 상태 (헤더 버튼과 패널 레이어가 함께 본다)
+  final _notiOpen = ValueNotifier<bool>(false);
+
   /// 콘텐츠 영역 전용 내비게이터.
   /// 슬라이드인 화면이 사이드바를 덮지 않고 콘텐츠 안에서만 전환되게 한다.
   final _paneNavKey = GlobalKey<NavigatorState>();
@@ -149,13 +152,38 @@ class _MainShellState extends State<MainShell> {
                       builder: (context, index, child) => Stack(
                         children: [
                           IndexedStack(index: index, children: _desktopPages),
+                          // 알림 패널 — 헤더 버튼보다 아래 레이어여야 한다.
+                          // 위에 두면 패널 그림자가 네이티브 버튼 위를 덮어
+                          // 오버레이가 생기면서 버튼 클릭이 먹지 않는다.
+                          SafeArea(
+                            bottom: false,
+                            child: Align(
+                              alignment: Alignment.topRight,
+                              child: Padding(
+                                // 종 버튼(오른쪽에서 16+40+10) 오른쪽 끝에 맞춘다
+                                padding: EdgeInsets.only(top: 60, right: 66),
+                                child: ValueListenableBuilder<bool>(
+                                  valueListenable: _notiOpen,
+                                  builder: (context, open, child) =>
+                                      _FloatingPanel(
+                                        open: open,
+                                        alignment: Alignment.topRight,
+                                        reserve: 24,
+                                        child: NotificationScreen(
+                                          embedded: true,
+                                        ),
+                                      ),
+                                ),
+                              ),
+                            ),
+                          ),
                           SafeArea(
                             bottom: false,
                             child: Align(
                               alignment: Alignment.topRight,
                               child: Padding(
                                 padding: EdgeInsets.only(top: 8, right: 16),
-                                child: _HeaderButtons(),
+                                child: _HeaderButtons(notiOpen: _notiOpen),
                               ),
                             ),
                           ),
@@ -221,6 +249,74 @@ class _MainShellState extends State<MainShell> {
   }
 }
 
+/// 데스크톱 플로팅 패널 (사내톡·알림 공통)
+///
+/// 닫혀 있을 때도 자리는 차지하되 투명하게 두고 터치를 통과시킨다.
+/// 열릴 때 [alignment] 기준으로 살짝 커지며 나타난다.
+class _FloatingPanel extends StatelessWidget {
+  _FloatingPanel({
+    required this.open,
+    required this.alignment,
+    required this.child,
+    this.height,
+    this.reserve = 24,
+  });
+
+  final bool open;
+  final Alignment alignment;
+  final Widget child;
+
+  /// 높이를 직접 줄 때 사용. 없으면 남는 공간에서 [reserve]를 뺀다.
+  final double? height;
+
+  /// 높이를 계산할 때 여백으로 남겨둘 크기
+  final double reserve;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // 창이 낮으면 패널도 함께 줄어든다
+        final h =
+            height ?? (constraints.maxHeight - reserve).clamp(240.0, 560.0);
+        return IgnorePointer(
+          ignoring: !open,
+          child: AnimatedOpacity(
+            duration: Duration(milliseconds: 200),
+            opacity: open ? 1 : 0,
+            child: AnimatedScale(
+              duration: Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              scale: open ? 1 : 0.94,
+              alignment: alignment,
+              child: Container(
+                width: 380,
+                height: h,
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.gray100),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.14),
+                      blurRadius: 40,
+                      offset: Offset(0, 12),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: child,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 /// 데스크톱 우하단 사내톡 플로팅 필 + 패널
 ///
 /// 인스타그램 데스크톱의 메시지 필과 같은 위치·역할이지만
@@ -260,44 +356,17 @@ class _ChatDockState extends State<_ChatDock> {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             // 사내톡 패널 — 필 위로 떠오른다
-            IgnorePointer(
-              ignoring: !_open,
-              child: AnimatedOpacity(
-                duration: Duration(milliseconds: 200),
-                opacity: _open ? 1 : 0,
-                child: AnimatedScale(
-                  duration: Duration(milliseconds: 220),
-                  curve: Curves.easeOutCubic,
-                  scale: _open ? 1 : 0.94,
-                  alignment: Alignment.bottomRight,
-                  child: Container(
-                    width: 380,
-                    height: panelHeight,
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppColors.gray100),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.14),
-                          blurRadius: 40,
-                          offset: Offset(0, 12),
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      // 패널 전용 내비게이터 — 채팅방·새 채팅 화면이
-                      // 콘텐츠 영역 전체가 아니라 패널 안에서 열린다
-                      child: Navigator(
-                        onGenerateRoute: (settings) => MaterialPageRoute(
-                          settings: settings,
-                          builder: (_) =>
-                              MessageScreen(embedded: true, onExpand: _expand),
-                        ),
-                      ),
-                    ),
-                  ),
+            _FloatingPanel(
+              open: _open,
+              alignment: Alignment.bottomRight,
+              height: panelHeight,
+              // 패널 전용 내비게이터 — 채팅방·새 채팅 화면이
+              // 콘텐츠 영역 전체가 아니라 패널 안에서 열린다
+              child: Navigator(
+                onGenerateRoute: (settings) => MaterialPageRoute(
+                  settings: settings,
+                  builder: (_) =>
+                      MessageScreen(embedded: true, onExpand: _expand),
                 ),
               ),
             ),
@@ -460,7 +529,10 @@ class _ChatDockState extends State<_ChatDock> {
 /// 바코드 오버레이가 떠 있는 동안에는 버튼 모양은 그대로 두고
 /// 터치만 비활성화한다. 글래스 눌림 효과가 딤 위로 그려지는 것을 막기 위함.
 class _HeaderButtons extends StatefulWidget {
-  _HeaderButtons();
+  _HeaderButtons({this.notiOpen});
+
+  /// 데스크톱 알림 패널 열림 상태. null이면(폰) 알림을 화면 전환으로 연다.
+  final ValueNotifier<bool>? notiOpen;
 
   @override
   State<_HeaderButtons> createState() => _HeaderButtonsState();
@@ -469,20 +541,44 @@ class _HeaderButtons extends StatefulWidget {
 class _HeaderButtonsState extends State<_HeaderButtons> {
   bool _overlayOpen = false;
 
-  /// 데스크톱 알림 패널이 열려 있는지 (열리면 종 아이콘이 X로 바뀐다)
-  bool _notiOpen = false;
-
   Future<void> _openBarcode() async {
     setState(() => _overlayOpen = true);
     await showAttendanceBarcode(context);
     if (mounted) setState(() => _overlayOpen = false);
   }
 
+  /// 알림 버튼 — 데스크톱은 화면 전환 대신 패널을 열고 종이 X로 바뀐다
+  Widget _bell() {
+    final noti = widget.notiOpen;
+    if (noti == null) {
+      return GlassIconButton(
+        symbol: 'bell',
+        showBadge: true,
+        enabled: !_overlayOpen,
+        onPressed: () => Navigator.push(
+          context,
+          CupertinoPageRoute(builder: (_) => NotificationScreen()),
+        ),
+      );
+    }
+    return ValueListenableBuilder<bool>(
+      valueListenable: noti,
+      builder: (context, open, child) => GlassIconButton(
+        // 심볼이 바뀌어도 네이티브 버튼을 새로 만들지 않게 고정 식별자를 준다
+        stableId: 'noti',
+        symbol: open ? 'xmark' : 'bell',
+        showBadge: !open,
+        enabled: !_overlayOpen,
+        onPressed: () => noti.value = !noti.value,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // 출퇴근 바코드는 폰을 직원 리더기에 찍는 용도라 데스크톱에서는 뺀다
     final desktop = isDesktop;
-    final buttons = Row(
+    return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (!desktop) ...[
@@ -503,22 +599,7 @@ class _HeaderButtonsState extends State<_HeaderButtons> {
           ),
           SizedBox(width: 10),
         ],
-        // 데스크톱은 화면 전환 대신 아래에 알림 패널을 펼친다
-        GlassIconButton(
-          symbol: desktop && _notiOpen ? 'xmark' : 'bell',
-          showBadge: !_notiOpen,
-          enabled: !_overlayOpen,
-          onPressed: () {
-            if (desktop) {
-              setState(() => _notiOpen = !_notiOpen);
-              return;
-            }
-            Navigator.push(
-              context,
-              CupertinoPageRoute(builder: (_) => NotificationScreen()),
-            );
-          },
-        ),
+        _bell(),
         SizedBox(width: 10),
         GlassIconButton(
           symbol: 'person',
@@ -529,56 +610,6 @@ class _HeaderButtonsState extends State<_HeaderButtons> {
           ),
         ),
       ],
-    );
-
-    if (!desktop) return buttons;
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // 사내톡 패널과 같은 크기 규칙 (창이 낮으면 함께 줄어든다)
-        final panelHeight = (constraints.maxHeight - 84).clamp(240.0, 560.0);
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            buttons,
-            SizedBox(height: 12),
-            IgnorePointer(
-              ignoring: !_notiOpen,
-              child: AnimatedOpacity(
-                duration: Duration(milliseconds: 200),
-                opacity: _notiOpen ? 1 : 0,
-                child: AnimatedScale(
-                  duration: Duration(milliseconds: 220),
-                  curve: Curves.easeOutCubic,
-                  scale: _notiOpen ? 1 : 0.94,
-                  alignment: Alignment.topRight,
-                  child: Container(
-                    width: 380,
-                    height: panelHeight,
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppColors.gray100),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.14),
-                          blurRadius: 40,
-                          offset: Offset(0, 12),
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: NotificationScreen(embedded: true),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
     );
   }
 }

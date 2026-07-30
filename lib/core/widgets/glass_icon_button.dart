@@ -15,9 +15,14 @@ class GlassIconButton extends StatelessWidget {
     this.size = 40,
     this.enabled = true,
     this.symbolColor,
+    this.stableId,
   });
 
   final String symbol;
+
+  /// 심볼이 바뀌어도 네이티브 버튼을 새로 만들지 않게 할 때 쓰는 고정 식별자.
+  /// (예: 알림 버튼의 종 ↔ X 전환) 형제 버튼과 겹치지 않는 값을 준다.
+  final String? stableId;
   final VoidCallback? onPressed;
   final bool showBadge;
 
@@ -40,7 +45,7 @@ class GlassIconButton extends StatelessWidget {
         CNButton.icon(
           // 패키지의 setBrightness가 아이콘 설정을 유실하는 버그가 있어,
           // 테마가 바뀌면 네이티브 버튼을 새로 생성한다.
-          key: ValueKey('glass-$symbol-${AppColors.isDark}'),
+          key: ValueKey('glass-${stableId ?? symbol}-${AppColors.isDark}'),
           icon: CNSymbol(
             symbol,
             size: size * 0.42,
