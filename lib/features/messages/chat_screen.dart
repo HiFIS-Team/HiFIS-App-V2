@@ -8,6 +8,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
 import '../../core/widgets/glass_icon_button.dart';
+import '../../core/widgets/glass_input_bar.dart';
 import '../../core/widgets/pressable.dart';
 import '../../core/widgets/top_frost.dart';
 import 'chat_detail_screen.dart';
@@ -449,7 +450,7 @@ class _ChatScreenState extends State<ChatScreen> {
               top: false,
               child: Padding(
                 padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
-                child: _MessageInputBar(
+                child: GlassInputBar(
                   onSend: _send,
                   focusNode: _inputFocus,
                   replyLabel: _replyTarget?.text,
@@ -938,194 +939,6 @@ class _MenuRow extends StatelessWidget {
             ),
             Icon(icon, size: 18, color: color ?? AppColors.gray600),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MessageInputBar extends StatefulWidget {
-  _MessageInputBar({
-    required this.onSend,
-    this.focusNode,
-    this.replyLabel,
-    this.onCancelReply,
-  });
-
-  final ValueChanged<String> onSend;
-  final FocusNode? focusNode;
-
-  /// 답글 대상 원문. 있으면 입력바 위에 인용 줄이 표시된다.
-  final String? replyLabel;
-  final VoidCallback? onCancelReply;
-
-  @override
-  State<_MessageInputBar> createState() => _MessageInputBarState();
-}
-
-class _MessageInputBarState extends State<_MessageInputBar> {
-  final _controller = TextEditingController();
-  bool _hasText = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller.addListener(() {
-      final hasText = _controller.text.trim().isNotEmpty;
-      if (hasText != _hasText) setState(() => _hasText = hasText);
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    final text = _controller.text.trim();
-    if (text.isEmpty) return;
-    widget.onSend(text);
-    _controller.clear();
-    // 엔터/전송 후 포커스가 풀리므로 다시 잡아 연속 입력이 되게 한다
-    widget.focusNode?.requestFocus();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x1F101828),
-            blurRadius: 32,
-            offset: Offset(0, 10),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-          child: Container(
-            padding: EdgeInsets.only(left: 18, right: 8),
-            decoration: BoxDecoration(
-              color: AppColors.surface.withValues(alpha: 0.72),
-              borderRadius: BorderRadius.circular(28),
-              // 네이티브 글래스의 림처럼 보이는 헤어라인 — 흰 배경에서도 구분되게
-              border: Border.all(color: AppColors.gray100),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // 답글 인용 줄
-                if (widget.replyLabel != null)
-                  Padding(
-                    padding: EdgeInsets.only(top: 12, right: 10),
-                    child: Row(
-                      children: [
-                        Icon(
-                          CupertinoIcons.arrowshape_turn_up_left,
-                          size: 14,
-                          color: AppColors.gray500,
-                        ),
-                        SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            widget.replyLabel!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTextStyles.caption,
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: widget.onCancelReply,
-                          child: Icon(
-                            CupertinoIcons.xmark_circle_fill,
-                            size: 16,
-                            color: AppColors.gray400,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                SizedBox(
-                  height: 52,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _controller,
-                          focusNode: widget.focusNode,
-                          style: AppTextStyles.body2,
-                          cursorColor: AppColors.primary,
-                          textInputAction: TextInputAction.send,
-                          onSubmitted: (_) => _submit(),
-                          decoration: InputDecoration(
-                            hintText: '메시지 보내기',
-                            hintStyle: AppTextStyles.body2.copyWith(
-                              color: AppColors.gray400,
-                            ),
-                            border: InputBorder.none,
-                            isCollapsed: true,
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: 8),
-                      // 입력 전에는 링크 아이콘, 입력 중에는 파란 전송(비행기) 버튼
-                      AnimatedSwitcher(
-                        duration: Duration(milliseconds: 220),
-                        switchInCurve: Curves.easeOutBack,
-                        switchOutCurve: Curves.easeIn,
-                        transitionBuilder: (child, animation) =>
-                            ScaleTransition(
-                              scale: animation,
-                              child: FadeTransition(
-                                opacity: animation,
-                                child: child,
-                              ),
-                            ),
-                        child: _hasText
-                            ? GestureDetector(
-                                key: ValueKey('send'),
-                                onTap: _submit,
-                                child: Container(
-                                  width: 38,
-                                  height: 38,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    CupertinoIcons.paperplane_fill,
-                                    color: Colors.white,
-                                    size: 18,
-                                  ),
-                                ),
-                              )
-                            : GestureDetector(
-                                key: ValueKey('link'),
-                                onTap: () {},
-                                child: Container(
-                                  width: 38,
-                                  height: 38,
-                                  alignment: Alignment.center,
-                                  color: Colors.transparent,
-                                  child: Icon(
-                                    CupertinoIcons.link,
-                                    color: AppColors.gray600,
-                                    size: 22,
-                                  ),
-                                ),
-                              ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
         ),
       ),
     );

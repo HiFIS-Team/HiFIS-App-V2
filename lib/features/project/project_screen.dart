@@ -14,10 +14,12 @@ import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/avatar.dart';
 import '../../core/widgets/glass_bottom_button.dart';
 import '../../core/widgets/glass_icon_button.dart';
+import '../../core/widgets/glass_input_bar.dart';
 import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/pressable.dart';
 
+part 'project_comments.dart';
 part 'project_phone.dart';
 
 /// 프로젝트 화면 (목업)
@@ -716,6 +718,14 @@ class _ProjectDetail extends StatelessWidget {
           onAssign: (todo) => _assign(context, todo),
         ),
         SizedBox(height: 16),
+        // 폰은 댓글을 시트로 빼고, 여기엔 눌러서 여는 줄만 둔다
+        if (!isDesktop) ...[
+          _CommentTeaser(
+            project: project,
+            onTap: () => _showComments(context, project, onComment: _comment),
+          ),
+          SizedBox(height: 16),
+        ],
         _ActivityCard(project: project, onComment: _comment),
       ],
     );
@@ -1223,7 +1233,10 @@ class _ActivityCardState extends State<_ActivityCard> {
 
   @override
   Widget build(BuildContext context) {
-    final all = widget.project.events;
+    // 폰은 댓글이 시트로 빠져서 여기엔 시스템 기록만 남는다
+    final all = isDesktop
+        ? widget.project.events
+        : widget.project.events.where((e) => !e.comment).toList();
     final events = _expanded ? all : all.take(_fold).toList();
     final hidden = all.length - events.length;
 
@@ -1245,58 +1258,61 @@ class _ActivityCardState extends State<_ActivityCard> {
               ),
             ],
           ),
-          SizedBox(height: 12),
-          // 댓글 입력
-          Row(
-            children: [
-              Avatar(name: me, size: 34),
-              SizedBox(width: 10),
-              Expanded(
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: AppColors.gray50,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: TextField(
-                    controller: _controller,
-                    focusNode: _focus,
-                    style: AppTextStyles.body2,
-                    cursorColor: AppColors.primary,
-                    textInputAction: TextInputAction.send,
-                    onSubmitted: (_) => _send(),
-                    decoration: InputDecoration(
-                      hintText: '댓글을 남겨보세요',
-                      hintStyle: AppTextStyles.body2.copyWith(
-                        color: AppColors.gray400,
+          // 댓글 입력 — 폰은 시트로 빠져서 데스크톱에서만 둔다
+          if (isDesktop) ...[
+            SizedBox(height: 12),
+            // 댓글 입력
+            Row(
+              children: [
+                Avatar(name: me, size: 34),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.gray50,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: TextField(
+                      controller: _controller,
+                      focusNode: _focus,
+                      style: AppTextStyles.body2,
+                      cursorColor: AppColors.primary,
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => _send(),
+                      decoration: InputDecoration(
+                        hintText: '댓글을 남겨보세요',
+                        hintStyle: AppTextStyles.body2.copyWith(
+                          color: AppColors.gray400,
+                        ),
+                        border: InputBorder.none,
+                        isCollapsed: true,
                       ),
-                      border: InputBorder.none,
-                      isCollapsed: true,
                     ),
                   ),
                 ),
-              ),
-              SizedBox(width: 8),
-              Pressable(
-                onTap: _send,
-                scale: 0.94,
-                child: Container(
-                  width: 38,
-                  height: 38,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.arrow_upward_rounded,
-                    size: 18,
-                    color: Colors.white,
+                SizedBox(width: 8),
+                Pressable(
+                  onTap: _send,
+                  scale: 0.94,
+                  child: Container(
+                    width: 38,
+                    height: 38,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.arrow_upward_rounded,
+                      size: 18,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
+          ],
           SizedBox(height: 14),
           if (events.isEmpty)
             Padding(
