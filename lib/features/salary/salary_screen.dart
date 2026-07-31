@@ -9,7 +9,6 @@ import '../../core/util/platform.dart';
 import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/glass_bottom_button.dart';
-import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/phone_scaffold.dart';
 import '../../core/widgets/pressable.dart';
 
@@ -75,7 +74,7 @@ class _SalaryScreenState extends State<SalaryScreen> {
       SizedBox(height: 12),
       _PayCard(payslip: current),
       SizedBox(height: 12),
-      _DeductCard(payslip: current),
+      _CommissionCard(),
       SizedBox(height: 12),
       _HistoryCard(onOpenAll: () => _openHistory(context)),
     ];
@@ -117,7 +116,7 @@ class _SalaryScreenState extends State<SalaryScreen> {
                 children: [
                   Expanded(child: _PayCard(payslip: current)),
                   SizedBox(width: 16),
-                  Expanded(child: _DeductCard(payslip: current)),
+                  Expanded(child: _CommissionCard()),
                 ],
               ),
             ),
@@ -159,19 +158,6 @@ class _SummaryCard extends StatelessWidget {
                       '${payslip.month.month}월 급여',
                       style: AppTextStyles.label,
                     ),
-                    SizedBox(width: 8),
-                    // 어떤 조건으로 계산된 금액인지 밝힌다
-                    Flexible(
-                      child: Text(
-                        '${payslip.type.label} · ${payslip.insuranceLabel}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTextStyles.caption.copyWith(
-                          fontSize: 12,
-                          color: AppColors.textTertiary,
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -183,7 +169,7 @@ class _SummaryCard extends StatelessWidget {
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
             child: Text(
-              _won(payslip.net),
+              _won(payslip.total),
               style: TextStyle(
                 fontFamily: AppTextStyles.fontFamily,
                 fontSize: 32,
@@ -211,45 +197,25 @@ class _SummaryCard extends StatelessWidget {
           SizedBox(height: 14),
           Row(
             children: [
-              _part('지급', payslip.gross, AppColors.textPrimary),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 10),
+              Icon(
+                CupertinoIcons.info_circle,
+                size: 13,
+                color: AppColors.gray400,
+              ),
+              SizedBox(width: 5),
+              Expanded(
                 child: Text(
-                  '−',
-                  style: AppTextStyles.body2.copyWith(
-                    color: AppColors.textTertiary,
-                  ),
+                  // 실제 입금액과 다르다는 걸 금액 바로 아래에서 알린다
+                  '세금·보험 공제 전 금액이에요',
+                  style: AppTextStyles.caption.copyWith(fontSize: 12),
                 ),
               ),
-              _part('공제', payslip.deduction, AppColors.error),
             ],
           ),
         ],
       ),
     );
   }
-
-  Widget _part(String label, int value, Color color) => Expanded(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: AppTextStyles.caption.copyWith(fontSize: 12)),
-        SizedBox(height: 3),
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Text(
-            _won(value),
-            maxLines: 1,
-            style: AppTextStyles.body1.copyWith(
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
 }
 
 class _StatusTag extends StatelessWidget {
@@ -281,7 +247,7 @@ class _StatusTag extends StatelessWidget {
 // 최근 추이
 // ---------------------------------------------------------------------------
 
-/// 최근 6개월 실수령액 막대 — 이번 달만 파랗게
+/// 최근 6개월 총 지급액 막대 — 이번 달만 파랗게
 class _TrendCard extends StatelessWidget {
   _TrendCard();
 
@@ -289,8 +255,8 @@ class _TrendCard extends StatelessWidget {
   Widget build(BuildContext context) {
     // 오래된 달이 왼쪽에 오도록 뒤집는다
     final months = _payslips.take(6).toList().reversed.toList();
-    final top = months.map((p) => p.net).reduce((a, b) => a > b ? a : b);
-    final average = months.fold(0, (sum, p) => sum + p.net) ~/ months.length;
+    final top = months.map((p) => p.total).reduce((a, b) => a > b ? a : b);
+    final average = months.fold(0, (sum, p) => sum + p.total) ~/ months.length;
 
     return Container(
       padding: EdgeInsets.fromLTRB(22, 20, 22, 18),
@@ -318,7 +284,7 @@ class _TrendCard extends StatelessWidget {
                   Expanded(
                     child: _Bar(
                       payslip: payslip,
-                      ratio: payslip.net / top,
+                      ratio: payslip.total / top,
                       // 마지막(이번 달)만 색을 준다
                       current: payslip == months.last,
                     ),
@@ -346,7 +312,7 @@ class _Bar extends StatelessWidget {
       children: [
         Text(
           // 만 원 단위로 줄여야 좁은 칸에 들어간다
-          _amount(payslip.net ~/ 10000),
+          _amount(payslip.total ~/ 10000),
           style: AppTextStyles.caption.copyWith(
             fontSize: 11,
             fontWeight: FontWeight.w600,
@@ -393,25 +359,8 @@ class _PayCard extends StatelessWidget {
   Widget build(BuildContext context) => _AmountCard(
     title: '지급',
     items: payslip.pays,
-    total: payslip.gross,
-    totalLabel: '지급 합계',
-  );
-}
-
-/// 무엇을 뗐는지 — 고용 형태에 따라 항목이 다르고, 없을 수도 있다
-class _DeductCard extends StatelessWidget {
-  _DeductCard({required this.payslip});
-
-  final _Payslip payslip;
-
-  @override
-  Widget build(BuildContext context) => _AmountCard(
-    title: '공제',
-    items: payslip.deductions,
-    total: payslip.deduction,
-    totalLabel: '공제 합계',
-    minus: true,
-    empty: '떼는 금액이 없어요',
+    total: payslip.total,
+    totalLabel: '총 지급액',
   );
 }
 
@@ -422,20 +371,12 @@ class _AmountCard extends StatelessWidget {
     required this.items,
     required this.total,
     required this.totalLabel,
-    this.minus = false,
-    this.empty,
   });
 
   final String title;
   final List<_PayItem> items;
   final int total;
   final String totalLabel;
-
-  /// 공제처럼 빼는 금액이면 앞에 −를 붙인다
-  final bool minus;
-
-  /// 항목이 하나도 없을 때 대신 보여줄 안내
-  final String? empty;
 
   @override
   Widget build(BuildContext context) {
@@ -447,16 +388,6 @@ class _AmountCard extends StatelessWidget {
         children: [
           Text(title, style: AppTextStyles.label),
           SizedBox(height: 6),
-          if (items.isEmpty)
-            Padding(
-              padding: EdgeInsets.symmetric(vertical: 14),
-              child: Text(
-                empty ?? '항목이 없어요',
-                style: AppTextStyles.body2.copyWith(
-                  color: AppColors.textTertiary,
-                ),
-              ),
-            ),
           for (final item in items)
             Padding(
               padding: EdgeInsets.symmetric(vertical: 9),
@@ -492,7 +423,7 @@ class _AmountCard extends StatelessWidget {
                   ),
                   SizedBox(width: 10),
                   Text(
-                    minus ? '−${_won(item.amount)}' : _won(item.amount),
+                    _won(item.amount),
                     style: AppTextStyles.body2.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
@@ -515,12 +446,7 @@ class _AmountCard extends StatelessWidget {
                 ),
               ),
               SizedBox(width: 10),
-              Text(
-                minus ? '−${_won(total)}' : _won(total),
-                style: AppTextStyles.title3.copyWith(
-                  color: minus ? AppColors.error : AppColors.textPrimary,
-                ),
-              ),
+              Text(_won(total), style: AppTextStyles.title3),
             ],
           ),
         ],
@@ -623,7 +549,7 @@ class _PayslipRow extends StatelessWidget {
             ),
             Spacer(),
             Text(
-              _won(payslip.net),
+              _won(payslip.total),
               style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w700),
             ),
             SizedBox(width: 6),
@@ -711,7 +637,7 @@ class _PayslipDetail extends StatelessWidget {
           SizedBox(height: 12),
           _PayCard(payslip: payslip),
           SizedBox(height: 12),
-          _DeductCard(payslip: payslip),
+          _CommissionCard(),
         ],
       ),
     );

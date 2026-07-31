@@ -24,34 +24,6 @@ enum _PayStatus {
   };
 }
 
-/// 고용 형태 — 무엇을 떼는지가 사람마다 다르다
-///
-/// 4대보험 가입자, 3.3%만 떼는 프리랜서, 주 15시간 미만이라 고용보험도
-/// 안 드는 아르바이트가 한 지점에 섞여 있다. 그래서 앱이 정하지 않고
-/// 신청서에 본인이 적어 낸다.
-enum _EmployType {
-  regular('정규직'),
-  parttime('아르바이트'),
-  freelance('프리랜서');
-
-  const _EmployType(this.label);
-
-  final String label;
-}
-
-/// 본인이 가입 여부를 신고하는 보험
-///
-/// 산재보험은 전액 회사 부담이라 급여에서 떼지 않아 여기 없다.
-enum _Insurance {
-  pension('국민연금'),
-  health('건강보험'),
-  employment('고용보험');
-
-  const _Insurance(this.label);
-
-  final String label;
-}
-
 /// 명세서 한 줄 — 이름, 계산 근거, 금액
 class _PayItem {
   const _PayItem(this.label, this.amount, {this.note});
@@ -63,9 +35,12 @@ class _PayItem {
   final String? note;
 }
 
-/// 회사가 정해 주는 값 — 신청서에서 못 바꾼다
-class _CompanyTerms {
-  const _CompanyTerms({
+/// 내 커미션 조건 (목업)
+///
+/// 기본급과 단가는 사람마다 다르고 대표와 협의해 정해진다.
+/// 앱에서는 못 바꾸고, 계약된 값을 받아 총액을 계산하는 데만 쓴다.
+class _Commission {
+  const _Commission({
     required this.base,
     required this.sessionRate,
     required this.newBonus,
@@ -78,7 +53,8 @@ class _CompanyTerms {
   final int reBonus;
 }
 
-const _companyBase = _CompanyTerms(
+/// 로그인한 사람의 커미션 — 실제 연동 때 서버에서 받아 온다
+const _myCommission = _Commission(
   base: 2400000,
   sessionRate: 15000,
   newBonus: 50000,
@@ -87,19 +63,15 @@ const _companyBase = _CompanyTerms(
 
 /// 한 달치 급여 신청서 (목업)
 ///
-/// 실적(세션·등록 건수)과 단가는 회사가 집계해 채워 주고, 고용 형태와
-/// 가입 보험은 본인이 적어 낸다. 대표가 승인하면 그대로 지급된다.
-///
-/// 금액 계산은 목업용이다. 실제로는 서버가 계산한 지급·공제 항목을
-/// 받아 그대로 보여주면 되고, 화면은 손대지 않아도 된다.
+/// 실적(세션·등록 건수)은 회사가 집계해 채워 주고, 앱은 커미션을 곱해
+/// **총 지급액**까지만 계산한다. 세금·보험처럼 빠져나가는 돈은 사람마다
+/// 조건이 달라 회사가 따로 처리하므로 여기서 다루지 않는다.
 class _Payslip {
   _Payslip({
     required this.month,
     required this.sessions,
     required this.newSignups,
     required this.reSignups,
-    required this.type,
-    required this.insurances,
     required this.status,
     this.submittedAt,
     this.decidedAt,
@@ -113,10 +85,6 @@ class _Payslip {
   final int newSignups;
   final int reSignups;
 
-  /// 신청서에 적어 낸 조건
-  _EmployType type;
-  Set<_Insurance> insurances;
-
   _PayStatus status;
   DateTime? submittedAt;
   DateTime? decidedAt;
@@ -129,60 +97,28 @@ class _Payslip {
 
   bool get submitted => status != _PayStatus.draft;
 
-  String get insuranceLabel => type == _EmployType.freelance
-      ? '4대보험 대상 아님'
-      : insurances.isEmpty
-      ? '보험 미가입'
-      : insurances.map((i) => i.label).join(', ');
-
   /// 지급 항목
   List<_PayItem> get pays => [
-    _PayItem('기본급', _companyBase.base),
+    _PayItem('기본급', _myCommission.base),
     _PayItem(
       'PT 세션 수당',
-      sessions * _companyBase.sessionRate,
-      note: '$sessions회 × ${_amount(_companyBase.sessionRate)}',
+      sessions * _myCommission.sessionRate,
+      note: '$sessions회 × ${_amount(_myCommission.sessionRate)}',
     ),
     _PayItem(
       '신규 등록',
-      newSignups * _companyBase.newBonus,
-      note: '$newSignups건 × ${_amount(_companyBase.newBonus)}',
+      newSignups * _myCommission.newBonus,
+      note: '$newSignups건 × ${_amount(_myCommission.newBonus)}',
     ),
     _PayItem(
       '재등록',
-      reSignups * _companyBase.reBonus,
-      note: '$reSignups건 × ${_amount(_companyBase.reBonus)}',
+      reSignups * _myCommission.reBonus,
+      note: '$reSignups건 × ${_amount(_myCommission.reBonus)}',
     ),
   ];
 
-  /// 공제 항목 — 신청서에 가입했다고 적어 낸 4대보험만 뗀다.
-  /// 소득세는 회사가 따로 처리하므로 여기서 다루지 않는다.
-  List<_PayItem> get deductions {
-    // 프리랜서는 4대보험 대상이 아니라 뗄 게 없다
-    if (type == _EmployType.freelance) return const [];
-
-    final pay = gross;
-    int cut(num value) => (value ~/ 10) * 10;
-
-    final items = <_PayItem>[];
-    if (insurances.contains(_Insurance.pension)) {
-      items.add(_PayItem('국민연금', cut(pay * 0.045), note: '4.5%'));
-    }
-    if (insurances.contains(_Insurance.health)) {
-      final health = cut(pay * 0.03545);
-      items
-        ..add(_PayItem('건강보험', health, note: '3.545%'))
-        ..add(_PayItem('장기요양', cut(health * 0.1295), note: '건강보험의 12.95%'));
-    }
-    if (insurances.contains(_Insurance.employment)) {
-      items.add(_PayItem('고용보험', cut(pay * 0.009), note: '0.9%'));
-    }
-    return items;
-  }
-
-  int get gross => pays.fold(0, (sum, item) => sum + item.amount);
-  int get deduction => deductions.fold(0, (sum, item) => sum + item.amount);
-  int get net => gross - deduction;
+  /// 총 지급액
+  int get total => pays.fold(0, (sum, item) => sum + item.amount);
 
   /// 지급일 — 다음 달 10일
   DateTime get payDay => DateTime(month.year, month.month + 1, 10);
@@ -226,12 +162,6 @@ List<_Payslip> _seedPayslips() {
         sessions: record[i].$1,
         newSignups: record[i].$2,
         reSignups: record[i].$3,
-        type: _EmployType.regular,
-        insurances: {
-          _Insurance.pension,
-          _Insurance.health,
-          _Insurance.employment,
-        },
         // 이번 달은 아직 제출 전, 지난 달은 지급까지 끝난 상태
         status: i == 0 ? _PayStatus.draft : _PayStatus.paid,
         submittedAt: i == 0 ? null : DateTime(now.year, now.month - i + 1, 2),

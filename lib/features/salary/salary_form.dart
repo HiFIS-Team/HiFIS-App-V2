@@ -2,6 +2,7 @@ part of 'salary_screen.dart';
 
 /// 급여 신청서 작성 — 폰은 밀려 들어오는 화면, PC는 모달
 ///
+/// 실적과 커미션은 회사가 정한 값이라 확인만 한다.
 /// 제출하면 그 달 급여가 대표 승인을 기다린다.
 Future<bool?> _showPayslipForm(BuildContext context, _Payslip payslip) {
   if (isDesktop) {
@@ -23,42 +24,11 @@ class _PayslipForm extends StatefulWidget {
 }
 
 class _PayslipFormState extends State<_PayslipForm> {
-  late _EmployType _type = widget.payslip.type;
-  late final Set<_Insurance> _insurances = {...widget.payslip.insurances};
   late final _note = TextEditingController(text: widget.payslip.note ?? '');
 
-  /// 프리랜서는 4대보험 대상이 아니라 고를 수 없다
-  bool get _canPickInsurance => _type != _EmployType.freelance;
-
-  /// 고른 조건으로 금액이 어떻게 되는지 미리 계산해 본다
-  _Payslip get _preview => _Payslip(
-    month: widget.payslip.month,
-    sessions: widget.payslip.sessions,
-    newSignups: widget.payslip.newSignups,
-    reSignups: widget.payslip.reSignups,
-    type: _type,
-    insurances: _insurances,
-    status: widget.payslip.status,
-  );
-
-  void _pickType(int index) {
-    setState(() {
-      _type = _EmployType.values[index];
-      if (!_canPickInsurance) _insurances.clear();
-    });
-  }
-
-  void _toggle(_Insurance insurance) {
-    setState(() {
-      if (!_insurances.remove(insurance)) _insurances.add(insurance);
-    });
-  }
-
-  /// 신청서를 그 달 급여에 반영하고 대표 승인 대기로 넘긴다
+  /// 신청서를 올리고 대표 승인 대기로 넘긴다
   void _submit() {
     widget.payslip
-      ..type = _type
-      ..insurances = {..._insurances}
       ..note = _note.text.trim().isEmpty ? null : _note.text.trim()
       ..status = _PayStatus.pending
       ..submittedAt = DateTime.now()
@@ -76,7 +46,6 @@ class _PayslipFormState extends State<_PayslipForm> {
   @override
   Widget build(BuildContext context) {
     final payslip = widget.payslip;
-    final preview = _preview;
 
     final body = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -118,38 +87,47 @@ class _PayslipFormState extends State<_PayslipForm> {
           ),
         ),
         SizedBox(height: 20),
-        _FormLabel('고용 형태'),
+        _FormLabel('신청 금액'),
         SizedBox(height: 8),
-        SegmentedTabs(
-          labels: [for (final t in _EmployType.values) t.label],
-          selected: _EmployType.values.indexOf(_type),
-          onSelect: _pickType,
-        ),
-        SizedBox(height: 20),
-        _FormLabel('가입 보험'),
-        SizedBox(height: 8),
-        if (_canPickInsurance)
-          for (final insurance in _Insurance.values)
-            Padding(
-              padding: EdgeInsets.only(bottom: 8),
-              child: _CheckRow(
-                label: insurance.label,
-                checked: _insurances.contains(insurance),
-                onTap: () => _toggle(insurance),
-              ),
-            )
-        else
-          Container(
-            padding: EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.gray50,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              '프리랜서는 4대보험 가입 대상이 아니라 공제 없이 전액 지급돼요.',
-              style: AppTextStyles.caption.copyWith(height: 1.5),
-            ),
+        Container(
+          padding: EdgeInsets.fromLTRB(16, 14, 16, 14),
+          decoration: BoxDecoration(
+            color: AppColors.primaryLight,
+            borderRadius: BorderRadius.circular(14),
           ),
+          child: Column(
+            children: [
+              for (final item in payslip.pays) ...[
+                _amountRow(item),
+                SizedBox(height: 8),
+              ],
+              Container(
+                height: 1,
+                color: AppColors.primary.withValues(alpha: 0.15),
+              ),
+              SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '총 지급액',
+                      style: AppTextStyles.body2.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    _won(payslip.total),
+                    style: AppTextStyles.title3.copyWith(
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
         SizedBox(height: 20),
         _FormLabel('특이사항 (선택)'),
         SizedBox(height: 8),
@@ -165,58 +143,17 @@ class _PayslipFormState extends State<_PayslipForm> {
             style: AppTextStyles.body2,
             cursorColor: AppColors.primary,
             decoration: InputDecoration(
-              hintText: '예) 이번 달부터 국민연금 가입했어요',
+              hintText: '예) 대타 수업 2회가 빠진 것 같아요',
               hintStyle: AppTextStyles.body2.copyWith(color: AppColors.gray400),
               border: InputBorder.none,
               isCollapsed: true,
             ),
           ),
         ),
-        SizedBox(height: 20),
-        // 제출하면 얼마를 받게 되는지 미리 보여준다
-        Container(
-          padding: EdgeInsets.fromLTRB(16, 14, 16, 14),
-          decoration: BoxDecoration(
-            color: AppColors.primaryLight,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Column(
-            children: [
-              _amountRow('지급', preview.gross),
-              SizedBox(height: 6),
-              _amountRow('공제', -preview.deduction),
-              SizedBox(height: 10),
-              Container(
-                height: 1,
-                color: AppColors.primary.withValues(alpha: 0.15),
-              ),
-              SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      '실수령액',
-                      style: AppTextStyles.body2.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    _won(preview.net),
-                    style: AppTextStyles.title3.copyWith(
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        SizedBox(height: 12),
+        SizedBox(height: 16),
         Text(
           '제출하면 대표 승인 후 ${_dayLabel(payslip.payDay)}에 지급돼요.\n'
-          '기본급과 수당 단가는 회사가 정하는 값이라 신청서에서 바꿀 수 없어요.',
+          '세금·보험 공제는 회사에서 따로 처리해서 실제 입금액과는 달라요.',
           style: AppTextStyles.caption.copyWith(height: 1.5),
         ),
       ],
@@ -287,16 +224,30 @@ class _PayslipFormState extends State<_PayslipForm> {
     ],
   );
 
-  Widget _amountRow(String label, int value) => Row(
+  Widget _amountRow(_PayItem item) => Row(
     children: [
-      Expanded(
-        child: Text(
-          label,
-          style: AppTextStyles.caption.copyWith(color: AppColors.primary),
-        ),
-      ),
       Text(
-        _won(value),
+        item.label,
+        style: AppTextStyles.caption.copyWith(color: AppColors.primary),
+      ),
+      if (item.note != null) ...[
+        SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            item.note!,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.caption.copyWith(
+              fontSize: 12,
+              color: AppColors.primary.withValues(alpha: 0.7),
+            ),
+          ),
+        ),
+      ],
+      Spacer(),
+      SizedBox(width: 8),
+      Text(
+        _won(item.amount),
         style: AppTextStyles.caption.copyWith(
           fontWeight: FontWeight.w600,
           color: AppColors.primary,
@@ -319,58 +270,6 @@ class _FormLabel extends StatelessWidget {
       fontWeight: FontWeight.w600,
     ),
   );
-}
-
-class _CheckRow extends StatelessWidget {
-  _CheckRow({required this.label, required this.checked, required this.onTap});
-
-  final String label;
-  final bool checked;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Pressable(
-      onTap: onTap,
-      scale: 0.98,
-      child: Container(
-        height: 52,
-        padding: EdgeInsets.symmetric(horizontal: 14),
-        decoration: BoxDecoration(
-          color: checked ? AppColors.primaryLight : AppColors.gray50,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            AnimatedContainer(
-              duration: Duration(milliseconds: 120),
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(
-                color: checked ? AppColors.primary : AppColors.surface,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: checked ? AppColors.primary : AppColors.gray300,
-                  width: 1.4,
-                ),
-              ),
-              child: checked
-                  ? Icon(Icons.check_rounded, size: 14, color: Colors.white)
-                  : null,
-            ),
-            SizedBox(width: 10),
-            Text(
-              label,
-              style: AppTextStyles.body2.copyWith(
-                fontWeight: checked ? FontWeight.w600 : FontWeight.w400,
-                color: checked ? AppColors.primary : AppColors.textPrimary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _DialogButton extends StatelessWidget {
@@ -408,6 +307,65 @@ class _DialogButton extends StatelessWidget {
   }
 }
 
+/// 내 커미션 — 회사가 정한 단가라 보기만 한다
+class _CommissionCard extends StatelessWidget {
+  _CommissionCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(22, 20, 22, 20),
+      decoration: AppDecorations.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Text('내 커미션', style: AppTextStyles.label)),
+              Text(
+                '회사 지정',
+                style: AppTextStyles.caption.copyWith(fontSize: 12),
+              ),
+            ],
+          ),
+          SizedBox(height: 6),
+          _row('기본급', _won(_myCommission.base)),
+          _row('PT 세션', '회당 ${_won(_myCommission.sessionRate)}'),
+          _row('신규 등록', '건당 ${_won(_myCommission.newBonus)}'),
+          _row('재등록', '건당 ${_won(_myCommission.reBonus)}'),
+          SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.gray50,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              '커미션은 대표와 협의해 사람마다 다르게 정해져요.\n'
+              '세금·보험 공제는 회사에서 따로 처리해요.',
+              style: AppTextStyles.caption.copyWith(height: 1.5),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _row(String label, String value) => Padding(
+    padding: EdgeInsets.symmetric(vertical: 9),
+    child: Row(
+      children: [
+        Expanded(child: Text(label, style: AppTextStyles.body2)),
+        Text(
+          value,
+          style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w600),
+        ),
+      ],
+    ),
+  );
+}
+
 /// 제출·승인 상태를 알리는 색 면 (요약 카드 아래)
 class _StatusNotice extends StatelessWidget {
   _StatusNotice({
@@ -437,14 +395,14 @@ class _StatusNotice extends StatelessWidget {
         onSubmit,
       ),
       _PayStatus.pending => (
-        '${payslip.type.label} · ${payslip.insuranceLabel}로 제출했어요',
+        '${_won(payslip.total)}으로 제출했어요',
         '${_dayLabel(payslip.submittedAt!)} 제출 · 대표 승인을 기다리는 중이에요.',
         '제출 취소',
         onCancel,
       ),
       _ => (
         '신청서가 반려됐어요',
-        payslip.comment ?? '내용을 고쳐 다시 제출해 주세요.',
+        payslip.comment ?? '내용을 확인하고 다시 제출해 주세요.',
         '다시 작성',
         onSubmit,
       ),
