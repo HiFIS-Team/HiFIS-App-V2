@@ -11,6 +11,7 @@ import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/glass_search_bar.dart';
 import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/pressable.dart';
+import '../../core/widgets/progress_bar.dart';
 import '../../core/widgets/see_all_button.dart';
 
 /// 수업 개수 탭 콘텐츠 (목업)
@@ -252,6 +253,8 @@ class _LessonSectionState extends State<LessonSection> {
   Widget build(BuildContext context) {
     return Column(
       children: [
+        _SessionGoalCard(),
+        SizedBox(height: 16),
         // 상단 액션 버튼 두 개
         Row(
           children: [
@@ -328,6 +331,86 @@ class _LessonSectionState extends State<LessonSection> {
                 onTap: () => _showSignDetail(context, recent[i]),
               ),
             ],
+        ],
+      ),
+    );
+  }
+}
+
+/// 이번 달 세션 목표 (목업 — 실제로는 대표와 협의한 값을 받아 온다)
+const _sessionGoal = 50;
+
+/// 이번 달 목표 진행 — 세션 수와 담당 회원을 한자리에서 보여준다
+///
+/// 숫자만 있으면 지금 잘 가고 있는지 알 수 없어서 목표 대비 막대를 같이 둔다.
+class _SessionGoalCard extends StatelessWidget {
+  _SessionGoalCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final count = _signs
+        .where((s) => s.time.year == now.year && s.time.month == now.month)
+        .length;
+    final left = _sessionGoal - count;
+    final reached = left <= 0;
+    final color = reached ? AppColors.success : AppColors.primary;
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(22, 20, 22, 20),
+      decoration: AppDecorations.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Expanded(
+                child: Text('${now.month}월 세션', style: AppTextStyles.label),
+              ),
+              Text(
+                '$count',
+                style: AppTextStyles.title2.copyWith(color: color),
+              ),
+              Text(
+                ' / $_sessionGoal회',
+                style: AppTextStyles.body2.copyWith(
+                  color: AppColors.textTertiary,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 14),
+          ProgressBar(ratio: count / _sessionGoal, color: color),
+          SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(
+                reached
+                    ? CupertinoIcons.checkmark_seal_fill
+                    : CupertinoIcons.flag_fill,
+                size: 13,
+                color: color,
+              ),
+              SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  reached ? '이번 달 목표를 채웠어요' : '목표까지 $left회 남았어요',
+                  style: AppTextStyles.caption.copyWith(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  ),
+                ),
+              ),
+              Text(
+                '담당 회원 ${_members.length}명',
+                style: AppTextStyles.caption.copyWith(fontSize: 12),
+              ),
+            ],
+          ),
         ],
       ),
     );

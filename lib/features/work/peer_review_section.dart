@@ -9,48 +9,148 @@ import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/glass_bottom_button.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/pressable.dart';
+import '../../core/widgets/progress_bar.dart';
 
 /// 동료 평가 탭 콘텐츠 (목업)
 ///
 /// 사람마다 한 줄씩 나열되고, 줄을 누르면 평가 화면으로 이동한다.
 /// 점수는 항목마다 별 5개로 매기고, 별 하나의 가치가 대상에 따라 다르다
 /// (본인 1점 → 항목 최대 5점 / 동료 5점 → 항목 최대 25점).
-class PeerReviewSection extends StatelessWidget {
+class PeerReviewSection extends StatefulWidget {
   PeerReviewSection({super.key});
 
-  void _openForm(BuildContext context, _Person person) {
-    Navigator.push(
+  @override
+  State<PeerReviewSection> createState() => _PeerReviewSectionState();
+}
+
+class _PeerReviewSectionState extends State<PeerReviewSection> {
+  Future<void> _openForm(_Person person) async {
+    await Navigator.push<bool>(
       context,
       CupertinoPageRoute(builder: (_) => _PeerReviewFormScreen(person: person)),
     );
+    // 제출하고 돌아왔을 수 있으니 진행 상황을 새로 그린다
+    if (mounted) setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
+    // 아직 안 한 사람이 위로 온다 — 무엇이 남았는지가 이 화면의 용건이다
+    final pending = _persons
+        .where((p) => !_submitted.contains(p.name))
+        .toList();
+    final done = _persons.where((p) => _submitted.contains(p.name)).toList();
+    final ordered = [...pending, ...done];
+
+    return Column(
+      children: [
+        _ReviewProgress(done: done.length, total: _persons.length),
+        SizedBox(height: 16),
+        Container(
+          width: double.infinity,
+          padding: EdgeInsets.fromLTRB(20, 20, 20, 10),
+          decoration: AppDecorations.card(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4),
+                child: Row(
+                  children: [
+                    Expanded(child: Text('평가 작성', style: AppTextStyles.label)),
+                    Text(
+                      pending.isEmpty ? '모두 마쳤어요' : '남은 ${pending.length}명',
+                      style: AppTextStyles.caption.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: pending.isEmpty
+                            ? AppColors.success
+                            : AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 8),
+              for (var i = 0; i < ordered.length; i++) ...[
+                if (i > 0) Divider(height: 1, color: AppColors.divider),
+                _PersonRow(
+                  person: ordered[i],
+                  done: _submitted.contains(ordered[i].name),
+                  onTap: () => _openForm(ordered[i]),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 이번 달 평가 진행 — 몇 명 중 몇 명을 마쳤는지
+class _ReviewProgress extends StatelessWidget {
+  _ReviewProgress({required this.done, required this.total});
+
+  final int done;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    final left = total - done;
+    final finished = left == 0;
+    final color = finished ? AppColors.success : AppColors.primary;
+
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.fromLTRB(20, 20, 20, 10),
+      padding: EdgeInsets.fromLTRB(22, 20, 22, 20),
       decoration: AppDecorations.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 4),
-            child: Row(
-              children: [
-                Expanded(child: Text('평가 작성', style: AppTextStyles.label)),
-                Text('평가할 사람을 선택하세요', style: AppTextStyles.caption),
-              ],
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Expanded(
+                child: Text(
+                  '${DateTime.now().month}월 동료 평가',
+                  style: AppTextStyles.label,
+                ),
+              ),
+              Text('$done', style: AppTextStyles.title2.copyWith(color: color)),
+              Text(
+                ' / $total명',
+                style: AppTextStyles.body2.copyWith(
+                  color: AppColors.textTertiary,
+                ),
+              ),
+            ],
           ),
-          SizedBox(height: 8),
-          for (var i = 0; i < _persons.length; i++) ...[
-            if (i > 0) Divider(height: 1, color: AppColors.divider),
-            _PersonRow(
-              person: _persons[i],
-              onTap: () => _openForm(context, _persons[i]),
-            ),
-          ],
+          SizedBox(height: 14),
+          ProgressBar(ratio: total == 0 ? 0 : done / total, color: color),
+          SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(
+                finished
+                    ? CupertinoIcons.checkmark_seal_fill
+                    : CupertinoIcons.pencil_circle_fill,
+                size: 14,
+                color: color,
+              ),
+              SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  finished ? '이번 달 평가를 모두 마쳤어요' : '$left명 남았어요',
+                  style: AppTextStyles.caption.copyWith(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -63,6 +163,12 @@ const _categories = ['업무 역량', '협업 소통', '성과 기여도', '태�
 const _starCount = 5;
 
 const _me = '김은후';
+
+/// 이번 달 평가를 제출한 사람 (목업)
+///
+/// 탭을 오가도 남아 있어야 해서 모듈 전역으로 둔다.
+/// 실제 연동 때는 서버에서 내려받은 제출 이력으로 바꾼다.
+final _submitted = <String>{};
 
 /// 평가 대상 목록 — 본인이 맨 앞. 아바타 색은 사내톡 멤버 목록과 동일.
 const _persons = [
@@ -94,11 +200,15 @@ class _Person {
 }
 
 /// 사람 한 줄 — 아바타·이름·소속과 끝의 이동 화살표
+///
+/// 이미 평가한 사람은 아바타가 한 톤 흐려지고 끝에 체크가 붙는다.
+/// (다시 눌러 고쳐 쓸 수는 있다)
 class _PersonRow extends StatelessWidget {
-  _PersonRow({required this.person, required this.onTap});
+  _PersonRow({required this.person, required this.onTap, this.done = false});
 
   final _Person person;
   final VoidCallback onTap;
+  final bool done;
 
   @override
   Widget build(BuildContext context) {
@@ -115,7 +225,7 @@ class _PersonRow extends StatelessWidget {
             height: 38,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: person.color,
+              color: done ? person.color.withValues(alpha: 0.35) : person.color,
               shape: BoxShape.circle,
             ),
             child: Text(
@@ -166,10 +276,13 @@ class _PersonRow extends StatelessWidget {
                 ),
                 SizedBox(height: 2),
                 Text(
-                  person.caption,
+                  done ? '평가 완료' : person.caption,
                   style: AppTextStyles.caption.copyWith(
                     fontSize: 11,
-                    color: person.isSelf
+                    fontWeight: done ? FontWeight.w600 : FontWeight.w400,
+                    color: done
+                        ? AppColors.success
+                        : person.isSelf
                         ? AppColors.primary
                         : AppColors.textTertiary,
                   ),
@@ -178,9 +291,11 @@ class _PersonRow extends StatelessWidget {
             ),
           ),
           Icon(
-            CupertinoIcons.chevron_right,
+            done
+                ? CupertinoIcons.checkmark_circle_fill
+                : CupertinoIcons.chevron_right,
             size: 16,
-            color: AppColors.gray300,
+            color: done ? AppColors.success : AppColors.gray300,
           ),
         ],
       ),
@@ -248,13 +363,14 @@ class _PeerReviewFormScreenState extends State<_PeerReviewFormScreen> {
       return;
     }
     FocusScope.of(context).unfocus();
+    _submitted.add(widget.person.name);
     AppToast.show(
       context,
       widget.person.isSelf
           ? '내 평가를 제출했습니다'
           : '${widget.person.name}님 평가를 제출했습니다',
     );
-    Navigator.pop(context);
+    Navigator.pop(context, true);
   }
 
   @override
