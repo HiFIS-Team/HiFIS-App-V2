@@ -104,9 +104,22 @@ class _SummaryCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text(
-                  '${payslip.month.month}월 급여',
-                  style: AppTextStyles.label,
+                child: Row(
+                  children: [
+                    Text(
+                      '${payslip.month.month}월 급여',
+                      style: AppTextStyles.label,
+                    ),
+                    SizedBox(width: 8),
+                    // 어떤 계약 기준으로 계산된 금액인지 밝힌다
+                    Text(
+                      payslip.type.label,
+                      style: AppTextStyles.caption.copyWith(
+                        fontSize: 12,
+                        color: AppColors.textTertiary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               _StatusTag(status: payslip.status),
@@ -318,85 +331,59 @@ class _Bar extends StatelessWidget {
 // 지급 · 공제
 // ---------------------------------------------------------------------------
 
-/// 무엇을 받았는지 — 기본급 + 수당 + 인센티브
+/// 무엇을 받았는지 — 명세에 담겨 온 지급 항목을 그대로
 class _PayCard extends StatelessWidget {
   _PayCard({required this.payslip});
 
   final _Payslip payslip;
 
   @override
-  Widget build(BuildContext context) {
-    return _AmountCard(
-      title: '지급',
-      total: payslip.gross,
-      totalLabel: '지급 합계',
-      rows: [
-        ('기본급', null, payslip.base),
-        (
-          'PT 세션 수당',
-          '${payslip.sessions}회 × ${_amount(_Payslip.sessionRate)}',
-          payslip.sessionPay,
-        ),
-        (
-          '신규 등록',
-          '${payslip.newSignups}건 × ${_amount(_Payslip.newBonus)}',
-          payslip.newPay,
-        ),
-        (
-          '재등록',
-          '${payslip.reSignups}건 × ${_amount(_Payslip.reBonus)}',
-          payslip.rePay,
-        ),
-        ('식대', '비과세', _Payslip.meal),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => _AmountCard(
+    title: '지급',
+    items: payslip.pays,
+    total: payslip.gross,
+    totalLabel: '지급 합계',
+  );
 }
 
-/// 무엇을 뗐는지 — 4대보험 + 세금
+/// 무엇을 뗐는지 — 고용 형태에 따라 항목이 다르고, 없을 수도 있다
 class _DeductCard extends StatelessWidget {
   _DeductCard({required this.payslip});
 
   final _Payslip payslip;
 
   @override
-  Widget build(BuildContext context) {
-    return _AmountCard(
-      title: '공제',
-      total: payslip.deduction,
-      totalLabel: '공제 합계',
-      minus: true,
-      rows: [
-        ('국민연금', '4.5%', payslip.pension),
-        ('건강보험', '3.545%', payslip.health),
-        ('장기요양', '건강보험의 12.95%', payslip.care),
-        ('고용보험', '0.9%', payslip.employment),
-        ('소득세', null, payslip.incomeTax),
-        ('지방소득세', '소득세의 10%', payslip.localTax),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => _AmountCard(
+    title: '공제',
+    items: payslip.deductions,
+    total: payslip.deduction,
+    totalLabel: '공제 합계',
+    minus: true,
+    empty: '떼는 금액이 없어요',
+  );
 }
 
 /// 항목 나열 + 맨 아래 합계
 class _AmountCard extends StatelessWidget {
   _AmountCard({
     required this.title,
-    required this.rows,
+    required this.items,
     required this.total,
     required this.totalLabel,
     this.minus = false,
+    this.empty,
   });
 
   final String title;
-
-  /// (항목, 계산 근거, 금액)
-  final List<(String, String?, int)> rows;
+  final List<_PayItem> items;
   final int total;
   final String totalLabel;
 
   /// 공제처럼 빼는 금액이면 앞에 −를 붙인다
   final bool minus;
+
+  /// 항목이 하나도 없을 때 대신 보여줄 안내
+  final String? empty;
 
   @override
   Widget build(BuildContext context) {
@@ -408,7 +395,17 @@ class _AmountCard extends StatelessWidget {
         children: [
           Text(title, style: AppTextStyles.label),
           SizedBox(height: 6),
-          for (final (label, note, value) in rows)
+          if (items.isEmpty)
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: 14),
+              child: Text(
+                empty ?? '항목이 없어요',
+                style: AppTextStyles.body2.copyWith(
+                  color: AppColors.textTertiary,
+                ),
+              ),
+            ),
+          for (final item in items)
             Padding(
               padding: EdgeInsets.symmetric(vertical: 9),
               child: Row(
@@ -420,16 +417,16 @@ class _AmountCard extends StatelessWidget {
                     child: Row(
                       children: [
                         Text(
-                          label,
+                          item.label,
                           style: AppTextStyles.body2.copyWith(
                             color: AppColors.textPrimary,
                           ),
                         ),
-                        if (note != null) ...[
+                        if (item.note != null) ...[
                           SizedBox(width: 8),
                           Flexible(
                             child: Text(
-                              note,
+                              item.note!,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: AppTextStyles.caption.copyWith(
@@ -443,7 +440,7 @@ class _AmountCard extends StatelessWidget {
                   ),
                   SizedBox(width: 10),
                   Text(
-                    minus ? '−${_won(value)}' : _won(value),
+                    minus ? '−${_won(item.amount)}' : _won(item.amount),
                     style: AppTextStyles.body2.copyWith(
                       fontWeight: FontWeight.w600,
                     ),

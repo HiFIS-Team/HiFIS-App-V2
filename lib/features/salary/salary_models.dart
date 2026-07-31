@@ -13,66 +13,65 @@ enum _PayStatus {
       this == _PayStatus.paid ? AppColors.success : AppColors.primary;
 }
 
+/// 고용 형태 — 무엇을 떼는지가 사람마다 다르다
+///
+/// 4대보험 가입자, 3.3%만 떼는 프리랜서, 주 15시간 미만이라 고용보험만
+/// 드는 아르바이트가 한 지점에 섞여 있다. 그래서 화면은 공제를 계산하지
+/// 않고, 계약에 맞게 정해진 항목을 그대로 받아 보여준다.
+enum _EmployType {
+  regular('정규직'),
+  parttime('아르바이트'),
+  freelance('프리랜서');
+
+  const _EmployType(this.label);
+
+  final String label;
+}
+
+/// 명세서 한 줄 — 이름, 계산 근거, 금액
+class _PayItem {
+  const _PayItem(this.label, this.amount, {this.note});
+
+  final String label;
+  final int amount;
+
+  /// '62회 × 15,000' 처럼 왜 이 금액인지
+  final String? note;
+}
+
 /// 한 달치 급여 명세 (목업)
 ///
-/// 기본급에 PT 세션 수당과 등록 인센티브를 더하고, 4대보험·소득세를 뺀다.
-/// 요율은 2026년 기준을 대략 따른 값이라 실제 정산과는 다를 수 있다.
-/// 실제 연동 때는 계산 결과를 서버에서 받아 그대로 보여주면 된다.
+/// 앱은 금액을 계산하지 않는다. 계약 조건(고용 형태·수당 단가·공제 항목)은
+/// 회사가 정하고 서버가 계산해서 내려주는 값이며, 여기서는 그 결과를
+/// 그대로 담아 보여주기만 한다. 실제 연동 때는 [pays]·[deductions]를
+/// 응답으로 채우면 화면은 그대로 동작한다.
 class _Payslip {
   const _Payslip({
     required this.month,
-    required this.base,
+    required this.type,
+    required this.pays,
+    required this.deductions,
     required this.sessions,
-    required this.newSignups,
-    required this.reSignups,
     required this.status,
   });
 
   /// 근무한 달 (1일로 맞춰 둔다)
   final DateTime month;
 
-  /// 기본급
-  final int base;
+  /// 이 명세에 적용된 고용 형태
+  final _EmployType type;
 
-  /// 진행한 PT 세션 수
+  /// 지급 항목 · 공제 항목 (없으면 빈 목록)
+  final List<_PayItem> pays;
+  final List<_PayItem> deductions;
+
+  /// 목록에서 실적을 같이 보여주려고 들고 있는다
   final int sessions;
-
-  /// 신규 등록 · 재등록 건수
-  final int newSignups;
-  final int reSignups;
 
   final _PayStatus status;
 
-  /// 세션 단가 · 등록 인센티브 단가 · 식대(비과세)
-  static const sessionRate = 15000;
-  static const newBonus = 50000;
-  static const reBonus = 20000;
-  static const meal = 100000;
-
-  int get sessionPay => sessions * sessionRate;
-  int get newPay => newSignups * newBonus;
-  int get rePay => reSignups * reBonus;
-
-  /// 지급 합계
-  int get gross => base + sessionPay + newPay + rePay + meal;
-
-  /// 과세 대상 (식대는 비과세)
-  int get taxable => gross - meal;
-
-  int get pension => _round(taxable * 0.045);
-  int get health => _round(taxable * 0.03545);
-  int get care => _round(health * 0.1295);
-  int get employment => _round(taxable * 0.009);
-
-  /// 소득세는 간이세액표를 따르지만, 목업이라 단순 요율로 잡는다
-  int get incomeTax => _round(taxable * 0.031);
-  int get localTax => _round(incomeTax * 0.1);
-
-  /// 공제 합계
-  int get deduction =>
-      pension + health + care + employment + incomeTax + localTax;
-
-  /// 실수령액
+  int get gross => pays.fold(0, (sum, item) => sum + item.amount);
+  int get deduction => deductions.fold(0, (sum, item) => sum + item.amount);
   int get net => gross - deduction;
 
   /// 지급일 — 다음 달 10일
@@ -86,9 +85,6 @@ class _Payslip {
         .inDays;
     return days < 0 ? 0 : days;
   }
-
-  /// 10원 단위 절사 — 급여 명세에서 흔한 처리
-  static int _round(num value) => (value ~/ 10) * 10;
 }
 
 /// 최근 12개월 명세 (0번이 이번 달)
@@ -115,9 +111,8 @@ List<_Payslip> _seedPayslips() {
 
   return [
     for (var i = 0; i < record.length; i++)
-      _Payslip(
+      _payslipOf(
         month: DateTime(now.year, now.month - i),
-        base: 2400000,
         sessions: record[i].$1,
         newSignups: record[i].$2,
         reSignups: record[i].$3,
@@ -125,6 +120,86 @@ List<_Payslip> _seedPayslips() {
         status: i == 0 ? _PayStatus.scheduled : _PayStatus.paid,
       ),
   ];
+}
+
+/// 목업용 명세 만들기
+///
+/// 실제로는 서버가 하는 일이다. 여기 있는 단가와 요율은 흔한 값을
+/// 가져다 쓴 것일 뿐, 실제 계약·세액과는 다르다.
+_Payslip _payslipOf({
+  required DateTime month,
+  required int sessions,
+  required int newSignups,
+  required int reSignups,
+  required _PayStatus status,
+  _EmployType type = _EmployType.regular,
+}) {
+  const base = 2400000;
+  const sessionRate = 15000;
+  const newBonus = 50000;
+  const reBonus = 20000;
+  const meal = 100000;
+
+  final pays = [
+    _PayItem('기본급', base),
+    _PayItem(
+      'PT 세션 수당',
+      sessions * sessionRate,
+      note: '$sessions회 × ${_amount(sessionRate)}',
+    ),
+    _PayItem(
+      '신규 등록',
+      newSignups * newBonus,
+      note: '$newSignups건 × ${_amount(newBonus)}',
+    ),
+    _PayItem(
+      '재등록',
+      reSignups * reBonus,
+      note: '$reSignups건 × ${_amount(reBonus)}',
+    ),
+    _PayItem('식대', meal, note: '비과세'),
+  ];
+
+  final gross = pays.fold(0, (sum, item) => sum + item.amount);
+
+  // 식대는 비과세라 과세 대상에서 뺀다
+  final taxable = gross - meal;
+  int cut(num value) => (value ~/ 10) * 10;
+
+  final deductions = switch (type) {
+    // 4대보험 + 근로소득세
+    _EmployType.regular => () {
+      final health = cut(taxable * 0.03545);
+      final incomeTax = cut(taxable * 0.031);
+      return [
+        _PayItem('국민연금', cut(taxable * 0.045), note: '4.5%'),
+        _PayItem('건강보험', health, note: '3.545%'),
+        _PayItem('장기요양', cut(health * 0.1295), note: '건강보험의 12.95%'),
+        _PayItem('고용보험', cut(taxable * 0.009), note: '0.9%'),
+        _PayItem('소득세', incomeTax),
+        _PayItem('지방소득세', cut(incomeTax * 0.1), note: '소득세의 10%'),
+      ];
+    }(),
+    // 주 15시간 미만이면 고용보험도 안 든다 — 소득세만
+    _EmployType.parttime => [
+      _PayItem('소득세', cut(taxable * 0.006)),
+      _PayItem('지방소득세', cut(taxable * 0.0006), note: '소득세의 10%'),
+    ],
+    // 사업소득 3.3% 원천징수
+    _EmployType.freelance => [
+      _PayItem('사업소득세', cut(taxable * 0.03), note: '3%'),
+      _PayItem('지방소득세', cut(taxable * 0.003), note: '0.3%'),
+    ],
+  };
+
+  return _Payslip(
+    month: month,
+    type: type,
+    pays: pays,
+    deductions: deductions,
+    sessions: sessions,
+    status: status,
+  );
 }
 
 /// 1234567 → '1,234,567'
