@@ -56,20 +56,23 @@ class _ContributionSectionState extends State<ContributionSection> {
       setState(() => _loading = false);
       return;
     }
-    final now = DateTime.now();
+    final period = periodKey(DateTime.now());
     try {
-      // 부여 내역과 점수 원장을 같이 띄운다
-      final grantRequest = ContributionApi.list(employeeId: me.id);
+      // 부여 내역과 점수 원장을 같이 띄운다 — 둘 다 이번 달만
+      final grantRequest = ContributionApi.list(
+        employeeId: me.id,
+        period: period,
+      );
       final eventRequest = ScoreApi.events(
         employeeId: me.id,
         category: ScoreCategory.contrib,
-        period: periodKey(now),
+        period: period,
       );
       final grants = await grantRequest;
       final events = await eventRequest;
       if (!mounted) return;
       setState(() {
-        _items = _merge(grants, events, now);
+        _items = _merge(grants, events);
         _loading = false;
       });
     } catch (error) {
@@ -87,20 +90,16 @@ class _ContributionSectionState extends State<ContributionSection> {
   static List<_Contribution> _merge(
     List<ContributionGrant> grants,
     List<ScoreEvent> events,
-    DateTime now,
   ) {
     return [
       for (final grant in grants)
-        // 부여 내역은 기간으로 못 걸러서 전부 온다 — 이번 달만 남긴다
-        if (grant.createdAt.year == now.year &&
-            grant.createdAt.month == now.month)
-          _Contribution(
-            kind: grant.type,
-            title: grant.reason,
-            points: grant.points,
-            date: grant.createdAt,
-            by: StaffDirectory.instance.byId(grant.grantedById)?.name,
-          ),
+        _Contribution(
+          kind: grant.type,
+          title: grant.reason,
+          points: grant.points,
+          date: grant.createdAt,
+          by: StaffDirectory.instance.byId(grant.grantedById)?.name,
+        ),
       for (final event in events)
         if (event.automatic)
           _Contribution(

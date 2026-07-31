@@ -1,5 +1,7 @@
 import 'api_client.dart';
 
+export 'period.dart' show periodKey;
+
 /// 센터 기여 항목 — 서버 `ContribType`
 ///
 /// 앞의 셋은 대표·관리자·점장이 보고 직접 준다.
@@ -86,12 +88,14 @@ class ContributionApi {
 
   /// 부여 내역 (최신순)
   ///
-  /// 기간으로 거를 방법이 없어서 전부 온다 (backend-gap.md 34번).
-  /// 이번 달 것만 쓰려면 앱이 걸러야 한다.
-  static Future<List<ContributionGrant>> list({String? employeeId}) async {
+  /// [period] 는 `2026-07`. 안 주면 그 사람 것이 전부 온다.
+  static Future<List<ContributionGrant>> list({
+    String? employeeId,
+    String? period,
+  }) async {
     final rows = await _client.getList(
       '/contributions',
-      query: {'employeeId': ?employeeId},
+      query: {'employeeId': ?employeeId, 'period': ?period},
     );
     return [
       for (final row in rows)
