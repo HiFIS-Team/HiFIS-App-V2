@@ -219,6 +219,17 @@ final _branches = [
   ...{for (final r in _rankers) r.branch},
 ];
 
+/// 시상대 색 — 위(밝은 쪽), 아래(진한 쪽)
+///
+/// 회색 계열로 두면 3위 받침대가 화면 배경([AppColors.gray50] ==
+/// [AppColors.background])과 같은 색이라 아예 안 보인다. 등수는 금·은·동이
+/// 제일 빨리 읽히므로 여기서만 포인트 컬러 밖의 색을 쓴다.
+(Color, Color) _medal(int rank) => switch (rank) {
+  1 => (Color(0xFFFFC94B), Color(0xFFE59A12)),
+  2 => (Color(0xFFC9D2DB), Color(0xFF97A3B0)),
+  _ => (Color(0xFFDCA06C), Color(0xFFB1723E)),
+};
+
 /// 랭킹 한 줄 — 순위와 그 항목에서의 값·근거를 함께 담는다
 class _Entry {
   _Entry({

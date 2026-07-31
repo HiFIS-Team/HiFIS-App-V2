@@ -756,6 +756,7 @@ class _Step extends StatelessWidget {
       _ => 44.0,
     };
     final avatar = big ? (first ? 72.0 : 56.0) : (first ? 52.0 : 42.0);
+    final (light, dark) = _medal(entry.rank);
 
     return Column(
       children: [
@@ -767,14 +768,12 @@ class _Step extends StatelessWidget {
                 ? Text('👑', style: TextStyle(fontSize: 20, height: 1.1))
                 : null,
           ),
-        // 1위만 브랜드 색 링을 두른다
+        // 1위만 메달 색 링을 두른다
         Container(
           padding: EdgeInsets.all(first ? 3 : 0),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            border: first
-                ? Border.all(color: AppColors.primary, width: 2.5)
-                : null,
+            border: first ? Border.all(color: dark, width: 2.5) : null,
           ),
           child: Avatar(name: entry.ranker.name, size: avatar),
         ),
@@ -797,7 +796,7 @@ class _Step extends StatelessWidget {
             style: AppTextStyles.caption.copyWith(
               fontSize: big ? 13 : 12,
               fontWeight: FontWeight.w700,
-              color: first ? AppColors.primary : AppColors.textSecondary,
+              color: dark,
             ),
           ),
         ),
@@ -808,19 +807,12 @@ class _Step extends StatelessWidget {
           alignment: Alignment.topCenter,
           padding: EdgeInsets.only(top: big ? 14 : 10),
           decoration: BoxDecoration(
-            // 1위만 브랜드 색으로, 나머지는 회색 면 (포인트 컬러 하나 원칙)
-            gradient: first
-                ? LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [AppColors.gradientStart, AppColors.gradientEnd],
-                  )
-                : null,
-            color: first
-                ? null
-                : entry.rank == 2
-                ? AppColors.gray100
-                : AppColors.gray50,
+            // 금·은·동 — 셋 다 색이 있어야 3위도 배경에서 떨어져 보인다
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [light, dark],
+            ),
             borderRadius: BorderRadius.vertical(
               top: Radius.circular(big ? 16 : 12),
             ),
@@ -832,7 +824,7 @@ class _Step extends StatelessWidget {
               fontSize: big ? (first ? 34 : 28) : (first ? 22 : 18),
               fontWeight: FontWeight.w800,
               height: 1,
-              color: first ? Colors.white : AppColors.gray400,
+              color: Colors.white,
             ),
           ),
         ),
