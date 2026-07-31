@@ -1,6 +1,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/api/api_exception.dart';
+import '../../core/api/env_api.dart';
+import '../../core/data/current_user.dart';
+import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -19,10 +23,10 @@ import 'lesson_section.dart';
 import 'peer_review_section.dart';
 import 'praise_section.dart';
 
-/// 업무 탭 화면 (목업)
+/// 업무 탭 화면
 ///
 /// 5개 평가 항목을 밑줄 탭으로 전환하며 항목별 점수와 상세를 보여준다.
-/// 데이터는 하드코딩된 샘플이며, 평가 기능 연동 시 실제 데이터로 교체한다.
+/// 환경정비는 서버 데이터로 돌고, 나머지 항목은 아직 목업이다.
 class WorkScreen extends StatefulWidget {
   WorkScreen({super.key});
 
@@ -33,59 +37,100 @@ class WorkScreen extends StatefulWidget {
 class _WorkScreenState extends State<WorkScreen> {
   int _tab = 0;
 
-  static const _me = '김피스';
+  /// 환경정비 항목과 배점 — 지점마다 다르다
+  List<EnvItem> _envItems = const [];
 
-  /// 환경정비 오늘 수행 로그 — 횟수는 이 로그에서 집계한다 (목업 초기값 포함)
-  late final List<_WorkLog> _logs = _seedLogs();
+  /// 오늘 지점에서 나온 수행 기록 전부 (내 것 + 동료 것)
+  List<EnvTaskLog> _logs = const [];
 
-  /// 다른 직원들의 오늘 수행 기록 (목업, 전체 내역 탭에서만 사용)
-  late final List<_WorkLog> _teamLogs = _seedTeamLogs();
+  bool _envLoading = true;
 
-  static List<_WorkLog> _seedLogs() {
+  @override
+  void initState() {
+    super.initState();
+    _loadEnv();
+  }
+
+  Future<void> _loadEnv() async {
+    try {
+      final itemRequest = EnvApi.items();
+      final logRequest = EnvApi.logs();
+      final items = await itemRequest;
+      final logs = await logRequest;
+      if (!mounted) return;
+      setState(() {
+        _envItems = items;
+        _logs = _todayOnly(logs);
+        _envLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _envLoading = false);
+      AppToast.show(context, messageOf(error));
+    }
+  }
+
+  /// 오늘 것만 남긴다
+  ///
+  /// 서버가 날짜로 걸러 주지 않아서 지점의 전체 기록이 온다
+  /// (backend-gap.md 29번). 화면은 "오늘 점검"이라 여기서 자른다.
+  static List<EnvTaskLog> _todayOnly(List<EnvTaskLog> logs) {
     final now = DateTime.now();
-    DateTime at(int hour, int minute) =>
-        DateTime(now.year, now.month, now.day, hour, minute);
     return [
-      _WorkLog(name: _me, task: '세탁', time: at(8, 40)),
-      _WorkLog(name: _me, task: '건조기', time: at(9, 15)),
-      _WorkLog(name: _me, task: '복도청소', time: at(10, 5)),
-      _WorkLog(name: _me, task: '세탁', time: at(11, 30)),
+      for (final log in logs)
+        if (log.createdAt.year == now.year &&
+            log.createdAt.month == now.month &&
+            log.createdAt.day == now.day)
+          log,
     ];
   }
 
-  static List<_WorkLog> _seedTeamLogs() {
-    final now = DateTime.now();
-    DateTime at(int hour, int minute) =>
-        DateTime(now.year, now.month, now.day, hour, minute);
-    return [
-      _WorkLog(name: '민중기', task: '구역청소', time: at(8, 20)),
-      _WorkLog(name: '박준현', task: '기구관리', time: at(8, 55)),
-      _WorkLog(name: '유찬빈', task: '게시물', time: at(9, 40)),
-      _WorkLog(name: '전상현', task: '화장실청소', time: at(10, 25)),
-      _WorkLog(name: '민중기', task: '세탁', time: at(10, 50)),
-      _WorkLog(name: '박준현', task: '클레임해결', time: at(11, 45)),
-    ];
-  }
+  List<EnvTaskLog> get _myLogs => [
+    for (final log in _logs)
+      if (log.employeeId == currentUser?.id) log,
+  ];
 
+  /// 항목 id 별 오늘 내 수행 횟수
   Map<String, int> get _counts {
     final counts = <String, int>{};
-    for (final log in _logs) {
-      counts[log.task] = (counts[log.task] ?? 0) + 1;
+    for (final log in _myLogs) {
+      counts[log.envItemId] = (counts[log.envItemId] ?? 0) + 1;
     }
     return counts;
   }
 
-  void _adjust(String task, int delta) {
-    setState(() {
+  Future<void> _adjust(EnvItem item, int delta) async {
+    try {
       if (delta > 0) {
-        _logs.add(_WorkLog(name: _me, task: task, time: DateTime.now()));
+        final log = await EnvApi.createLog(item.id);
+        if (!mounted) return;
+        setState(() => _logs = [log, ..._logs]);
+        AppToast.show(
+          context,
+          '${_withJosa(item.name)} 완료했습니다 · +${item.points}점',
+        );
       } else {
-        // 감소는 해당 항목의 가장 최근 기록을 지운다
-        final index = _logs.lastIndexWhere((log) => log.task == task);
-        if (index >= 0) _logs.removeAt(index);
+        // 감소는 그 항목의 내 기록 중 가장 최근 것을 지운다 (점수도 같이 회수된다)
+        EnvTaskLog? target;
+        for (final log in _myLogs) {
+          if (log.envItemId != item.id) continue;
+          if (target == null || log.createdAt.isAfter(target.createdAt)) {
+            target = log;
+          }
+        }
+        if (target == null) return;
+        await EnvApi.deleteLog(target.id);
+        if (!mounted) return;
+        setState(() {
+          _logs = [
+            for (final log in _logs)
+              if (log.id != target!.id) log,
+          ];
+        });
       }
-    });
-    if (delta > 0) AppToast.show(context, '${_withJosa(task)} 완료했습니다');
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
   }
 
   /// 오늘 수행 내역 — 폰은 밀려 들어오는 화면, PC는 모달로 열린다
@@ -95,8 +140,8 @@ class _WorkScreenState extends State<WorkScreen> {
     showFullPage<void>(
       context,
       (_) => _HistoryScreen(
-        myLogs: List.of(_logs),
-        allLogs: [..._logs, ..._teamLogs],
+        myLogs: _myLogs,
+        allLogs: List.of(_logs),
         initialAll: all,
         tabs: tabs,
       ),
@@ -110,34 +155,9 @@ class _WorkScreenState extends State<WorkScreen> {
     return (code - 0xAC00) % 28 != 0 ? '$word을' : '$word를';
   }
 
+  /// 항목 목록 — 환경정비의 점검 항목은 서버(지점별)에서 받아 온다
   static const _items = [
-    _WorkItem(
-      label: '환경정비',
-      checklist: [
-        '세탁',
-        '건조기',
-        '빨래 정리',
-        '구역청소',
-        '복도청소',
-        '락커정리',
-        '남탈부스',
-        '남탈청소',
-        '여탈부스',
-        '여탈청소',
-        '화장실청소',
-        '기구관리',
-        '회원지도',
-        'TM 회원관리',
-        '게시물',
-        '스토리',
-        '전단지',
-        '현수막',
-        '족자',
-        '블로그',
-        '클레임해결',
-        '기타',
-      ],
-    ),
+    _WorkItem(label: '환경정비', checklist: true),
     _WorkItem(label: '동료 평가'),
     _WorkItem(label: '회원 친절도'),
     _WorkItem(label: '수업 개수'),
@@ -269,15 +289,25 @@ class _WorkScreenState extends State<WorkScreen> {
       child: Column(
         key: ValueKey(_tab),
         children: [
-          if (item.checklist != null) ...[
+          if (item.checklist) ...[
             Padding(
               padding: EdgeInsets.symmetric(horizontal: _pad),
-              child: _ChecklistCard(
-                items: item.checklist!,
-                counts: _counts,
-                onAdjust: _adjust,
-                onShowHistory: _showHistory,
-              ),
+              child: _envLoading
+                  ? Padding(
+                      padding: EdgeInsets.symmetric(vertical: 60),
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.4,
+                          valueColor: AlwaysStoppedAnimation(AppColors.primary),
+                        ),
+                      ),
+                    )
+                  : _ChecklistCard(
+                      items: _envItems,
+                      counts: _counts,
+                      onAdjust: _adjust,
+                      onShowHistory: _showHistory,
+                    ),
             ),
             // 데스크톱: 내 내역 / 전체 내역을 양쪽에 상시 표시
             if (isDesktop) ...[
@@ -290,7 +320,7 @@ class _WorkScreenState extends State<WorkScreen> {
                     Expanded(
                       child: _HistoryCard(
                         title: '내 내역',
-                        logs: _logs,
+                        logs: _myLogs,
                         showName: false,
                         emptyText: '오늘 완료한 항목이 없어요',
                         onOpenAll: () => _showHistory(all: false, tabs: false),
@@ -300,7 +330,7 @@ class _WorkScreenState extends State<WorkScreen> {
                     Expanded(
                       child: _HistoryCard(
                         title: '전체 내역',
-                        logs: [..._logs, ..._teamLogs],
+                        logs: _logs,
                         showName: true,
                         emptyText: '오늘 완료된 항목이 없어요',
                         onOpenAll: () => _showHistory(all: true, tabs: false),
@@ -336,23 +366,18 @@ class _WorkScreenState extends State<WorkScreen> {
   }
 }
 
-/// 환경정비 수행 기록 한 건
-class _WorkLog {
-  _WorkLog({required this.name, required this.task, required this.time});
-
-  final String name;
-  final String task;
-  final DateTime time;
-}
+/// 수행 기록을 누가 남겼는지 — 서버는 직원 id 만 준다
+String _logAuthor(EnvTaskLog log) =>
+    StaffDirectory.instance.byId(log.employeeId)?.name ?? '알 수 없음';
 
 /// 업무 탭의 항목 하나 — 내용은 항목마다 전용 섹션 위젯이 그린다
 class _WorkItem {
-  const _WorkItem({required this.label, this.checklist});
+  const _WorkItem({required this.label, this.checklist = false});
 
   final String label;
 
-  /// 2열 점검 체크리스트 (환경정비만 쓴다)
-  final List<String>? checklist;
+  /// 2열 점검 체크리스트를 쓰는 항목인지 (환경정비만)
+  final bool checklist;
 }
 
 /// 데스크톱 업무 항목 탭 — 회색 트랙 위에 흰 알약이 움직이는 분절 토글.
@@ -482,11 +507,13 @@ class _ChecklistCard extends StatelessWidget {
     required this.onShowHistory,
   });
 
-  final List<String> items;
+  final List<EnvItem> items;
+
+  /// 항목 id 별 오늘 수행 횟수
   final Map<String, int> counts;
 
   /// (항목, 증감량) — +1 또는 -1
-  final void Function(String task, int delta) onAdjust;
+  final void Function(EnvItem item, int delta) onAdjust;
 
   /// 오늘 내역 시트 열기 (폰 전용)
   final VoidCallback onShowHistory;
@@ -538,7 +565,9 @@ class _ChecklistCard extends StatelessWidget {
               // 폰은 칸이 좁아 애플·안드로이드 모두 필요하다.
               final chipWidth =
                   (constraints.maxWidth - 10 * (columns - 1)) / columns;
-              final fontSize = _chipFontSize(items, chipWidth);
+              final fontSize = _chipFontSize([
+                for (final item in items) item.name,
+              ], chipWidth);
               return Column(
                 children: [
                   for (var i = 0; i < items.length; i += columns) ...[
@@ -550,8 +579,8 @@ class _ChecklistCard extends StatelessWidget {
                           Expanded(
                             child: i + col < items.length
                                 ? _CountChip(
-                                    label: items[i + col],
-                                    count: counts[items[i + col]] ?? 0,
+                                    label: items[i + col].name,
+                                    count: counts[items[i + col].id] ?? 0,
                                     fontSize: fontSize,
                                     onAdjust: (delta) =>
                                         onAdjust(items[i + col], delta),
@@ -735,7 +764,7 @@ class _AdjustButtonState extends State<_AdjustButton> {
 class _LogRow extends StatelessWidget {
   _LogRow({required this.log, required this.showName});
 
-  final _WorkLog log;
+  final EnvTaskLog log;
 
   /// 전체 내역처럼 누가 했는지 함께 보여줄지
   final bool showName;
@@ -755,18 +784,21 @@ class _LogRow extends StatelessWidget {
         children: [
           SizedBox(
             width: 64,
-            child: Text(formatTime(log.time), style: AppTextStyles.caption),
+            child: Text(
+              formatTime(log.createdAt),
+              style: AppTextStyles.caption,
+            ),
           ),
           SizedBox(width: 8),
           if (showName) ...[
             Text(
-              log.name,
+              _logAuthor(log),
               style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w600),
             ),
             SizedBox(width: 8),
             Expanded(
               child: Text(
-                log.task,
+                log.itemName,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: AppTextStyles.body2.copyWith(
@@ -777,7 +809,7 @@ class _LogRow extends StatelessWidget {
           ] else
             Expanded(
               child: Text(
-                log.task,
+                log.itemName,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: AppTextStyles.body2.copyWith(
@@ -785,6 +817,15 @@ class _LogRow extends StatelessWidget {
                 ),
               ),
             ),
+          // 그때 받은 점수 — 항목 배점이 나중에 바뀌어도 이 값은 안 바뀐다
+          Text(
+            '+${log.points}',
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          SizedBox(width: 6),
           Icon(
             CupertinoIcons.checkmark_circle_fill,
             size: 16,
@@ -808,7 +849,7 @@ class _HistoryCard extends StatefulWidget {
   });
 
   final String title;
-  final List<_WorkLog> logs;
+  final List<EnvTaskLog> logs;
   final bool showName;
   final String emptyText;
 
@@ -835,7 +876,7 @@ class _HistoryCardState extends State<_HistoryCard> {
   @override
   Widget build(BuildContext context) {
     final sorted = List.of(widget.logs)
-      ..sort((a, b) => b.time.compareTo(a.time));
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
     return Container(
       padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
@@ -910,8 +951,8 @@ class _HistoryScreen extends StatefulWidget {
     this.tabs = true,
   });
 
-  final List<_WorkLog> myLogs;
-  final List<_WorkLog> allLogs;
+  final List<EnvTaskLog> myLogs;
+  final List<EnvTaskLog> allLogs;
 
   /// 어느 쪽으로 열지 (데스크톱은 누른 카드에 맞춰 연다)
   final bool initialAll;
@@ -934,7 +975,8 @@ class _HistoryScreenState extends State<_HistoryScreen> {
     final now = DateTime.now();
     final date = '${now.month}월 ${now.day}일 ${_weekdays[now.weekday - 1]}요일';
     final logs = _all ? widget.allLogs : widget.myLogs;
-    final sorted = List.of(logs)..sort((a, b) => b.time.compareTo(a.time));
+    final sorted = List.of(logs)
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
     return Scaffold(
       backgroundColor: AppColors.surface,
