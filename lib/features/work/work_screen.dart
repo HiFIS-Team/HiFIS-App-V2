@@ -148,15 +148,12 @@ class _WorkScreenState extends State<WorkScreen> {
     // 데스크톱은 넓은 화면에 밑줄 탭이 헐거워 보여서
     // 분절 토글(ModeSwitch) 스타일의 알약 탭으로 보여준다
     if (isDesktop) {
-      return Padding(
-        padding: EdgeInsets.fromLTRB(20, 0, 20, 16),
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: _WorkSegmentedTabs(
-            labels: [for (final item in _items) item.label],
-            selected: _tab,
-            onSelect: (i) => setState(() => _tab = i),
-          ),
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: _WorkSegmentedTabs(
+          labels: [for (final item in _items) item.label],
+          selected: _tab,
+          onSelect: (i) => setState(() => _tab = i),
         ),
       );
     }
@@ -216,6 +213,26 @@ class _WorkScreenState extends State<WorkScreen> {
       );
     }
 
+    // 데스크톱은 다른 PC 화면(직원·근태·급여·랭킹)과 머리 모양을 맞춘다.
+    // 타이틀 없이 탭부터 시작하면 이 화면만 위가 비어 보인다.
+    if (isDesktop) {
+      return Scaffold(
+        body: SafeArea(
+          bottom: false,
+          child: ListView(
+            padding: EdgeInsets.fromLTRB(24, 64, 24, 32),
+            children: [
+              Text('업무', style: AppTextStyles.title1),
+              SizedBox(height: 20),
+              _tabs(),
+              SizedBox(height: 16),
+              _content(item),
+            ],
+          ),
+        ),
+      );
+    }
+
     // 홈처럼 화면 전체가 한 번에 스크롤된다.
     // 항목 탭도 같이 올라가야 위쪽 글래스 버튼에 콘텐츠가 비친다.
     return Scaffold(
@@ -234,6 +251,9 @@ class _WorkScreenState extends State<WorkScreen> {
     );
   }
 
+  /// 콘텐츠 좌우 여백 — 데스크톱은 페이지 ListView가 이미 24를 준다
+  double get _pad => isDesktop ? 0 : 20;
+
   /// 고른 항목의 내용 — 탭 전환 시 페이드로 바뀐다.
   /// 체크리스트 탭(환경정비)은 점수 카드 없이 리스트만 보여준다.
   Widget _content(_WorkItem item) {
@@ -250,7 +270,7 @@ class _WorkScreenState extends State<WorkScreen> {
         children: [
           if (item.checklist != null) ...[
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
+              padding: EdgeInsets.symmetric(horizontal: _pad),
               child: _ChecklistCard(
                 items: item.checklist!,
                 counts: _counts,
@@ -262,7 +282,7 @@ class _WorkScreenState extends State<WorkScreen> {
             if (isDesktop) ...[
               SizedBox(height: 16),
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20),
+                padding: EdgeInsets.symmetric(horizontal: _pad),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -291,22 +311,22 @@ class _WorkScreenState extends State<WorkScreen> {
             ],
           ] else if (item.label == '동료 평가')
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
+              padding: EdgeInsets.symmetric(horizontal: _pad),
               child: PeerReviewSection(),
             )
           else if (item.label == '수업 개수')
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
+              padding: EdgeInsets.symmetric(horizontal: _pad),
               child: LessonSection(),
             )
           else if (item.label == '회원 친절도')
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
+              padding: EdgeInsets.symmetric(horizontal: _pad),
               child: PraiseSection(),
             )
           else
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
+              padding: EdgeInsets.symmetric(horizontal: _pad),
               child: ContributionSection(),
             ),
         ],
