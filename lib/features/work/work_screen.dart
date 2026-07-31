@@ -770,14 +770,15 @@ class _CountChip extends StatelessWidget {
             color: active ? AppColors.error : AppColors.gray300,
             onTap: () => onAdjust(-1),
           ),
-          // 칸에 맞춰 글자를 줄이는(FittedBox) 방식은 라벨 길이마다 크기가
-          // 달라져서 쓰지 않는다. 모두 같은 크기로 그린다.
+          // 글자 크기는 [_chipFontSize]가 모든 칩에 같은 값을 주므로
+          // 여기서 줄어들 일은 없다. 계산이 한 픽셀 모자랄 때를 대비한
+          // 안전망으로만 둔다 — 잘라내는(…) 것보다는 줄이는 게 낫다.
           Expanded(
-            child: Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
               child: Text(
                 label,
                 maxLines: 1,
-                overflow: TextOverflow.ellipsis,
                 style: AppTextStyles.body2.copyWith(
                   fontSize: fontSize,
                   color: active ? AppColors.primary : AppColors.textPrimary,
