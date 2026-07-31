@@ -31,7 +31,8 @@ class _RankingScreenState extends State<RankingScreen> {
   /// 고른 항목 ([_Metric] 순서)
   int _tab = 0;
 
-  late String _branch = _rankers.firstWhere((r) => r.isMe).branch;
+  /// 지점은 전체로 시작한다 (내 지점만 보려면 직접 고른다)
+  String _branch = _allBranches;
 
   _Metric get _metric => _Metric.values[_tab];
 

@@ -37,7 +37,9 @@ class StaffScreen extends StatefulWidget {
 class _StaffScreenState extends State<StaffScreen> {
   String _query = '';
   String _team = '전체';
-  late String _branch = _members.firstWhere((m) => m.isMe).branch;
+
+  /// 지점은 전체로 시작한다 (내 지점만 보려면 직접 고른다)
+  String _branch = _allBranches;
 
   /// 0 재직자 · 1 대기자 · 2 퇴사자
   int _tab = 0;
