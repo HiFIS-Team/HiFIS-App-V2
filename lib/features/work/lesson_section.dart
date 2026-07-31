@@ -73,32 +73,9 @@ class _LessonStore {
     signs = await signRequest;
   }
 
-  /// 싸인에 회원 이름과 등록권을 붙인다 — 기록 화면도 이걸 쓴다
-  List<_LessonSign> decorate(List<SessionSign> rows) {
-    final decorated = [
-      for (final sign in rows)
-        _LessonSign(
-          source: sign,
-          memberName: memberOf(sign.memberId)?.name ?? '알 수 없음',
-          registration: registrationOf(sign.registrationId),
-        ),
-    ];
-    return decorated..sort((a, b) => b.time.compareTo(a.time));
-  }
-
-  Member? memberOf(String id) {
-    for (final member in members) {
-      if (member.id == id) return member;
-    }
-    return null;
-  }
-
-  Registration? registrationOf(String id) {
-    for (final registration in registrations) {
-      if (registration.id == id) return registration;
-    }
-    return null;
-  }
+  /// 최신순으로 세운다 — 서버가 기록 표시에 필요한 값을 이미 채워 준다
+  List<SessionSign> sorted(List<SessionSign> rows) =>
+      [...rows]..sort((a, b) => b.signedAt.compareTo(a.signedAt));
 
   /// 회원이 지금 쓰는 등록권
   ///
@@ -134,8 +111,8 @@ class _LessonStore {
         ),
   ];
 
-  /// 이번 달 내 싸인 — 회원·등록권을 붙여서
-  List<_LessonSign> get mySigns => decorate(signs);
+  /// 이번 달 내 싸인 (최신순)
+  List<SessionSign> get mySigns => sorted(signs);
 }
 
 /// 화면이 다루는 회원 한 명 — 서버 회원에 지금 쓰는 등록권을 붙인 것
@@ -162,27 +139,18 @@ class _LessonMember {
   bool get canSign => registration != null && !registration!.exhausted;
 }
 
-/// 세션 기록 한 줄 — 싸인에 회원 이름과 등록권을 붙여 놓은 것
-class _LessonSign {
-  _LessonSign({
-    required this.source,
-    required this.memberName,
-    required this.registration,
-  });
+/// 기록 한 줄에 쓰는 표시용 값
+///
+/// 서버가 조인해서 내려 준다. 지난 달 기록을 볼 때도 등록권 목록 없이
+/// 이것만으로 그려진다.
+extension _SignDisplay on SessionSign {
+  String get displayName => memberName ?? '알 수 없음';
 
-  final SessionSign source;
-  final String memberName;
+  /// '12/20회차' — 총 회차를 모르는 옛 기록이면 '12회차'
+  String get roundLabel =>
+      totalSessions == null ? '$sessionNo회차' : '$sessionNo/$totalSessions회차';
 
-  /// 어느 등록권의 몇 회차인지 — 목록에서 빠졌으면 null
-  final Registration? registration;
-
-  int get round => source.sessionNo;
-  int get total => registration?.totalSessions ?? 0;
-  bool get isNew => registration?.type == RegistrationType.newMember;
-  DateTime get time => source.signedAt;
-
-  /// 서명 이미지 주소
-  String get imageUrl => source.signatureFullUrl;
+  bool get isNewRegistration => registrationType == RegistrationType.newMember;
 }
 
 /// 서명 이미지를 화면 배율의 몇 배까지 키워 구울지
@@ -262,7 +230,7 @@ class _SignImage extends StatelessWidget {
 }
 
 /// 기록 줄을 누르면 서명을 크게 보여준다
-void _showSignDetail(BuildContext context, _LessonSign sign) {
+void _showSignDetail(BuildContext context, SessionSign sign) {
   showGeneralDialog(
     context: context,
     barrierDismissible: true,
@@ -290,19 +258,17 @@ void _showSignDetail(BuildContext context, _LessonSign sign) {
                   color: AppColors.gray50,
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: _SignImage(url: sign.imageUrl),
+                child: _SignImage(url: sign.signatureFullUrl),
               ),
               SizedBox(height: 14),
               Text(
-                sign.total > 0
-                    ? '${sign.memberName} · ${sign.round}/${sign.total}회차'
-                    : '${sign.memberName} · ${sign.round}회차',
+                '${sign.displayName} · ${sign.roundLabel}',
                 style: AppTextStyles.body1.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
               ),
               SizedBox(height: 4),
-              Text(_formatStamp(sign.time), style: AppTextStyles.caption),
+              Text(_formatStamp(sign.signedAt), style: AppTextStyles.caption),
             ],
           ),
         ),
@@ -629,15 +595,11 @@ class _MemberBadge extends StatelessWidget {
 class _SignRow extends StatelessWidget {
   _SignRow({required this.sign, required this.onTap});
 
-  final _LessonSign sign;
+  final SessionSign sign;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final round = sign.total > 0
-        ? '${sign.round}/${sign.total}회차'
-        : '${sign.round}회차';
-
     return Pressable(
       onTap: onTap,
       scale: 0.98,
@@ -656,7 +618,7 @@ class _SignRow extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: AppColors.gray100),
             ),
-            child: _SignImage(url: sign.imageUrl),
+            child: _SignImage(url: sign.signatureFullUrl),
           ),
           SizedBox(width: 12),
           Expanded(
@@ -666,18 +628,18 @@ class _SignRow extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      sign.memberName,
+                      sign.displayName,
                       style: AppTextStyles.body2.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     SizedBox(width: 6),
-                    _MemberBadge(isNew: sign.isNew),
+                    _MemberBadge(isNew: sign.isNewRegistration),
                   ],
                 ),
                 SizedBox(height: 2),
                 Text(
-                  '$round · ${_formatStamp(sign.time)}',
+                  '${sign.roundLabel} · ${_formatStamp(sign.signedAt)}',
                   style: AppTextStyles.caption.copyWith(fontSize: 11),
                 ),
               ],
@@ -775,7 +737,7 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen> {
   final _search = TextEditingController();
 
   late DateTime _month;
-  List<_LessonSign> _rows = const [];
+  List<SessionSign> _rows = const [];
   bool _loading = true;
 
   @override
@@ -808,7 +770,7 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen> {
       );
       if (!mounted) return;
       setState(() {
-        _rows = _LessonStore.instance.decorate(rows);
+        _rows = _LessonStore.instance.sorted(rows);
         _loading = false;
       });
     } catch (error) {
@@ -839,14 +801,14 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen> {
     final all = _rows;
     final query = _search.text.trim();
     final sorted = all
-        .where((s) => query.isEmpty || s.memberName.contains(query))
+        .where((s) => query.isEmpty || s.displayName.contains(query))
         .toList();
 
     // 날짜가 바뀌는 지점마다 그룹 헤더를 끼워 넣는다
     final children = <Widget>[];
     String? label;
     for (final sign in sorted) {
-      final dayLabel = _dayLabel(sign.time);
+      final dayLabel = _dayLabel(sign.signedAt);
       if (dayLabel != label) {
         children.add(
           Padding(
@@ -1065,36 +1027,20 @@ class _RegisterScreenState extends State<_RegisterScreen> {
         if (!mounted) return;
         AppToast.show(context, '${member.name}님이 재등록되었습니다');
       } else {
-        // 서버는 회원과 등록권이 따로다 — 회원을 만들고 등록권을 붙인다
+        // 회원과 첫 등록권을 한 트랜잭션으로 만든다 — 둘로 나눠 부르면
+        // 등록권에서 실패했을 때 등록권 없는 회원이 남는다
         final name = _name.text.trim();
-        final member = await MemberApi.create(
+        await MemberApi.create(
           name: name,
           phone: _phone.text.trim(),
           branchId: me.branchId,
           ownerTrainerId: me.id,
           referrerMemberId: _referrer?.id,
+          type: RegistrationType.newMember,
+          totalSessions: _roundCount,
+          pricePaid: _paymentWon,
+          sessionUnitPrice: _unitPrice,
         );
-        try {
-          await RegistrationApi.create(
-            memberId: member.id,
-            trainerId: me.id,
-            type: RegistrationType.newMember,
-            totalSessions: _roundCount,
-            pricePaid: _paymentWon,
-            sessionUnitPrice: _unitPrice,
-          );
-        } catch (error) {
-          // 회원은 만들어졌는데 등록권이 실패한 상태 — 그냥 실패로 덮으면
-          // 다시 등록할 때 같은 회원이 두 명 생긴다
-          if (!mounted) return;
-          setState(() => _saving = false);
-          AppToast.show(
-            context,
-            '$name님은 등록됐지만 등록권 발급에 실패했어요. 재등록으로 다시 시도해 주세요',
-          );
-          Navigator.pop(context, true);
-          return;
-        }
         if (!mounted) return;
         AppToast.show(context, '$name님이 등록되었습니다');
       }

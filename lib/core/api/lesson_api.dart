@@ -131,8 +131,8 @@ class Registration {
 
 /// 세션 싸인 한 건 (서버 `SessionSignOut`)
 ///
-/// 회원 이름·총 회차는 여기 없다 — [Member]·[Registration] 을 따로 받아
-/// id 로 맞춰야 한다.
+/// 기록 한 줄에 필요한 회원 이름·총 회차·등록 종류를 서버가 조인해 준다.
+/// 지난 달 기록을 볼 때도 이것만으로 그릴 수 있다.
 class SessionSign {
   SessionSign({
     required this.id,
@@ -142,6 +142,9 @@ class SessionSign {
     required this.sessionNo,
     required this.signatureUrl,
     required this.signedAt,
+    this.memberName,
+    this.totalSessions,
+    this.registrationType,
   });
 
   factory SessionSign.fromJson(Map<String, dynamic> json) => SessionSign(
@@ -152,17 +155,27 @@ class SessionSign {
     sessionNo: json['sessionNo'] as int,
     signatureUrl: json['signatureUrl'] as String,
     signedAt: DateTime.parse(json['signedAt'] as String).toLocal(),
+    memberName: json['memberName'] as String?,
+    totalSessions: json['totalSessions'] as int?,
+    registrationType: json['registrationType'] == null
+        ? null
+        : RegistrationType.parse(json['registrationType'] as String),
   );
 
   final String id;
   final String registrationId;
   final String memberId;
 
-  /// 수업을 한 트레이너 — 담당과 다를 수 있다 (대타)
+  /// 수업을 한 트레이너
   final String performedByTrainerId;
 
   /// 몇 회차인지 (1부터)
   final int sessionNo;
+
+  /// 서버가 조인해 준 표시용 값 — 예전 기록이면 비어 있을 수 있다
+  final String? memberName;
+  final int? totalSessions;
+  final RegistrationType? registrationType;
 
   /// 서명 이미지 — `/files/...?exp=&sig=` 꼴의 상대 경로
   ///
@@ -199,6 +212,23 @@ String periodKey(DateTime date) =>
     '${date.year.toString().padLeft(4, '0')}-'
     '${date.month.toString().padLeft(2, '0')}';
 
+/// 회원 등록 결과 — 등록권을 같이 만들었으면 실려 온다
+class MemberCreated {
+  MemberCreated({required this.member, required this.registration});
+
+  factory MemberCreated.fromJson(Map<String, dynamic> json) => MemberCreated(
+    member: Member.fromJson(json),
+    registration: json['registration'] == null
+        ? null
+        : Registration.fromJson(
+            (json['registration'] as Map).cast<String, dynamic>(),
+          ),
+  );
+
+  final Member member;
+  final Registration? registration;
+}
+
 /// `/members` — 센터 회원
 ///
 /// 목록은 지점 스코프다. 점장·직원은 본인 지점만, 대표·관리자는 전 지점.
@@ -224,13 +254,21 @@ class MemberApi {
     ];
   }
 
-  static Future<Member> create({
+  /// 회원 등록 — [totalSessions] 를 주면 첫 등록권까지 **한 트랜잭션**으로 만든다
+  ///
+  /// 둘로 나눠 부르면 회원만 만들어지고 등록권에서 실패했을 때
+  /// 등록권 없는 회원이 남는다. 실무에 그런 회원은 없다.
+  static Future<MemberCreated> create({
     required String name,
     required String phone,
     required String branchId,
     required String ownerTrainerId,
     String? referrerMemberId,
     String? memo,
+    RegistrationType? type,
+    int? totalSessions,
+    int? pricePaid,
+    int? sessionUnitPrice,
   }) async {
     final data = await ApiClient.instance.post(
       '/members',
@@ -241,9 +279,16 @@ class MemberApi {
         'ownerTrainerId': ownerTrainerId,
         'referrerMemberId': ?referrerMemberId,
         'memo': ?memo,
+        if (totalSessions != null)
+          'registration': {
+            'type': (type ?? RegistrationType.newMember).wire,
+            'totalSessions': totalSessions,
+            'pricePaid': pricePaid ?? 0,
+            'sessionUnitPrice': sessionUnitPrice ?? 0,
+          },
       },
     );
-    return Member.fromJson(data!);
+    return MemberCreated.fromJson(data!);
   }
 }
 
