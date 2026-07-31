@@ -26,6 +26,8 @@ const staffList = [
   Staff('유찬빈', '트레이너', Color(0xFF5C7CFA)),
   Staff('전상현', 'FC', Color(0xFFE0447C)),
   Staff('정다은', '마케터', Color(0xFFB44BD9)),
+  Staff('문가온', '트레이너', Color(0xFF0F9BD7)),
+  Staff('배시현', 'FC', Color(0xFFD9822B)),
 ];
 
 /// 명단에 없는 이름이면 회색 아바타로 떨어진다

@@ -44,16 +44,46 @@ enum _Permission {
   bool get strong => this != _Permission.member;
 }
 
+/// 재직 상태 — 서로 겹치지 않아 탭으로 나눈다
+enum _Employment {
+  active('재직자'),
+  pending('대기자'),
+  left('퇴사자');
+
+  const _Employment(this.label);
+
+  final String label;
+}
+
+/// 대기자가 무엇을 기다리는지
+enum _Waiting {
+  /// 초대키로 가입 신청까지 하고 관리자 승인을 기다리는 사람
+  approval('가입 승인 대기'),
+
+  /// 채용이 확정돼 출근일만 기다리는 사람
+  incoming('입사 예정');
+
+  const _Waiting(this.label);
+
+  final String label;
+}
+
 /// 직원 한 명 (목업)
 ///
 /// 이름과 아바타 색은 공용 명단([staffList])을 따르고, 조직도에서만 쓰는
 /// 소속·연락처·근태 요약을 여기에 덧붙인다.
 class _Member {
-  const _Member({
+  _Member({
     required this.name,
     required this.role,
     required this.team,
+    required this.branch,
     required this.permission,
+    this.employment = _Employment.active,
+    this.waiting,
+    this.appliedAt,
+    this.startAt,
+    this.leftAt,
     required this.code,
     required this.phone,
     required this.email,
@@ -71,7 +101,21 @@ class _Member {
   final String name;
   final String role;
   final String team;
+
+  /// 소속 지점 — 한 번에 한 곳만 본다
+  final String branch;
   final _Permission permission;
+
+  /// 재직 상태 — 승인하면 대기자에서 재직자로 바뀐다
+  _Employment employment;
+
+  /// 대기자일 때만 채운다
+  final _Waiting? waiting;
+
+  /// 가입 신청일 · 입사 예정일 · 퇴사일
+  final DateTime? appliedAt;
+  final DateTime? startAt;
+  final DateTime? leftAt;
 
   /// 사번
   final String code;
@@ -98,6 +142,8 @@ class _Member {
 
   bool get isMe => name == me;
 
+  bool get active => employment == _Employment.active;
+
   /// '3년 4개월' — 한 해가 안 됐으면 개월만
   String get career {
     final now = DateTime.now();
@@ -115,6 +161,7 @@ final _members = <_Member>[
     name: '이준승',
     role: '대표',
     team: '대표',
+    branch: '강남점',
     permission: _Permission.master,
     code: 'FS-0001',
     phone: '010-4410-0001',
@@ -129,6 +176,7 @@ final _members = <_Member>[
     name: '민중기',
     role: '점장',
     team: '대표',
+    branch: '강남점',
     permission: _Permission.admin,
     code: 'FS-0044',
     phone: '010-7720-0044',
@@ -143,6 +191,7 @@ final _members = <_Member>[
     name: '김피스',
     role: '개발',
     team: '개발',
+    branch: '강남점',
     permission: _Permission.admin,
     code: 'FS-0102',
     phone: '010-3388-0102',
@@ -158,6 +207,7 @@ final _members = <_Member>[
     name: '정다은',
     role: '마케터',
     team: '마케팅',
+    branch: '강남점',
     permission: _Permission.member,
     code: 'FS-0826',
     phone: '010-6650-0826',
@@ -172,6 +222,7 @@ final _members = <_Member>[
     name: me,
     role: '트레이너',
     team: '트레이너',
+    branch: '강남점',
     permission: _Permission.member,
     code: 'FS-0903',
     phone: '010-2913-0903',
@@ -189,6 +240,7 @@ final _members = <_Member>[
     name: '박준현',
     role: '트레이너',
     team: '트레이너',
+    branch: '강남점',
     permission: _Permission.member,
     code: 'FS-0311',
     phone: '010-9042-0311',
@@ -205,6 +257,7 @@ final _members = <_Member>[
     name: '유찬빈',
     role: '트레이너',
     team: '트레이너',
+    branch: '강남점',
     permission: _Permission.member,
     code: 'FS-0520',
     phone: '010-5517-0520',
@@ -221,6 +274,7 @@ final _members = <_Member>[
     name: '전상현',
     role: 'FC',
     team: 'FC',
+    branch: '강남점',
     permission: _Permission.member,
     code: 'FS-0715',
     phone: '010-2266-0715',
@@ -234,6 +288,112 @@ final _members = <_Member>[
     lateCount: 1,
     leaveUsed: 1,
   ),
+  _Member(
+    name: '문가온',
+    role: '트레이너',
+    team: '트레이너',
+    branch: '잠실점',
+    permission: _Permission.member,
+    code: 'FS-1120',
+    phone: '010-8834-1120',
+    email: 'go.moon@hifis.app',
+    joined: DateTime(2024, 1, 8),
+    status: _Status.working,
+    clients: 12,
+    sessions: 55,
+    workedDays: 19,
+    workedHours: 160,
+  ),
+  _Member(
+    name: '배시현',
+    role: 'FC',
+    team: 'FC',
+    branch: '잠실점',
+    permission: _Permission.member,
+    code: 'FS-1133',
+    phone: '010-2077-1133',
+    email: 'sh.bae@hifis.app',
+    joined: DateTime(2022, 4, 11),
+    status: _Status.meal,
+    clients: 18,
+    workedDays: 18,
+    workedHours: 149,
+    lateCount: 1,
+  ),
+  // 대기자 — 가입 승인을 기다리는 사람
+  _Member(
+    name: '오세진',
+    role: '트레이너',
+    team: '트레이너',
+    branch: '강남점',
+    permission: _Permission.member,
+    employment: _Employment.pending,
+    waiting: _Waiting.approval,
+    appliedAt: DateTime(2026, 7, 28),
+    code: '미발급',
+    phone: '010-4471-2250',
+    email: 'sj.oh@hifis.app',
+    joined: DateTime(2026, 7, 28),
+    status: _Status.off,
+    workedDays: 0,
+    workedHours: 0,
+  ),
+  // 대기자 — 출근일만 기다리는 사람
+  _Member(
+    name: '한지후',
+    role: 'FC',
+    team: 'FC',
+    branch: '강남점',
+    permission: _Permission.member,
+    employment: _Employment.pending,
+    waiting: _Waiting.incoming,
+    startAt: DateTime(2026, 8, 4),
+    code: 'FS-0930',
+    phone: '010-3312-0930',
+    email: 'jh.han@hifis.app',
+    joined: DateTime(2026, 8, 4),
+    status: _Status.off,
+    workedDays: 0,
+    workedHours: 0,
+  ),
+  // 퇴사자
+  _Member(
+    name: '서민재',
+    role: '트레이너',
+    team: '트레이너',
+    branch: '강남점',
+    permission: _Permission.member,
+    employment: _Employment.left,
+    leftAt: DateTime(2026, 3, 31),
+    code: 'FS-0288',
+    phone: '010-5590-0288',
+    email: 'mj.seo@hifis.app',
+    joined: DateTime(2021, 6, 14),
+    status: _Status.off,
+    workedDays: 0,
+    workedHours: 0,
+  ),
+  _Member(
+    name: '노경훈',
+    role: '마케터',
+    team: '마케팅',
+    branch: '강남점',
+    permission: _Permission.member,
+    employment: _Employment.left,
+    leftAt: DateTime(2025, 12, 20),
+    code: 'FS-0173',
+    phone: '010-7043-0173',
+    email: 'kh.noh@hifis.app',
+    joined: DateTime(2022, 2, 7),
+    status: _Status.off,
+    workedDays: 0,
+    workedHours: 0,
+  ),
+];
+
+/// 지점 목록 — 명단에 실제로 있는 지점만
+final _branches = [
+  ...{for (final m in _members) m.branch},
 ];
 
 /// 필터에 쓸 팀 목록 — 명단에 실제로 있는 팀만 명단 순서대로

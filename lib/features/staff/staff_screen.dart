@@ -37,13 +37,24 @@ class StaffScreen extends StatefulWidget {
 class _StaffScreenState extends State<StaffScreen> {
   String _query = '';
   String _team = '전체';
+  late String _branch = _branches.first;
+
+  /// 0 재직자 · 1 대기자 · 2 퇴사자
+  int _tab = 0;
 
   /// 카드 보기(true) · 목록 보기(false)
   bool _grid = true;
 
+  _Employment get _employment => _Employment.values[_tab];
+
+  /// 지점 + 재직 상태까지만 걸러낸 명단 (팀 칩 인원 수의 기준)
+  List<_Member> get _scoped => _members
+      .where((m) => m.branch == _branch && m.employment == _employment)
+      .toList();
+
   List<_Member> get _visible {
     final query = _query.trim();
-    return _members.where((m) {
+    return _scoped.where((m) {
       if (_team != '전체' && m.team != _team) return false;
       if (query.isEmpty) return true;
       // 이름·직무·팀·이메일 아무 데나 걸리면 보여준다
@@ -56,6 +67,27 @@ class _StaffScreenState extends State<StaffScreen> {
 
   void _open(_Member member) {
     showFullPage<void>(context, (_) => _MemberDetail(member: member));
+  }
+
+  /// 가입 신청 승인 — 대기자에서 재직자로 옮긴다
+  ///
+  /// 실제로는 ADMIN 이상만 할 수 있어야 한다. 목업이라 권한 검사는 생략.
+  void _approve(_Member member) {
+    setState(() => member.employment = _Employment.active);
+    AppToast.show(context, '${member.name}님의 가입을 승인했어요');
+  }
+
+  Future<void> _reject(_Member member) async {
+    final ok = await showConfirmDialog(
+      context,
+      title: '가입 신청을 반려할까요?',
+      message: '${member.name}님의 신청이 명단에서 사라져요.',
+      confirmLabel: '반려',
+      destructive: true,
+    );
+    if (!ok || !mounted) return;
+    setState(() => _members.remove(member));
+    AppToast.show(context, '가입 신청을 반려했어요');
   }
 
   /// 1:1 사내톡 — 상대 이름으로 대화방을 연다
@@ -108,6 +140,8 @@ class _StaffScreenState extends State<StaffScreen> {
                 onTap: () => _open(member),
                 onChat: () => _chat(member),
                 onCopy: () => _copy('이메일', member.email),
+                onApprove: () => _approve(member),
+                onReject: () => _reject(member),
               ),
             ),
         ],
@@ -125,6 +159,8 @@ class _StaffScreenState extends State<StaffScreen> {
             onTap: () => _open(member),
             onChat: () => _chat(member),
             onCopy: () => _copy('이메일', member.email),
+            onApprove: () => _approve(member),
+            onReject: () => _reject(member),
           ),
         ),
     ],
@@ -140,18 +176,36 @@ class _StaffScreenState extends State<StaffScreen> {
       body: SafeArea(
         bottom: false,
         child: ListView(
-          padding: EdgeInsets.fromLTRB(24, 60, 24, 32),
+          padding: EdgeInsets.fromLTRB(24, 64, 24, 32),
           children: [
-            Text('직원', style: AppTextStyles.title1),
-            SizedBox(height: 6),
-            Text(
-              '지점 구성원을 찾아보고 바로 대화를 시작할 수 있어요.',
-              style: AppTextStyles.body2.copyWith(
-                color: AppColors.textSecondary,
-              ),
+            Row(
+              children: [
+                Text('직원', style: AppTextStyles.title1),
+                Spacer(),
+                // 지점은 한 번에 한 곳만 보므로 목록에서 골라 바꾼다
+                _BranchPicker(
+                  selected: _branch,
+                  onSelect: (branch) => setState(() {
+                    _branch = branch;
+                    _team = '전체';
+                  }),
+                ),
+              ],
             ),
             SizedBox(height: 20),
-            _MyCard(),
+            _MyCard(branch: _branch),
+            SizedBox(height: 16),
+            SegmentedTabs(
+              labels: [
+                for (final e in _Employment.values)
+                  '${e.label} ${_members.where((m) => m.branch == _branch && m.employment == e).length}',
+              ],
+              selected: _tab,
+              onSelect: (i) => setState(() {
+                _tab = i;
+                _team = '전체';
+              }),
+            ),
             SizedBox(height: 16),
             _SearchBar(onChanged: (q) => setState(() => _query = q)),
             SizedBox(height: 12),
@@ -159,6 +213,7 @@ class _StaffScreenState extends State<StaffScreen> {
               children: [
                 Expanded(
                   child: _TeamChips(
+                    scope: _scoped,
                     selected: _team,
                     onSelect: (team) => setState(() => _team = team),
                   ),
@@ -172,7 +227,14 @@ class _StaffScreenState extends State<StaffScreen> {
             ),
             SizedBox(height: 24),
             if (list.isEmpty)
-              EmptyCard(icon: CupertinoIcons.person_2, text: '찾는 직원이 없어요')
+              EmptyCard(
+                icon: CupertinoIcons.person_2,
+                text: switch (_employment) {
+                  _Employment.pending => '기다리는 사람이 없어요',
+                  _Employment.left => '퇴사한 사람이 없어요',
+                  _ => '찾는 직원이 없어요',
+                },
+              )
             else
               ..._body(list),
           ],
@@ -188,13 +250,17 @@ class _StaffScreenState extends State<StaffScreen> {
 
 /// 맨 위 내 카드 — 내가 누구인지와 지점 규모를 같이 보여준다
 class _MyCard extends StatelessWidget {
-  _MyCard();
+  _MyCard({required this.branch});
+
+  /// 보고 있는 지점 — 동료·팀 수를 이 지점 기준으로 센다
+  final String branch;
 
   @override
   Widget build(BuildContext context) {
     final mine = _members.firstWhere((m) => m.isMe);
-    final teams = {for (final m in _members) m.team}.length;
-    final working = _members.where((m) => m.status.present).length;
+    final here = _members.where((m) => m.branch == branch && m.active).toList();
+    final teams = {for (final m in here) m.team}.length;
+    final working = here.where((m) => m.status.present).length;
 
     return Container(
       decoration: AppDecorations.card(radius: 20),
@@ -238,7 +304,7 @@ class _MyCard extends StatelessWidget {
                         Text(mine.name, style: AppTextStyles.title2),
                         SizedBox(height: 2),
                         Text(
-                          '${mine.role} · ${mine.team}',
+                          '${mine.branch} · ${mine.role}',
                           style: AppTextStyles.body2.copyWith(
                             color: AppColors.textSecondary,
                           ),
@@ -248,7 +314,7 @@ class _MyCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  _count('동료', _members.length - 1),
+                  _count('동료', here.where((m) => !m.isMe).length),
                   _divider(),
                   _count('팀', teams),
                   _divider(),
@@ -286,6 +352,93 @@ class _MyCard extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // 검색 · 필터 · 보기 전환
 // ---------------------------------------------------------------------------
+
+/// 지점 고르기 — 지점이 하나뿐이면 글자만 보여준다
+class _BranchPicker extends StatelessWidget {
+  _BranchPicker({required this.selected, required this.onSelect});
+
+  final String selected;
+  final ValueChanged<String> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(CupertinoIcons.location_solid, size: 14, color: AppColors.gray500),
+        SizedBox(width: 6),
+        Text(
+          selected,
+          style: AppTextStyles.label.copyWith(
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        if (_branches.length > 1) ...[
+          SizedBox(width: 4),
+          Icon(
+            Icons.keyboard_arrow_down_rounded,
+            size: 18,
+            color: AppColors.gray500,
+          ),
+        ],
+      ],
+    );
+
+    final box = Container(
+      height: 38,
+      padding: EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.gray200),
+      ),
+      child: Center(widthFactor: 1, child: label),
+    );
+
+    if (_branches.length < 2) return box;
+
+    return PopupMenuButton<String>(
+      onSelected: onSelect,
+      tooltip: '',
+      position: PopupMenuPosition.under,
+      color: AppColors.surface,
+      elevation: 8,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: AppColors.gray100),
+      ),
+      itemBuilder: (context) => [
+        for (final branch in _branches)
+          PopupMenuItem(
+            value: branch,
+            height: 42,
+            child: Row(
+              children: [
+                Text(
+                  branch,
+                  style: AppTextStyles.body2.copyWith(
+                    fontWeight: branch == selected
+                        ? FontWeight.w700
+                        : FontWeight.w400,
+                    color: branch == selected
+                        ? AppColors.primary
+                        : AppColors.textPrimary,
+                  ),
+                ),
+                Spacer(),
+                Text(
+                  '${_members.where((m) => m.branch == branch && m.active).length}명',
+                  style: AppTextStyles.caption.copyWith(fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+      ],
+      child: box,
+    );
+  }
+}
 
 class _SearchBar extends StatefulWidget {
   _SearchBar({required this.onChanged});
@@ -344,22 +497,30 @@ class _SearchBarState extends State<_SearchBar> {
 
 /// 팀 필터 — 팀 이름 옆에 인원 수를 같이 보여준다
 class _TeamChips extends StatelessWidget {
-  _TeamChips({required this.selected, required this.onSelect});
+  _TeamChips({
+    required this.scope,
+    required this.selected,
+    required this.onSelect,
+  });
 
+  /// 지금 보고 있는 지점·재직 상태의 명단
+  final List<_Member> scope;
   final String selected;
   final ValueChanged<String> onSelect;
 
-  int _countOf(String team) => team == '전체'
-      ? _members.length
-      : _members.where((m) => m.team == team).length;
+  int _countOf(String team) =>
+      team == '전체' ? scope.length : scope.where((m) => m.team == team).length;
 
   @override
   Widget build(BuildContext context) {
+    // 지금 범위에 아무도 없는 팀은 칩을 만들지 않는다
+    final teams = _teams.where((t) => _countOf(t) > 0 || t == selected);
+
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: [
-        for (final team in _teams)
+        for (final team in teams)
           Pressable(
             onTap: () => onSelect(team),
             scale: 0.96,
@@ -525,12 +686,16 @@ class _MemberCard extends StatefulWidget {
     required this.onTap,
     required this.onChat,
     required this.onCopy,
+    required this.onApprove,
+    required this.onReject,
   });
 
   final _Member member;
   final VoidCallback onTap;
   final VoidCallback onChat;
   final VoidCallback onCopy;
+  final VoidCallback onApprove;
+  final VoidCallback onReject;
 
   @override
   State<_MemberCard> createState() => _MemberCardState();
@@ -538,6 +703,48 @@ class _MemberCard extends StatefulWidget {
 
 class _MemberCardState extends State<_MemberCard> {
   bool _hovered = false;
+
+  /// 상태마다 할 수 있는 일이 다르다.
+  /// 승인 대기는 승인·반려, 퇴사자는 연락처 복사만.
+  List<Widget> _actions() {
+    final member = widget.member;
+    final copy = _IconAction(
+      icon: CupertinoIcons.doc_on_doc,
+      onTap: widget.onCopy,
+    );
+
+    if (member.waiting == _Waiting.approval) {
+      return [
+        Expanded(
+          child: _SmallButton(
+            label: '승인',
+            onTap: widget.onApprove,
+            filled: true,
+          ),
+        ),
+        SizedBox(width: 8),
+        Expanded(
+          child: _SmallButton(label: '반려', onTap: widget.onReject),
+        ),
+      ];
+    }
+
+    if (member.employment == _Employment.left) {
+      return [
+        Expanded(
+          child: _SmallButton(label: '연락처 보기', onTap: widget.onTap),
+        ),
+        SizedBox(width: 8),
+        copy,
+      ];
+    }
+
+    return [
+      Expanded(child: _ChatButton(onTap: widget.onChat)),
+      SizedBox(width: 8),
+      copy,
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -608,18 +815,9 @@ class _MemberCardState extends State<_MemberCard> {
                 style: AppTextStyles.caption.copyWith(fontSize: 12),
               ),
               SizedBox(height: 8),
-              _StatusBadge(member: member),
+              _StatusLine(member: member),
               SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(child: _ChatButton(onTap: widget.onChat)),
-                  SizedBox(width: 8),
-                  _IconAction(
-                    icon: CupertinoIcons.doc_on_doc,
-                    onTap: widget.onCopy,
-                  ),
-                ],
-              ),
+              Row(children: _actions()),
             ],
           ),
         ),
@@ -635,12 +833,16 @@ class _MemberRow extends StatefulWidget {
     required this.onTap,
     required this.onChat,
     required this.onCopy,
+    required this.onApprove,
+    required this.onReject,
   });
 
   final _Member member;
   final VoidCallback onTap;
   final VoidCallback onChat;
   final VoidCallback onCopy;
+  final VoidCallback onApprove;
+  final VoidCallback onReject;
 
   @override
   State<_MemberRow> createState() => _MemberRowState();
@@ -768,6 +970,46 @@ class _ChatButton extends StatelessWidget {
   }
 }
 
+/// 글자만 있는 작은 버튼 (승인·반려 등)
+class _SmallButton extends StatelessWidget {
+  _SmallButton({required this.label, required this.onTap, this.filled = false});
+
+  final String label;
+  final VoidCallback onTap;
+  final bool filled;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      scale: 0.95,
+      child: Container(
+        height: 40,
+        padding: EdgeInsets.symmetric(horizontal: 14),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: filled ? AppColors.primary : AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: filled ? AppColors.primary : AppColors.gray200,
+          ),
+        ),
+        child: Center(
+          widthFactor: 1,
+          child: Text(
+            label,
+            maxLines: 1,
+            style: AppTextStyles.label.copyWith(
+              fontWeight: FontWeight.w600,
+              color: filled ? Colors.white : AppColors.textPrimary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// 정사각 아이콘 버튼 (이메일 복사 등)
 class _IconAction extends StatelessWidget {
   _IconAction({required this.icon, required this.onTap});
@@ -850,6 +1092,65 @@ class _MeTag extends StatelessWidget {
   }
 }
 
+/// 카드 한 줄짜리 상태 표시
+///
+/// 재직자는 지금 무엇을 하는지, 대기자는 무엇을 기다리는지,
+/// 퇴사자는 언제 나갔는지를 같은 자리에 보여준다.
+class _StatusLine extends StatelessWidget {
+  _StatusLine({required this.member});
+
+  final _Member member;
+
+  @override
+  Widget build(BuildContext context) {
+    if (member.employment == _Employment.left) {
+      return _line(AppColors.gray400, '퇴사', _date(member.leftAt!));
+    }
+    if (member.waiting == _Waiting.approval) {
+      return _line(
+        AppColors.warning,
+        _Waiting.approval.label,
+        '${_date(member.appliedAt!)} 신청',
+      );
+    }
+    if (member.waiting == _Waiting.incoming) {
+      return _line(
+        AppColors.primary,
+        _Waiting.incoming.label,
+        '${_date(member.startAt!)}부터',
+      );
+    }
+    return _StatusBadge(member: member);
+  }
+
+  Widget _line(Color color, String label, String note) => Row(
+    children: [
+      Container(
+        width: 7,
+        height: 7,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      ),
+      SizedBox(width: 7),
+      Text(
+        label,
+        style: AppTextStyles.caption.copyWith(
+          fontWeight: FontWeight.w700,
+          color: color,
+        ),
+      ),
+      SizedBox(width: 6),
+      Expanded(
+        child: Text(
+          '· $note',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTextStyles.caption.copyWith(fontSize: 12),
+        ),
+      ),
+    ],
+  );
+}
+
 /// 상태 점 + 이름 (+ 상태 메시지)
 class _StatusBadge extends StatelessWidget {
   _StatusBadge({required this.member});
@@ -925,21 +1226,24 @@ class _MemberDetail extends StatelessWidget {
           SizedBox(height: 12),
           Row(
             children: [
-              Expanded(
-                child: _ActionButton(
-                  icon: CupertinoIcons.chat_bubble_fill,
-                  label: '사내톡',
-                  primary: true,
-                  onTap: () => Navigator.push(
-                    context,
-                    CupertinoPageRoute(
-                      builder: (_) =>
-                          ChatScreen(name: member.name, color: member.color),
+              // 아직 합류 전이거나 이미 나간 사람에게는 사내톡을 걸지 않는다
+              if (member.active) ...[
+                Expanded(
+                  child: _ActionButton(
+                    icon: CupertinoIcons.chat_bubble_fill,
+                    label: '사내톡',
+                    primary: true,
+                    onTap: () => Navigator.push(
+                      context,
+                      CupertinoPageRoute(
+                        builder: (_) =>
+                            ChatScreen(name: member.name, color: member.color),
+                      ),
                     ),
                   ),
                 ),
-              ),
-              SizedBox(width: 8),
+                SizedBox(width: 8),
+              ],
               Expanded(
                 child: _ActionButton(
                   icon: CupertinoIcons.phone_fill,
@@ -962,19 +1266,24 @@ class _MemberDetail extends StatelessWidget {
             title: '기본 정보',
             rows: [
               ('사번', member.code),
+              ('지점', member.branch),
               ('소속', '${member.team} · ${member.role}'),
               ('권한', member.permission.label),
-              ('입사일', _date(member.joined)),
-              ('근속', member.career),
+              ('상태', _employmentLine(member)),
+              if (member.active) ('입사일', _date(member.joined)),
+              if (member.active) ('근속', member.career),
               ('전화번호', member.phone),
               ('이메일', member.email),
             ],
           ),
-          SizedBox(height: 12),
-          _MonthCard(member: member),
-          if (member.clients > 0) ...[
+          // 대기자·퇴사자는 이번 달 기록이 없다
+          if (member.active) ...[
             SizedBox(height: 12),
-            _ClientCard(member: member),
+            _MonthCard(member: member),
+            if (member.clients > 0) ...[
+              SizedBox(height: 12),
+              _ClientCard(member: member),
+            ],
           ],
         ],
       ),
@@ -1014,7 +1323,7 @@ class _ProfileCard extends StatelessWidget {
                   ),
                 ),
                 SizedBox(height: 10),
-                _StatusBadge(member: member),
+                _StatusLine(member: member),
               ],
             ),
           ),
@@ -1254,6 +1563,15 @@ class _ClientCard extends StatelessWidget {
     );
   }
 }
+
+/// 상세의 '상태' 줄 — 대기·퇴사는 날짜까지 붙인다
+String _employmentLine(_Member member) => switch (member.employment) {
+  _Employment.active => '재직 중',
+  _Employment.pending when member.waiting == _Waiting.approval =>
+    '가입 승인 대기 (${_date(member.appliedAt!)} 신청)',
+  _Employment.pending => '입사 예정 (${_date(member.startAt!)})',
+  _Employment.left => '퇴사 (${_date(member.leftAt!)})',
+};
 
 /// '2023년 3월 2일'
 String _date(DateTime value) => '${value.year}년 ${value.month}월 ${value.day}일';
