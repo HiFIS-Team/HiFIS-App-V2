@@ -11,6 +11,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
 import '../../core/util/sf_symbols.dart';
+import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/desktop_header.dart';
@@ -22,6 +23,17 @@ import 'contribution_section.dart';
 import 'lesson_section.dart';
 import 'peer_review_section.dart';
 import 'praise_section.dart';
+
+/// 목록에 없는 일을 직접 적어 남기는 항목
+///
+/// 그냥 '기타' 로만 쌓이면 나중에 무슨 일을 했는지 알 길이 없다.
+/// 적은 내용을 서버가 `기타(창고 정리)` 로 라벨에 접어 넣고,
+/// 점수 원장·랭킹 사유까지 같은 값으로 남긴다.
+const _writeInItemName = '기타';
+
+/// 적을 수 있는 글자 수 — 넘기면 서버가 422 를 준다
+/// (기록의 `itemName` 이 100자라 라벨이 넘치지 않게 막아 둔 것)
+const _writeInMaxLength = 80;
 
 /// 업무 탭 화면
 ///
@@ -139,15 +151,30 @@ class _WorkScreenState extends State<WorkScreen> {
     return counts;
   }
 
+  /// 목록에 없는 걸 적어 남기는 항목인가 ('기타')
+  static bool _isWriteIn(EnvItem item) =>
+      _envKey(item.name) == _envKey(_writeInItemName);
+
   Future<void> _adjust(EnvItem item, int delta) async {
     try {
       if (delta > 0) {
-        final log = await EnvApi.createLog(item.id);
+        // '기타'는 무슨 일을 했는지 먼저 받는다 — 안 적으면 남길 이유가 없다
+        String? note;
+        if (_isWriteIn(item)) {
+          note = await showAppDialog<String>(
+            context,
+            (_) => _WriteInCard(item: item),
+          );
+          if (note == null || !mounted) return;
+        }
+        final log = await EnvApi.createLog(item.id, note: note);
         if (!mounted) return;
         setState(() => _logs = [log, ..._logs]);
         AppToast.show(
           context,
-          '${_withJosa(item.name)} 완료했습니다 · +${item.points}점',
+          note == null
+              ? '${_withJosa(item.name)} 완료했습니다 · +${item.points}점'
+              : '"$note" 기록했습니다 · +${item.points}점',
         );
       } else {
         // 감소는 그 항목의 내 기록 중 가장 최근 것을 지운다 (점수도 같이 회수된다)
@@ -400,6 +427,123 @@ class _WorkScreenState extends State<WorkScreen> {
               padding: EdgeInsets.symmetric(horizontal: _pad),
               child: ContributionSection(),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+/// '기타'에 적을 내용을 받는 팝업
+///
+/// 비워 두면 완료할 수 없다. 적은 내용이 그대로 기록에 남는 자리라
+/// 빈 '기타' 는 남겨 봐야 나중에 아무 의미가 없다.
+class _WriteInCard extends StatefulWidget {
+  _WriteInCard({required this.item});
+
+  final EnvItem item;
+
+  @override
+  State<_WriteInCard> createState() => _WriteInCardState();
+}
+
+class _WriteInCardState extends State<_WriteInCard> {
+  final _text = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    // 글자 수와 완료 버튼 상태가 입력 따라 바뀐다
+    _text.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  String get _value => _text.text.trim();
+
+  void _submit() {
+    if (_value.isEmpty) return;
+    Navigator.pop(context, _value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: dialogWidth(context, 320),
+      padding: EdgeInsets.fromLTRB(24, 24, 24, 20),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('무엇을 했나요?', style: AppTextStyles.title3),
+          SizedBox(height: 6),
+          Text(
+            '목록에 없는 일을 적어주세요. 적은 내용이 기록에 그대로 남아요.',
+            style: AppTextStyles.caption.copyWith(height: 1.5),
+          ),
+          SizedBox(height: 14),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppColors.gray50,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: TextField(
+              controller: _text,
+              autofocus: true,
+              maxLength: _writeInMaxLength,
+              style: AppTextStyles.body1,
+              cursorColor: AppColors.primary,
+              onSubmitted: (_) => _submit(),
+              decoration: InputDecoration(
+                hintText: '예) 창고 정리',
+                hintStyle: AppTextStyles.body1.copyWith(
+                  color: AppColors.gray400,
+                ),
+                border: InputBorder.none,
+                isCollapsed: true,
+                // 기본 글자 수 표시는 칸 밖으로 삐져나온다 — 아래에 직접 둔다
+                counterText: '',
+              ),
+            ),
+          ),
+          SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              '${_text.text.characters.length} / $_writeInMaxLength',
+              style: AppTextStyles.caption.copyWith(
+                fontSize: 11,
+                color: AppColors.gray400,
+              ),
+            ),
+          ),
+          SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: AppButton(
+                  label: '취소',
+                  onTap: () => Navigator.pop(context),
+                ),
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                child: AppButton(
+                  label: '완료 · +${widget.item.points}점',
+                  filled: _value.isNotEmpty,
+                  onTap: _submit,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
