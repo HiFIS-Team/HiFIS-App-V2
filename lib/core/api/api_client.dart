@@ -151,8 +151,12 @@ class ApiClient {
   }
 
   /// 본문이 없는 응답(204)도 있어서 Map 이 아닐 수 있다
-  Future<Map<String, dynamic>?> post(String path, {Object? body}) async {
-    final response = await _send('POST', path, body: body);
+  Future<Map<String, dynamic>?> post(
+    String path, {
+    Object? body,
+    Map<String, dynamic>? query,
+  }) async {
+    final response = await _send('POST', path, body: body, query: query);
     final data = response.data;
     return data is Map ? data.cast<String, dynamic>() : null;
   }

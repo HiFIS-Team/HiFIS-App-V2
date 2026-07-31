@@ -3,10 +3,10 @@ part of 'salary_screen.dart';
 /// 급여 신청서 상태
 ///
 /// 본인이 제출하고 대표가 승인해야 지급된다.
-/// 미제출 → 승인 대기 → 승인 완료 (반려되면 다시 제출)
+/// 미제출 → 승인 대기 → 승인 완료 → 지급 완료 (반려되면 다시 제출)
 ///
-/// '지급 완료'는 서버에 없다 — 실제 입금까지 추적하지 않는다
-/// (backend-gap.md 20번). 남겨 두되 서버에서 오지는 않는다.
+/// '지급 완료'는 대표가 실제로 입금한 뒤 직접 처리한다 — 지급일이 지났다고
+/// 자동으로 넘어가지 않는다 (이체 확인 없이 찍으면 오표기가 된다).
 enum _PayStatus {
   draft('미제출'),
   pending('승인 대기'),
@@ -30,6 +30,7 @@ enum _PayStatus {
     PayslipStatus.draft => _PayStatus.draft,
     PayslipStatus.submitted => _PayStatus.pending,
     PayslipStatus.approved => _PayStatus.approved,
+    PayslipStatus.paid => _PayStatus.paid,
     PayslipStatus.rejected => _PayStatus.rejected,
   };
 }
@@ -50,7 +51,7 @@ class _PayItem {
 /// 금액은 전부 서버가 계산한다. 직급 정책·인센티브 요율이 서버에 있어서
 /// 앱이 따로 곱하면 실지급액과 어긋난다.
 ///
-/// [source]가 null이면 아직 산출 전인 달이다 (서버가 404를 준다).
+/// [source]가 null이면 아직 산출 전인 달이다 (목록 응답에서 빠져 있다).
 class _Payslip {
   _Payslip({required this.month, required this.source, this.window});
 
@@ -72,13 +73,16 @@ class _Payslip {
   DateTime? get submittedAt => source?.submittedAt;
   DateTime? get decidedAt => source?.decidedAt;
 
+  /// 실제로 입금된 시각 — 대표가 지급 처리해야 찍힌다
+  DateTime? get paidAt => source?.paidAt;
+
   /// 대표가 남긴 반려 사유
   String? get comment => source?.rejectReason;
 
   /// 본인이 남긴 특이사항
   ///
-  /// 서버 `PayslipSubmit`이 `yearMonth`만 받아서 보낼 데가 없다
-  /// (backend-gap.md 22번). 지금은 앱 안에서만 산다.
+  /// 신청서에서 고친 값이 제출 전까지 여기 머물다가 제출할 때 서버로 간다.
+  /// 제출 뒤에는 서버가 돌려준 값으로 덮는다.
   String? note;
 
   bool get submitted => status != _PayStatus.draft;
@@ -146,8 +150,7 @@ class _Payslip {
 
 /// 최근 몇 달치를 보여줄지 — 추이 그래프와 히스토리가 이 범위를 쓴다
 ///
-/// 본인 명세서를 한 번에 주는 엔드포인트가 없어서 달마다 따로 부른다
-/// (backend-gap.md 21번). 너무 늘리면 요청이 그만큼 늘어난다.
+/// 범위로 한 번에 받아오므로 늘려도 요청 수는 그대로다.
 const _monthsToLoad = 6;
 
 /// 최근 명세서 (0번이 이번 달) — 서버에서 받아 채운다
@@ -159,12 +162,18 @@ Future<void> _loadPayslips() async {
     for (var i = 0; i < _monthsToLoad; i++) DateTime(now.year, now.month - i),
   ];
 
-  // 달마다 명세서를 따로 부르되 한꺼번에 보낸다
-  final sources = await Future.wait(
-    months.map((month) => PayrollApi.mine(yearMonthKey(month))),
+  // 명세서 범위와 신청 창을 같이 띄워 둔다 (신청 창은 이번 달만 필요하다)
+  final listing = PayrollApi.list(
+    from: yearMonthKey(months.last),
+    to: yearMonthKey(months.first),
   );
-  // 신청 창은 이번 달만 필요하다
-  final window = await PayrollApi.window(yearMonthKey(months.first));
+  final windowRequest = PayrollApi.window(yearMonthKey(months.first));
+
+  // 산출 안 된 달은 응답에서 빠져 있다 — 달을 키로 짝지어 빈 자리를 남긴다
+  final sources = {
+    for (final payslip in await listing) payslip.yearMonth: payslip,
+  };
+  final window = await windowRequest;
 
   _payslips
     ..clear()
@@ -172,9 +181,9 @@ Future<void> _loadPayslips() async {
       for (var i = 0; i < months.length; i++)
         _Payslip(
           month: months[i],
-          source: sources[i],
+          source: sources[yearMonthKey(months[i])],
           window: i == 0 ? window : null,
-        ),
+        )..note = sources[yearMonthKey(months[i])]?.note,
     ]);
 }
 

@@ -60,21 +60,36 @@ class _SalaryScreenState extends State<SalaryScreen> {
     if (done != true || !mounted) return;
 
     try {
-      final submitted = await PayrollApi.submit(payslip.key);
+      final submitted = await PayrollApi.submit(
+        payslip.key,
+        note: payslip.note,
+      );
       if (!mounted) return;
-      setState(() => payslip.source = submitted);
+      setState(() {
+        payslip.source = submitted;
+        payslip.note = submitted.note;
+      });
       AppToast.show(context, '${payslip.month.month}월 급여 신청서를 제출했어요');
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
     }
   }
 
-  /// 제출 취소 — 서버에 되돌리는 엔드포인트가 없다 (backend-gap.md 23번)
+  /// 제출 취소 — 승인 대기 중일 때만 된다
   ///
-  /// 버튼을 없애면 나중에 생겼을 때 되살릴 자리를 잃으므로, 지금은 왜 안 되는지
-  /// 알려만 준다.
-  void _cancel(_Payslip payslip) {
-    AppToast.show(context, '제출 취소는 아직 안 돼요. 대표에게 반려를 요청해 주세요');
+  /// 특이사항은 서버가 남겨 둬서 다시 신청할 때 그대로 뜬다.
+  Future<void> _cancel(_Payslip payslip) async {
+    try {
+      final cancelled = await PayrollApi.cancel(payslip.key);
+      if (!mounted) return;
+      setState(() {
+        payslip.source = cancelled;
+        payslip.note = cancelled.note;
+      });
+      AppToast.show(context, '${payslip.month.month}월 급여 신청을 취소했어요');
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
   }
 
   @override
@@ -212,7 +227,8 @@ class _SummaryCard extends StatelessWidget {
           SizedBox(height: 6),
           Text(
             paid
-                ? '${_dayLabel(payslip.payDay)} 지급 완료'
+                // 실제 입금일은 지급 예정일과 다를 수 있어 서버가 찍은 날을 쓴다
+                ? '${_dayLabel(payslip.paidAt ?? payslip.payDay)} 지급 완료'
                 : payslip.status == _PayStatus.approved
                 ? '${_dayLabel(payslip.payDay)} 지급 예정 · D-${payslip.daysLeft}'
                 // 아직 승인 전이라 확정 금액이 아니다
