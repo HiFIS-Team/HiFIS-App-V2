@@ -37,7 +37,7 @@ class StaffScreen extends StatefulWidget {
 class _StaffScreenState extends State<StaffScreen> {
   String _query = '';
   String _team = '전체';
-  late String _branch = _branches.first;
+  late String _branch = _members.firstWhere((m) => m.isMe).branch;
 
   /// 0 재직자 · 1 대기자 · 2 퇴사자
   int _tab = 0;
@@ -48,8 +48,11 @@ class _StaffScreenState extends State<StaffScreen> {
   _Employment get _employment => _Employment.values[_tab];
 
   /// 지점 + 재직 상태까지만 걸러낸 명단 (팀 칩 인원 수의 기준)
+  bool _inBranch(_Member member) =>
+      _branch == _allBranches || member.branch == _branch;
+
   List<_Member> get _scoped => _members
-      .where((m) => m.branch == _branch && m.employment == _employment)
+      .where((m) => _inBranch(m) && m.employment == _employment)
       .toList();
 
   List<_Member> get _visible {
@@ -136,6 +139,7 @@ class _StaffScreenState extends State<StaffScreen> {
             SizedBox(
               width: width,
               child: _MemberCard(
+                showBranch: _branch == _allBranches,
                 member: member,
                 onTap: () => _open(member),
                 onChat: () => _chat(member),
@@ -155,6 +159,7 @@ class _StaffScreenState extends State<StaffScreen> {
         Padding(
           padding: EdgeInsets.only(bottom: 8),
           child: _MemberRow(
+            showBranch: _branch == _allBranches,
             member: member,
             onTap: () => _open(member),
             onChat: () => _chat(member),
@@ -198,7 +203,7 @@ class _StaffScreenState extends State<StaffScreen> {
             SegmentedTabs(
               labels: [
                 for (final e in _Employment.values)
-                  '${e.label} ${_members.where((m) => m.branch == _branch && m.employment == e).length}',
+                  '${e.label} ${_members.where((m) => _inBranch(m) && m.employment == e).length}',
               ],
               selected: _tab,
               onSelect: (i) => setState(() {
@@ -368,7 +373,7 @@ class _BranchPicker extends StatelessWidget {
         Icon(CupertinoIcons.location_solid, size: 14, color: AppColors.gray500),
         SizedBox(width: 6),
         Text(
-          selected,
+          selected == _allBranches ? '전체 지점' : selected,
           style: AppTextStyles.label.copyWith(
             fontWeight: FontWeight.w600,
             color: AppColors.textPrimary,
@@ -428,7 +433,7 @@ class _BranchPicker extends StatelessWidget {
                 ),
                 Spacer(),
                 Text(
-                  '${_members.where((m) => m.branch == branch && m.active).length}명',
+                  '${_members.where((m) => (branch == _allBranches || m.branch == branch) && m.active).length}명',
                   style: AppTextStyles.caption.copyWith(fontSize: 12),
                 ),
               ],
@@ -682,6 +687,7 @@ class _StatusAvatar extends StatelessWidget {
 
 class _MemberCard extends StatefulWidget {
   _MemberCard({
+    required this.showBranch,
     required this.member,
     required this.onTap,
     required this.onChat,
@@ -689,6 +695,9 @@ class _MemberCard extends StatefulWidget {
     required this.onApprove,
     required this.onReject,
   });
+
+  /// 전체 지점을 보고 있을 때만 어느 지점 사람인지 같이 보여준다
+  final bool showBranch;
 
   final _Member member;
   final VoidCallback onTap;
@@ -794,7 +803,9 @@ class _MemberCardState extends State<_MemberCard> {
                         ),
                         SizedBox(height: 2),
                         Text(
-                          member.role,
+                          widget.showBranch
+                              ? '${member.branch} · ${member.role}'
+                              : member.role,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: AppTextStyles.caption,
@@ -829,6 +840,7 @@ class _MemberCardState extends State<_MemberCard> {
 /// 목록 보기 한 줄 — 카드와 같은 정보를 가로로 편다
 class _MemberRow extends StatefulWidget {
   _MemberRow({
+    required this.showBranch,
     required this.member,
     required this.onTap,
     required this.onChat,
@@ -836,6 +848,9 @@ class _MemberRow extends StatefulWidget {
     required this.onApprove,
     required this.onReject,
   });
+
+  /// 전체 지점을 보고 있을 때만 어느 지점 사람인지 같이 보여준다
+  final bool showBranch;
 
   final _Member member;
   final VoidCallback onTap;
@@ -893,9 +908,11 @@ class _MemberRowState extends State<_MemberRow> {
                 ),
               ),
               SizedBox(
-                width: 96,
+                width: widget.showBranch ? 148 : 96,
                 child: Text(
-                  member.role,
+                  widget.showBranch
+                      ? '${member.branch} · ${member.role}'
+                      : member.role,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: AppTextStyles.caption,

@@ -391,8 +391,10 @@ final _members = <_Member>[
   ),
 ];
 
-/// 지점 목록 — 명단에 실제로 있는 지점만
+/// 지점 필터 목록 — 맨 앞은 모든 지점을 함께 보는 '전체'
+const _allBranches = '전체';
 final _branches = [
+  _allBranches,
   ...{for (final m in _members) m.branch},
 ];
 
