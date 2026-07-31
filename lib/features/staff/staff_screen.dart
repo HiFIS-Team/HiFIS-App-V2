@@ -195,10 +195,11 @@ class _StaffScreenState extends State<StaffScreen> {
             SizedBox(height: 20),
             _MyCard(branch: _branch),
             SizedBox(height: 16),
-            // 큰 구분(재직 상태)이 위, 그 아래 팀·검색·보기 전환 — 두 층으로 끝낸다.
-            // Row로 감싸야 세그먼트가 왼쪽에 붙는다 (ListView는 폭을 꽉 채운다)
+            // 재직 상태를 오른쪽 끝에 맞춰 아래 검색+보기 전환과 한 기둥으로 세운다.
+            // 폭 340 = 검색 240 + 간격 8 + 보기 전환 92 (오른쪽 선이 정확히 맞는다)
             Row(
               children: [
+                Spacer(),
                 SizedBox(
                   width: 340,
                   child: SegmentedTabs(
@@ -215,7 +216,7 @@ class _StaffScreenState extends State<StaffScreen> {
                 ),
               ],
             ),
-            SizedBox(height: 14),
+            SizedBox(height: 10),
             // 팀 필터와 검색·보기 전환을 한 줄에 — 고르는 일이 한자리에 모인다
             Row(
               children: [
