@@ -721,7 +721,8 @@ class _GrantScreenState extends State<_GrantScreen> {
                 24,
                 68,
                 24,
-                MediaQuery.paddingOf(context).bottom + 96,
+                // 마지막 줄(점수)이 아래 버튼·모달 끝에 붙지 않게 넉넉히
+                MediaQuery.paddingOf(context).bottom + 130,
               ),
               children: [
                 _label('항목'),
