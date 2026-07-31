@@ -85,6 +85,9 @@ flutter:
 
   assets:
     - assets/images/
+    # 이용약관·개인정보처리방침 — 앱 안에서 그대로 렌더링한다.
+    # 웹에 올릴 공개 페이지도 같은 파일을 쓴다 (사본을 만들지 않는다).
+    - assets/legal/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

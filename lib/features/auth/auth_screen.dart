@@ -11,6 +11,7 @@ import '../../core/util/platform.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/pressable.dart';
+import '../legal/legal_screen.dart';
 import 'auth_session.dart';
 
 part 'auth_widgets.dart';
@@ -156,6 +157,35 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             SizedBox(width: 6),
             _AuthTextButton(label: '회원가입', onTap: _openSignup, strong: true),
+          ],
+        ),
+        SizedBox(height: 12),
+        // 가입하지 않은 사람도 언제든 열어볼 수 있어야 한다 (공개 의무)
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            for (final document in LegalDocument.values) ...[
+              if (document != LegalDocument.values.first)
+                Text(
+                  ' · ',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.gray300,
+                  ),
+                ),
+              Pressable(
+                onTap: () => showLegalDocument(context, document),
+                scale: 0.94,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                  child: Text(
+                    document.title,
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ],

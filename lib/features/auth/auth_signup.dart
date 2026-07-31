@@ -22,6 +22,10 @@ class _SignupScreenState extends State<_SignupScreen> {
   bool _busy = false;
   final _errors = <String, String?>{};
 
+  /// 약관 동의 — 둘 다 필수라 하나라도 빠지면 가입이 막힌다
+  final _agreed = {LegalDocument.terms: false, LegalDocument.privacy: false};
+  bool _agreeError = false;
+
   @override
   void dispose() {
     _invite.dispose();
@@ -59,12 +63,15 @@ class _SignupScreenState extends State<_SignupScreen> {
           : null,
     };
 
+    final agreeMissing = _agreed.values.any((v) => !v);
+
     setState(() {
       _errors
         ..clear()
         ..addAll(errors);
+      _agreeError = agreeMissing;
     });
-    if (errors.values.any((e) => e != null)) return;
+    if (errors.values.any((e) => e != null) || agreeMissing) return;
 
     setState(() => _busy = true);
     await _fakeDelay();
@@ -142,7 +149,26 @@ class _SignupScreenState extends State<_SignupScreen> {
             error: _errors['confirm'],
           ),
         ),
-        SizedBox(height: 28),
+        SizedBox(height: 24),
+        for (final document in LegalDocument.values) ...[
+          _AgreeRow(
+            document: document,
+            value: _agreed[document]!,
+            onChanged: (v) => setState(() {
+              _agreed[document] = v;
+              if (!_agreed.values.any((e) => !e)) _agreeError = false;
+            }),
+          ),
+          if (document != LegalDocument.values.last) SizedBox(height: 6),
+        ],
+        if (_agreeError) ...[
+          SizedBox(height: 7),
+          Text(
+            '필수 항목에 모두 동의해 주세요.',
+            style: AppTextStyles.caption.copyWith(color: AppColors.error),
+          ),
+        ],
+        SizedBox(height: 24),
         _AuthButton(label: '가입하기', onTap: _submit, busy: _busy),
       ],
     );

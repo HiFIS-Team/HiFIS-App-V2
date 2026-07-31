@@ -474,6 +474,74 @@ class _AuthCheck extends StatelessWidget {
   }
 }
 
+/// 약관 동의 한 줄 — 체크 + 문서 이름 + 전문 보기
+///
+/// 동의는 받았다는 **기록**이 남아야 의미가 있으므로, 화면에서 누른 값은
+/// 가입 요청에 실어 보낸다. 서버 저장은 아직 미구현 (backend-gap.md 12번).
+class _AgreeRow extends StatelessWidget {
+  _AgreeRow({
+    required this.document,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final LegalDocument document;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Pressable(
+            onTap: () => onChanged(!value),
+            scale: 0.98,
+            child: Row(
+              children: [
+                AnimatedContainer(
+                  duration: Duration(milliseconds: 120),
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: value ? AppColors.primary : AppColors.surface,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: value ? AppColors.primary : AppColors.gray300,
+                      width: 1.4,
+                    ),
+                  ),
+                  child: value
+                      ? Icon(Icons.check_rounded, size: 14, color: Colors.white)
+                      : null,
+                ),
+                SizedBox(width: 8),
+                Text(
+                  '(필수) ',
+                  style: AppTextStyles.label.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  '${document.title}에 동의합니다',
+                  style: AppTextStyles.label.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        _AuthTextButton(
+          label: '보기',
+          onTap: () => showLegalDocument(context, document),
+        ),
+      ],
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // 검증
 // ---------------------------------------------------------------------------
