@@ -1,6 +1,9 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/api/api_exception.dart';
+import '../../core/api/attendance_api.dart';
+import '../../core/data/current_user.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -32,6 +35,24 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   /// 달력이 보고 있는 달
   late DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
 
+  /// 첫 로딩 — 받아오기 전에는 빈 달력 대신 로딩을 보여준다
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      await _loadAttendance();
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
   void _moveMonth(int delta) {
     setState(() => _month = DateTime(_month.year, _month.month + delta));
   }
@@ -48,12 +69,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     return null;
   }
 
-  /// 그날 잡혀 있는 월차 (반려된 건 빼고)
+  /// 그날 잡혀 있는 월차 (반려·취소된 건 빼고)
   _Leave? _leaveOf(DateTime date) {
     for (final leave in _leaves) {
-      if (_sameDay(leave.date, date) && leave.status != _LeaveStatus.rejected) {
-        return leave;
-      }
+      if (leave.covers(date) && leave.status.counted) return leave;
     }
     return null;
   }
@@ -67,19 +86,40 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   }
 
   Future<void> _requestLeave() async {
-    final leave = await _showLeaveComposer(context);
-    if (leave == null || !mounted) return;
-    setState(() {
-      _leaves.insert(0, leave);
-      // 신청한 달을 바로 보여준다
-      _month = DateTime(leave.date.year, leave.date.month);
-    });
-    AppToast.show(context, '월차를 신청했어요');
+    final draft = await _showLeaveComposer(context);
+    if (draft == null || !mounted) return;
+
+    try {
+      final created = await AttendanceApi.createLeave(
+        type: draft.kind.type,
+        startDate: draft.date,
+        endDate: draft.endDate,
+        reason: draft.reason,
+      );
+      if (!mounted) return;
+      setState(() {
+        _leaves.insert(0, _Leave.from(created));
+        // 신청한 달을 바로 보여준다
+        _month = DateTime(draft.date.year, draft.date.month);
+      });
+      AppToast.show(context, '월차를 신청했어요');
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
   }
 
-  void _cancelLeave(_Leave leave) {
-    setState(() => _leaves.remove(leave));
-    AppToast.show(context, '신청을 취소했어요');
+  Future<void> _cancelLeave(_Leave leave) async {
+    final id = leave.id;
+    if (id == null) return;
+    try {
+      final cancelled = await AttendanceApi.cancelLeave(id);
+      if (!mounted) return;
+      // 서버가 이력을 남기므로 목록에서 지우지 않고 상태만 바꾼다
+      setState(() => leave.status = _LeaveStatus.of(cancelled.status));
+      AppToast.show(context, '신청을 취소했어요');
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
   }
 
   /// 전체 목록에서 취소하고 돌아올 수 있어 다녀오면 다시 그린다
@@ -90,6 +130,17 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2.4,
+            valueColor: AlwaysStoppedAnimation(AppColors.primary),
+          ),
+        ),
+      );
+    }
+
     final calendar = _MonthCalendar(
       month: _month,
       days: _days,
@@ -304,7 +355,7 @@ class _MonthCalendar extends StatelessWidget {
 
   _Leave? _leaveOf(DateTime date) {
     for (final leave in leaves) {
-      if (_sameDay(leave.date, date) && leave.status != _LeaveStatus.rejected) {
+      if (leave.covers(date) && leave.status.counted) {
         return leave;
       }
     }

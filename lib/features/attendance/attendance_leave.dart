@@ -199,6 +199,20 @@ class _LeaveHistoryScreenState extends State<_LeaveHistoryScreen> {
     _ => true,
   };
 
+  /// 취소는 서버에 알려야 한다 — 이력이 남으므로 목록에서 지우지 않는다
+  Future<void> _cancel(_Leave leave) async {
+    final id = leave.id;
+    if (id == null) return;
+    try {
+      final cancelled = await AttendanceApi.cancelLeave(id);
+      if (!mounted) return;
+      setState(() => leave.status = _LeaveStatus.of(cancelled.status));
+      AppToast.show(context, '신청을 취소했어요');
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final sorted = _leaves.where(_matches).toList()
@@ -226,12 +240,7 @@ class _LeaveHistoryScreenState extends State<_LeaveHistoryScreen> {
       } else {
         children.add(Divider(height: 1, color: AppColors.divider));
       }
-      children.add(
-        _LeaveRow(
-          leave: leave,
-          onCancel: () => setState(() => _leaves.remove(leave)),
-        ),
-      );
+      children.add(_LeaveRow(leave: leave, onCancel: () => _cancel(leave)));
     }
 
     return PhoneDetailScaffold(
@@ -418,10 +427,9 @@ class _LeaveComposerState extends State<_LeaveComposer> {
 
   bool get _ready => _reason.text.trim().isNotEmpty;
 
-  /// 같은 날에 이미 올린 신청이 있으면 막는다
-  bool get _duplicated => _leaves.any(
-    (l) => _sameDay(l.date, _date) && l.status != _LeaveStatus.rejected,
-  );
+  /// 같은 날에 이미 올린 신청이 있으면 막는다 (여러 날짜리 신청도 걸러야 한다)
+  bool get _duplicated =>
+      _leaves.any((l) => l.covers(_date) && l.status.counted);
 
   Future<void> _pickDate() async {
     final picked = await showAppDialog<DateTime>(
@@ -444,14 +452,10 @@ class _LeaveComposerState extends State<_LeaveComposer> {
       AppToast.show(context, '남은 월차가 모자라요');
       return;
     }
+    // 아직 서버에 안 보낸 초안 — 부르는 쪽이 이걸로 신청 요청을 만든다
     Navigator.pop(
       context,
-      _Leave(
-        date: _date,
-        kind: _kind,
-        reason: _reason.text.trim(),
-        requested: DateTime.now(),
-      ),
+      _Leave(date: _date, kind: _kind, reason: _reason.text.trim()),
     );
   }
 
