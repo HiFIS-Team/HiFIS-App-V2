@@ -57,13 +57,17 @@ class _WorkScreenState extends State<WorkScreen> {
     final branchId = currentUser?.branchId;
     try {
       final itemRequest = EnvApi.items(branchId: branchId);
-      final logRequest = EnvApi.logs(branchId: branchId);
+      // 화면이 "오늘 점검"이라 오늘 것만 받는다 — 서버가 한국 시간으로 잘라 준다
+      final logRequest = EnvApi.logs(
+        branchId: branchId,
+        date: dateKey(DateTime.now()),
+      );
       final items = await itemRequest;
       final logs = await logRequest;
       if (!mounted) return;
       setState(() {
         _envItems = _sortForDisplay(items);
-        _logs = _todayOnly(logs);
+        _logs = logs;
         _envLoading = false;
       });
     } catch (error) {
@@ -103,8 +107,10 @@ class _WorkScreenState extends State<WorkScreen> {
     '기타',
   ];
 
-  /// 이름 비교용 열쇠 — 서버 이름의 공백·대소문자가 고르지 않다
-  /// (`tm회원관리`, `클레임 해결` — backend-gap.md 30번)
+  /// 이름 비교용 열쇠 — 공백·대소문자를 지우고 맞춘다
+  ///
+  /// 지금은 서버 이름과 위 목록이 딱 맞지만, '기타'는 지점이 이름을 고칠 수
+  /// 있어서 띄어쓰기 하나로 순서에서 빠지지 않게 해 둔다.
   static String _envKey(String name) => name.replaceAll(' ', '').toLowerCase();
 
   static List<EnvItem> _sortForDisplay(List<EnvItem> items) {
@@ -117,21 +123,6 @@ class _WorkScreenState extends State<WorkScreen> {
       final rb = rank[_envKey(b.name)] ?? _envOrder.length;
       return ra != rb ? ra.compareTo(rb) : a.name.compareTo(b.name);
     });
-  }
-
-  /// 오늘 것만 남긴다
-  ///
-  /// 서버가 날짜로 걸러 주지 않아서 지점의 전체 기록이 온다
-  /// (backend-gap.md 29번). 화면은 "오늘 점검"이라 여기서 자른다.
-  static List<EnvTaskLog> _todayOnly(List<EnvTaskLog> logs) {
-    final now = DateTime.now();
-    return [
-      for (final log in logs)
-        if (log.createdAt.year == now.year &&
-            log.createdAt.month == now.month &&
-            log.createdAt.day == now.day)
-          log,
-    ];
   }
 
   List<EnvTaskLog> get _myLogs => [

@@ -74,6 +74,12 @@ class EnvTaskLog {
   final String? note;
 }
 
+/// `2026-07-31` — 서버 `date` 쿼리 형식 (한국 시간 기준 하루)
+String dateKey(DateTime date) =>
+    '${date.year.toString().padLeft(4, '0')}-'
+    '${date.month.toString().padLeft(2, '0')}-'
+    '${date.day.toString().padLeft(2, '0')}';
+
 /// `/env-items` `/env-logs` — 환경정비
 ///
 /// 목록은 지점 스코프다. 직원·점장은 본인 지점만 본다.
@@ -96,15 +102,22 @@ class EnvApi {
 
   /// 수행 기록 (최신순)
   ///
-  /// 날짜로 거를 방법이 없어서 **지점의 전체 기록**이 온다
-  /// (backend-gap.md 29번). 오늘 것만 쓰려면 앱이 걸러야 한다.
+  /// [date] 는 `2026-07-31`, [period] 는 `2026-07`. 서버가 **한국 시간 기준**으로
+  /// 자른다. 둘 다 안 주면 지점의 전체 기록이 오니 화면 용도에 맞게 준다.
   static Future<List<EnvTaskLog>> logs({
     String? branchId,
     String? employeeId,
+    String? date,
+    String? period,
   }) async {
     final rows = await _client.getList(
       '/env-logs',
-      query: {'branchId': ?branchId, 'employeeId': ?employeeId},
+      query: {
+        'branchId': ?branchId,
+        'employeeId': ?employeeId,
+        'date': ?date,
+        'period': ?period,
+      },
     );
     return [
       for (final row in rows)
