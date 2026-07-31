@@ -1,5 +1,7 @@
 import 'api_client.dart';
 
+export 'period.dart' show periodKey;
+
 /// 등록 종류 — 서버 `RegistrationType`
 enum RegistrationType {
   newMember('NEW', '신규'),
@@ -206,11 +208,6 @@ class SessionSignResult {
   final SessionSign sign;
   final Registration registration;
 }
-
-/// `2026-07` — 서버 `period` 쿼리 형식
-String periodKey(DateTime date) =>
-    '${date.year.toString().padLeft(4, '0')}-'
-    '${date.month.toString().padLeft(2, '0')}';
 
 /// 회원 등록 결과 — 등록권을 같이 만들었으면 실려 온다
 class MemberCreated {

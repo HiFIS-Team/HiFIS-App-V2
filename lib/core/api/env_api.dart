@@ -1,5 +1,7 @@
 import 'api_client.dart';
 
+export 'period.dart' show dateKey, periodKey;
+
 /// 환경정비 항목 (서버 `EnvItemOut`)
 ///
 /// 지점마다 항목과 배점을 따로 갖는다. 지점에 항목이 하나도 없으면
@@ -73,12 +75,6 @@ class EnvTaskLog {
   final DateTime createdAt;
   final String? note;
 }
-
-/// `2026-07-31` — 서버 `date` 쿼리 형식 (한국 시간 기준 하루)
-String dateKey(DateTime date) =>
-    '${date.year.toString().padLeft(4, '0')}-'
-    '${date.month.toString().padLeft(2, '0')}-'
-    '${date.day.toString().padLeft(2, '0')}';
 
 /// `/env-items` `/env-logs` — 환경정비
 ///

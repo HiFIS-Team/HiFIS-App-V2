@@ -2,6 +2,12 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/api/api_exception.dart';
+import '../../core/api/peer_review_api.dart';
+import '../../core/data/current_user.dart';
+import '../../core/data/employee.dart';
+import '../../core/data/staff.dart';
+import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -12,11 +18,14 @@ import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/pressable.dart';
 import '../../core/widgets/progress_bar.dart';
 
-/// 동료 평가 탭 콘텐츠 (목업)
+/// 동료 평가 탭 콘텐츠
 ///
-/// 사람마다 한 줄씩 나열되고, 줄을 누르면 평가 화면으로 이동한다.
+/// 같은 지점 사람이 한 줄씩 나열되고, 줄을 누르면 평가 화면으로 이동한다.
 /// 점수는 항목마다 별 5개로 매기고, 별 하나의 가치가 대상에 따라 다르다
-/// (본인 1점 → 항목 최대 5점 / 동료 5점 → 항목 최대 25점).
+/// (본인 1점 → 전체 최대 25점 / 동료 4점 → 전체 최대 100점).
+///
+/// **한 번 내면 고칠 수 없다** — 이미 낸 사람 줄을 누르면 그때 쓴 내용을
+/// 읽기만 한다.
 class PeerReviewSection extends StatefulWidget {
   PeerReviewSection({super.key});
 
@@ -25,28 +34,99 @@ class PeerReviewSection extends StatefulWidget {
 }
 
 class _PeerReviewSectionState extends State<PeerReviewSection> {
+  bool _loading = true;
+
+  /// 평가 대상 — 같은 지점 사람들, 본인이 맨 앞
+  List<Employee> _targets = const [];
+
+  /// 이번 달에 내가 낸 평가 (받는 사람 id → 평가)
+  Map<String, PeerReview> _mine = const {};
+
+  String get _period => periodKey(DateTime.now());
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final me = currentUser;
+    try {
+      final reviews = await PeerReviewApi.list(period: _period);
+      if (!mounted) return;
+      setState(() {
+        _targets = _targetsOf(me);
+        // 점장·대표는 지점 전체 평가가 오므로 내가 쓴 것만 남긴다
+        _mine = {
+          for (final review in reviews)
+            if (review.reviewerId == me?.id) review.revieweeId: review,
+        };
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _targets = _targetsOf(me);
+        _loading = false;
+      });
+      AppToast.show(context, messageOf(error));
+    }
+  }
+
+  /// 평가 대상 — 같은 지점의 재직 중인 사람, 본인이 맨 앞
+  static List<Employee> _targetsOf(Employee? me) {
+    if (me == null) return const [];
+    return [
+      me,
+      for (final employee in StaffDirectory.instance.employees)
+        if (employee.branchId == me.branchId && employee.id != me.id) employee,
+    ];
+  }
+
   /// 평가 작성 — 폰은 밀려 들어오고 PC는 모달로 뜬다
-  Future<void> _openForm(_Person person) async {
-    await showFullPage<bool>(
+  ///
+  /// 이미 낸 사람이면 그때 쓴 내용을 읽기 전용으로 연다.
+  Future<void> _openForm(Employee person) async {
+    final submitted = await showFullPage<bool>(
       context,
-      (_) => _PeerReviewFormScreen(person: person),
+      (_) => _PeerReviewFormScreen(
+        person: person,
+        isSelf: person.id == currentUser?.id,
+        submitted: _mine[person.id],
+      ),
     );
-    // 제출하고 돌아왔을 수 있으니 진행 상황을 새로 그린다
-    if (mounted) setState(() {});
+    if (submitted == true && mounted) await _load();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return Padding(
+        padding: EdgeInsets.symmetric(vertical: 60),
+        child: Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2.4,
+            valueColor: AlwaysStoppedAnimation(AppColors.primary),
+          ),
+        ),
+      );
+    }
+
     // 아직 안 한 사람이 위로 온다 — 무엇이 남았는지가 이 화면의 용건이다
-    final pending = _persons
-        .where((p) => !_submitted.contains(p.name))
-        .toList();
-    final done = _persons.where((p) => _submitted.contains(p.name)).toList();
+    final pending = [
+      for (final person in _targets)
+        if (!_mine.containsKey(person.id)) person,
+    ];
+    final done = [
+      for (final person in _targets)
+        if (_mine.containsKey(person.id)) person,
+    ];
     final ordered = [...pending, ...done];
 
     return Column(
       children: [
-        _ReviewProgress(done: done.length, total: _persons.length),
+        _ReviewProgress(done: done.length, total: _targets.length),
         SizedBox(height: 16),
         Container(
           width: double.infinity,
@@ -73,14 +153,26 @@ class _PeerReviewSectionState extends State<PeerReviewSection> {
                 ),
               ),
               SizedBox(height: 8),
-              for (var i = 0; i < ordered.length; i++) ...[
-                if (i > 0) Divider(height: 1, color: AppColors.divider),
-                _PersonRow(
-                  person: ordered[i],
-                  done: _submitted.contains(ordered[i].name),
-                  onTap: () => _openForm(ordered[i]),
-                ),
-              ],
+              if (ordered.isEmpty)
+                Padding(
+                  padding: EdgeInsets.fromLTRB(4, 16, 4, 22),
+                  child: Text(
+                    '평가할 사람이 없어요',
+                    style: AppTextStyles.body2.copyWith(
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                )
+              else
+                for (var i = 0; i < ordered.length; i++) ...[
+                  if (i > 0) Divider(height: 1, color: AppColors.divider),
+                  _PersonRow(
+                    person: ordered[i],
+                    isSelf: ordered[i].id == currentUser?.id,
+                    done: _mine.containsKey(ordered[i].id),
+                    onTap: () => _openForm(ordered[i]),
+                  ),
+                ],
             ],
           ),
         ),
@@ -159,61 +251,27 @@ class _ReviewProgress extends StatelessWidget {
   }
 }
 
-const _categories = ['업무 역량', '협업 소통', '성과 기여도', '태도·규정 준수', '리더십'];
-
-/// 항목마다 매길 수 있는 별 개수 (대상과 무관하게 5개)
-const _starCount = 5;
-
-const _me = '김피스';
-
-/// 이번 달 평가를 제출한 사람 (목업)
-///
-/// 탭을 오가도 남아 있어야 해서 모듈 전역으로 둔다.
-/// 실제 연동 때는 서버에서 내려받은 제출 이력으로 바꾼다.
-final _submitted = <String>{};
-
-/// 평가 대상 목록 — 본인이 맨 앞. 아바타 색은 사내톡 멤버 목록과 동일.
-const _persons = [
-  _Person(_me, '본인 평가', AppColors.primary, isSelf: true),
-  _Person('이준승', '대표', Color(0xFF7C5CFC)),
-  _Person('이준경', '개발', Color(0xFF00A8B5)),
-  _Person('민중기', '점장', AppColors.success),
-  _Person('박준현', '트레이너', AppColors.warning),
-  _Person('유찬빈', '트레이너', Color(0xFF5C7CFA)),
-  _Person('전상현', 'FC', Color(0xFFE0447C)),
-];
-
-/// 평가 대상 한 명
-class _Person {
-  const _Person(this.name, this.caption, this.color, {this.isSelf = false});
-
-  final String name;
-
-  /// 줄에 보여줄 소속·직책 (본인은 '본인 평가')
-  final String caption;
-  final Color color;
-  final bool isSelf;
-
-  /// 별 하나의 점수 — 본인 평가보다 동료 평가의 비중이 크다
-  int get pointsPerStar => isSelf ? 1 : 5;
-
-  /// 항목 하나의 만점
-  int get maxScore => pointsPerStar * _starCount;
-}
-
 /// 사람 한 줄 — 아바타·이름·소속과 끝의 이동 화살표
 ///
 /// 이미 평가한 사람은 아바타가 한 톤 흐려지고 끝에 체크가 붙는다.
-/// (다시 눌러 고쳐 쓸 수는 있다)
+/// (눌러서 그때 쓴 내용을 다시 볼 수는 있다 — 고치지는 못한다)
 class _PersonRow extends StatelessWidget {
-  _PersonRow({required this.person, required this.onTap, this.done = false});
+  _PersonRow({
+    required this.person,
+    required this.isSelf,
+    required this.onTap,
+    this.done = false,
+  });
 
-  final _Person person;
+  final Employee person;
+  final bool isSelf;
   final VoidCallback onTap;
   final bool done;
 
   @override
   Widget build(BuildContext context) {
+    final color = person.color ?? avatarColorFor(person.name);
+
     return Pressable(
       onTap: onTap,
       scale: 0.98,
@@ -227,7 +285,7 @@ class _PersonRow extends StatelessWidget {
             height: 38,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: done ? person.color.withValues(alpha: 0.35) : person.color,
+              color: done ? color.withValues(alpha: 0.35) : color,
               shape: BoxShape.circle,
             ),
             child: Text(
@@ -253,7 +311,7 @@ class _PersonRow extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    if (person.isSelf) ...[
+                    if (isSelf) ...[
                       SizedBox(width: 6),
                       Container(
                         padding: EdgeInsets.symmetric(
@@ -278,13 +336,17 @@ class _PersonRow extends StatelessWidget {
                 ),
                 SizedBox(height: 2),
                 Text(
-                  done ? '평가 완료' : person.caption,
+                  done
+                      ? '평가 완료'
+                      : isSelf
+                      ? '본인 평가'
+                      : person.rank.label,
                   style: AppTextStyles.caption.copyWith(
                     fontSize: 11,
                     fontWeight: done ? FontWeight.w600 : FontWeight.w400,
                     color: done
                         ? AppColors.success
-                        : person.isSelf
+                        : isSelf
                         ? AppColors.primary
                         : AppColors.textTertiary,
                   ),
@@ -307,10 +369,21 @@ class _PersonRow extends StatelessWidget {
 
 /// 평가 작성 화면 — 사람 줄을 누르면 옆에서 슬라이드되어 열린다.
 /// 5개 항목에 별점과 사유를 적고 제출한다.
+///
+/// [submitted] 가 있으면 이미 낸 평가라 **읽기만 한다.**
+/// 서버가 같은 사람·같은 달 재제출을 409 로 막는다.
 class _PeerReviewFormScreen extends StatefulWidget {
-  _PeerReviewFormScreen({required this.person});
+  _PeerReviewFormScreen({
+    required this.person,
+    required this.isSelf,
+    this.submitted,
+  });
 
-  final _Person person;
+  final Employee person;
+  final bool isSelf;
+
+  /// 이미 낸 평가 — 없으면 새로 쓰는 중
+  final PeerReview? submitted;
 
   @override
   State<_PeerReviewFormScreen> createState() => _PeerReviewFormScreenState();
@@ -318,20 +391,31 @@ class _PeerReviewFormScreen extends StatefulWidget {
 
 class _PeerReviewFormScreenState extends State<_PeerReviewFormScreen> {
   /// 항목별 별 개수 (점수가 아니라 별 개수를 담는다)
-  final Map<String, int> _stars = {};
-
-  late final Map<String, TextEditingController> _reasons = {
-    for (final category in _categories) category: TextEditingController(),
+  late final Map<PeerCategory, int> _stars = {
+    for (final category in PeerCategory.values)
+      category: widget.submitted?.stars[category] ?? 0,
   };
 
-  int get _perStar => widget.person.pointsPerStar;
+  late final Map<PeerCategory, TextEditingController> _reasons = {
+    for (final category in PeerCategory.values)
+      category: TextEditingController(
+        text: widget.submitted?.reasons[category] ?? '',
+      ),
+  };
+
+  /// 이미 낸 평가를 열어 본 것 — 고칠 수 없다
+  bool get _readOnly => widget.submitted != null;
+
+  bool _saving = false;
+
+  int get _perStar => peerPointsPerStar(isSelf: widget.isSelf);
 
   int get _total => _stars.values.fold(0, (sum, v) => sum + v) * _perStar;
 
-  int get _maxTotal => widget.person.maxScore * _categories.length;
+  int get _maxTotal => peerStarCount * _perStar * PeerCategory.values.length;
 
   /// 모든 항목에 별점과 사유가 채워져야 제출이 열린다
-  bool get _complete => _categories.every(
+  bool get _complete => PeerCategory.values.every(
     (c) => (_stars[c] ?? 0) > 0 && _reasons[c]!.text.trim().isNotEmpty,
   );
 
@@ -352,27 +436,43 @@ class _PeerReviewFormScreenState extends State<_PeerReviewFormScreen> {
     super.dispose();
   }
 
-  void _setStars(String category, int stars) {
-    if ((_stars[category] ?? 0) == stars) return;
+  void _setStars(PeerCategory category, int stars) {
+    if (_readOnly || (_stars[category] ?? 0) == stars) return;
     // 드래그로 별을 훑을 때 한 칸씩 걸리는 느낌을 준다
     HapticFeedback.selectionClick();
     setState(() => _stars[category] = stars);
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_complete) {
       AppToast.show(context, '모든 항목의 점수와 사유를 입력해주세요');
       return;
     }
+    if (_saving) return;
+
     FocusScope.of(context).unfocus();
-    _submitted.add(widget.person.name);
-    AppToast.show(
-      context,
-      widget.person.isSelf
-          ? '내 평가를 제출했습니다'
-          : '${widget.person.name}님 평가를 제출했습니다',
-    );
-    Navigator.pop(context, true);
+    setState(() => _saving = true);
+    try {
+      await PeerReviewApi.create(
+        revieweeId: widget.person.id,
+        period: periodKey(DateTime.now()),
+        stars: _stars,
+        reasons: {
+          for (final entry in _reasons.entries)
+            entry.key: entry.value.text.trim(),
+        },
+      );
+      if (!mounted) return;
+      AppToast.show(
+        context,
+        widget.isSelf ? '내 평가를 제출했습니다' : '${widget.person.name}님 평가를 제출했습니다',
+      );
+      Navigator.pop(context, true);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      AppToast.show(context, messageOf(error));
+    }
   }
 
   @override
@@ -396,7 +496,8 @@ class _PeerReviewFormScreenState extends State<_PeerReviewFormScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          '${person.caption} · 별 1개 $_perStar점',
+                          '${widget.isSelf ? '본인 평가' : person.rank.label}'
+                          ' · 별 1개 $_perStar점',
                           style: AppTextStyles.caption,
                         ),
                       ),
@@ -411,6 +512,30 @@ class _PeerReviewFormScreenState extends State<_PeerReviewFormScreen> {
                   ),
                 ),
                 Container(height: 1, color: AppColors.gray100),
+                if (_readOnly)
+                  Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.fromLTRB(24, 12, 24, 12),
+                    color: AppColors.gray50,
+                    child: Row(
+                      children: [
+                        Icon(
+                          CupertinoIcons.lock_fill,
+                          size: 13,
+                          color: AppColors.textSecondary,
+                        ),
+                        SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '이미 제출한 평가예요. 고칠 수 없어요',
+                            style: AppTextStyles.caption.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 Expanded(
                   child: ListView(
                     padding: EdgeInsets.fromLTRB(
@@ -421,11 +546,12 @@ class _PeerReviewFormScreenState extends State<_PeerReviewFormScreen> {
                       MediaQuery.paddingOf(context).bottom + 96,
                     ),
                     children: [
-                      for (final category in _categories) ...[
+                      for (final category in PeerCategory.values) ...[
                         _StarRow(
-                          label: category,
+                          label: category.label,
                           stars: _stars[category] ?? 0,
                           pointsPerStar: _perStar,
+                          readOnly: _readOnly,
                           onChanged: (v) => _setStars(category, v),
                         ),
                         SizedBox(height: 12),
@@ -441,6 +567,7 @@ class _PeerReviewFormScreenState extends State<_PeerReviewFormScreen> {
                           ),
                           child: TextField(
                             controller: _reasons[category],
+                            readOnly: _readOnly,
                             style: AppTextStyles.body2,
                             cursorColor: AppColors.primary,
                             keyboardType: TextInputType.multiline,
@@ -472,7 +599,7 @@ class _PeerReviewFormScreenState extends State<_PeerReviewFormScreen> {
                 height: 56,
                 child: Center(
                   child: Text(
-                    person.isSelf ? '내 평가' : '${person.name} 평가',
+                    widget.isSelf ? '내 평가' : '${person.name} 평가',
                     style: AppTextStyles.title3,
                   ),
                 ),
@@ -491,23 +618,25 @@ class _PeerReviewFormScreenState extends State<_PeerReviewFormScreen> {
             ),
           ),
           // 하단 고정: 제출 버튼 (키보드와 함께 상승)
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: BottomActionBar(
-              children: [
-                Expanded(
-                  child: BottomActionButton(
-                    id: 'pr-submit',
-                    label: '평가 제출',
-                    // 전 항목이 채워져야 채워진 상태가 되고,
-                    // 미완성 시 동작은 _submit에서 무시한다
-                    filled: _complete,
-                    onPressed: _submit,
+          // 이미 낸 평가는 낼 것이 없으므로 버튼 자체를 두지 않는다
+          if (!_readOnly)
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: BottomActionBar(
+                children: [
+                  Expanded(
+                    child: BottomActionButton(
+                      id: 'pr-submit',
+                      label: _saving ? '제출 중...' : '평가 제출',
+                      // 전 항목이 채워져야 채워진 상태가 되고,
+                      // 미완성 시 동작은 _submit에서 무시한다
+                      filled: _complete && !_saving,
+                      onPressed: _submit,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -521,12 +650,16 @@ class _StarRow extends StatelessWidget {
     required this.stars,
     required this.pointsPerStar,
     required this.onChanged,
+    this.readOnly = false,
   });
 
   final String label;
   final int stars;
   final int pointsPerStar;
   final ValueChanged<int> onChanged;
+
+  /// 이미 낸 평가를 보는 중이면 별을 못 건드린다
+  final bool readOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -555,7 +688,7 @@ class _StarRow extends StatelessWidget {
                 ),
                 children: [
                   TextSpan(
-                    text: ' / ${_starCount * pointsPerStar}점',
+                    text: ' / ${peerStarCount * pointsPerStar}점',
                     style: AppTextStyles.caption.copyWith(
                       color: AppColors.gray400,
                       fontWeight: FontWeight.w500,
@@ -567,7 +700,10 @@ class _StarRow extends StatelessWidget {
           ],
         ),
         SizedBox(height: 6),
-        _StarPicker(stars: stars, onChanged: onChanged),
+        IgnorePointer(
+          ignoring: readOnly,
+          child: _StarPicker(stars: stars, onChanged: onChanged),
+        ),
       ],
     );
   }
@@ -586,7 +722,8 @@ class _StarPicker extends StatelessWidget {
   static const _icon = 32.0;
   static const _height = 40.0;
 
-  int _starsAt(double dx) => (dx / _slot).floor().clamp(0, _starCount - 1) + 1;
+  int _starsAt(double dx) =>
+      (dx / _slot).floor().clamp(0, peerStarCount - 1) + 1;
 
   void _tap(double dx) {
     final next = _starsAt(dx);
@@ -602,11 +739,11 @@ class _StarPicker extends StatelessWidget {
       onHorizontalDragStart: (d) => onChanged(_starsAt(d.localPosition.dx)),
       onHorizontalDragUpdate: (d) => onChanged(_starsAt(d.localPosition.dx)),
       child: SizedBox(
-        width: _slot * _starCount,
+        width: _slot * peerStarCount,
         height: _height,
         child: Row(
           children: [
-            for (var i = 0; i < _starCount; i++)
+            for (var i = 0; i < peerStarCount; i++)
               SizedBox(
                 width: _slot,
                 child: Icon(
