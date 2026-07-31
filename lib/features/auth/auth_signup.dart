@@ -8,11 +8,11 @@ class _SignupOutcome {
   final SignupResult result;
 }
 
-/// 회원가입
+/// 회원가입 — 초대키를 받은 직원만 가입할 수 있다
 ///
-/// 초대키가 있으면 바로 가입되고, 없으면 관리자 승인 대기로 넘어간다.
-/// 닫힐 때 가입한 이메일과 결과를 돌려주므로 로그인 화면이 이메일을
-/// 채워 두고 결과에 맞는 안내를 띄운다.
+/// 서버는 초대키 없이도 승인 대기(PENDING)로 받아 주지만, 앱은 초대키를
+/// 필수로 받는다. 닫힐 때 가입한 이메일과 결과를 돌려주므로 로그인 화면이
+/// 이메일을 채워 두고 안내를 띄운다.
 class _SignupScreen extends StatefulWidget {
   _SignupScreen();
 
@@ -35,6 +35,12 @@ class _SignupScreenState extends State<_SignupScreen> {
   final _agreed = {LegalDocument.terms: false, LegalDocument.privacy: false};
   bool _agreeError = false;
 
+  /// 폰에서만 쓰는 단계 — 0 초대키 · 1 내 정보 · 2 비밀번호
+  ///
+  /// 한 화면에 입력칸 6개를 쌓으면 답답해서 끊어 받는다.
+  /// PC는 카드가 넓어 두 칸씩 나란히 들어가므로 한 장으로 둔다.
+  int _step = 0;
+
   @override
   void dispose() {
     _invite.dispose();
@@ -46,29 +52,66 @@ class _SignupScreenState extends State<_SignupScreen> {
     super.dispose();
   }
 
+  /// 단계별 검증 — 폰은 이 단위로 끊어서 본다
+  ///
+  /// 0 초대키 · 1 내 정보 · 2 비밀번호
+  Map<String, String?> _checkStep(int step) {
+    final invite = _invite.text.trim();
+    final name = _name.text.trim();
+
+    return switch (step) {
+      0 => {
+        'invite': invite.isEmpty
+            ? '초대키를 입력해 주세요.'
+            : invite.replaceAll('-', '').length < 8
+            ? '초대키를 다시 확인해 주세요.'
+            : null,
+      },
+      1 => {
+        'name': name.isEmpty
+            ? '이름을 입력해 주세요.'
+            : name.length < 2
+            ? '이름을 두 글자 이상 입력해 주세요.'
+            : null,
+        'email': _checkEmail(_email.text.trim()),
+        'phone': _checkPhone(_phone.text),
+      },
+      _ => {
+        'password': _checkPassword(_password.text),
+        'confirm': _confirm.text.isEmpty
+            ? '비밀번호를 한 번 더 입력해 주세요.'
+            : _confirm.text != _password.text
+            ? '비밀번호가 서로 달라요.'
+            : null,
+      },
+    };
+  }
+
+  /// 다음 단계로 — 이 단계 입력이 통과해야 넘어간다 (폰 전용)
+  void _next() {
+    final errors = _checkStep(_step);
+    setState(() {
+      _errors
+        ..clear()
+        ..addAll(errors);
+    });
+    if (errors.values.any((e) => e != null)) return;
+    setState(() => _step++);
+  }
+
+  /// 뒤로 — 단계가 남아 있으면 한 단계씩 물러난다 (폰 전용)
+  void _back() {
+    if (_step == 0 || isDesktop) return Navigator.pop(context);
+    setState(() => _step--);
+  }
+
   Future<void> _submit() async {
     final invite = _invite.text.trim();
     final name = _name.text.trim();
     final email = _email.text.trim();
 
     final errors = <String, String?>{
-      // 초대키는 선택 — 없으면 서버가 승인 대기(PENDING)로 받아 준다
-      'invite': invite.isNotEmpty && invite.replaceAll('-', '').length < 8
-          ? '초대키를 다시 확인해 주세요.'
-          : null,
-      'name': name.isEmpty
-          ? '이름을 입력해 주세요.'
-          : name.length < 2
-          ? '이름을 두 글자 이상 입력해 주세요.'
-          : null,
-      'email': _checkEmail(email),
-      'phone': _checkPhone(_phone.text),
-      'password': _checkPassword(_password.text),
-      'confirm': _confirm.text.isEmpty
-          ? '비밀번호를 한 번 더 입력해 주세요.'
-          : _confirm.text != _password.text
-          ? '비밀번호가 서로 달라요.'
-          : null,
+      for (var step = 0; step < 3; step++) ..._checkStep(step),
     };
 
     final agreeMissing = _agreed.values.any((v) => !v);
@@ -96,26 +139,31 @@ class _SignupScreenState extends State<_SignupScreen> {
       if (!mounted) return;
       // 이메일 중복·초대키 만료 등 서버가 알려준 이유를 해당 칸에 붙인다
       final message = messageOf(error);
+      final aboutInvite = message.contains('초대키');
       setState(() {
         _busy = false;
-        _errors['invite'] = message.contains('초대키') ? message : null;
-        _errors['email'] = message.contains('초대키') ? null : message;
+        _errors['invite'] = aboutInvite ? message : null;
+        _errors['email'] = aboutInvite ? null : message;
+        // 폰은 단계로 나뉘어 있어서, 오류가 난 칸이 있는 단계로 되돌아가야 보인다
+        if (!isDesktop) _step = aboutInvite ? 0 : 1;
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!isDesktop) return _buildPhone();
+
     return _AuthScaffold(
       title: '회원가입',
-      caption: '초대키가 있으면 바로 가입돼요.',
+      caption: '초대키를 받은 직원만 가입할 수 있어요.',
       onBack: () => Navigator.pop(context),
-      // 짝지은 칸을 나란히 두려면 폭이 있어야 한다 (폰은 이 값을 안 쓴다)
+      // 짝지은 칸을 나란히 두려면 폭이 있어야 한다
       width: 560,
       children: [
         _AuthField(
           controller: _invite,
-          label: '초대키 (선택)',
+          label: '초대키',
           hint: 'HIFIS-4F2A-91K7',
           autofocus: !isDesktop,
           textInputAction: TextInputAction.next,
@@ -123,10 +171,7 @@ class _SignupScreenState extends State<_SignupScreen> {
           error: _errors['invite'],
         ),
         SizedBox(height: 7),
-        Text(
-          '관리자에게 받은 초대키를 그대로 입력해 주세요.\n초대키가 없으면 가입 신청 후 관리자 승인을 기다리게 돼요.',
-          style: AppTextStyles.caption,
-        ),
+        Text('관리자에게 받은 초대키를 그대로 입력해 주세요.', style: AppTextStyles.caption),
         SizedBox(height: 16),
         _AuthField(
           controller: _name,
@@ -200,6 +245,125 @@ class _SignupScreenState extends State<_SignupScreen> {
       ],
     );
   }
+
+  /// 폰 — 세 단계로 끊어 받는다
+  Widget _buildPhone() {
+    final last = _step == 2;
+
+    return _AuthScaffold(
+      title: switch (_step) {
+        0 => '초대키 입력',
+        1 => '내 정보',
+        _ => '비밀번호 설정',
+      },
+      caption: switch (_step) {
+        0 => '관리자에게 받은 초대키가 필요해요.',
+        1 => '급여·근태에 쓰이니 정확하게 입력해 주세요.',
+        _ => '앞으로 로그인할 때 쓸 비밀번호예요.',
+      },
+      onBack: _back,
+      children: [
+        _StepBar(step: _step),
+        SizedBox(height: 24),
+        ...switch (_step) {
+          0 => _inviteStep(),
+          1 => _profileStep(),
+          _ => _passwordStep(),
+        },
+        SizedBox(height: 28),
+        _AuthButton(
+          label: last ? '가입하기' : '다음',
+          onTap: last ? _submit : _next,
+          busy: _busy,
+        ),
+      ],
+    );
+  }
+
+  List<Widget> _inviteStep() => [
+    _AuthField(
+      controller: _invite,
+      label: '초대키',
+      hint: 'HIFIS-4F2A-91K7',
+      autofocus: true,
+      textInputAction: TextInputAction.done,
+      onSubmitted: _next,
+      formatters: [_UpperCaseFormatter()],
+      error: _errors['invite'],
+    ),
+    SizedBox(height: 7),
+    Text('관리자에게 받은 초대키를 그대로 입력해 주세요.', style: AppTextStyles.caption),
+  ];
+
+  List<Widget> _profileStep() => [
+    _AuthField(
+      controller: _name,
+      label: '이름',
+      hint: '홍길동',
+      textInputAction: TextInputAction.next,
+      error: _errors['name'],
+    ),
+    SizedBox(height: 16),
+    _AuthField(
+      controller: _email,
+      label: '업무용 이메일',
+      hint: 'name@hifis.app',
+      keyboardType: TextInputType.emailAddress,
+      textInputAction: TextInputAction.next,
+      error: _errors['email'],
+    ),
+    SizedBox(height: 16),
+    _AuthField(
+      controller: _phone,
+      label: '전화번호',
+      hint: '010-1234-5678',
+      keyboardType: TextInputType.phone,
+      textInputAction: TextInputAction.done,
+      onSubmitted: _next,
+      formatters: [_PhoneFormatter()],
+      error: _errors['phone'],
+    ),
+  ];
+
+  List<Widget> _passwordStep() => [
+    _AuthField(
+      controller: _password,
+      label: '비밀번호',
+      hint: '8자 이상, 영문·숫자 포함',
+      obscure: true,
+      textInputAction: TextInputAction.next,
+      error: _errors['password'],
+    ),
+    SizedBox(height: 16),
+    _AuthField(
+      controller: _confirm,
+      label: '비밀번호 확인',
+      hint: '비밀번호 다시 입력',
+      obscure: true,
+      textInputAction: TextInputAction.done,
+      onSubmitted: _submit,
+      error: _errors['confirm'],
+    ),
+    SizedBox(height: 24),
+    for (final document in LegalDocument.values) ...[
+      _AgreeRow(
+        document: document,
+        value: _agreed[document]!,
+        onChanged: (v) => setState(() {
+          _agreed[document] = v;
+          if (!_agreed.values.any((e) => !e)) _agreeError = false;
+        }),
+      ),
+      if (document != LegalDocument.values.last) SizedBox(height: 6),
+    ],
+    if (_agreeError) ...[
+      SizedBox(height: 7),
+      Text(
+        '필수 항목에 모두 동의해 주세요.',
+        style: AppTextStyles.caption.copyWith(color: AppColors.error),
+      ),
+    ],
+  ];
 }
 
 /// 초대키는 대문자로만 받는다
