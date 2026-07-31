@@ -6,8 +6,11 @@ import 'package:flutter/material.dart';
 /// 앱을 켤 때 안 보는 화면까지 통째로 만드느라 첫 화면이 늦게 뜨고,
 /// 탭을 바꿀 때마다 12개 화면이 다시 만들어진다.
 ///
-/// 연 적 있는 탭만 남기므로 화면 상태(스크롤 위치·입력값)는 그대로 유지되고,
+/// 연 적 있는 탭만 남기므로 화면 상태(필터·입력값)는 그대로 유지되고,
 /// 아직 안 연 탭은 빈 자리로 둔다.
+///
+/// 다만 **스크롤 위치는 탭을 떠날 때 맨 위로 되돌린다.** 한참 내려보다
+/// 다른 탭에 갔다 오면 중간에서 시작해 지금 어디를 보는지 알기 어렵다.
 class LazyIndexedStack extends StatefulWidget {
   LazyIndexedStack({super.key, required this.index, required this.children});
 
@@ -21,6 +24,11 @@ class LazyIndexedStack extends StatefulWidget {
 class _LazyIndexedStackState extends State<LazyIndexedStack>
     with SingleTickerProviderStateMixin {
   final _opened = <int>{};
+
+  /// 탭을 떠날 때 그 탭 안만 되감으려고 탭마다 하나씩 잡아 둔다
+  final _keys = <int, GlobalKey>{};
+
+  GlobalKey _keyOf(int index) => _keys.putIfAbsent(index, GlobalKey.new);
 
   /// 탭이 바뀔 때마다 처음부터 다시 재생한다 (1에서 시작해 첫 화면은 그냥 떠 있다)
   late final _controller = AnimationController(
@@ -50,7 +58,38 @@ class _LazyIndexedStackState extends State<LazyIndexedStack>
   void didUpdateWidget(LazyIndexedStack oldWidget) {
     super.didUpdateWidget(oldWidget);
     _opened.add(widget.index);
-    if (oldWidget.index != widget.index) _controller.forward(from: 0);
+    if (oldWidget.index == widget.index) return;
+
+    _controller.forward(from: 0);
+
+    // 들어올 때가 아니라 나갈 때 되감는다 — 화면이 이미 가려진 뒤라
+    // 목록이 위로 튀는 게 보이지 않는다.
+    // 빌드가 끝난 뒤에 (스크롤 알림이 빌드 도중 돌면 안 된다)
+    final leaving = oldWidget.index;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _rewind(leaving));
+  }
+
+  /// 떠난 탭 안의 세로 스크롤을 전부 맨 위로 돌린다
+  ///
+  /// 화면마다 컨트롤러를 다는 방식은 이미 자기 컨트롤러를 쓰는 화면
+  /// (프로젝트·전자결재 등)을 놓쳐서, 그 탭의 위젯 트리를 훑어 되감는다.
+  void _rewind(int index) {
+    final context = _keys[index]?.currentContext;
+    if (context == null) return;
+
+    void visit(Element element) {
+      if (element.widget is Scrollable) {
+        final state = (element as StatefulElement).state as ScrollableState;
+        // 가로로 미는 칩 줄 같은 건 건드리지 않는다
+        if (state.mounted && state.position.axis == Axis.vertical) {
+          final position = state.position;
+          if (position.hasPixels && position.pixels != 0) position.jumpTo(0);
+        }
+      }
+      element.visitChildren(visit);
+    }
+
+    (context as Element).visitChildren(visit);
   }
 
   @override
@@ -71,7 +110,7 @@ class _LazyIndexedStackState extends State<LazyIndexedStack>
           children: [
             for (var i = 0; i < widget.children.length; i++)
               if (_opened.contains(i))
-                widget.children[i]
+                KeyedSubtree(key: _keyOf(i), child: widget.children[i])
               else
                 SizedBox.shrink(),
           ],
