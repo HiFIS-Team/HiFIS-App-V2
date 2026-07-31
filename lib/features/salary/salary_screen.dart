@@ -244,7 +244,8 @@ class _TrendCard extends StatelessWidget {
           ),
           SizedBox(height: 18),
           SizedBox(
-            height: 96,
+            // 금액(15) + 6 + 막대(최대 60) + 8 + 월(15)이 들어갈 높이
+            height: 108,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -412,25 +413,35 @@ class _AmountCard extends StatelessWidget {
               padding: EdgeInsets.symmetric(vertical: 9),
               child: Row(
                 children: [
-                  Text(
-                    label,
-                    style: AppTextStyles.body2.copyWith(
-                      color: AppColors.textPrimary,
+                  // 항목과 근거를 한 덩어리로 묶어야 금액이 늘 같은 선에 선다.
+                  // (설명을 Flexible로 두고 Spacer를 따로 쓰면 둘이 남는 폭을
+                  //  나눠 가져서 금액 위치가 줄마다 달라진다)
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Text(
+                          label,
+                          style: AppTextStyles.body2.copyWith(
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        if (note != null) ...[
+                          SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              note,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.caption.copyWith(
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-                  if (note != null) ...[
-                    SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        note,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTextStyles.caption.copyWith(fontSize: 12),
-                      ),
-                    ),
-                  ],
-                  Spacer(),
-                  SizedBox(width: 8),
+                  SizedBox(width: 10),
                   Text(
                     minus ? '−${_won(value)}' : _won(value),
                     style: AppTextStyles.body2.copyWith(
@@ -445,14 +456,16 @@ class _AmountCard extends StatelessWidget {
           SizedBox(height: 14),
           Row(
             children: [
-              Text(
-                totalLabel,
-                style: AppTextStyles.body2.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textSecondary,
+              Expanded(
+                child: Text(
+                  totalLabel,
+                  style: AppTextStyles.body2.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ),
-              Spacer(),
+              SizedBox(width: 10),
               Text(
                 minus ? '−${_won(total)}' : _won(total),
                 style: AppTextStyles.title3.copyWith(
