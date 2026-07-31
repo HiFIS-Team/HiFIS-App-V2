@@ -64,17 +64,15 @@ class _SalaryScreenState extends State<SalaryScreen> {
     final content = [
       _SummaryCard(payslip: current),
       SizedBox(height: 12),
+      _TrendCard(),
+      SizedBox(height: 12),
+      _PayCard(payslip: current),
+      SizedBox(height: 12),
       _StatusNotice(
         payslip: current,
         onSubmit: () => _submit(current),
         onCancel: () => _cancel(current),
       ),
-      SizedBox(height: 12),
-      _TrendCard(),
-      SizedBox(height: 12),
-      _PayCard(payslip: current),
-      SizedBox(height: 12),
-      _CommissionCard(),
       SizedBox(height: 12),
       _HistoryCard(onOpenAll: () => _openHistory(context)),
     ];
@@ -102,23 +100,21 @@ class _SalaryScreenState extends State<SalaryScreen> {
                 ],
               ),
             ),
-            // 안내는 두 카드 아래 한 줄로 — 왼쪽에 쌓으면 옆 그래프 카드만 늘어난다
             SizedBox(height: 16),
-            _StatusNotice(
-              payslip: current,
-              onSubmit: () => _submit(current),
-              onCancel: () => _cancel(current),
-            ),
-            SizedBox(height: 16),
-            IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(child: _PayCard(payslip: current)),
-                  SizedBox(width: 16),
-                  Expanded(child: _CommissionCard()),
-                ],
-              ),
+            // 늘리지 않고 각자 높이대로 — 안내가 짧아 늘리면 아래가 빈다
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: _PayCard(payslip: current)),
+                SizedBox(width: 16),
+                Expanded(
+                  child: _StatusNotice(
+                    payslip: current,
+                    onSubmit: () => _submit(current),
+                    onCancel: () => _cancel(current),
+                  ),
+                ),
+              ],
             ),
             SizedBox(height: 16),
             _HistoryCard(onOpenAll: () => _openHistory(context)),
@@ -636,8 +632,6 @@ class _PayslipDetail extends StatelessWidget {
           _SummaryCard(payslip: payslip),
           SizedBox(height: 12),
           _PayCard(payslip: payslip),
-          SizedBox(height: 12),
-          _CommissionCard(),
         ],
       ),
     );

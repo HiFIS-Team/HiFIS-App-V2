@@ -307,66 +307,7 @@ class _DialogButton extends StatelessWidget {
   }
 }
 
-/// 내 커미션 — 회사가 정한 단가라 보기만 한다
-class _CommissionCard extends StatelessWidget {
-  _CommissionCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.fromLTRB(22, 20, 22, 20),
-      decoration: AppDecorations.card(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(child: Text('내 커미션', style: AppTextStyles.label)),
-              Text(
-                '회사 지정',
-                style: AppTextStyles.caption.copyWith(fontSize: 12),
-              ),
-            ],
-          ),
-          SizedBox(height: 6),
-          _row('기본급', _won(_myCommission.base)),
-          _row('PT 세션', '회당 ${_won(_myCommission.sessionRate)}'),
-          _row('신규 등록', '건당 ${_won(_myCommission.newBonus)}'),
-          _row('재등록', '건당 ${_won(_myCommission.reBonus)}'),
-          SizedBox(height: 8),
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.gray50,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              '커미션은 대표와 협의해 사람마다 다르게 정해져요.\n'
-              '세금·보험 공제는 회사에서 따로 처리해요.',
-              style: AppTextStyles.caption.copyWith(height: 1.5),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _row(String label, String value) => Padding(
-    padding: EdgeInsets.symmetric(vertical: 9),
-    child: Row(
-      children: [
-        Expanded(child: Text(label, style: AppTextStyles.body2)),
-        Text(
-          value,
-          style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w600),
-        ),
-      ],
-    ),
-  );
-}
-
-/// 제출·승인 상태를 알리는 색 면 (요약 카드 아래)
+/// 급여 신청서 작성·제출 상태 안내
 class _StatusNotice extends StatelessWidget {
   _StatusNotice({
     required this.payslip,
