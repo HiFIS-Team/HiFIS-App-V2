@@ -52,14 +52,17 @@ class _WorkScreenState extends State<WorkScreen> {
   }
 
   Future<void> _loadEnv() async {
+    // 지점을 반드시 지정한다 — 대표·관리자는 지점 스코프가 안 걸려서
+    // 안 주면 전 지점 항목이 다 온다 (지점 3개면 항목이 3벌씩 나온다)
+    final branchId = currentUser?.branchId;
     try {
-      final itemRequest = EnvApi.items();
-      final logRequest = EnvApi.logs();
+      final itemRequest = EnvApi.items(branchId: branchId);
+      final logRequest = EnvApi.logs(branchId: branchId);
       final items = await itemRequest;
       final logs = await logRequest;
       if (!mounted) return;
       setState(() {
-        _envItems = items;
+        _envItems = _sortForDisplay(items);
         _logs = _todayOnly(logs);
         _envLoading = false;
       });
@@ -68,6 +71,52 @@ class _WorkScreenState extends State<WorkScreen> {
       setState(() => _envLoading = false);
       AppToast.show(context, messageOf(error));
     }
+  }
+
+  /// 화면에 세우는 순서 — 하루 일하는 흐름대로
+  ///
+  /// 서버는 배점이 높은 순으로 준다. 그러면 매일 여러 번 누르는 세탁(1점)이
+  /// 맨 아래로 가고 어쩌다 하는 현수막(10점)이 맨 위에 온다.
+  /// 빨래·청소 → 관리 → 홍보 → 기타 순으로 다시 세운다.
+  static const _envOrder = [
+    '세탁',
+    '건조기',
+    '빨래정리',
+    '구역청소',
+    '복도청소',
+    '락커정리',
+    '남탈부스',
+    '남탈청소',
+    '여탈부스',
+    '여탈청소',
+    '화장실청소',
+    '기구관리',
+    '회원지도',
+    'TM회원관리',
+    '게시물',
+    '스토리',
+    '전단지',
+    '현수막',
+    '족자',
+    '블로그',
+    '클레임해결',
+    '기타',
+  ];
+
+  /// 이름 비교용 열쇠 — 서버 이름의 공백·대소문자가 고르지 않다
+  /// (`tm회원관리`, `클레임 해결` — backend-gap.md 30번)
+  static String _envKey(String name) => name.replaceAll(' ', '').toLowerCase();
+
+  static List<EnvItem> _sortForDisplay(List<EnvItem> items) {
+    final rank = {
+      for (var i = 0; i < _envOrder.length; i++) _envKey(_envOrder[i]): i,
+    };
+    return [...items]..sort((a, b) {
+      // 목록에 없는 항목(지점이 새로 만든 것)은 맨 뒤에 이름순으로 붙인다
+      final ra = rank[_envKey(a.name)] ?? _envOrder.length;
+      final rb = rank[_envKey(b.name)] ?? _envOrder.length;
+      return ra != rb ? ra.compareTo(rb) : a.name.compareTo(b.name);
+    });
   }
 
   /// 오늘 것만 남긴다
