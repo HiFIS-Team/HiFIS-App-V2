@@ -11,17 +11,22 @@ import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/avatar.dart';
 import '../../core/widgets/empty_card.dart';
+import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/phone_scaffold.dart';
 import '../../core/widgets/placeholder_screen.dart';
 import '../../core/widgets/pressable.dart';
+import '../messages/chat_screen.dart';
 
 part 'staff_models.dart';
 
 /// 직원 화면 (목업)
 ///
-/// 지점 구성원을 한눈에 보고 누구에게 연락할지 정하는 화면이다.
-/// 카드마다 지금 상태(근무중·회의중·외출…)가 보이고, 누르면 연락처와
-/// 이번 달 근태 요약이 뜬다. 폰은 아직 진입점이 없어 PC를 먼저 만든다.
+/// 지점 구성원을 찾아보고 바로 연락하는 화면이다. 카드마다 지금 상태
+/// (근무중·회의중·외출…)가 보이고, 카드를 누르면 연락처와 이번 달 근태
+/// 요약이 뜬다. 폰은 아직 진입점이 없어 PC를 먼저 만든다.
+///
+/// 사람은 팀으로 나눈다 — 일이 팀 단위로 움직이기 때문이다.
+/// 시스템 권한(MASTER·ADMIN·MEMBER)은 찾는 기준이 아니라서 배지로만 붙인다.
 class StaffScreen extends StatefulWidget {
   StaffScreen({super.key});
 
@@ -33,21 +38,97 @@ class _StaffScreenState extends State<StaffScreen> {
   String _query = '';
   String _team = '전체';
 
+  /// 카드 보기(true) · 목록 보기(false)
+  bool _grid = true;
+
   List<_Member> get _visible {
     final query = _query.trim();
     return _members.where((m) {
       if (_team != '전체' && m.team != _team) return false;
       if (query.isEmpty) return true;
-      // 이름·직무·팀 아무 데나 걸리면 보여준다
+      // 이름·직무·팀·이메일 아무 데나 걸리면 보여준다
       return m.name.contains(query) ||
           m.role.contains(query) ||
-          m.team.contains(query);
+          m.team.contains(query) ||
+          m.email.toLowerCase().contains(query.toLowerCase());
     }).toList();
   }
 
   void _open(_Member member) {
     showFullPage<void>(context, (_) => _MemberDetail(member: member));
   }
+
+  /// 1:1 사내톡 — 상대 이름으로 대화방을 연다
+  void _chat(_Member member) {
+    Navigator.push(
+      context,
+      CupertinoPageRoute(
+        builder: (_) => ChatScreen(name: member.name, color: member.color),
+      ),
+    );
+  }
+
+  void _copy(String label, String value) {
+    Clipboard.setData(ClipboardData(text: value));
+    AppToast.show(context, '$label을 복사했어요');
+  }
+
+  /// 전체는 팀을 나누지 않고 한 판에 쭉 나열하고,
+  /// 팀을 고르면 그 팀 머리말과 함께 보여준다
+  List<Widget> _body(List<_Member> list) {
+    final body = _grid ? _cards(list) : _rows(list);
+    if (_team == '전체') return [body];
+
+    return [
+      _SectionHeader(title: _team, count: list.length),
+      SizedBox(height: 12),
+      body,
+    ];
+  }
+
+  Widget _cards(List<_Member> list) => LayoutBuilder(
+    builder: (context, constraints) {
+      // 카드가 너무 넓어지지 않게 최소 폭 기준으로 열 수를 잡는다
+      const min = 240.0;
+      const gap = 16.0;
+      final columns = ((constraints.maxWidth + gap) / (min + gap))
+          .floor()
+          .clamp(1, 4);
+      final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
+
+      return Wrap(
+        spacing: gap,
+        runSpacing: gap,
+        children: [
+          for (final member in list)
+            SizedBox(
+              width: width,
+              child: _MemberCard(
+                member: member,
+                onTap: () => _open(member),
+                onChat: () => _chat(member),
+                onCopy: () => _copy('이메일', member.email),
+              ),
+            ),
+        ],
+      );
+    },
+  );
+
+  Widget _rows(List<_Member> list) => Column(
+    children: [
+      for (final member in list)
+        Padding(
+          padding: EdgeInsets.only(bottom: 8),
+          child: _MemberRow(
+            member: member,
+            onTap: () => _open(member),
+            onChat: () => _chat(member),
+            onCopy: () => _copy('이메일', member.email),
+          ),
+        ),
+    ],
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -59,27 +140,21 @@ class _StaffScreenState extends State<StaffScreen> {
       body: SafeArea(
         bottom: false,
         child: ListView(
-          padding: EdgeInsets.fromLTRB(24, 64, 24, 32),
+          padding: EdgeInsets.fromLTRB(24, 60, 24, 32),
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text('직원', style: AppTextStyles.title1),
-                SizedBox(width: 10),
-                Padding(
-                  padding: EdgeInsets.only(bottom: 3),
-                  child: Text(
-                    '${_members.length}명',
-                    style: AppTextStyles.body2.copyWith(
-                      color: AppColors.textTertiary,
-                    ),
-                  ),
-                ),
-              ],
+            Text('직원', style: AppTextStyles.title1),
+            SizedBox(height: 6),
+            Text(
+              '지점 구성원을 찾아보고 바로 대화를 시작할 수 있어요.',
+              style: AppTextStyles.body2.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
             SizedBox(height: 20),
-            _StatusSummary(),
+            _MyCard(),
             SizedBox(height: 16),
+            _SearchBar(onChanged: (q) => setState(() => _query = q)),
+            SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
@@ -89,40 +164,17 @@ class _StaffScreenState extends State<StaffScreen> {
                   ),
                 ),
                 SizedBox(width: 12),
-                _SearchBox(onChanged: (q) => setState(() => _query = q)),
+                _ViewToggle(
+                  grid: _grid,
+                  onChanged: (value) => setState(() => _grid = value),
+                ),
               ],
             ),
-            SizedBox(height: 16),
+            SizedBox(height: 24),
             if (list.isEmpty)
               EmptyCard(icon: CupertinoIcons.person_2, text: '찾는 직원이 없어요')
             else
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  // 카드가 너무 넓어지지 않게 최소 폭 기준으로 열 수를 잡는다
-                  const min = 268.0;
-                  const gap = 16.0;
-                  final columns = ((constraints.maxWidth + gap) / (min + gap))
-                      .floor()
-                      .clamp(1, 4);
-                  final width =
-                      (constraints.maxWidth - gap * (columns - 1)) / columns;
-
-                  return Wrap(
-                    spacing: gap,
-                    runSpacing: gap,
-                    children: [
-                      for (final member in list)
-                        SizedBox(
-                          width: width,
-                          child: _MemberCard(
-                            member: member,
-                            onTap: () => _open(member),
-                          ),
-                        ),
-                    ],
-                  );
-                },
-              ),
+              ..._body(list),
           ],
         ),
       ),
@@ -131,113 +183,120 @@ class _StaffScreenState extends State<StaffScreen> {
 }
 
 // ---------------------------------------------------------------------------
-// 상단 요약
+// 내 프로필 요약
 // ---------------------------------------------------------------------------
 
-/// 지금 몇 명이 나와 있는지 — 상태를 네 갈래로 묶어 보여준다
-class _StatusSummary extends StatelessWidget {
-  _StatusSummary();
+/// 맨 위 내 카드 — 내가 누구인지와 지점 규모를 같이 보여준다
+class _MyCard extends StatelessWidget {
+  _MyCard();
 
   @override
   Widget build(BuildContext context) {
-    final present = _members.where((m) => m.status.present).length;
-    final stepped = _members.where((m) => m.status.stepped).length;
-    final leave = _members.where((m) => m.status == _Status.leave).length;
-    final off = _members.where((m) => m.status == _Status.off).length;
+    final mine = _members.firstWhere((m) => m.isMe);
+    final teams = {for (final m in _members) m.team}.length;
+    final working = _members.where((m) => m.status.present).length;
 
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-      decoration: AppDecorations.card(),
-      child: Row(
-        children: [
-          _stat('근무중', present, AppColors.success),
-          _divider(),
-          _stat('자리 비움', stepped, AppColors.warning),
-          _divider(),
-          _stat('월차', leave, AppColors.primary),
-          _divider(),
-          _stat('퇴근', off, AppColors.textPrimary),
-        ],
+      decoration: AppDecorations.card(radius: 20),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Column(
+          children: [
+            // 내 카드임을 알리는 브랜드 띠
+            Container(
+              height: 3,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [AppColors.gradientStart, AppColors.gradientEnd],
+                ),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(22, 20, 22, 20),
+              child: Row(
+                children: [
+                  _StatusAvatar(member: mine, size: 62),
+                  SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              '내 프로필',
+                              style: AppTextStyles.caption.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            SizedBox(width: 6),
+                            _PermissionTag(permission: mine.permission),
+                          ],
+                        ),
+                        SizedBox(height: 4),
+                        Text(mine.name, style: AppTextStyles.title2),
+                        SizedBox(height: 2),
+                        Text(
+                          '${mine.role} · ${mine.team}',
+                          style: AppTextStyles.body2.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(mine.email, style: AppTextStyles.caption),
+                      ],
+                    ),
+                  ),
+                  _count('동료', _members.length - 1),
+                  _divider(),
+                  _count('팀', teams),
+                  _divider(),
+                  _count('근무중', working, color: AppColors.success),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _stat(String label, int count, Color color) => Expanded(
+  Widget _count(String label, int value, {Color? color}) => SizedBox(
+    width: 74,
     child: Column(
       children: [
         Text(
-          '$count명',
-          style: AppTextStyles.title3.copyWith(fontSize: 19, color: color),
+          '$value',
+          style: AppTextStyles.title1.copyWith(
+            fontSize: 26,
+            color: color ?? AppColors.textPrimary,
+          ),
         ),
-        SizedBox(height: 4),
+        SizedBox(height: 2),
         Text(label, style: AppTextStyles.caption.copyWith(fontSize: 12)),
       ],
     ),
   );
 
   Widget _divider() =>
-      Container(width: 1, height: 32, color: AppColors.gray100);
+      Container(width: 1, height: 34, color: AppColors.gray100);
 }
 
 // ---------------------------------------------------------------------------
-// 필터 · 검색
+// 검색 · 필터 · 보기 전환
 // ---------------------------------------------------------------------------
 
-class _TeamChips extends StatelessWidget {
-  _TeamChips({required this.selected, required this.onSelect});
-
-  final String selected;
-  final ValueChanged<String> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        for (final team in _teams)
-          Pressable(
-            onTap: () => onSelect(team),
-            scale: 0.96,
-            child: AnimatedContainer(
-              duration: Duration(milliseconds: 140),
-              height: 34,
-              padding: EdgeInsets.symmetric(horizontal: 14),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: team == selected ? AppColors.primary : AppColors.surface,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: team == selected
-                      ? AppColors.primary
-                      : AppColors.gray200,
-                ),
-              ),
-              child: Text(
-                team,
-                style: AppTextStyles.label.copyWith(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: team == selected ? Colors.white : AppColors.gray600,
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _SearchBox extends StatefulWidget {
-  _SearchBox({required this.onChanged});
+class _SearchBar extends StatefulWidget {
+  _SearchBar({required this.onChanged});
 
   final ValueChanged<String> onChanged;
 
   @override
-  State<_SearchBox> createState() => _SearchBoxState();
+  State<_SearchBar> createState() => _SearchBarState();
 }
 
-class _SearchBoxState extends State<_SearchBox> {
+class _SearchBarState extends State<_SearchBar> {
   final _controller = TextEditingController();
 
   @override
@@ -249,29 +308,27 @@ class _SearchBoxState extends State<_SearchBox> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 220,
-      height: 34,
-      padding: EdgeInsets.symmetric(horizontal: 10),
+      height: 48,
+      padding: EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
         // 화면 배경이 gray50과 같은 색이라 흰 면 + 테두리로 띄운다
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.gray200),
       ),
       child: Row(
         children: [
-          Icon(CupertinoIcons.search, size: 14, color: AppColors.gray500),
-          SizedBox(width: 6),
+          Icon(CupertinoIcons.search, size: 16, color: AppColors.gray500),
+          SizedBox(width: 10),
           Expanded(
             child: TextField(
               controller: _controller,
-              style: AppTextStyles.body2.copyWith(fontSize: 13),
+              style: AppTextStyles.body2,
               cursorColor: AppColors.primary,
               onChanged: widget.onChanged,
               decoration: InputDecoration(
-                hintText: '이름·직무 검색',
+                hintText: '이름·이메일·팀·직무로 검색',
                 hintStyle: AppTextStyles.body2.copyWith(
-                  fontSize: 13,
                   color: AppColors.gray400,
                 ),
                 border: InputBorder.none,
@@ -285,15 +342,195 @@ class _SearchBoxState extends State<_SearchBox> {
   }
 }
 
+/// 팀 필터 — 팀 이름 옆에 인원 수를 같이 보여준다
+class _TeamChips extends StatelessWidget {
+  _TeamChips({required this.selected, required this.onSelect});
+
+  final String selected;
+  final ValueChanged<String> onSelect;
+
+  int _countOf(String team) => team == '전체'
+      ? _members.length
+      : _members.where((m) => m.team == team).length;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final team in _teams)
+          Pressable(
+            onTap: () => onSelect(team),
+            scale: 0.96,
+            child: AnimatedContainer(
+              duration: Duration(milliseconds: 140),
+              height: 38,
+              padding: EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: team == selected ? AppColors.primary : AppColors.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: team == selected
+                      ? AppColors.primary
+                      : AppColors.gray200,
+                ),
+              ),
+              // 칸이 남는 폭을 다 먹지 않게 내용만큼만 잡는다
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    team,
+                    style: AppTextStyles.label.copyWith(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: team == selected
+                          ? Colors.white
+                          : AppColors.gray600,
+                    ),
+                  ),
+                  SizedBox(width: 6),
+                  Text(
+                    '${_countOf(team)}',
+                    style: AppTextStyles.caption.copyWith(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: team == selected
+                          ? Colors.white.withValues(alpha: 0.8)
+                          : AppColors.gray400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// 카드 보기 · 목록 보기 전환
+class _ViewToggle extends StatelessWidget {
+  _ViewToggle({required this.grid, required this.onChanged});
+
+  final bool grid;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 38,
+      padding: EdgeInsets.all(4),
+      decoration: segmentTrack(),
+      child: Row(
+        children: [
+          _button(Icons.grid_view_rounded, true),
+          _button(Icons.format_list_bulleted_rounded, false),
+        ],
+      ),
+    );
+  }
+
+  Widget _button(IconData icon, bool value) {
+    final selected = grid == value;
+    return Pressable(
+      onTap: () => onChanged(value),
+      scale: 0.94,
+      child: Container(
+        width: 42,
+        alignment: Alignment.center,
+        decoration: segmentFill(selected: selected),
+        child: Icon(
+          icon,
+          size: 17,
+          color: selected ? AppColors.textPrimary : AppColors.gray500,
+        ),
+      ),
+    );
+  }
+}
+
+/// 팀 머리말 — 이름 + 인원 + 나머지 폭을 채우는 헤어라인
+class _SectionHeader extends StatelessWidget {
+  _SectionHeader({required this.title, required this.count});
+
+  final String title;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Text(
+          title,
+          style: AppTextStyles.label.copyWith(
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        SizedBox(width: 8),
+        Text('$count명', style: AppTextStyles.caption),
+        SizedBox(width: 14),
+        Expanded(child: Container(height: 1, color: AppColors.gray200)),
+      ],
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
-// 명단 카드
+// 명단 카드 · 줄
 // ---------------------------------------------------------------------------
 
+/// 아바타 우하단에 상태 점을 붙인 아바타
+class _StatusAvatar extends StatelessWidget {
+  _StatusAvatar({required this.member, this.size = 44});
+
+  final _Member member;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final dot = size * 0.29;
+
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        children: [
+          Avatar(name: member.name, size: size),
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: Container(
+              width: dot,
+              height: dot,
+              decoration: BoxDecoration(
+                color: member.status.color,
+                shape: BoxShape.circle,
+                // 아바타 색과 붙어 보이지 않게 배경색으로 테를 두른다
+                border: Border.all(color: AppColors.surface, width: 2),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _MemberCard extends StatefulWidget {
-  _MemberCard({required this.member, required this.onTap});
+  _MemberCard({
+    required this.member,
+    required this.onTap,
+    required this.onChat,
+    required this.onCopy,
+  });
 
   final _Member member;
   final VoidCallback onTap;
+  final VoidCallback onChat;
+  final VoidCallback onCopy;
 
   @override
   State<_MemberCard> createState() => _MemberCardState();
@@ -327,8 +564,9 @@ class _MemberCardState extends State<_MemberCard> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Avatar(name: member.name, size: 46),
+                  _StatusAvatar(member: member),
                   SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -347,9 +585,9 @@ class _MemberCardState extends State<_MemberCard> {
                             if (member.isMe) ...[SizedBox(width: 6), _MeTag()],
                           ],
                         ),
-                        SizedBox(height: 3),
+                        SizedBox(height: 2),
                         Text(
-                          '${member.role} · ${member.team}',
+                          member.role,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: AppTextStyles.caption,
@@ -357,35 +595,231 @@ class _MemberCardState extends State<_MemberCard> {
                       ],
                     ),
                   ),
+                  SizedBox(width: 6),
+                  // 팀은 머리말에 이미 있으니 여기는 권한을 보여준다
+                  _PermissionTag(permission: member.permission),
                 ],
               ),
               SizedBox(height: 14),
+              Text(
+                member.email,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.caption.copyWith(fontSize: 12),
+              ),
+              SizedBox(height: 8),
               _StatusBadge(member: member),
               SizedBox(height: 14),
-              Divider(height: 1, color: AppColors.divider),
-              SizedBox(height: 12),
               Row(
                 children: [
-                  Expanded(
-                    child: Text(
-                      // 회원을 안 맡는 직무는 근속을 대신 보여준다
-                      member.clients > 0
-                          ? '담당 ${member.clients}명'
-                          : '근속 ${member.career}',
-                      style: AppTextStyles.caption.copyWith(
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    member.phone,
-                    style: AppTextStyles.caption.copyWith(fontSize: 12),
+                  Expanded(child: _ChatButton(onTap: widget.onChat)),
+                  SizedBox(width: 8),
+                  _IconAction(
+                    icon: CupertinoIcons.doc_on_doc,
+                    onTap: widget.onCopy,
                   ),
                 ],
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 목록 보기 한 줄 — 카드와 같은 정보를 가로로 편다
+class _MemberRow extends StatefulWidget {
+  _MemberRow({
+    required this.member,
+    required this.onTap,
+    required this.onChat,
+    required this.onCopy,
+  });
+
+  final _Member member;
+  final VoidCallback onTap;
+  final VoidCallback onChat;
+  final VoidCallback onCopy;
+
+  @override
+  State<_MemberRow> createState() => _MemberRowState();
+}
+
+class _MemberRowState extends State<_MemberRow> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final member = widget.member;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Pressable(
+        onTap: widget.onTap,
+        scale: 0.995,
+        child: AnimatedContainer(
+          duration: Duration(milliseconds: 140),
+          height: 72,
+          padding: EdgeInsets.symmetric(horizontal: 18),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: _hovered ? AppColors.primary : AppColors.gray100,
+            ),
+          ),
+          child: Row(
+            children: [
+              _StatusAvatar(member: member, size: 40),
+              SizedBox(width: 14),
+              SizedBox(
+                width: 150,
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        member.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.title3.copyWith(fontSize: 16),
+                      ),
+                    ),
+                    if (member.isMe) ...[SizedBox(width: 6), _MeTag()],
+                  ],
+                ),
+              ),
+              SizedBox(
+                width: 96,
+                child: Text(
+                  member.role,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.caption,
+                ),
+              ),
+              _PermissionTag(permission: member.permission),
+              SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  member.email,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.caption.copyWith(fontSize: 12),
+                ),
+              ),
+              SizedBox(width: 12),
+              SizedBox(width: 160, child: _StatusBadge(member: member)),
+              SizedBox(width: 12),
+              _ChatButton(onTap: widget.onChat),
+              SizedBox(width: 8),
+              _IconAction(
+                icon: CupertinoIcons.doc_on_doc,
+                onTap: widget.onCopy,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 사내톡 열기 버튼
+class _ChatButton extends StatelessWidget {
+  _ChatButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      scale: 0.95,
+      child: Container(
+        height: 40,
+        padding: EdgeInsets.symmetric(horizontal: 14),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppColors.primary,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              CupertinoIcons.chat_bubble_fill,
+              size: 14,
+              color: Colors.white,
+            ),
+            SizedBox(width: 6),
+            Text(
+              '메시지',
+              style: AppTextStyles.label.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 정사각 아이콘 버튼 (이메일 복사 등)
+class _IconAction extends StatelessWidget {
+  _IconAction({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      scale: 0.92,
+      child: Container(
+        width: 40,
+        height: 40,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.gray200),
+        ),
+        child: Icon(icon, size: 15, color: AppColors.gray600),
+      ),
+    );
+  }
+}
+
+/// 권한 꼬리표 — 관리 권한이 있는 사람만 파랗게
+class _PermissionTag extends StatelessWidget {
+  _PermissionTag({required this.permission});
+
+  final _Permission permission;
+
+  @override
+  Widget build(BuildContext context) {
+    final strong = permission.strong;
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: strong ? AppColors.primaryLight : AppColors.gray50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: strong ? Colors.transparent : AppColors.gray100,
+        ),
+      ),
+      child: Text(
+        permission.label,
+        style: AppTextStyles.caption.copyWith(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: strong ? AppColors.primary : AppColors.gray500,
         ),
       ),
     );
@@ -445,10 +879,10 @@ class _StatusBadge extends StatelessWidget {
           ),
         ),
         if (member.note != null) ...[
-          SizedBox(width: 8),
+          SizedBox(width: 6),
           Expanded(
             child: Text(
-              member.note!,
+              '· ${member.note}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: AppTextStyles.caption.copyWith(fontSize: 12),
@@ -496,7 +930,13 @@ class _MemberDetail extends StatelessWidget {
                   icon: CupertinoIcons.chat_bubble_fill,
                   label: '사내톡',
                   primary: true,
-                  onTap: () => AppToast.show(context, '사내톡은 준비 중이에요'),
+                  onTap: () => Navigator.push(
+                    context,
+                    CupertinoPageRoute(
+                      builder: (_) =>
+                          ChatScreen(name: member.name, color: member.color),
+                    ),
+                  ),
                 ),
               ),
               SizedBox(width: 8),
@@ -523,6 +963,7 @@ class _MemberDetail extends StatelessWidget {
             rows: [
               ('사번', member.code),
               ('소속', '${member.team} · ${member.role}'),
+              ('권한', member.permission.label),
               ('입사일', _date(member.joined)),
               ('근속', member.career),
               ('전화번호', member.phone),
@@ -553,7 +994,7 @@ class _ProfileCard extends StatelessWidget {
       decoration: AppDecorations.card(),
       child: Row(
         children: [
-          Avatar(name: member.name, size: 62),
+          _StatusAvatar(member: member, size: 62),
           SizedBox(width: 16),
           Expanded(
             child: Column(

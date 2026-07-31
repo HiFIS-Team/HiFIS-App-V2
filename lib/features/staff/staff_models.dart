@@ -31,6 +31,19 @@ enum _Status {
       this == _Status.meal || this == _Status.out || this == _Status.away;
 }
 
+/// 시스템 권한 — 사람을 찾는 기준이 아니라서 필터로 쓰지 않고 배지로만 보여준다
+enum _Permission {
+  master('MASTER'),
+  admin('ADMIN'),
+  member('MEMBER');
+
+  const _Permission(this.label);
+
+  final String label;
+
+  bool get strong => this != _Permission.member;
+}
+
 /// 직원 한 명 (목업)
 ///
 /// 이름과 아바타 색은 공용 명단([staffList])을 따르고, 조직도에서만 쓰는
@@ -40,6 +53,7 @@ class _Member {
     required this.name,
     required this.role,
     required this.team,
+    required this.permission,
     required this.code,
     required this.phone,
     required this.email,
@@ -57,6 +71,7 @@ class _Member {
   final String name;
   final String role;
   final String team;
+  final _Permission permission;
 
   /// 사번
   final String code;
@@ -97,9 +112,67 @@ class _Member {
 
 final _members = <_Member>[
   _Member(
+    name: '이준승',
+    role: '대표',
+    team: '대표',
+    permission: _Permission.master,
+    code: 'FS-0001',
+    phone: '010-4410-0001',
+    email: 'js.lee@hifis.app',
+    joined: DateTime(2019, 1, 2),
+    status: _Status.meeting,
+    note: '본사 임원 회의',
+    workedDays: 19,
+    workedHours: 162,
+  ),
+  _Member(
+    name: '민중기',
+    role: '점장',
+    team: '대표',
+    permission: _Permission.admin,
+    code: 'FS-0044',
+    phone: '010-7720-0044',
+    email: 'jk.min@hifis.app',
+    joined: DateTime(2020, 7, 13),
+    status: _Status.working,
+    workedDays: 19,
+    workedHours: 171,
+    leaveUsed: 1,
+  ),
+  _Member(
+    name: '김피스',
+    role: '개발',
+    team: '개발',
+    permission: _Permission.admin,
+    code: 'FS-0102',
+    phone: '010-3388-0102',
+    email: 'peace@hifis.app',
+    joined: DateTime(2024, 5, 20),
+    status: _Status.out,
+    note: '14시까지 외근',
+    workedDays: 18,
+    workedHours: 152,
+    lateCount: 2,
+  ),
+  _Member(
+    name: '정다은',
+    role: '마케터',
+    team: '마케팅',
+    permission: _Permission.member,
+    code: 'FS-0826',
+    phone: '010-6650-0826',
+    email: 'de.jung@hifis.app',
+    joined: DateTime(2023, 8, 21),
+    status: _Status.working,
+    workedDays: 18,
+    workedHours: 150,
+    leaveUsed: 2,
+  ),
+  _Member(
     name: me,
     role: '트레이너',
-    team: 'PT팀',
+    team: '트레이너',
+    permission: _Permission.member,
     code: 'FS-0903',
     phone: '010-2913-0903',
     email: 'eunhoo@hifis.app',
@@ -113,49 +186,10 @@ final _members = <_Member>[
     leaveUsed: 3,
   ),
   _Member(
-    name: '이준승',
-    role: '대표',
-    team: '경영',
-    code: 'FS-0001',
-    phone: '010-4410-0001',
-    email: 'js.lee@hifis.app',
-    joined: DateTime(2019, 1, 2),
-    status: _Status.meeting,
-    note: '본사 임원 회의',
-    workedDays: 19,
-    workedHours: 162,
-  ),
-  _Member(
-    name: '민중기',
-    role: '점장',
-    team: '운영팀',
-    code: 'FS-0044',
-    phone: '010-7720-0044',
-    email: 'jk.min@hifis.app',
-    joined: DateTime(2020, 7, 13),
-    status: _Status.working,
-    workedDays: 19,
-    workedHours: 171,
-    leaveUsed: 1,
-  ),
-  _Member(
-    name: '김피스',
-    role: '개발',
-    team: '운영팀',
-    code: 'FS-0102',
-    phone: '010-3388-0102',
-    email: 'peace@hifis.app',
-    joined: DateTime(2024, 5, 20),
-    status: _Status.out,
-    note: '14시까지 외근',
-    workedDays: 18,
-    workedHours: 152,
-    lateCount: 2,
-  ),
-  _Member(
     name: '박준현',
     role: '트레이너',
-    team: 'PT팀',
+    team: '트레이너',
+    permission: _Permission.member,
     code: 'FS-0311',
     phone: '010-9042-0311',
     email: 'jh.park@hifis.app',
@@ -170,7 +204,8 @@ final _members = <_Member>[
   _Member(
     name: '유찬빈',
     role: '트레이너',
-    team: 'PT팀',
+    team: '트레이너',
+    permission: _Permission.member,
     code: 'FS-0520',
     phone: '010-5517-0520',
     email: 'cb.yoo@hifis.app',
@@ -185,7 +220,8 @@ final _members = <_Member>[
   _Member(
     name: '전상현',
     role: 'FC',
-    team: 'FC팀',
+    team: 'FC',
+    permission: _Permission.member,
     code: 'FS-0715',
     phone: '010-2266-0715',
     email: 'sh.jeon@hifis.app',
@@ -200,7 +236,7 @@ final _members = <_Member>[
   ),
 ];
 
-/// 필터에 쓸 팀 목록 — 명단에 실제로 있는 팀만 순서대로
+/// 필터에 쓸 팀 목록 — 명단에 실제로 있는 팀만 명단 순서대로
 final _teams = [
   '전체',
   ...{for (final m in _members) m.team},
