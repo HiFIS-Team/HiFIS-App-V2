@@ -4,6 +4,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/api/api_exception.dart';
+import '../../core/api/auth_api.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -60,26 +62,41 @@ class _LoginScreenState extends State<LoginScreen> {
     if (emailError != null || passwordError != null) return;
 
     setState(() => _busy = true);
-    await _fakeDelay();
-    if (!mounted) return;
-
-    // 로그인 상태가 되면 최상위 게이트가 메인 화면으로 바꿔 끼운다
-    await AuthSession.instance.signIn(email: email, autoLogin: _auto);
+    try {
+      // 로그인 상태가 되면 최상위 게이트가 메인 화면으로 바꿔 끼운다
+      await AuthSession.instance.signIn(
+        email: email,
+        password: _password.text,
+        autoLogin: _auto,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      // 서버가 알려준 이유를 그대로 보여준다 (자격 증명 오류·네트워크 등)
+      setState(() {
+        _busy = false;
+        _passwordError = messageOf(error);
+      });
+    }
   }
 
   Future<void> _openSignup() async {
-    final email = await Navigator.push<String>(
+    final outcome = await Navigator.push<_SignupOutcome>(
       context,
       CupertinoPageRoute(builder: (_) => _SignupScreen()),
     );
-    if (email == null || !mounted) return;
+    if (outcome == null || !mounted) return;
 
     // 가입한 이메일로 바로 로그인할 수 있게 채워 준다
     setState(() {
-      _email.text = email;
+      _email.text = outcome.email;
       _emailError = null;
     });
-    AppToast.show(context, '가입이 완료됐어요. 로그인해 주세요');
+    AppToast.show(
+      context,
+      outcome.result == SignupResult.joined
+          ? '가입이 완료됐어요. 로그인해 주세요'
+          : '가입 신청이 접수됐어요. 관리자 승인 후 로그인할 수 있어요',
+    );
   }
 
   Future<void> _openReset() async {

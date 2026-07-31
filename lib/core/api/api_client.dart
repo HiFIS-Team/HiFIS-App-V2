@@ -37,6 +37,21 @@ class ApiClient {
 
   static final ApiClient instance = ApiClient._();
 
+  /// 토큰 없이 부르는 엔드포인트
+  ///
+  /// `/auth/` 전체를 빼면 안 된다 — `/auth/me`·`/auth/logout` 은 토큰이
+  /// 있어야 하고, 안 붙이면 자동 로그인이 영영 안 된다.
+  static const _publicPaths = {
+    '/auth/login',
+    '/auth/signup',
+    '/auth/refresh',
+    '/auth/password-reset/request',
+    '/auth/password-reset/verify',
+    '/auth/password-reset/confirm',
+  };
+
+  static bool _isPublic(String path) => _publicPaths.contains(path);
+
   final dio = Dio(
     BaseOptions(
       baseUrl: apiBaseUrl,
@@ -55,7 +70,7 @@ class ApiClient {
 
   void _onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     final token = TokenStore.instance.accessToken;
-    if (token != null && !options.path.startsWith('/auth/')) {
+    if (token != null && !_isPublic(options.path)) {
       options.headers['Authorization'] = 'Bearer $token';
     }
     handler.next(options);
@@ -64,9 +79,7 @@ class ApiClient {
   Future<void> _onError(DioException e, ErrorInterceptorHandler handler) async {
     // 네트워크가 아예 안 될 때 — 서버 응답이 없으므로 그대로 메시지를 만들어 준다
     if (e.response == null) {
-      return handler.reject(
-        e.copyWith(error: ApiException.network(e.type)),
-      );
+      return handler.reject(e.copyWith(error: ApiException.network(e.type)));
     }
     handler.next(e);
   }
@@ -86,7 +99,7 @@ class ApiClient {
     );
 
     var response = await once();
-    if (response.statusCode == 401 && !path.startsWith('/auth/')) {
+    if (response.statusCode == 401 && !_isPublic(path)) {
       if (await _refresh()) {
         response = await once();
       } else {

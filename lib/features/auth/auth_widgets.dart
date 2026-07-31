@@ -573,6 +573,3 @@ String? _checkPassword(String value) {
   if (!hasLetter || !hasDigit) return '영문과 숫자를 함께 넣어 주세요.';
   return null;
 }
-
-/// 서버를 기다리는 척하는 시간 — 실제 연동 때 API 호출로 바꾼다
-Future<void> _fakeDelay() => Future.delayed(Duration(milliseconds: 600));

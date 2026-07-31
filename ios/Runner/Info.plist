@@ -66,5 +66,21 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- 개발 중 로컬 서버(http://localhost:8001)에 붙기 위한 예외.
+	     iOS는 기본적으로 평문 HTTP를 막는다. 운영 서버는 HTTPS라 여기 손댈 일이 없고,
+	     이 설정은 로컬·사설망에만 적용된다. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>localhost</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
 </dict>
 </plist>

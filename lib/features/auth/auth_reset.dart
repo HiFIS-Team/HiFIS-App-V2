@@ -36,6 +36,9 @@ class _PasswordResetScreenState extends State<_PasswordResetScreen> {
   int _left = _limit;
   Timer? _ticker;
 
+  /// 2단계에서 받은 재설정 토큰 — 3단계에서 한 번만 쓸 수 있다
+  String? _resetToken;
+
   @override
   void dispose() {
     _ticker?.cancel();
@@ -72,7 +75,16 @@ class _PasswordResetScreenState extends State<_PasswordResetScreen> {
     if (error != null) return;
 
     setState(() => _busy = true);
-    await _fakeDelay();
+    try {
+      // 계정이 없어도 서버는 성공으로 답한다 (가입 여부가 새어 나가지 않게)
+      await AuthApi.requestPasswordReset(byEmail: _email, contact: value);
+    } catch (error) {
+      if (!mounted) return;
+      return setState(() {
+        _busy = false;
+        _contactError = messageOf(error);
+      });
+    }
     if (!mounted) return;
 
     setState(() {
@@ -97,7 +109,18 @@ class _PasswordResetScreenState extends State<_PasswordResetScreen> {
     if (error != null) return;
 
     setState(() => _busy = true);
-    await _fakeDelay();
+    try {
+      _resetToken = await AuthApi.verifyPasswordReset(
+        contact: _contact.text.trim(),
+        code: code,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      return setState(() {
+        _busy = false;
+        _codeError = messageOf(error);
+      });
+    }
     if (!mounted) return;
 
     _ticker?.cancel();
@@ -122,7 +145,18 @@ class _PasswordResetScreenState extends State<_PasswordResetScreen> {
     if (passwordError != null || confirmError != null) return;
 
     setState(() => _busy = true);
-    await _fakeDelay();
+    try {
+      await AuthApi.confirmPasswordReset(
+        resetToken: _resetToken!,
+        password: _password.text,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      return setState(() {
+        _busy = false;
+        _passwordError = messageOf(error);
+      });
+    }
     if (!mounted) return;
 
     Navigator.pop(context, true);

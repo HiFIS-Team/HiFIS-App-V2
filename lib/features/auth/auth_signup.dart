@@ -1,9 +1,18 @@
 part of 'auth_screen.dart';
 
-/// 회원가입 — 초대키를 받은 직원만 가입할 수 있다
+/// 회원가입 결과 — 로그인 화면이 안내 문구를 고르는 데 쓴다
+class _SignupOutcome {
+  _SignupOutcome(this.email, this.result);
+
+  final String email;
+  final SignupResult result;
+}
+
+/// 회원가입
 ///
-/// 성공하면 가입한 이메일을 돌려주며 닫힌다. 로그인 화면이 그 이메일을
-/// 채워 두기 때문에 바로 로그인할 수 있다.
+/// 초대키가 있으면 바로 가입되고, 없으면 관리자 승인 대기로 넘어간다.
+/// 닫힐 때 가입한 이메일과 결과를 돌려주므로 로그인 화면이 이메일을
+/// 채워 두고 결과에 맞는 안내를 띄운다.
 class _SignupScreen extends StatefulWidget {
   _SignupScreen();
 
@@ -43,9 +52,8 @@ class _SignupScreenState extends State<_SignupScreen> {
     final email = _email.text.trim();
 
     final errors = <String, String?>{
-      'invite': invite.isEmpty
-          ? '초대키를 입력해 주세요.'
-          : invite.replaceAll('-', '').length < 8
+      // 초대키는 선택 — 없으면 서버가 승인 대기(PENDING)로 받아 준다
+      'invite': invite.isNotEmpty && invite.replaceAll('-', '').length < 8
           ? '초대키를 다시 확인해 주세요.'
           : null,
       'name': name.isEmpty
@@ -74,24 +82,40 @@ class _SignupScreenState extends State<_SignupScreen> {
     if (errors.values.any((e) => e != null) || agreeMissing) return;
 
     setState(() => _busy = true);
-    await _fakeDelay();
-    if (!mounted) return;
-
-    Navigator.pop(context, email);
+    try {
+      final result = await AuthApi.signup(
+        name: name,
+        email: email,
+        password: _password.text,
+        phone: _phone.text,
+        inviteKey: invite,
+      );
+      if (!mounted) return;
+      Navigator.pop(context, _SignupOutcome(email, result));
+    } catch (error) {
+      if (!mounted) return;
+      // 이메일 중복·초대키 만료 등 서버가 알려준 이유를 해당 칸에 붙인다
+      final message = messageOf(error);
+      setState(() {
+        _busy = false;
+        _errors['invite'] = message.contains('초대키') ? message : null;
+        _errors['email'] = message.contains('초대키') ? null : message;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return _AuthScaffold(
       title: '회원가입',
-      caption: '초대키를 받은 직원만 가입할 수 있어요.',
+      caption: '초대키가 있으면 바로 가입돼요.',
       onBack: () => Navigator.pop(context),
       // 짝지은 칸을 나란히 두려면 폭이 있어야 한다 (폰은 이 값을 안 쓴다)
       width: 560,
       children: [
         _AuthField(
           controller: _invite,
-          label: '초대키',
+          label: '초대키 (선택)',
           hint: 'HIFIS-4F2A-91K7',
           autofocus: !isDesktop,
           textInputAction: TextInputAction.next,
@@ -99,7 +123,10 @@ class _SignupScreenState extends State<_SignupScreen> {
           error: _errors['invite'],
         ),
         SizedBox(height: 7),
-        Text('관리자에게 받은 초대키를 그대로 입력해 주세요.', style: AppTextStyles.caption),
+        Text(
+          '관리자에게 받은 초대키를 그대로 입력해 주세요.\n초대키가 없으면 가입 신청 후 관리자 승인을 기다리게 돼요.',
+          style: AppTextStyles.caption,
+        ),
         SizedBox(height: 16),
         _AuthField(
           controller: _name,
