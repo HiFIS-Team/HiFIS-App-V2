@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/api/api_exception.dart';
+import '../../core/api/payroll_api.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -31,6 +33,23 @@ class SalaryScreen extends StatefulWidget {
 }
 
 class _SalaryScreenState extends State<SalaryScreen> {
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      await _loadPayslips();
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
   void _openHistory(BuildContext context) {
     showFullPage<void>(context, (_) => _HistoryScreen());
   }
@@ -39,29 +58,38 @@ class _SalaryScreenState extends State<SalaryScreen> {
   Future<void> _submit(_Payslip payslip) async {
     final done = await _showPayslipForm(context, payslip);
     if (done != true || !mounted) return;
-    setState(() {});
-    AppToast.show(context, '${payslip.month.month}월 급여 신청서를 제출했어요');
+
+    try {
+      final submitted = await PayrollApi.submit(payslip.key);
+      if (!mounted) return;
+      setState(() => payslip.source = submitted);
+      AppToast.show(context, '${payslip.month.month}월 급여 신청서를 제출했어요');
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
   }
 
-  Future<void> _cancel(_Payslip payslip) async {
-    final ok = await showConfirmDialog(
-      context,
-      title: '제출을 취소할까요?',
-      message: '대표에게 올린 신청서가 사라지고 다시 작성해야 해요.',
-      confirmLabel: '취소하기',
-      destructive: true,
-    );
-    if (!ok || !mounted) return;
-    setState(() {
-      payslip
-        ..status = _PayStatus.draft
-        ..submittedAt = null;
-    });
-    AppToast.show(context, '제출을 취소했어요');
+  /// 제출 취소 — 서버에 되돌리는 엔드포인트가 없다 (backend-gap.md 23번)
+  ///
+  /// 버튼을 없애면 나중에 생겼을 때 되살릴 자리를 잃으므로, 지금은 왜 안 되는지
+  /// 알려만 준다.
+  void _cancel(_Payslip payslip) {
+    AppToast.show(context, '제출 취소는 아직 안 돼요. 대표에게 반려를 요청해 주세요');
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading || _payslips.isEmpty) {
+      return Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2.4,
+            valueColor: AlwaysStoppedAnimation(AppColors.primary),
+          ),
+        ),
+      );
+    }
+
     final current = _payslips.first;
 
     // 폰은 이번 달 금액을 본 다음 바로 신청서를 낼 수 있게
@@ -262,7 +290,9 @@ class _TrendCard extends StatelessWidget {
     // 오래된 달이 왼쪽에 오도록 뒤집는다
     final months = _payslips.take(6).toList().reversed.toList();
     final top = months.map((p) => p.total).reduce((a, b) => a > b ? a : b);
-    final average = months.fold(0, (sum, p) => sum + p.total) ~/ months.length;
+    final average = months.isEmpty
+        ? 0
+        : months.fold(0, (sum, p) => sum + p.total) ~/ months.length;
 
     return Container(
       padding: EdgeInsets.fromLTRB(22, 20, 22, 18),
@@ -290,7 +320,9 @@ class _TrendCard extends StatelessWidget {
                   Expanded(
                     child: _Bar(
                       payslip: payslip,
-                      ratio: payslip.total / top,
+                      // 명세서가 아직 안 나온 달만 있으면 top 이 0이라
+                      // 그냥 나누면 NaN 이 되고 막대 높이가 터진다
+                      ratio: top == 0 ? 0 : payslip.total / top,
                       // 마지막(이번 달)만 색을 준다
                       current: payslip == months.last,
                     ),

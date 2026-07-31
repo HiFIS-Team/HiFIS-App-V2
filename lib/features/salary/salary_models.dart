@@ -3,7 +3,10 @@ part of 'salary_screen.dart';
 /// 급여 신청서 상태
 ///
 /// 본인이 제출하고 대표가 승인해야 지급된다.
-/// 미제출 → 승인 대기 → 승인 완료 → 지급 완료 (반려되면 다시 제출)
+/// 미제출 → 승인 대기 → 승인 완료 (반려되면 다시 제출)
+///
+/// '지급 완료'는 서버에 없다 — 실제 입금까지 추적하지 않는다
+/// (backend-gap.md 20번). 남겨 두되 서버에서 오지는 않는다.
 enum _PayStatus {
   draft('미제출'),
   pending('승인 대기'),
@@ -22,6 +25,13 @@ enum _PayStatus {
     _PayStatus.paid => AppColors.success,
     _PayStatus.rejected => AppColors.error,
   };
+
+  static _PayStatus of(PayslipStatus status) => switch (status) {
+    PayslipStatus.draft => _PayStatus.draft,
+    PayslipStatus.submitted => _PayStatus.pending,
+    PayslipStatus.approved => _PayStatus.approved,
+    PayslipStatus.rejected => _PayStatus.rejected,
+  };
 }
 
 /// 명세서 한 줄 — 이름, 계산 근거, 금액
@@ -35,93 +45,94 @@ class _PayItem {
   final String? note;
 }
 
-/// 내 커미션 조건 (목업)
+/// 한 달치 급여 명세서
 ///
-/// 기본급과 단가는 사람마다 다르고 대표와 협의해 정해진다.
-/// 앱에서는 못 바꾸고, 계약된 값을 받아 총액을 계산하는 데만 쓴다.
-class _Commission {
-  const _Commission({
-    required this.base,
-    required this.sessionRate,
-    required this.newBonus,
-    required this.reBonus,
-  });
-
-  final int base;
-  final int sessionRate;
-  final int newBonus;
-  final int reBonus;
-}
-
-/// 로그인한 사람의 커미션 — 실제 연동 때 서버에서 받아 온다
-const _myCommission = _Commission(
-  base: 2400000,
-  sessionRate: 15000,
-  newBonus: 50000,
-  reBonus: 20000,
-);
-
-/// 한 달치 급여 신청서 (목업)
+/// 금액은 전부 서버가 계산한다. 직급 정책·인센티브 요율이 서버에 있어서
+/// 앱이 따로 곱하면 실지급액과 어긋난다.
 ///
-/// 실적(세션·등록 건수)은 회사가 집계해 채워 주고, 앱은 커미션을 곱해
-/// **총 지급액**까지만 계산한다. 세금·보험처럼 빠져나가는 돈은 사람마다
-/// 조건이 달라 회사가 따로 처리하므로 여기서 다루지 않는다.
+/// [source]가 null이면 아직 산출 전인 달이다 (서버가 404를 준다).
 class _Payslip {
-  _Payslip({
-    required this.month,
-    required this.sessions,
-    required this.newSignups,
-    required this.reSignups,
-    required this.status,
-    this.submittedAt,
-    this.decidedAt,
-  });
+  _Payslip({required this.month, required this.source, this.window});
 
   /// 근무한 달 (1일로 맞춰 둔다)
   final DateTime month;
 
-  /// 회사가 집계한 실적 — 본인이 못 고친다
-  final int sessions;
-  final int newSignups;
-  final int reSignups;
+  /// 서버 명세서 — 아직 안 나온 달이면 null
+  Payslip? source;
 
-  _PayStatus status;
-  DateTime? submittedAt;
-  DateTime? decidedAt;
+  /// 신청 창 (지급일·오늘 신청 가능 여부)
+  PaydayWindow? window;
+
+  /// `2026-07`
+  String get key => yearMonthKey(month);
+
+  _PayStatus get status =>
+      source == null ? _PayStatus.draft : _PayStatus.of(source!.status);
+
+  DateTime? get submittedAt => source?.submittedAt;
+  DateTime? get decidedAt => source?.decidedAt;
+
+  /// 대표가 남긴 반려 사유
+  String? get comment => source?.rejectReason;
 
   /// 본인이 남긴 특이사항
+  ///
+  /// 서버 `PayslipSubmit`이 `yearMonth`만 받아서 보낼 데가 없다
+  /// (backend-gap.md 22번). 지금은 앱 안에서만 산다.
   String? note;
-
-  /// 대표가 남긴 의견 (반려 사유 등)
-  String? comment;
 
   bool get submitted => status != _PayStatus.draft;
 
-  /// 지급 항목
-  List<_PayItem> get pays => [
-    _PayItem('기본급', _myCommission.base),
-    _PayItem(
-      'PT 세션 수당',
-      sessions * _myCommission.sessionRate,
-      note: '$sessions회 × ${_amount(_myCommission.sessionRate)}',
-    ),
-    _PayItem(
-      '신규 등록',
-      newSignups * _myCommission.newBonus,
-      note: '$newSignups건 × ${_amount(_myCommission.newBonus)}',
-    ),
-    _PayItem(
-      '재등록',
-      reSignups * _myCommission.reBonus,
-      note: '$reSignups건 × ${_amount(_myCommission.reBonus)}',
-    ),
+  /// 지급 항목 — 서버가 계산한 값을 그대로 늘어놓는다
+  List<_PayItem> get pays {
+    final payslip = source;
+    if (payslip == null) return const [];
+    final basis = payslip.basis;
+    return [
+      _PayItem('기본급', payslip.baseSalary),
+      _PayItem(
+        '신규 등록 인센티브',
+        payslip.incentiveNew,
+        note: basis.newSales.isEmpty ? null : '${basis.newSales.length}건',
+      ),
+      _PayItem(
+        '재등록 인센티브',
+        payslip.incentiveRenewal,
+        note: basis.renewalSales.isEmpty
+            ? null
+            : '${basis.renewalSales.length}건',
+      ),
+      if (payslip.otherAllowances != 0)
+        _PayItem('기타 수당', payslip.otherAllowances),
+    ];
+  }
+
+  /// 공제 항목 (4대 보험·세금) — 서버가 직급·공제 방식에 따라 계산한다
+  List<_PayItem> get deductions => [
+    for (final line in source?.deductions ?? const <DeductionLine>[])
+      _PayItem(line.label, line.amount),
   ];
 
-  /// 총 지급액
-  int get total => pays.fold(0, (sum, item) => sum + item.amount);
+  /// 세전 총액
+  int get total => source?.gross ?? 0;
 
-  /// 지급일 — 다음 달 10일
-  DateTime get payDay => DateTime(month.year, month.month + 1, 10);
+  /// 실수령액
+  int get net => source?.net ?? 0;
+
+  int get totalDeduction => source?.totalDeduction ?? 0;
+
+  /// 이번 달 세션 싸인 수
+  int get sessions => source?.basis.sessionSigns ?? 0;
+
+  int get newSignups => source?.basis.newSales.length ?? 0;
+  int get reSignups => source?.basis.renewalSales.length ?? 0;
+
+  /// 지급일 — 서버가 알려 준다 (없으면 다음 달 10일로 가정)
+  DateTime get payDay =>
+      window?.payday ?? DateTime(month.year, month.month + 1, 10);
+
+  /// 오늘 신청할 수 있는지 — 서버는 지급일 당일만 받는다
+  bool get canSubmit => window?.isOpen ?? false;
 
   /// 지급일까지 남은 날 (지난 날짜면 0)
   int get daysLeft {
@@ -133,41 +144,38 @@ class _Payslip {
   }
 }
 
-/// 최근 12개월 신청서 (0번이 이번 달)
-final _payslips = _seedPayslips();
+/// 최근 몇 달치를 보여줄지 — 추이 그래프와 히스토리가 이 범위를 쓴다
+///
+/// 본인 명세서를 한 번에 주는 엔드포인트가 없어서 달마다 따로 부른다
+/// (backend-gap.md 21번). 너무 늘리면 요청이 그만큼 늘어난다.
+const _monthsToLoad = 6;
 
-List<_Payslip> _seedPayslips() {
+/// 최근 명세서 (0번이 이번 달) — 서버에서 받아 채운다
+final _payslips = <_Payslip>[];
+
+Future<void> _loadPayslips() async {
   final now = DateTime.now();
-
-  // (세션 수, 신규 등록, 재등록) — 회사가 집계해 채워 주는 실적
-  const record = [
-    (62, 3, 5),
-    (58, 2, 4),
-    (65, 4, 3),
-    (54, 1, 6),
-    (60, 3, 4),
-    (49, 2, 2),
-    (57, 3, 5),
-    (63, 5, 4),
-    (51, 2, 3),
-    (55, 1, 5),
-    (59, 4, 4),
-    (47, 2, 2),
+  final months = [
+    for (var i = 0; i < _monthsToLoad; i++) DateTime(now.year, now.month - i),
   ];
 
-  return [
-    for (var i = 0; i < record.length; i++)
-      _Payslip(
-        month: DateTime(now.year, now.month - i),
-        sessions: record[i].$1,
-        newSignups: record[i].$2,
-        reSignups: record[i].$3,
-        // 이번 달은 아직 제출 전, 지난 달은 지급까지 끝난 상태
-        status: i == 0 ? _PayStatus.draft : _PayStatus.paid,
-        submittedAt: i == 0 ? null : DateTime(now.year, now.month - i + 1, 2),
-        decidedAt: i == 0 ? null : DateTime(now.year, now.month - i + 1, 4),
-      ),
-  ];
+  // 달마다 명세서를 따로 부르되 한꺼번에 보낸다
+  final sources = await Future.wait(
+    months.map((month) => PayrollApi.mine(yearMonthKey(month))),
+  );
+  // 신청 창은 이번 달만 필요하다
+  final window = await PayrollApi.window(yearMonthKey(months.first));
+
+  _payslips
+    ..clear()
+    ..addAll([
+      for (var i = 0; i < months.length; i++)
+        _Payslip(
+          month: months[i],
+          source: sources[i],
+          window: i == 0 ? window : null,
+        ),
+    ]);
 }
 
 /// 1234567 → '1,234,567'

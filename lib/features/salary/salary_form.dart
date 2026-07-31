@@ -26,14 +26,10 @@ class _PayslipForm extends StatefulWidget {
 class _PayslipFormState extends State<_PayslipForm> {
   late final _note = TextEditingController(text: widget.payslip.note ?? '');
 
-  /// 신청서를 올리고 대표 승인 대기로 넘긴다
+  /// 특이사항만 담아 닫는다 — 실제 제출 요청은 부르는 쪽이 보낸다
   void _submit() {
-    widget.payslip
-      ..note = _note.text.trim().isEmpty ? null : _note.text.trim()
-      ..status = _PayStatus.pending
-      ..submittedAt = DateTime.now()
-      ..decidedAt = null
-      ..comment = null;
+    final note = _note.text.trim();
+    widget.payslip.note = note.isEmpty ? null : note;
     Navigator.pop(context, true);
   }
 
