@@ -8,14 +8,13 @@ import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
 import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/app_toast.dart';
-import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/glass_bottom_button.dart';
 import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/phone_scaffold.dart';
 import '../../core/widgets/pressable.dart';
 
 part 'salary_models.dart';
-part 'salary_request.dart';
+part 'salary_form.dart';
 
 /// 급여 화면 (목업)
 ///
@@ -34,38 +33,30 @@ class _SalaryScreenState extends State<SalaryScreen> {
     showFullPage<void>(context, (_) => _HistoryScreen());
   }
 
-  /// 조건 변경 신청 — 올리면 대표 승인을 기다린다
-  Future<void> _request() async {
-    final request = await _showRequestComposer(context);
-    if (request == null || !mounted) return;
-    setState(() => _requests.insert(0, request));
-    AppToast.show(context, '급여 조건 변경을 신청했어요');
+  /// 급여 신청서 작성 — 제출하면 대표 승인을 기다린다
+  Future<void> _submit(_Payslip payslip) async {
+    final done = await _showPayslipForm(context, payslip);
+    if (done != true || !mounted) return;
+    setState(() {});
+    AppToast.show(context, '${payslip.month.month}월 급여 신청서를 제출했어요');
   }
 
-  Future<void> _cancelRequest(_PayRequest request) async {
+  Future<void> _cancel(_Payslip payslip) async {
     final ok = await showConfirmDialog(
       context,
-      title: '신청을 취소할까요?',
-      message: '대표에게 올린 급여 조건 변경 신청이 사라져요.',
+      title: '제출을 취소할까요?',
+      message: '대표에게 올린 신청서가 사라지고 다시 작성해야 해요.',
       confirmLabel: '취소하기',
       destructive: true,
     );
     if (!ok || !mounted) return;
-    setState(() => _requests.remove(request));
-    AppToast.show(context, '신청을 취소했어요');
+    setState(() {
+      payslip
+        ..status = _PayStatus.draft
+        ..submittedAt = null;
+    });
+    AppToast.show(context, '제출을 취소했어요');
   }
-
-  /// 신청 내역에서 취소하고 돌아올 수 있어 다녀오면 다시 그린다
-  Future<void> _openRequests() async {
-    await showFullPage<void>(context, (_) => _RequestHistoryScreen());
-    if (mounted) setState(() {});
-  }
-
-  Widget _conditionCard() => _ConditionCard(
-    onRequest: _request,
-    onCancel: _cancelRequest,
-    onHistory: _openRequests,
-  );
 
   @override
   Widget build(BuildContext context) {
@@ -74,13 +65,17 @@ class _SalaryScreenState extends State<SalaryScreen> {
     final content = [
       _SummaryCard(payslip: current),
       SizedBox(height: 12),
+      _StatusNotice(
+        payslip: current,
+        onSubmit: () => _submit(current),
+        onCancel: () => _cancel(current),
+      ),
+      SizedBox(height: 12),
       _TrendCard(),
       SizedBox(height: 12),
       _PayCard(payslip: current),
       SizedBox(height: 12),
       _DeductCard(payslip: current),
-      SizedBox(height: 12),
-      _conditionCard(),
       SizedBox(height: 12),
       _HistoryCard(onOpenAll: () => _openHistory(context)),
     ];
@@ -102,7 +97,21 @@ class _SalaryScreenState extends State<SalaryScreen> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(flex: 3, child: _SummaryCard(payslip: current)),
+                  Expanded(
+                    flex: 3,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _SummaryCard(payslip: current),
+                        SizedBox(height: 16),
+                        _StatusNotice(
+                          payslip: current,
+                          onSubmit: () => _submit(current),
+                          onCancel: () => _cancel(current),
+                        ),
+                      ],
+                    ),
+                  ),
                   SizedBox(width: 16),
                   Expanded(flex: 4, child: _TrendCard()),
                 ],
@@ -120,19 +129,7 @@ class _SalaryScreenState extends State<SalaryScreen> {
               ),
             ),
             SizedBox(height: 16),
-            IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    flex: 4,
-                    child: _HistoryCard(onOpenAll: () => _openHistory(context)),
-                  ),
-                  SizedBox(width: 16),
-                  Expanded(flex: 3, child: _conditionCard()),
-                ],
-              ),
-            ),
+            _HistoryCard(onOpenAll: () => _openHistory(context)),
           ],
         ),
       ),
@@ -152,7 +149,7 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheduled = payslip.status == _PayStatus.scheduled;
+    final paid = payslip.status == _PayStatus.paid;
 
     return Container(
       padding: EdgeInsets.fromLTRB(22, 20, 22, 22),
@@ -170,12 +167,16 @@ class _SummaryCard extends StatelessWidget {
                       style: AppTextStyles.label,
                     ),
                     SizedBox(width: 8),
-                    // 어떤 계약 기준으로 계산된 금액인지 밝힌다
-                    Text(
-                      payslip.type.label,
-                      style: AppTextStyles.caption.copyWith(
-                        fontSize: 12,
-                        color: AppColors.textTertiary,
+                    // 어떤 조건으로 계산된 금액인지 밝힌다
+                    Flexible(
+                      child: Text(
+                        '${payslip.type.label} · ${payslip.insuranceLabel}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.caption.copyWith(
+                          fontSize: 12,
+                          color: AppColors.textTertiary,
+                        ),
                       ),
                     ),
                   ],
@@ -201,12 +202,15 @@ class _SummaryCard extends StatelessWidget {
           ),
           SizedBox(height: 6),
           Text(
-            scheduled
+            paid
+                ? '${_dayLabel(payslip.payDay)} 지급 완료'
+                : payslip.status == _PayStatus.approved
                 ? '${_dayLabel(payslip.payDay)} 지급 예정 · D-${payslip.daysLeft}'
-                : '${_dayLabel(payslip.payDay)} 지급 완료',
+                // 아직 승인 전이라 확정 금액이 아니다
+                : '${_dayLabel(payslip.payDay)} 지급 예정 (승인 전)',
             style: AppTextStyles.caption.copyWith(
-              color: scheduled ? AppColors.primary : AppColors.textTertiary,
-              fontWeight: scheduled ? FontWeight.w600 : FontWeight.w400,
+              color: paid ? AppColors.textTertiary : AppColors.primary,
+              fontWeight: paid ? FontWeight.w400 : FontWeight.w600,
             ),
           ),
           SizedBox(height: 18),
@@ -265,9 +269,7 @@ class _StatusTag extends StatelessWidget {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
-        color: status == _PayStatus.paid
-            ? AppColors.gray50
-            : AppColors.primaryLight,
+        color: status.color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
@@ -275,9 +277,7 @@ class _StatusTag extends StatelessWidget {
         style: AppTextStyles.caption.copyWith(
           fontSize: 12,
           fontWeight: FontWeight.w700,
-          color: status == _PayStatus.paid
-              ? AppColors.gray500
-              : AppColors.primary,
+          color: status.color,
         ),
       ),
     );
@@ -618,6 +618,15 @@ class _PayslipRow extends StatelessWidget {
             Text(
               '세션 ${payslip.sessions}회',
               style: AppTextStyles.caption.copyWith(fontSize: 12),
+            ),
+            SizedBox(width: 8),
+            Text(
+              payslip.status.label,
+              style: AppTextStyles.caption.copyWith(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: payslip.status.color,
+              ),
             ),
             Spacer(),
             Text(
