@@ -1071,7 +1071,7 @@ class _IconAction extends StatelessWidget {
 class _PermissionTag extends StatelessWidget {
   _PermissionTag({required this.permission});
 
-  final _Permission permission;
+  final Permission permission;
 
   @override
   Widget build(BuildContext context) {

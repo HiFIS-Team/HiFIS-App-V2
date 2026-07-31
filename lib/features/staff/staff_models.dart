@@ -31,19 +31,6 @@ enum _Status {
       this == _Status.meal || this == _Status.out || this == _Status.away;
 }
 
-/// 시스템 권한 — 사람을 찾는 기준이 아니라서 필터로 쓰지 않고 배지로만 보여준다
-enum _Permission {
-  master('MASTER'),
-  admin('ADMIN'),
-  member('MEMBER');
-
-  const _Permission(this.label);
-
-  final String label;
-
-  bool get strong => this != _Permission.member;
-}
-
 /// 재직 상태 — 서로 겹치지 않아 탭으로 나눈다
 enum _Employment {
   active('재직자'),
@@ -104,7 +91,7 @@ class _Member {
 
   /// 소속 지점 — 한 번에 한 곳만 본다
   final String branch;
-  final _Permission permission;
+  final Permission permission;
 
   /// 재직 상태 — 승인하면 대기자에서 재직자로 바뀐다
   _Employment employment;
@@ -162,7 +149,7 @@ final _members = <_Member>[
     role: '대표',
     team: '대표',
     branch: '강남점',
-    permission: _Permission.master,
+    permission: Permission.master,
     code: 'FS-0001',
     phone: '010-4410-0001',
     email: 'js.lee@hifis.app',
@@ -177,7 +164,7 @@ final _members = <_Member>[
     role: '점장',
     team: '대표',
     branch: '강남점',
-    permission: _Permission.admin,
+    permission: Permission.admin,
     code: 'FS-0044',
     phone: '010-7720-0044',
     email: 'jk.min@hifis.app',
@@ -192,7 +179,7 @@ final _members = <_Member>[
     role: '개발',
     team: '개발',
     branch: '강남점',
-    permission: _Permission.admin,
+    permission: Permission.admin,
     code: 'FS-0102',
     phone: '010-3388-0102',
     email: 'peace@hifis.app',
@@ -208,7 +195,7 @@ final _members = <_Member>[
     role: '마케터',
     team: '마케팅',
     branch: '강남점',
-    permission: _Permission.member,
+    permission: Permission.member,
     code: 'FS-0826',
     phone: '010-6650-0826',
     email: 'de.jung@hifis.app',
@@ -223,7 +210,7 @@ final _members = <_Member>[
     role: '트레이너',
     team: '트레이너',
     branch: '강남점',
-    permission: _Permission.member,
+    permission: Permission.member,
     code: 'FS-0903',
     phone: '010-2913-0903',
     email: 'eunhoo@hifis.app',
@@ -241,7 +228,7 @@ final _members = <_Member>[
     role: '트레이너',
     team: '트레이너',
     branch: '강남점',
-    permission: _Permission.member,
+    permission: Permission.member,
     code: 'FS-0311',
     phone: '010-9042-0311',
     email: 'jh.park@hifis.app',
@@ -258,7 +245,7 @@ final _members = <_Member>[
     role: '트레이너',
     team: '트레이너',
     branch: '강남점',
-    permission: _Permission.member,
+    permission: Permission.member,
     code: 'FS-0520',
     phone: '010-5517-0520',
     email: 'cb.yoo@hifis.app',
@@ -275,7 +262,7 @@ final _members = <_Member>[
     role: 'FC',
     team: 'FC',
     branch: '강남점',
-    permission: _Permission.member,
+    permission: Permission.member,
     code: 'FS-0715',
     phone: '010-2266-0715',
     email: 'sh.jeon@hifis.app',
@@ -293,7 +280,7 @@ final _members = <_Member>[
     role: '트레이너',
     team: '트레이너',
     branch: '잠실점',
-    permission: _Permission.member,
+    permission: Permission.member,
     code: 'FS-1120',
     phone: '010-8834-1120',
     email: 'go.moon@hifis.app',
@@ -309,7 +296,7 @@ final _members = <_Member>[
     role: 'FC',
     team: 'FC',
     branch: '잠실점',
-    permission: _Permission.member,
+    permission: Permission.member,
     code: 'FS-1133',
     phone: '010-2077-1133',
     email: 'sh.bae@hifis.app',
@@ -326,7 +313,7 @@ final _members = <_Member>[
     role: '트레이너',
     team: '트레이너',
     branch: '강남점',
-    permission: _Permission.member,
+    permission: Permission.member,
     employment: _Employment.pending,
     waiting: _Waiting.approval,
     appliedAt: DateTime(2026, 7, 28),
@@ -344,7 +331,7 @@ final _members = <_Member>[
     role: 'FC',
     team: 'FC',
     branch: '강남점',
-    permission: _Permission.member,
+    permission: Permission.member,
     employment: _Employment.pending,
     waiting: _Waiting.incoming,
     startAt: DateTime(2026, 8, 4),
@@ -362,7 +349,7 @@ final _members = <_Member>[
     role: '트레이너',
     team: '트레이너',
     branch: '강남점',
-    permission: _Permission.member,
+    permission: Permission.member,
     employment: _Employment.left,
     leftAt: DateTime(2026, 3, 31),
     code: 'FS-0288',
@@ -378,7 +365,7 @@ final _members = <_Member>[
     role: '마케터',
     team: '마케팅',
     branch: '강남점',
-    permission: _Permission.member,
+    permission: Permission.member,
     employment: _Employment.left,
     leftAt: DateTime(2025, 12, 20),
     code: 'FS-0173',

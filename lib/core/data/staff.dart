@@ -17,6 +17,32 @@ class Staff {
 /// 로그인한 사람 (목업)
 const me = '김은후';
 
+/// 시스템 권한
+///
+/// 사람을 찾는 기준은 아니라서 직원 명단에서는 배지로만 쓰지만,
+/// 기여 점수 부여처럼 아무나 하면 안 되는 기능이 이 값을 본다.
+enum Permission {
+  master('MASTER'),
+  admin('ADMIN'),
+  member('MEMBER');
+
+  const Permission(this.label);
+
+  final String label;
+
+  /// 관리 권한 (MASTER·ADMIN) — 배지를 파랗게 칠한다
+  bool get strong => this != Permission.member;
+
+  /// 남에게 기여 점수를 줄 수 있는지 (마스터~매니저)
+  bool get canGrant => strong;
+}
+
+/// 로그인한 사람의 권한 (목업)
+///
+/// 실제 연동 때는 로그인 응답에서 받아 온다.
+/// 부여 화면을 확인하려면 여기를 [Permission.member]로 바꿔 보면 된다.
+const myPermission = Permission.master;
+
 const staffList = [
   Staff(me, '트레이너', AppColors.primary),
   Staff('이준승', '대표', Color(0xFF7C5CFC)),

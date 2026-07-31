@@ -13,6 +13,7 @@ import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/pressable.dart';
 import '../../core/widgets/see_all_button.dart';
+import 'contribution_section.dart';
 import 'lesson_section.dart';
 import 'peer_review_section.dart';
 import 'praise_section.dart';
@@ -111,11 +112,6 @@ class _WorkScreenState extends State<WorkScreen> {
   static const _items = [
     _WorkItem(
       label: '환경정비',
-      score: 92,
-      unit: '점',
-      delta: 3,
-      comment: '담당 구역 점검을 꾸준히 잘 지키고 있어요',
-      rows: [],
       checklist: [
         '세탁',
         '건조기',
@@ -141,38 +137,10 @@ class _WorkScreenState extends State<WorkScreen> {
         '기타',
       ],
     ),
-    _WorkItem(
-      label: '동료 평가',
-      score: 88,
-      unit: '점',
-      delta: 2,
-      comment: '협업 항목에서 좋은 평가를 받았어요',
-      rows: [('받은 평가', '14건'), ('평균 별점', '4.4 / 5'), ('최고 항목', '협업')],
-    ),
-    _WorkItem(
-      label: '회원 친절도',
-      score: 96,
-      unit: '점',
-      delta: 5,
-      comment: '회원 리뷰 평점이 센터 상위 10%예요',
-      rows: [('회원 리뷰', '32건'), ('평균 별점', '4.8 / 5'), ('재등록률', '81%')],
-    ),
-    _WorkItem(
-      label: '수업 개수',
-      score: 46,
-      unit: '회',
-      delta: 4,
-      comment: '이번 달 목표(50회)까지 4회 남았어요',
-      rows: [('PT 수업', '38회'), ('GX 수업', '8회'), ('노쇼', '2회')],
-    ),
-    _WorkItem(
-      label: '센터 기여도',
-      score: 84,
-      unit: '점',
-      delta: -2,
-      comment: '지난달보다 이벤트 참여가 줄었어요',
-      rows: [('대타 지원', '3회'), ('이벤트 참여', '2회'), ('신규 상담', '6건')],
-    ),
+    _WorkItem(label: '동료 평가'),
+    _WorkItem(label: '회원 친절도'),
+    _WorkItem(label: '수업 개수'),
+    _WorkItem(label: '센터 기여도'),
   ];
 
   /// 항목 탭 — 데스크톱은 알약 토글, 폰은 밑줄 스타일
@@ -336,17 +304,11 @@ class _WorkScreenState extends State<WorkScreen> {
               padding: EdgeInsets.symmetric(horizontal: 20),
               child: PraiseSection(),
             )
-          else ...[
+          else
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 20),
-              child: _ScoreCard(item: item),
+              child: ContributionSection(),
             ),
-            SizedBox(height: 16),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: _DetailCard(item: item),
-            ),
-          ],
         ],
       ),
     );
@@ -362,27 +324,13 @@ class _WorkLog {
   final DateTime time;
 }
 
+/// 업무 탭의 항목 하나 — 내용은 항목마다 전용 섹션 위젯이 그린다
 class _WorkItem {
-  const _WorkItem({
-    required this.label,
-    required this.score,
-    required this.unit,
-    required this.delta,
-    required this.comment,
-    required this.rows,
-    this.checklist,
-  });
+  const _WorkItem({required this.label, this.checklist});
 
   final String label;
-  final int score;
-  final String unit;
 
-  /// 전월 대비 변화 (음수면 하락)
-  final int delta;
-  final String comment;
-  final List<(String, String)> rows;
-
-  /// 2열 점검 체크리스트 (있으면 상세 카드 대신 표시)
+  /// 2열 점검 체크리스트 (환경정비만 쓴다)
   final List<String>? checklist;
 }
 
@@ -498,78 +446,6 @@ class _WorkTab extends StatelessWidget {
           ),
         ),
         child: expand ? Center(child: fitted) : fitted,
-      ),
-    );
-  }
-}
-
-/// 이번 달 점수 요약 카드
-class _ScoreCard extends StatelessWidget {
-  _ScoreCard({required this.item});
-
-  final _WorkItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    final up = item.delta >= 0;
-    final deltaColor = up ? AppColors.success : AppColors.error;
-
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(24),
-      decoration: AppDecorations.card(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('이번 달 ${item.label}', style: AppTextStyles.label),
-          SizedBox(height: 10),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '${item.score}${item.unit}',
-                style: TextStyle(
-                  fontFamily: AppTextStyles.fontFamily,
-                  fontSize: 36,
-                  fontWeight: FontWeight.w700,
-                  height: 1.1,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              SizedBox(width: 10),
-              // 전월 대비 변화 배지
-              Container(
-                margin: EdgeInsets.only(bottom: 4),
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: deltaColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(100),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      up
-                          ? CupertinoIcons.arrow_up_right
-                          : CupertinoIcons.arrow_down_right,
-                      size: 11,
-                      color: deltaColor,
-                    ),
-                    SizedBox(width: 2),
-                    Text(
-                      '${item.delta.abs()}',
-                      style: AppTextStyles.caption.copyWith(
-                        color: deltaColor,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 8),
-          Text(item.comment, style: AppTextStyles.caption),
-        ],
       ),
     );
   }
@@ -1150,45 +1026,6 @@ class _HistoryScreenState extends State<_HistoryScreen> {
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 항목별 상세 카드
-class _DetailCard extends StatelessWidget {
-  _DetailCard({required this.item});
-
-  final _WorkItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.fromLTRB(24, 12, 24, 12),
-      decoration: AppDecorations.card(),
-      child: Column(
-        children: [
-          for (var i = 0; i < item.rows.length; i++) ...[
-            if (i > 0) Divider(height: 1, color: AppColors.divider),
-            Padding(
-              padding: EdgeInsets.symmetric(vertical: 14),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(item.rows[i].$1, style: AppTextStyles.body2),
-                  ),
-                  Text(
-                    item.rows[i].$2,
-                    style: AppTextStyles.body1.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
         ],
       ),
     );
