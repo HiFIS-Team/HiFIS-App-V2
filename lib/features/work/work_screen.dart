@@ -624,31 +624,7 @@ class _ChecklistCard extends StatelessWidget {
                     ),
                   )
                 else
-                  Pressable(
-                    onTap: onShowHistory,
-                    scale: 0.92,
-                    pressedColor: AppColors.gray100,
-                    borderRadius: BorderRadius.circular(100),
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          '총 $total회',
-                          style: AppTextStyles.caption.copyWith(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        SizedBox(width: 2),
-                        Icon(
-                          CupertinoIcons.chevron_right,
-                          size: 11,
-                          color: AppColors.primary,
-                        ),
-                      ],
-                    ),
-                  ),
+                  SeeAllButton(onTap: onShowHistory, label: '총 $total회'),
               ],
             ),
           ),

@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -9,6 +8,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
 import '../../core/widgets/pressable.dart';
+import '../../core/widgets/see_all_button.dart';
 import '../notice/notice_screen.dart';
 import '../project/project_screen.dart';
 
@@ -376,24 +376,7 @@ class _CardHeader extends StatelessWidget {
           style: AppTextStyles.title3.copyWith(color: AppColors.gray400),
         ),
         Spacer(),
-        InkWell(
-          onTap: onOpenAll,
-          borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: EdgeInsets.all(4),
-            child: Row(
-              children: [
-                Text('전체', style: AppTextStyles.label),
-                SizedBox(width: 2),
-                Icon(
-                  CupertinoIcons.arrow_right,
-                  size: 14,
-                  color: AppColors.gray600,
-                ),
-              ],
-            ),
-          ),
-        ),
+        if (onOpenAll != null) SeeAllButton(onTap: onOpenAll!),
       ],
     );
   }
