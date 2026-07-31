@@ -15,7 +15,7 @@ class Staff {
 }
 
 /// 로그인한 사람 (목업)
-const me = '김은후';
+const me = '김피스';
 
 /// 시스템 권한
 ///
@@ -46,7 +46,7 @@ const myPermission = Permission.master;
 const staffList = [
   Staff(me, '트레이너', AppColors.primary),
   Staff('이준승', '대표', Color(0xFF7C5CFC)),
-  Staff('김피스', '개발', Color(0xFF00A8B5)),
+  Staff('차민석', '개발', Color(0xFF00A8B5)),
   Staff('민중기', '점장', AppColors.success),
   Staff('박준현', '트레이너', AppColors.warning),
   Staff('유찬빈', '트레이너', Color(0xFF5C7CFA)),

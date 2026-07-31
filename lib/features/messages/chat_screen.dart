@@ -66,7 +66,7 @@ class _ChatScreenState extends State<ChatScreen> {
   _ChatMessage? _replyTarget;
 
   final List<_ChatMessage> _messages = [
-    _ChatMessage(text: '은후님 혹시 내일 오전 근무 가능하실까요?', mine: false),
+    _ChatMessage(text: '피스님 혹시 내일 오전 근무 가능하실까요?', mine: false),
     _ChatMessage(text: '네 가능합니다! 몇 시부터인가요?', mine: true),
     _ChatMessage(text: '9시부터 부탁드려요 🙏', mine: false, reaction: '❤️'),
     _ChatMessage(text: '네 알겠습니다!', mine: true, read: true),

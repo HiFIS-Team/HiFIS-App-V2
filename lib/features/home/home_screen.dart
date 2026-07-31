@@ -119,7 +119,7 @@ class _GreetingCard extends StatelessWidget {
             shaderCallback: (bounds) => LinearGradient(
               colors: [AppColors.primary, Color(0xFF7C5CFC)],
             ).createShader(bounds),
-            child: Text('은후님', style: AppTextStyles.title1),
+            child: Text('피스님', style: AppTextStyles.title1),
           ),
         ],
       ),

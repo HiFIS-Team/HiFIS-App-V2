@@ -100,7 +100,7 @@ class _MessageScreenState extends State<MessageScreen> {
                 ),
                 _ConversationTile(
                   onOpen: widget.onOpenChat,
-                  name: '김피스',
+                  name: '차민석',
                   preview: '휴가 신청서 올렸어요',
                   time: '오전 10:12',
                   color: AppColors.warning,

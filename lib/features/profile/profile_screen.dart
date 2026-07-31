@@ -188,10 +188,10 @@ class _ProfileSummaryCard extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('김은후', style: AppTextStyles.title2),
+                  Text('김피스', style: AppTextStyles.title2),
                   SizedBox(height: 2),
                   Text(
-                    'eunhoo@hifis.app',
+                    'peace@hifis.app',
                     style: AppTextStyles.caption.copyWith(
                       color: AppColors.gray500,
                     ),
@@ -326,7 +326,7 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
           SizedBox(height: 20),
           _FieldLabel('이름'),
           SizedBox(height: 8),
-          _InputBox(initial: '김은후'),
+          _InputBox(initial: '김피스'),
           SizedBox(height: 20),
           _FieldLabel('프로필 이미지'),
           SizedBox(height: 10),
@@ -397,7 +397,7 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
           _FieldLabel('이메일'),
           SizedBox(height: 8),
           _InputBox(
-            initial: 'eunhoo@hifis.app',
+            initial: 'peace@hifis.app',
             enabled: false,
             helper: '이메일은 관리자만 변경할 수 있습니다.',
           ),

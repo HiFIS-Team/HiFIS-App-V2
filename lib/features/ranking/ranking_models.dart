@@ -166,7 +166,7 @@ const _rankers = [
     lastRank: [7, 7, 6, 6, 7],
   ),
   _Ranker(
-    name: '김피스',
+    name: '차민석',
     team: '개발',
     branch: '강남점',
     revenue: 0,

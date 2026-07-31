@@ -33,7 +33,7 @@ class WorkScreen extends StatefulWidget {
 class _WorkScreenState extends State<WorkScreen> {
   int _tab = 0;
 
-  static const _me = '김은후';
+  static const _me = '김피스';
 
   /// 환경정비 오늘 수행 로그 — 횟수는 이 로그에서 집계한다 (목업 초기값 포함)
   late final List<_WorkLog> _logs = _seedLogs();

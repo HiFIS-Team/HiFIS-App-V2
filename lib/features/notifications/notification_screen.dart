@@ -38,7 +38,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
     _Noti(
       icon: Icons.beach_access_rounded,
       color: AppColors.warning,
-      title: '김피스님이 휴가를 신청했어요',
+      title: '차민석님이 휴가를 신청했어요',
       time: '방금 전',
       unread: true,
     ),

@@ -164,7 +164,7 @@ const _categories = ['업무 역량', '협업 소통', '성과 기여도', '태�
 /// 항목마다 매길 수 있는 별 개수 (대상과 무관하게 5개)
 const _starCount = 5;
 
-const _me = '김은후';
+const _me = '김피스';
 
 /// 이번 달 평가를 제출한 사람 (목업)
 ///
@@ -176,7 +176,7 @@ final _submitted = <String>{};
 const _persons = [
   _Person(_me, '본인 평가', AppColors.primary, isSelf: true),
   _Person('이준승', '대표', Color(0xFF7C5CFC)),
-  _Person('김피스', '개발', Color(0xFF00A8B5)),
+  _Person('차민석', '개발', Color(0xFF00A8B5)),
   _Person('민중기', '점장', AppColors.success),
   _Person('박준현', '트레이너', AppColors.warning),
   _Person('유찬빈', '트레이너', Color(0xFF5C7CFA)),
