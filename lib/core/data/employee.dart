@@ -18,6 +18,9 @@ enum Role {
 
   /// 승인·반려를 실행할 수 있는가 — ADMIN 은 보기만 된다
   bool get canApprove => this == Role.master || this == Role.manager;
+
+  /// 남에게 기여 점수를 줄 수 있는가 (마스터~매니저)
+  bool get canGrant => strong;
 }
 
 /// 직급 — 서버 `Rank` 와 같은 값

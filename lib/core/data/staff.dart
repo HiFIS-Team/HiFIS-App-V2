@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
+import 'current_user.dart';
+import 'employee.dart';
 
 /// 지점 직원 명단 (목업)
 ///
@@ -14,36 +16,19 @@ class Staff {
   final Color color;
 }
 
-/// 로그인한 사람 (목업)
-const me = '김피스';
-
-/// 시스템 권한
+/// 로그인한 사람의 이름
 ///
-/// 사람을 찾는 기준은 아니라서 직원 명단에서는 배지로만 쓰지만,
-/// 기여 점수 부여처럼 아무나 하면 안 되는 기능이 이 값을 본다.
-enum Permission {
-  master('MASTER'),
-  admin('ADMIN'),
-  member('MEMBER');
+/// 아직 목업 화면들이 이름 문자열을 사람 키로 쓰고 있어서 이렇게 노출한다.
+/// uuid 기준으로 바꾸는 건 별도 작업이다 (backend-gap.md 10번).
+/// 로그인 전에는 목업 이름으로 떨어진다 — 로그인 화면 말고는 볼 일이 없다.
+String get me => currentUser?.name ?? '김피스';
 
-  const Permission(this.label);
+/// 로그인한 사람의 권한
+Role get myRole => currentUser?.role ?? Role.member;
 
-  final String label;
-
-  /// 관리 권한 (MASTER·ADMIN) — 배지를 파랗게 칠한다
-  bool get strong => this != Permission.member;
-
-  /// 남에게 기여 점수를 줄 수 있는지 (마스터~매니저)
-  bool get canGrant => strong;
-}
-
-/// 로그인한 사람의 권한 (목업)
-///
-/// 실제 연동 때는 로그인 응답에서 받아 온다.
-/// 부여 화면을 확인하려면 여기를 [Permission.member]로 바꿔 보면 된다.
-const myPermission = Permission.master;
-
-const staffList = [
+/// 첫 줄이 로그인한 사람이라 [me]가 바뀌면 같이 바뀌어야 한다.
+/// 상수로 두면 앱 시작 시점의 이름(로그아웃 상태)에 굳어 버린다.
+List<Staff> get staffList => [
   Staff(me, '트레이너', AppColors.primary),
   Staff('이준승', '대표', Color(0xFF7C5CFC)),
   Staff('이준경', '개발', Color(0xFF00A8B5)),

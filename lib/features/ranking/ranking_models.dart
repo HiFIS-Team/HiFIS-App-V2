@@ -74,7 +74,7 @@ class _Ranker {
 }
 
 /// 이번 달 실적 (목업) — 실제 연동 시 서버 집계로 교체한다
-const _rankers = [
+final _rankers = [
   _Ranker(
     name: me,
     team: '트레이너',

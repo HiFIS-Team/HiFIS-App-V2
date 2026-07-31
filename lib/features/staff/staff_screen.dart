@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/data/employee.dart';
 import '../../core/data/staff.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
@@ -1070,7 +1071,7 @@ class _IconAction extends StatelessWidget {
 class _PermissionTag extends StatelessWidget {
   _PermissionTag({required this.permission});
 
-  final Permission permission;
+  final Role permission;
 
   @override
   Widget build(BuildContext context) {

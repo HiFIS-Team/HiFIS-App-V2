@@ -52,7 +52,7 @@ class _ContributionSectionState extends State<ContributionSection> {
         SizedBox(height: 16),
         // 항목 넷 — 무엇으로 점수가 쌓였는지
         _KindGrid(items: mine),
-        if (myPermission.canGrant) ...[
+        if (myRole.canGrant) ...[
           SizedBox(height: 16),
           _GrantBanner(onTap: _grant),
         ],

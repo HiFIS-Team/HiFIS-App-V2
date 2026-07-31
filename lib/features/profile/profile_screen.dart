@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/data/current_user.dart';
+import '../../core/data/staff.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -188,10 +190,10 @@ class _ProfileSummaryCard extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('김피스', style: AppTextStyles.title2),
+                  Text(me, style: AppTextStyles.title2),
                   SizedBox(height: 2),
                   Text(
-                    'peace@hifis.app',
+                    currentUser?.email ?? '',
                     style: AppTextStyles.caption.copyWith(
                       color: AppColors.gray500,
                     ),
@@ -207,10 +209,16 @@ class _ProfileSummaryCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: _SummaryField(label: '사번', value: 'FS-0903'),
+                child: _SummaryField(
+                  label: '사번',
+                  value: currentUser?.empNo ?? '-',
+                ),
               ),
               Expanded(
-                child: _SummaryField(label: '직급', value: '트레이너'),
+                child: _SummaryField(
+                  label: '직급',
+                  value: currentUser?.rank.label ?? '-',
+                ),
               ),
             ],
           ),
@@ -326,7 +334,7 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
           SizedBox(height: 20),
           _FieldLabel('이름'),
           SizedBox(height: 8),
-          _InputBox(initial: '김피스'),
+          _InputBox(initial: me),
           SizedBox(height: 20),
           _FieldLabel('프로필 이미지'),
           SizedBox(height: 10),
@@ -397,7 +405,7 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
           _FieldLabel('이메일'),
           SizedBox(height: 8),
           _InputBox(
-            initial: 'peace@hifis.app',
+            initial: currentUser?.email ?? '',
             enabled: false,
             helper: '이메일은 관리자만 변경할 수 있습니다.',
           ),
@@ -405,7 +413,7 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
           _FieldLabel('사번'),
           SizedBox(height: 8),
           _InputBox(
-            initial: 'FS-0903',
+            initial: currentUser?.empNo ?? '-',
             enabled: false,
             helper: '가입 시 자동으로 부여됩니다.',
           ),

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/data/staff.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -119,7 +120,7 @@ class _GreetingCard extends StatelessWidget {
             shaderCallback: (bounds) => LinearGradient(
               colors: [AppColors.primary, Color(0xFF7C5CFC)],
             ).createShader(bounds),
-            child: Text('피스님', style: AppTextStyles.title1),
+            child: Text('$me님', style: AppTextStyles.title1),
           ),
         ],
       ),

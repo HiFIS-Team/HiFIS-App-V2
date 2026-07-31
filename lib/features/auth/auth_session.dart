@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/auth_api.dart';
 import '../../core/api/token_store.dart';
+import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
 
 /// 로그인 세션
@@ -49,6 +50,7 @@ class AuthSession extends ValueNotifier<bool> {
 
     try {
       me = await AuthApi.me();
+      currentUser = me;
       email = me!.email;
       value = true;
     } catch (_) {
@@ -77,6 +79,7 @@ class AuthSession extends ValueNotifier<bool> {
     this.email = email;
     this.autoLogin = autoLogin;
     me = result.employee;
+    currentUser = me;
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyEmail, email);
@@ -97,6 +100,7 @@ class AuthSession extends ValueNotifier<bool> {
     }
     await TokenStore.instance.clear();
     me = null;
+    currentUser = null;
     value = false;
   }
 }
