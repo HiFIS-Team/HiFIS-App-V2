@@ -1,7 +1,13 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/api/api_exception.dart';
+import '../../core/api/contribution_api.dart';
+import '../../core/api/score_api.dart';
+import '../../core/data/current_user.dart';
+import '../../core/data/employee.dart';
 import '../../core/data/staff.dart';
+import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -15,14 +21,16 @@ import '../../core/widgets/pressable.dart';
 import '../../core/widgets/progress_bar.dart';
 import '../../core/widgets/see_all_button.dart';
 
-/// 센터 기여도 탭 콘텐츠 (목업)
+/// 센터 기여도 탭 콘텐츠
 ///
 /// 네 가지가 이번 달 기여 점수로 쌓인다.
-/// - **창의적 아이디어 · 자발적 목표 업무**: 마스터~매니저가 보고 직접 준다
-/// - **근무 외 출근 · 매출 성과**: 기록에서 자동으로 들어온다
+/// - **창의적 아이디어 · 자발적 목표 업무**: 대표·관리자·점장이 보고 직접 준다
+/// - **근무 외 출근**: 근무 시간 밖에 출퇴근을 찍으면 자동으로 들어온다
+///   (기록이 빠졌을 때 사람이 직접 줄 수도 있다)
+/// - **매출 성과**: 급여 마감 때 그달 매출에서 계산돼 들어온다
 ///
-/// 그래서 화면도 둘을 갈라 보여준다. 자동 항목은 왜 이 점수인지 근거를 적고,
-/// 부여 항목은 누가 줬는지를 남긴다.
+/// 그래서 두 곳에서 받아 합친다 — 부여 내역은 `/contributions`,
+/// 자동으로 쌓인 것은 점수 원장(`/scores`)에만 있다.
 class ContributionSection extends StatefulWidget {
   ContributionSection({super.key});
 
@@ -31,35 +39,127 @@ class ContributionSection extends StatefulWidget {
 }
 
 class _ContributionSectionState extends State<ContributionSection> {
+  bool _loading = true;
+
+  /// 이번 달 내 기여 (부여 + 자동)
+  List<_Contribution> _items = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final me = currentUser;
+    if (me == null) {
+      setState(() => _loading = false);
+      return;
+    }
+    final now = DateTime.now();
+    try {
+      // 부여 내역과 점수 원장을 같이 띄운다
+      final grantRequest = ContributionApi.list(employeeId: me.id);
+      final eventRequest = ScoreApi.events(
+        employeeId: me.id,
+        category: ScoreCategory.contrib,
+        period: periodKey(now),
+      );
+      final grants = await grantRequest;
+      final events = await eventRequest;
+      if (!mounted) return;
+      setState(() {
+        _items = _merge(grants, events, now);
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      AppToast.show(context, messageOf(error));
+    }
+  }
+
+  /// 부여 내역과 자동 점수를 한 줄기로 합친다
+  ///
+  /// 부여분은 `/contributions` 에 항목 종류가 있고, 자동분은 점수 원장에만
+  /// 있으므로 원장에서 **사람이 준 게 아닌 것**만 골라 붙인다.
+  /// 둘을 다 원장에서 뽑으면 아이디어인지 목표 업무인지 알 수 없다.
+  static List<_Contribution> _merge(
+    List<ContributionGrant> grants,
+    List<ScoreEvent> events,
+    DateTime now,
+  ) {
+    return [
+      for (final grant in grants)
+        // 부여 내역은 기간으로 못 걸러서 전부 온다 — 이번 달만 남긴다
+        if (grant.createdAt.year == now.year &&
+            grant.createdAt.month == now.month)
+          _Contribution(
+            kind: grant.type,
+            title: grant.reason,
+            points: grant.points,
+            date: grant.createdAt,
+            by: StaffDirectory.instance.byId(grant.grantedById)?.name,
+          ),
+      for (final event in events)
+        if (event.automatic)
+          _Contribution(
+            kind: _autoKindOf(event),
+            title: event.reason ?? _autoKindOf(event).label,
+            points: event.points,
+            date: event.createdAt,
+          ),
+    ]..sort((a, b) => b.date.compareTo(a.date));
+  }
+
+  /// 자동으로 들어온 점수가 어느 항목인지 — 원본 표시로 가른다
+  static ContribType _autoKindOf(ScoreEvent event) {
+    final ref = event.sourceRefId ?? '';
+    // 매출 성과는 `sales:2026-07`, 근무 외 출근은 `offhours:...`
+    return ref.startsWith('sales:') ? ContribType.sales : ContribType.extraWork;
+  }
+
   /// 기여 점수 주기 — 권한이 있는 사람만 보인다
   Future<void> _grant() async {
     final granted = await showFullPage<bool>(context, (_) => _GrantScreen());
-    if (granted == true && mounted) setState(() {});
+    if (granted == true && mounted) await _load();
   }
 
   void _openHistory() {
-    showFullPage<void>(context, (_) => _ContributionHistoryScreen());
+    showFullPage<void>(
+      context,
+      (_) => _ContributionHistoryScreen(items: _items),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final mine = _minesThisMonth();
-    final recent = List.of(mine)..sort((a, b) => b.date.compareTo(a.date));
+    if (_loading) {
+      return Padding(
+        padding: EdgeInsets.symmetric(vertical: 60),
+        child: Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2.4,
+            valueColor: AlwaysStoppedAnimation(AppColors.primary),
+          ),
+        ),
+      );
+    }
 
     return Column(
       children: [
-        _ScoreCard(items: mine),
+        _ScoreCard(items: _items),
         SizedBox(height: 16),
         // 항목 넷 — 무엇으로 점수가 쌓였는지
-        _KindGrid(items: mine),
+        _KindGrid(items: _items),
         if (myRole.canGrant) ...[
           SizedBox(height: 16),
           _GrantBanner(onTap: _grant),
         ],
         SizedBox(height: 16),
         _HistoryCard(
-          items: recent.take(5).toList(),
-          total: recent.length,
+          items: _items.take(5).toList(),
+          total: _items.length,
           onOpenAll: _openHistory,
         ),
       ],
@@ -71,38 +171,32 @@ class _ContributionSectionState extends State<ContributionSection> {
 // 모델
 // ---------------------------------------------------------------------------
 
-/// 기여 항목 네 가지
-enum _Kind {
-  idea('창의적 아이디어', CupertinoIcons.lightbulb_fill, 3),
-  goal('자발적 목표 업무', CupertinoIcons.flag_fill, 10),
-  extra('근무 외 출근', CupertinoIcons.clock_fill, 0),
-  sales('매출 성과', CupertinoIcons.chart_bar_fill, 0);
-
-  const _Kind(this.label, this.icon, this.points);
-
-  final String label;
-  final IconData icon;
-
-  /// 한 건당 점수 — 부여 항목은 값이 정해져 있어 줄 때 고르지 않는다.
-  /// 자동 항목은 근태·매출 규칙으로 계산돼 들어오므로 0으로 둔다.
-  final int points;
-
-  /// 마스터~매니저가 보고 직접 주는 항목인지.
-  /// 나머지 둘은 근태·매출 기록에서 자동으로 들어온다.
-  bool get granted => this == _Kind.idea || this == _Kind.goal;
+/// 화면에서 항목마다 쓰는 아이콘과 색
+extension _KindStyle on ContribType {
+  IconData get icon => switch (this) {
+    ContribType.idea => CupertinoIcons.lightbulb_fill,
+    ContribType.goal => CupertinoIcons.flag_fill,
+    ContribType.extraWork => CupertinoIcons.clock_fill,
+    ContribType.sales => CupertinoIcons.chart_bar_fill,
+  };
 
   Color get color => switch (this) {
-    _Kind.idea => AppColors.warning,
-    _Kind.goal => AppColors.primary,
-    _Kind.extra => AppColors.success,
-    _Kind.sales => Color(0xFF7C5CFC),
+    ContribType.idea => AppColors.warning,
+    ContribType.goal => AppColors.primary,
+    ContribType.extraWork => AppColors.success,
+    ContribType.sales => Color(0xFF7C5CFC),
   };
+
+  /// 앱에서 사람이 직접 주는 항목인지
+  ///
+  /// 서버는 근무 외 출근도 부여를 받지만, 근태에서 자동으로 들어오는 게
+  /// 정상 경로라 앱은 아이디어·목표 업무만 준다 (이중 지급 방지).
+  bool get grantedInApp => this == ContribType.idea || this == ContribType.goal;
 }
 
-/// 기여 한 건
+/// 기여 한 건 — 부여받은 것과 자동으로 쌓인 것을 같은 모양으로 다룬다
 class _Contribution {
   const _Contribution({
-    required this.name,
     required this.kind,
     required this.title,
     required this.points,
@@ -110,86 +204,18 @@ class _Contribution {
     this.by,
   });
 
-  /// 점수를 받은 사람
-  final String name;
-
-  final _Kind kind;
+  final ContribType kind;
 
   /// 무엇으로 받았는지 (자동 항목은 집계 근거가 들어간다)
   final String title;
   final int points;
   final DateTime date;
 
-  /// 준 사람 — 부여 항목만 채운다
+  /// 준 사람 — 자동으로 쌓인 점수는 비어 있다
   final String? by;
-}
 
-/// 이번 달 기여 기록 (목업). 탭을 오가도 유지되도록 모듈 전역으로 둔다.
-final _contributions = <_Contribution>[..._seed()];
-
-List<_Contribution> _seed() {
-  final now = DateTime.now();
-  DateTime at(int day) => DateTime(now.year, now.month, day);
-  return [
-    _Contribution(
-      name: me,
-      kind: _Kind.idea,
-      title: '락커 회전율 안내 문구 제안',
-      points: 3,
-      date: at(4),
-      by: '이준승',
-    ),
-    _Contribution(
-      name: me,
-      kind: _Kind.goal,
-      title: '신규 회원 온보딩 문서 정리',
-      points: 10,
-      date: at(11),
-      by: '민중기',
-    ),
-    _Contribution(
-      name: me,
-      kind: _Kind.extra,
-      title: '휴무일 대타 근무 2회',
-      points: 10,
-      date: at(16),
-    ),
-    _Contribution(
-      name: me,
-      kind: _Kind.sales,
-      title: '월 목표 대비 118% 달성',
-      points: 18,
-      date: at(22),
-    ),
-    _Contribution(
-      name: me,
-      kind: _Kind.extra,
-      title: '오픈 준비 조기 출근 3회',
-      points: 6,
-      date: at(25),
-    ),
-    _Contribution(
-      name: '박준현',
-      kind: _Kind.idea,
-      title: 'GX 시간표 개편 제안',
-      points: 3,
-      date: at(9),
-      by: '이준승',
-    ),
-  ];
-}
-
-/// 로그인한 사람의 이번 달 기록
-List<_Contribution> _minesThisMonth() {
-  final now = DateTime.now();
-  return _contributions
-      .where(
-        (c) =>
-            c.name == me &&
-            c.date.year == now.year &&
-            c.date.month == now.month,
-      )
-      .toList();
+  /// 사람이 준 게 아니라 기록에서 자동으로 들어온 점수인가
+  bool get automatic => by == null;
 }
 
 int _sum(List<_Contribution> items) =>
@@ -211,7 +237,8 @@ class _ScoreCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final total = _sum(items);
-    final granted = _sum(items.where((c) => c.kind.granted).toList());
+    // 사람이 준 점수와 기록에서 자동으로 들어온 점수를 가른다
+    final granted = _sum(items.where((c) => !c.automatic).toList());
     final auto = total - granted;
 
     return Container(
@@ -301,7 +328,7 @@ class _KindGrid extends StatelessWidget {
           spacing: gap,
           runSpacing: gap,
           children: [
-            for (final kind in _Kind.values)
+            for (final kind in ContribType.values)
               SizedBox(
                 width: width,
                 child: _KindCard(
@@ -319,7 +346,7 @@ class _KindGrid extends StatelessWidget {
 class _KindCard extends StatelessWidget {
   _KindCard({required this.kind, required this.items});
 
-  final _Kind kind;
+  final ContribType kind;
   final List<_Contribution> items;
 
   @override
@@ -354,7 +381,7 @@ class _KindCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  kind.granted ? '부여' : '자동',
+                  kind.grantedInApp ? '부여' : '자동',
                   style: AppTextStyles.caption.copyWith(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
@@ -589,14 +616,15 @@ class _ContributionRow extends StatelessWidget {
   }
 }
 
-/// 기여 내역 전체 화면 — 내 것과 지점 전체를 나눠 본다
+/// 기여 내역 전체 화면 — 이번 달 내 기록
 class _ContributionHistoryScreen extends StatelessWidget {
-  _ContributionHistoryScreen();
+  _ContributionHistoryScreen({required this.items});
+
+  final List<_Contribution> items;
 
   @override
   Widget build(BuildContext context) {
-    final mine = List.of(_contributions.where((c) => c.name == me))
-      ..sort((a, b) => b.date.compareTo(a.date));
+    final mine = items;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -611,7 +639,7 @@ class _ContributionHistoryScreen extends StatelessWidget {
                   Padding(
                     padding: EdgeInsets.fromLTRB(0, 32, 0, 32),
                     child: Text(
-                      '기여 기록이 없어요',
+                      '이번 달 기여 기록이 없어요',
                       style: AppTextStyles.body2.copyWith(
                         color: AppColors.textTertiary,
                       ),
@@ -667,12 +695,27 @@ class _GrantScreen extends StatefulWidget {
 }
 
 class _GrantScreenState extends State<_GrantScreen> {
-  _Kind _kind = _Kind.idea;
-  String? _target;
+  ContribType _kind = ContribType.idea;
+  Employee? _target;
   final _title = TextEditingController();
 
-  /// 본인에게는 줄 수 없다
-  List<Staff> get _people => staffList.where((s) => s.name != me).toList();
+  bool _saving = false;
+
+  /// 줄 수 있는 사람 — 본인은 뺀다
+  ///
+  /// 점장은 자기 지점만, 대표·관리자는 전 지점.
+  /// (서버는 대상 지점을 막지 않지만, 안 보고 준 점수는 근거가 없다)
+  List<Employee> get _people {
+    final me = currentUser;
+    if (me == null) return const [];
+    final sameBranchOnly = me.role == Role.manager;
+    return [
+      for (final employee in StaffDirectory.instance.employees)
+        if (employee.id != me.id &&
+            (!sameBranchOnly || employee.branchId == me.branchId))
+          employee,
+    ];
+  }
 
   bool get _ready => _target != null && _title.text.trim().isNotEmpty;
 
@@ -688,25 +731,31 @@ class _GrantScreenState extends State<_GrantScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_ready) {
       AppToast.show(context, '받을 사람과 내용을 채워주세요');
       return;
     }
+    if (_saving) return;
+
     FocusScope.of(context).unfocus();
-    // 점수는 항목마다 정해져 있어 주는 사람이 고르지 않는다
-    _contributions.add(
-      _Contribution(
-        name: _target!,
-        kind: _kind,
-        title: _title.text.trim(),
-        points: _kind.points,
-        date: DateTime.now(),
-        by: me,
-      ),
-    );
-    AppToast.show(context, '$_target님에게 ${_kind.points}점을 줬어요');
-    Navigator.pop(context, true);
+    setState(() => _saving = true);
+    final target = _target!;
+    try {
+      // 점수는 항목마다 정해져 있어 주는 사람이 고르지 않는다
+      final grant = await ContributionApi.create(
+        employeeId: target.id,
+        type: _kind,
+        reason: _title.text.trim(),
+      );
+      if (!mounted) return;
+      AppToast.show(context, '${target.name}님에게 ${grant.points}점을 줬어요');
+      Navigator.pop(context, true);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      AppToast.show(context, messageOf(error));
+    }
   }
 
   @override
@@ -730,11 +779,13 @@ class _GrantScreenState extends State<_GrantScreen> {
                 SizedBox(height: 8),
                 Row(
                   children: [
-                    for (final kind in _Kind.values.where((k) => k.granted))
+                    for (final kind in ContribType.values.where(
+                      (k) => k.grantedInApp,
+                    ))
                       Expanded(
                         child: Padding(
                           padding: EdgeInsets.only(
-                            right: kind == _Kind.idea ? 8 : 0,
+                            right: kind == ContribType.idea ? 8 : 0,
                           ),
                           child: _kindButton(kind),
                         ),
@@ -764,7 +815,7 @@ class _GrantScreenState extends State<_GrantScreen> {
                     cursorColor: AppColors.primary,
                     maxLines: 2,
                     decoration: InputDecoration(
-                      hintText: _kind == _Kind.idea
+                      hintText: _kind == ContribType.idea
                           ? '예) 락커 회전율 안내 문구 제안'
                           : '예) 신규 회원 온보딩 문서 정리',
                       hintStyle: AppTextStyles.body2.copyWith(
@@ -802,8 +853,8 @@ class _GrantScreenState extends State<_GrantScreen> {
           Align(
             alignment: Alignment.bottomCenter,
             child: GlassBottomButton(
-              label: '주기',
-              active: _ready,
+              label: _saving ? '주는 중...' : '주기',
+              active: _ready && !_saving,
               onPressed: _submit,
             ),
           ),
@@ -821,7 +872,7 @@ class _GrantScreenState extends State<_GrantScreen> {
   );
 
   /// 항목 버튼 — 점수가 항목에 붙어 있으므로 여기에 같이 적는다
-  Widget _kindButton(_Kind kind) {
+  Widget _kindButton(ContribType kind) {
     final on = kind == _kind;
     final color = on ? AppColors.primary : AppColors.gray500;
 
@@ -867,10 +918,10 @@ class _GrantScreenState extends State<_GrantScreen> {
     );
   }
 
-  Widget _personChip(Staff person) {
-    final on = person.name == _target;
+  Widget _personChip(Employee person) {
+    final on = person.id == _target?.id;
     return Pressable(
-      onTap: () => setState(() => _target = person.name),
+      onTap: () => setState(() => _target = person),
       scale: 0.96,
       child: AnimatedContainer(
         duration: Duration(milliseconds: 140),
