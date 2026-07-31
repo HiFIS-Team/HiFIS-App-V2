@@ -1,6 +1,14 @@
+import 'dart:convert';
+import 'dart:ui' as ui;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/api/api_exception.dart';
+import '../../core/api/lesson_api.dart';
+import '../../core/data/current_user.dart';
+import '../../core/data/staff.dart';
+import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -14,7 +22,7 @@ import '../../core/widgets/pressable.dart';
 import '../../core/widgets/progress_bar.dart';
 import '../../core/widgets/see_all_button.dart';
 
-/// 수업 개수 탭 콘텐츠 (목업)
+/// 수업 개수 탭 콘텐츠
 ///
 /// 수업은 회원의 싸인을 받아야 인정된다.
 /// - 상단: 회원 등록 / 세션 싸인 받기 버튼
@@ -26,121 +34,182 @@ class LessonSection extends StatefulWidget {
   State<LessonSection> createState() => _LessonSectionState();
 }
 
-/// 아바타 색 팔레트 — 새 회원 등록 시 순서대로 배정
-const _palette = [
-  Color(0xFF00A8B5),
-  Color(0xFF7C5CFC),
-  Color(0xFFE0447C),
-  AppColors.success,
-  AppColors.warning,
-];
+// ---------------------------------------------------------------------------
+// 서버 데이터
+// ---------------------------------------------------------------------------
 
-/// 등록된 회원 목록 (목업 초기값). 탭을 오가도 유지되도록 모듈 전역으로 둔다.
-final _members = <_LessonMember>[
-  _LessonMember(
-    name: '박서연',
-    color: _palette[0],
-    total: 20,
-    done: 12,
-    price: 50000,
-  ),
-  _LessonMember(
-    name: '최준영',
-    color: _palette[1],
-    total: 30,
-    done: 0,
-    price: 55000,
-    isNew: true,
-  ),
-  _LessonMember(
-    name: '한지우',
-    color: _palette[2],
-    total: 10,
-    done: 9,
-    price: 45000,
-  ),
-];
+/// 이 화면이 쓰는 서버 데이터 한 벌
+///
+/// 회원·등록권·싸인을 따로 받아 앱에서 id 로 맞춘다. 서버 싸인 응답에
+/// 회원 이름도 총 회차도 신규/재등록도 없어서다 (backend-gap.md 24번).
+///
+/// 화면을 열 때마다 새로 받는다 — 서명 URL 이 7일이면 만료돼서
+/// 오래 들고 있으면 이미지가 403 으로 떨어진다.
+class _LessonStore {
+  _LessonStore._();
 
-/// 다른 트레이너 담당 회원 (세션 싸인 받기의 전체 탭에서만 노출)
-final _otherMembers = <_LessonMember>[
-  _LessonMember(
-    name: '윤소라',
-    color: _palette[3],
-    total: 20,
-    done: 3,
-    price: 50000,
-    isNew: true,
-    owner: '박준현',
-  ),
-  _LessonMember(
-    name: '윤태호',
-    color: _palette[4],
-    total: 30,
-    done: 21,
-    price: 60000,
-    owner: '유찬빈',
-  ),
-];
+  static final _LessonStore instance = _LessonStore._();
 
-/// 받은 싸인 내역 (표시할 때 최신순 정렬)
-final _signs = <_LessonSign>[..._seedSigns()];
+  List<Member> members = const [];
+  List<Registration> registrations = const [];
+  List<SessionSign> signs = const [];
 
-List<_LessonSign> _seedSigns() {
-  final now = DateTime.now();
-  // daysAgo일 전의 시각 — DateTime이 월 경계를 알아서 넘겨준다
-  DateTime at(int daysAgo, int hour, int minute) =>
-      DateTime(now.year, now.month, now.day - daysAgo, hour, minute);
-  const padSize = Size(300, 160);
-  return [
-    _LessonSign(
-      member: '박서연',
-      round: 12,
-      total: 20,
-      isNew: false,
-      time: at(0, 9, 30),
-      padSize: padSize,
-      strokes: [
-        [Offset(50, 100), Offset(80, 50), Offset(110, 105), Offset(140, 60)],
-        [Offset(165, 55), Offset(195, 95), Offset(230, 58), Offset(255, 90)],
-      ],
-    ),
-    _LessonSign(
-      member: '한지우',
-      round: 9,
-      total: 10,
-      isNew: false,
-      time: at(0, 11, 0),
-      padSize: padSize,
-      strokes: [
-        [Offset(60, 60), Offset(90, 100), Offset(120, 55), Offset(150, 95)],
-        [Offset(175, 75), Offset(205, 75), Offset(240, 100)],
-      ],
-    ),
-    _LessonSign(
-      member: '한지우',
-      round: 8,
-      total: 10,
-      isNew: false,
-      time: at(1, 18, 20),
-      padSize: padSize,
-      strokes: [
-        [Offset(55, 95), Offset(95, 55), Offset(135, 100), Offset(175, 60)],
-        [Offset(200, 80), Offset(240, 80)],
-      ],
-    ),
-    _LessonSign(
-      member: '박서연',
-      round: 11,
-      total: 20,
-      isNew: false,
-      time: at(2, 20, 5),
-      padSize: padSize,
-      strokes: [
-        [Offset(60, 70), Offset(100, 105), Offset(140, 55), Offset(180, 95)],
-        [Offset(205, 60), Offset(235, 95), Offset(255, 70)],
-      ],
-    ),
+  Future<void> load() async {
+    // 셋 다 서로를 안 기다려도 되니 같이 띄운다
+    final memberRequest = MemberApi.list();
+    final registrationRequest = RegistrationApi.list();
+    final signRequest = SessionSignApi.list(trainerId: currentUser?.id);
+
+    members = await memberRequest;
+    registrations = await registrationRequest;
+    signs = await signRequest;
+  }
+
+  Member? memberOf(String id) {
+    for (final member in members) {
+      if (member.id == id) return member;
+    }
+    return null;
+  }
+
+  Registration? registrationOf(String id) {
+    for (final registration in registrations) {
+      if (registration.id == id) return registration;
+    }
+    return null;
+  }
+
+  /// 회원이 지금 쓰는 등록권
+  ///
+  /// 회차가 남은 것 중 가장 최근 것. 다 썼으면 마지막 등록권을 준다 —
+  /// "20/20회차 사용"까지는 보여줘야 재등록하러 갈 수 있다.
+  Registration? currentRegistrationOf(String memberId) {
+    Registration? fallback;
+    for (final registration in registrations) {
+      if (registration.memberId != memberId) continue;
+      if (!registration.exhausted) {
+        if (fallback == null ||
+            fallback.exhausted ||
+            registration.purchasedAt.isAfter(fallback.purchasedAt)) {
+          fallback = registration;
+        }
+      } else if (fallback == null ||
+          (fallback.exhausted &&
+              registration.purchasedAt.isAfter(fallback.purchasedAt))) {
+        fallback = registration;
+      }
+    }
+    return fallback;
+  }
+
+  _LessonMember _wrap(Member member) => _LessonMember(
+    source: member,
+    registration: currentRegistrationOf(member.id),
+  );
+
+  /// 내가 담당하는 회원
+  List<_LessonMember> get myMembers => [
+    for (final member in members)
+      if (member.ownerTrainerId == currentUser?.id) _wrap(member),
   ];
+
+  /// 지점 전체 회원 (대타로 싸인 받을 때)
+  List<_LessonMember> get allMembers => [for (final m in members) _wrap(m)];
+
+  /// 내가 받은 싸인 — 회원·등록권을 붙여서
+  List<_LessonSign> get mySigns {
+    final rows = [
+      for (final sign in signs)
+        _LessonSign(
+          source: sign,
+          memberName: memberOf(sign.memberId)?.name ?? '알 수 없음',
+          registration: registrationOf(sign.registrationId),
+        ),
+    ];
+    return rows..sort((a, b) => b.time.compareTo(a.time));
+  }
+}
+
+/// 화면이 다루는 회원 한 명 — 서버 회원에 지금 쓰는 등록권을 붙인 것
+class _LessonMember {
+  _LessonMember({required this.source, required this.registration});
+
+  final Member source;
+
+  /// 지금 쓰는 등록권 — 등록권이 하나도 없는 회원이면 null
+  final Registration? registration;
+
+  String get id => source.id;
+  String get name => source.name;
+  Color get color => avatarColorFor(source.name);
+
+  int get total => registration?.totalSessions ?? 0;
+  int get done => registration?.usedSessions ?? 0;
+  int get remaining => registration?.remaining ?? 0;
+  int get price => registration?.sessionUnitPrice ?? 0;
+
+  bool get isNew => registration?.type == RegistrationType.newMember;
+
+  /// 싸인을 더 받을 수 있는가 — 등록권이 없거나 회차를 다 쓰면 못 받는다
+  bool get canSign => registration != null && !registration!.exhausted;
+
+  bool get mine => source.ownerTrainerId == currentUser?.id;
+
+  /// 담당 트레이너 이름 — 내 담당이면 빈 문자열
+  String get owner {
+    if (mine) return '';
+    return StaffDirectory.instance.byId(source.ownerTrainerId)?.name ?? '';
+  }
+}
+
+/// 세션 기록 한 줄 — 싸인에 회원 이름과 등록권을 붙여 놓은 것
+class _LessonSign {
+  _LessonSign({
+    required this.source,
+    required this.memberName,
+    required this.registration,
+  });
+
+  final SessionSign source;
+  final String memberName;
+
+  /// 어느 등록권의 몇 회차인지 — 목록에서 빠졌으면 null
+  final Registration? registration;
+
+  int get round => source.sessionNo;
+  int get total => registration?.totalSessions ?? 0;
+  bool get isNew => registration?.type == RegistrationType.newMember;
+  DateTime get time => source.signedAt;
+
+  /// 서명 이미지 주소
+  String get imageUrl => source.signatureFullUrl;
+}
+
+/// 서명 획을 PNG base64 로 만든다 — 서버는 좌표가 아니라 이미지를 받는다
+///
+/// 그림으로 저장해야 나중에 그리는 코드가 바뀌어도 회원이 실제로 쓴
+/// 싸인이 그대로 남는다. 좌표만 두면 증거로 쓸 수 없다.
+Future<String> _encodeSignature(List<List<Offset>> strokes, Size size) async {
+  final recorder = ui.PictureRecorder();
+  final canvas = Canvas(recorder);
+  // 배경을 깔아 준다 — 투명 PNG 는 어두운 배경에서 획이 안 보인다
+  canvas.drawRect(
+    Rect.fromLTWH(0, 0, size.width, size.height),
+    Paint()..color = Colors.white,
+  );
+  _SignPainter(
+    strokes: strokes,
+    color: Colors.black,
+    strokeWidth: 3,
+  ).paint(canvas, size);
+
+  final image = await recorder.endRecording().toImage(
+    size.width.round(),
+    size.height.round(),
+  );
+  final data = await image.toByteData(format: ui.ImageByteFormat.png);
+  image.dispose();
+  return base64Encode(data!.buffer.asUint8List());
 }
 
 /// 1,000 단위 콤마 표기
@@ -155,6 +224,23 @@ String _formatStamp(DateTime time) {
   final hour = time.hour % 12 == 0 ? 12 : time.hour % 12;
   final minute = time.minute.toString().padLeft(2, '0');
   return '${time.month}.${time.day} $period $hour:$minute';
+}
+
+/// 저장된 서명 이미지 — 실패해도 화면이 안 죽게 자리만 남긴다
+class _SignImage extends StatelessWidget {
+  _SignImage({required this.url});
+
+  final String url;
+
+  @override
+  Widget build(BuildContext context) => Image.network(
+    url,
+    fit: BoxFit.contain,
+    // 서명 URL 은 7일이면 만료된다 — 그때는 목록을 다시 받아야 새 주소가 온다
+    errorBuilder: (context, error, stack) => Center(
+      child: Icon(CupertinoIcons.signature, size: 16, color: AppColors.gray300),
+    ),
+  );
 }
 
 /// 기록 줄을 누르면 서명을 크게 보여준다
@@ -181,22 +267,18 @@ void _showSignDetail(BuildContext context, _LessonSign sign) {
               Container(
                 width: double.infinity,
                 height: 150,
+                clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
                   color: AppColors.gray50,
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: CustomPaint(
-                  painter: _SignPainter(
-                    strokes: sign.strokes,
-                    sourceSize: sign.padSize,
-                    color: AppColors.textPrimary,
-                    strokeWidth: 2.4,
-                  ),
-                ),
+                child: _SignImage(url: sign.imageUrl),
               ),
               SizedBox(height: 14),
               Text(
-                '${sign.member} · ${sign.round}/${sign.total}회차',
+                sign.total > 0
+                    ? '${sign.memberName} · ${sign.round}/${sign.total}회차'
+                    : '${sign.memberName} · ${sign.round}회차',
                 style: AppTextStyles.body1.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
@@ -225,17 +307,36 @@ void _showSignDetail(BuildContext context, _LessonSign sign) {
 }
 
 class _LessonSectionState extends State<LessonSection> {
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      await _LessonStore.instance.load();
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
   /// 회원 등록 화면을 연다 — 폰은 밀려 들어오고 PC는 모달로 뜬다
   Future<void> _register() async {
     final added = await showFullPage<bool>(context, (_) => _RegisterScreen());
-    if (added == true && mounted) setState(() {});
+    if (added == true && mounted) await _load();
   }
 
   /// 회원을 골라 싸인을 받는다
   Future<void> _pickAndSign() async {
-    await showFullPage<void>(context, (_) => _PickMemberScreen());
-    // 싸인이 추가됐을 수 있으니 갱신한다
-    if (mounted) setState(() {});
+    final signed = await showFullPage<bool>(
+      context,
+      (_) => _PickMemberScreen(),
+    );
+    if (signed == true && mounted) await _load();
   }
 
   /// 세션 기록 전체 화면을 연다
@@ -245,6 +346,18 @@ class _LessonSectionState extends State<LessonSection> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return Padding(
+        padding: EdgeInsets.symmetric(vertical: 60),
+        child: Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2.4,
+            valueColor: AlwaysStoppedAnimation(AppColors.primary),
+          ),
+        ),
+      );
+    }
+
     return Column(
       children: [
         _SessionGoalCard(),
@@ -277,7 +390,7 @@ class _LessonSectionState extends State<LessonSection> {
   }
 
   Widget _buildRecordCard() {
-    final sorted = List.of(_signs)..sort((a, b) => b.time.compareTo(a.time));
+    final sorted = _LessonStore.instance.mySigns;
     // 카드에는 최근 5건만 — 나머지는 전체 보기 화면에서
     final recent = sorted.take(5).toList();
 
@@ -296,7 +409,7 @@ class _LessonSectionState extends State<LessonSection> {
                 SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    '${_signs.length}',
+                    '${sorted.length}',
                     style: AppTextStyles.label.copyWith(
                       color: AppColors.textTertiary,
                     ),
@@ -331,7 +444,10 @@ class _LessonSectionState extends State<LessonSection> {
   }
 }
 
-/// 이번 달 세션 목표 (목업 — 실제로는 대표와 협의한 값을 받아 온다)
+/// 이번 달 세션 목표
+///
+/// 서버에 목표치 개념이 없어서 고정값이다 (backend-gap.md 4번).
+/// 누가 정하는지(대표 일괄 / 점장이 지점별)가 정해지면 서버에서 받아 온다.
 const _sessionGoal = 50;
 
 /// 이번 달 목표 진행 — 세션 수와 담당 회원을 한자리에서 보여준다
@@ -342,9 +458,12 @@ class _SessionGoalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final store = _LessonStore.instance;
     final now = DateTime.now();
-    final count = _signs
-        .where((s) => s.time.year == now.year && s.time.month == now.month)
+    final count = store.signs
+        .where(
+          (s) => s.signedAt.year == now.year && s.signedAt.month == now.month,
+        )
         .length;
     final left = _sessionGoal - count;
     final reached = left <= 0;
@@ -400,7 +519,7 @@ class _SessionGoalCard extends StatelessWidget {
                 ),
               ),
               Text(
-                '담당 회원 ${_members.length}명',
+                '담당 회원 ${store.myMembers.length}명',
                 style: AppTextStyles.caption.copyWith(fontSize: 12),
               ),
             ],
@@ -488,70 +607,6 @@ class _MemberBadge extends StatelessWidget {
   }
 }
 
-/// 등록된 회원 한 명
-class _LessonMember {
-  _LessonMember({
-    required this.name,
-    required this.color,
-    required this.total,
-    required this.price,
-    this.done = 0,
-    this.isNew = false,
-    this.phone = '',
-    this.referrer = '',
-    this.owner = '',
-  });
-
-  final String name;
-  final Color color;
-
-  /// 등록한 총 수업 횟수 — 재등록하면 새 등록권으로 바뀐다
-  int total;
-
-  /// 세션(1회) 단가, 원 — 결제액을 회차로 나눈 값
-  int price;
-
-  /// 신규 회원 여부 (재등록하면 false로 바뀐다)
-  bool isNew;
-
-  /// 연락처·소개한 회원 (등록 폼 입력, 아직 화면 표시는 없음)
-  final String phone;
-  final String referrer;
-
-  /// 담당 트레이너 이름 — 비어 있으면 내 담당
-  final String owner;
-
-  /// 싸인으로 확인된 진행 회차 — 싸인 한 번에 1회차씩 올라간다
-  int done;
-}
-
-/// 싸인 기록 한 건
-class _LessonSign {
-  _LessonSign({
-    required this.member,
-    required this.round,
-    required this.total,
-    required this.isNew,
-    required this.time,
-    required this.strokes,
-    required this.padSize,
-  });
-
-  final String member;
-
-  /// 몇 회차 수업인지 / 총 몇 회 등록인지
-  final int round;
-  final int total;
-  final bool isNew;
-  final DateTime time;
-
-  /// 서명 획 좌표 (패드 좌표계)
-  final List<List<Offset>> strokes;
-
-  /// 서명 당시 패드 크기 — 미리보기 비율 맞춤에 사용
-  final Size padSize;
-}
-
 /// 세션 기록 한 줄 — 서명 미리보기, 이름·배지, 회차·시각, +1
 class _SignRow extends StatelessWidget {
   _SignRow({required this.sign, required this.onTap});
@@ -561,6 +616,10 @@ class _SignRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final round = sign.total > 0
+        ? '${sign.round}/${sign.total}회차'
+        : '${sign.round}회차';
+
     return Pressable(
       onTap: onTap,
       scale: 0.98,
@@ -573,19 +632,13 @@ class _SignRow extends StatelessWidget {
           Container(
             width: 64,
             height: 40,
+            clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               color: AppColors.gray50,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: AppColors.gray100),
             ),
-            child: CustomPaint(
-              painter: _SignPainter(
-                strokes: sign.strokes,
-                sourceSize: sign.padSize,
-                color: AppColors.textPrimary,
-                strokeWidth: 1.4,
-              ),
-            ),
+            child: _SignImage(url: sign.imageUrl),
           ),
           SizedBox(width: 12),
           Expanded(
@@ -595,7 +648,7 @@ class _SignRow extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      sign.member,
+                      sign.memberName,
                       style: AppTextStyles.body2.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
@@ -606,7 +659,7 @@ class _SignRow extends StatelessWidget {
                 ),
                 SizedBox(height: 2),
                 Text(
-                  '${sign.round}/${sign.total}회차 · ${_formatStamp(sign.time)}',
+                  '$round · ${_formatStamp(sign.time)}',
                   style: AppTextStyles.caption.copyWith(fontSize: 11),
                 ),
               ],
@@ -665,10 +718,11 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final all = _LessonStore.instance.mySigns;
     final query = _search.text.trim();
-    final sorted =
-        _signs.where((s) => query.isEmpty || s.member.contains(query)).toList()
-          ..sort((a, b) => b.time.compareTo(a.time));
+    final sorted = all
+        .where((s) => query.isEmpty || s.memberName.contains(query))
+        .toList();
 
     // 날짜가 바뀌는 지점마다 그룹 헤더를 끼워 넣는다
     final children = <Widget>[];
@@ -730,7 +784,7 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen> {
                   Padding(
                     padding: EdgeInsets.fromLTRB(24, 32, 24, 44),
                     child: Text(
-                      _signs.isEmpty ? '아직 받은 싸인이 없어요' : '검색 결과가 없어요',
+                      all.isEmpty ? '아직 받은 싸인이 없어요' : '검색 결과가 없어요',
                       style: AppTextStyles.body2.copyWith(
                         color: AppColors.textTertiary,
                       ),
@@ -795,13 +849,20 @@ class _RegisterScreenState extends State<_RegisterScreen> {
 
   final _name = TextEditingController();
   final _phone = TextEditingController();
-  final _referrer = TextEditingController();
   final _rounds = TextEditingController();
   final _payment = TextEditingController();
   final _search = TextEditingController();
 
   /// 재등록 모드에서 선택된 기존 회원
   _LessonMember? _selected;
+
+  /// 소개한 회원 — 서버가 이름이 아니라 회원 id 를 요구해서 골라 받는다
+  ///
+  /// 소개로 온 회원은 급여 인센티브가 워크인(40%)이 아니라 재등록과 같은
+  /// 요율(50%)로 잡힌다. 비워 두면 트레이너 몫이 줄어든다.
+  Member? _referrer;
+
+  bool _saving = false;
 
   @override
   void initState() {
@@ -814,14 +875,7 @@ class _RegisterScreenState extends State<_RegisterScreen> {
 
   @override
   void dispose() {
-    for (final controller in [
-      _name,
-      _phone,
-      _referrer,
-      _rounds,
-      _payment,
-      _search,
-    ]) {
+    for (final controller in [_name, _phone, _rounds, _payment, _search]) {
       controller.dispose();
     }
     super.dispose();
@@ -835,51 +889,102 @@ class _RegisterScreenState extends State<_RegisterScreen> {
       ? (_paymentWon / _roundCount).round()
       : 0;
 
-  /// 검색어로 걸러진 기존 회원 목록
+  /// 검색어로 걸러진 내 담당 회원 목록
   List<_LessonMember> get _filtered {
+    final base = _LessonStore.instance.myMembers;
     final query = _search.text.trim();
-    if (query.isEmpty) return _members;
-    return _members.where((m) => m.name.contains(query)).toList();
+    if (query.isEmpty) return base;
+    return base.where((m) => m.name.contains(query)).toList();
   }
 
   bool get _complete =>
-      (_renew ? _selected != null : _name.text.trim().isNotEmpty) &&
+      (_renew
+          ? _selected != null
+          : _name.text.trim().isNotEmpty && _phone.text.trim().isNotEmpty) &&
       _roundCount > 0 &&
       _paymentWon > 0;
 
-  void _submit() {
+  Future<void> _pickReferrer() async {
+    final picked = await showFullPage<Member>(
+      context,
+      (_) => _ReferrerPickScreen(selected: _referrer),
+    );
+    if (picked != null && mounted) setState(() => _referrer = picked);
+  }
+
+  Future<void> _submit() async {
     if (!_complete) {
       AppToast.show(
         context,
-        _renew ? '재등록할 회원과 등록권 정보를 입력해주세요' : '성함과 등록권 정보를 입력해주세요',
+        _renew ? '재등록할 회원과 등록권 정보를 입력해주세요' : '성함·연락처와 등록권 정보를 입력해주세요',
       );
       return;
     }
-    FocusScope.of(context).unfocus();
-    if (_renew) {
-      // 기존 회원에게 새 등록권을 부여한다
-      final member = _selected!;
-      member.total = _roundCount;
-      member.price = _unitPrice;
-      member.done = 0;
-      member.isNew = false;
-      AppToast.show(context, '${member.name}님이 재등록되었습니다');
-    } else {
-      final name = _name.text.trim();
-      _members.add(
-        _LessonMember(
-          name: name,
-          color: _palette[_members.length % _palette.length],
-          total: _roundCount,
-          price: _unitPrice,
-          isNew: true,
-          phone: _phone.text.trim(),
-          referrer: _referrer.text.trim(),
-        ),
-      );
-      AppToast.show(context, '$name님이 등록되었습니다');
+    if (_saving) return;
+
+    final me = currentUser;
+    if (me == null) {
+      AppToast.show(context, '로그인 정보를 확인할 수 없어요');
+      return;
     }
-    Navigator.pop(context, true);
+
+    FocusScope.of(context).unfocus();
+    setState(() => _saving = true);
+
+    try {
+      if (_renew) {
+        // 기존 회원에게 새 등록권을 하나 더 발급한다
+        final member = _selected!;
+        await RegistrationApi.create(
+          memberId: member.id,
+          trainerId: me.id,
+          type: RegistrationType.renewal,
+          totalSessions: _roundCount,
+          pricePaid: _paymentWon,
+          sessionUnitPrice: _unitPrice,
+        );
+        if (!mounted) return;
+        AppToast.show(context, '${member.name}님이 재등록되었습니다');
+      } else {
+        // 서버는 회원과 등록권이 따로다 — 회원을 만들고 등록권을 붙인다
+        final name = _name.text.trim();
+        final member = await MemberApi.create(
+          name: name,
+          phone: _phone.text.trim(),
+          branchId: me.branchId,
+          ownerTrainerId: me.id,
+          referrerMemberId: _referrer?.id,
+        );
+        try {
+          await RegistrationApi.create(
+            memberId: member.id,
+            trainerId: me.id,
+            type: RegistrationType.newMember,
+            totalSessions: _roundCount,
+            pricePaid: _paymentWon,
+            sessionUnitPrice: _unitPrice,
+          );
+        } catch (error) {
+          // 회원은 만들어졌는데 등록권이 실패한 상태 — 그냥 실패로 덮으면
+          // 다시 등록할 때 같은 회원이 두 명 생긴다
+          if (!mounted) return;
+          setState(() => _saving = false);
+          AppToast.show(
+            context,
+            '$name님은 등록됐지만 등록권 발급에 실패했어요. 재등록으로 다시 시도해 주세요',
+          );
+          Navigator.pop(context, true);
+          return;
+        }
+        if (!mounted) return;
+        AppToast.show(context, '$name님이 등록되었습니다');
+      }
+      Navigator.pop(context, true);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      AppToast.show(context, messageOf(error));
+    }
   }
 
   @override
@@ -931,7 +1036,7 @@ class _RegisterScreenState extends State<_RegisterScreen> {
                                     SizedBox(height: 8),
                                     _FormField(controller: _phone, hint: ''),
                                     SizedBox(height: 8),
-                                    _FormField(controller: _referrer, hint: ''),
+                                    _PickerField(label: '', value: null),
                                   ],
                                 ),
                               ),
@@ -948,7 +1053,12 @@ class _RegisterScreenState extends State<_RegisterScreen> {
                                     child: _filtered.isEmpty
                                         ? Center(
                                             child: Text(
-                                              '검색 결과가 없어요',
+                                              _LessonStore
+                                                      .instance
+                                                      .myMembers
+                                                      .isEmpty
+                                                  ? '담당 회원이 없어요'
+                                                  : '검색 결과가 없어요',
                                               style: AppTextStyles.body2
                                                   .copyWith(
                                                     color:
@@ -971,10 +1081,12 @@ class _RegisterScreenState extends State<_RegisterScreen> {
                                                   if (i > 0)
                                                     SizedBox(height: 8),
                                                   _RenewPickRow(
-                                                    member: _filtered[i],
+                                                    name: _filtered[i].name,
+                                                    color: _filtered[i].color,
+                                                    trailing: '내 담당',
                                                     selected:
-                                                        _selected ==
-                                                        _filtered[i],
+                                                        _selected?.id ==
+                                                        _filtered[i].id,
                                                     onTap: () => setState(
                                                       () => _selected =
                                                           _filtered[i],
@@ -1005,7 +1117,40 @@ class _RegisterScreenState extends State<_RegisterScreen> {
                           keyboardType: TextInputType.phone,
                         ),
                         SizedBox(height: 8),
-                        _FormField(controller: _referrer, hint: '소개한 회원 (선택)'),
+                        // 소개한 회원은 이름이 아니라 등록된 회원을 골라야 한다
+                        _PickerField(
+                          label: '소개한 회원 (선택)',
+                          value: _referrer?.name,
+                          onTap: _pickReferrer,
+                          onClear: _referrer == null
+                              ? null
+                              : () => setState(() => _referrer = null),
+                        ),
+                        if (_referrer != null) ...[
+                          SizedBox(height: 8),
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 4),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  CupertinoIcons.info_circle,
+                                  size: 13,
+                                  color: AppColors.primary,
+                                ),
+                                SizedBox(width: 5),
+                                Expanded(
+                                  child: Text(
+                                    '소개로 온 회원이라 인센티브가 재등록과 같은 요율로 잡혀요',
+                                    style: AppTextStyles.caption.copyWith(
+                                      fontSize: 12,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                         SizedBox(height: 24),
                       ],
                       Padding(
@@ -1085,10 +1230,14 @@ class _RegisterScreenState extends State<_RegisterScreen> {
                 Expanded(
                   child: BottomActionButton(
                     id: 'register',
-                    label: _renew ? '재등록' : '신규 회원 등록',
+                    label: _saving
+                        ? '등록 중...'
+                        : _renew
+                        ? '재등록'
+                        : '신규 회원 등록',
                     // 필수 입력이 채워져야 채워진 상태가 되고,
                     // 미완성 시 동작은 _submit에서 무시한다
-                    filled: _complete,
+                    filled: _complete && !_saving,
                     onPressed: _submit,
                   ),
                 ),
@@ -1101,15 +1250,141 @@ class _RegisterScreenState extends State<_RegisterScreen> {
   }
 }
 
-/// 재등록할 회원 선택 줄 — 선택되면 파란 배경과 체크로 표시
+/// 소개한 회원 고르기 — 지점 전체 회원에서 찾는다
+///
+/// 소개자가 우리 센터 회원이 아니면 고를 수 없다. 서버가 실제 회원인지
+/// 검증하기 때문에 이름만 적어 보낼 수 없다.
+class _ReferrerPickScreen extends StatefulWidget {
+  _ReferrerPickScreen({this.selected});
+
+  final Member? selected;
+
+  @override
+  State<_ReferrerPickScreen> createState() => _ReferrerPickScreenState();
+}
+
+class _ReferrerPickScreenState extends State<_ReferrerPickScreen> {
+  final _search = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _search.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  List<Member> get _filtered {
+    final base = _LessonStore.instance.members;
+    final query = _search.text.trim();
+    if (query.isEmpty) return base;
+    return base.where((m) => m.name.contains(query)).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final list = _filtered;
+
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      body: Stack(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                // 상단 고정 타이틀 영역만큼 비워둔다
+                SizedBox(height: 56),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(24, 12, 24, 12),
+                  child: Text(
+                    '이 회원을 데려온 기존 회원을 골라주세요',
+                    style: AppTextStyles.caption,
+                  ),
+                ),
+                Container(height: 1, color: AppColors.gray100),
+                Expanded(
+                  child: list.isEmpty
+                      ? Center(
+                          child: Text(
+                            '검색 결과가 없어요',
+                            style: AppTextStyles.body2.copyWith(
+                              color: AppColors.textTertiary,
+                            ),
+                          ),
+                        )
+                      : ListView(
+                          padding: EdgeInsets.fromLTRB(
+                            20,
+                            12,
+                            20,
+                            MediaQuery.paddingOf(context).bottom + 96,
+                          ),
+                          children: [
+                            for (var i = 0; i < list.length; i++) ...[
+                              if (i > 0) SizedBox(height: 8),
+                              _RenewPickRow(
+                                name: list[i].name,
+                                color: avatarColorFor(list[i].name),
+                                trailing: list[i].phone,
+                                selected: widget.selected?.id == list[i].id,
+                                onTap: () => Navigator.pop(context, list[i]),
+                              ),
+                            ],
+                          ],
+                        ),
+                ),
+              ],
+            ),
+          ),
+          // 상단 중앙 고정 타이틀 (터치는 아래로 통과)
+          IgnorePointer(
+            child: SafeArea(
+              bottom: false,
+              child: SizedBox(
+                height: 56,
+                child: Center(
+                  child: Text('소개한 회원', style: AppTextStyles.title3),
+                ),
+              ),
+            ),
+          ),
+          // 좌측 상단 고정 뒤로가기 글래스 버튼
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: EdgeInsets.only(top: 8, left: 16),
+              child: GlassIconButton(
+                symbol: 'chevron.backward',
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+          ),
+          // 하단 고정: 플로팅 글래스 검색 바 (키보드와 함께 상승)
+          GlassSearchBar(controller: _search, hint: '회원 이름 검색'),
+        ],
+      ),
+    );
+  }
+}
+
+/// 회원 선택 줄 — 선택되면 파란 배경과 체크로 표시
 class _RenewPickRow extends StatelessWidget {
   _RenewPickRow({
-    required this.member,
+    required this.name,
+    required this.color,
+    required this.trailing,
     required this.selected,
     required this.onTap,
   });
 
-  final _LessonMember member;
+  final String name;
+  final Color color;
+  final String trailing;
   final bool selected;
   final VoidCallback onTap;
 
@@ -1137,12 +1412,9 @@ class _RenewPickRow extends StatelessWidget {
               width: 32,
               height: 32,
               alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: member.color,
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
               child: Text(
-                member.name.characters.first,
+                name.characters.first,
                 style: TextStyle(
                   fontFamily: AppTextStyles.fontFamily,
                   fontSize: 13,
@@ -1154,7 +1426,7 @@ class _RenewPickRow extends StatelessWidget {
             SizedBox(width: 10),
             Expanded(
               child: Text(
-                member.name,
+                name,
                 style: AppTextStyles.body2.copyWith(
                   color: selected ? AppColors.primary : AppColors.textPrimary,
                   fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
@@ -1169,7 +1441,7 @@ class _RenewPickRow extends StatelessWidget {
               )
             else
               Text(
-                '내 담당',
+                trailing,
                 style: AppTextStyles.caption.copyWith(color: AppColors.gray400),
               ),
           ],
@@ -1179,7 +1451,6 @@ class _RenewPickRow extends StatelessWidget {
   }
 }
 
-/// 신규 회원 / 재등록 전환 세그먼트
 /// 회색 입력 칸
 class _FormField extends StatelessWidget {
   _FormField({required this.controller, required this.hint, this.keyboardType});
@@ -1212,6 +1483,69 @@ class _FormField extends StatelessWidget {
   }
 }
 
+/// 눌러서 고르는 칸 — 입력 칸과 같은 모양이라 폼에서 줄이 맞는다
+class _PickerField extends StatelessWidget {
+  _PickerField({
+    required this.label,
+    required this.value,
+    this.onTap,
+    this.onClear,
+  });
+
+  final String label;
+
+  /// 고른 값 — 없으면 [label]이 회색으로 뜬다
+  final String? value;
+
+  final VoidCallback? onTap;
+  final VoidCallback? onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final picked = value != null;
+
+    return Pressable(
+      onTap: onTap ?? () {},
+      scale: 0.99,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.gray50,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                picked ? value! : label,
+                style: AppTextStyles.body1.copyWith(
+                  color: picked ? AppColors.textPrimary : AppColors.gray400,
+                ),
+              ),
+            ),
+            if (picked && onClear != null)
+              Pressable(
+                onTap: onClear!,
+                scale: 0.9,
+                child: Icon(
+                  CupertinoIcons.xmark_circle_fill,
+                  size: 17,
+                  color: AppColors.gray300,
+                ),
+              )
+            else
+              Icon(
+                CupertinoIcons.chevron_right,
+                size: 15,
+                color: AppColors.gray300,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// 싸인 받을 회원 선택 화면
 class _PickMemberScreen extends StatefulWidget {
   @override
@@ -1237,7 +1571,8 @@ class _PickMemberScreenState extends State<_PickMemberScreen> {
   }
 
   List<_LessonMember> get _filtered {
-    final base = _all ? [..._members, ..._otherMembers] : _members;
+    final store = _LessonStore.instance;
+    final base = _all ? store.allMembers : store.myMembers;
     final query = _search.text.trim();
     if (query.isEmpty) return base;
     return base.where((m) => m.name.contains(query)).toList();
@@ -1248,18 +1583,28 @@ class _PickMemberScreenState extends State<_PickMemberScreen> {
   /// 선택 화면이 PC에서 모달이라 서명도 모달로 겹쳐 띄운다.
   /// (여기서 push를 쓰면 모달 밖 루트로 나가 창 전체를 덮는다)
   Future<void> _open(_LessonMember member) async {
+    if (!member.canSign) {
+      AppToast.show(
+        context,
+        member.registration == null
+            ? '${member.name}님은 등록권이 없어요. 먼저 등록해 주세요'
+            : '${member.name}님은 남은 회차가 없어요. 재등록이 필요해요',
+      );
+      return;
+    }
+
     final done = await showFullPage<bool>(
       context,
       (_) => _SignScreen(member: member),
     );
     // 싸인을 받았으면 선택 화면도 닫고 업무 탭으로 돌아간다
-    if (done == true && mounted) Navigator.pop(context);
-    if (mounted) setState(() {});
+    if (done == true && mounted) Navigator.pop(context, true);
   }
 
   @override
   Widget build(BuildContext context) {
     final list = _filtered;
+    final mineCount = _LessonStore.instance.myMembers.length;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -1281,7 +1626,7 @@ class _PickMemberScreenState extends State<_PickMemberScreen> {
                     ),
                     children: [
                       ModeSwitch(
-                        left: '내 담당 (${_members.length})',
+                        left: '내 담당 ($mineCount)',
                         right: '전체',
                         value: _all,
                         onChanged: (v) => setState(() => _all = v),
@@ -1291,7 +1636,9 @@ class _PickMemberScreenState extends State<_PickMemberScreen> {
                         Padding(
                           padding: EdgeInsets.fromLTRB(4, 10, 4, 10),
                           child: Text(
-                            '검색 결과가 없어요',
+                            _search.text.trim().isEmpty
+                                ? '등록된 회원이 없어요'
+                                : '검색 결과가 없어요',
                             style: AppTextStyles.body2.copyWith(
                               color: AppColors.textTertiary,
                             ),
@@ -1348,8 +1695,8 @@ class _PickRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final remain = member.total - member.done;
-    final ownerLabel = member.owner.isEmpty ? '내 담당' : '${member.owner} 담당';
+    final ownerLabel = member.mine ? '내 담당' : '${member.owner} 담당';
+    final hasRegistration = member.registration != null;
 
     return Pressable(
       onTap: onTap,
@@ -1393,13 +1740,17 @@ class _PickRow extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      SizedBox(width: 6),
-                      _MemberBadge(isNew: member.isNew),
+                      if (hasRegistration) ...[
+                        SizedBox(width: 6),
+                        _MemberBadge(isNew: member.isNew),
+                      ],
                     ],
                   ),
                   SizedBox(height: 2),
                   Text(
-                    '${member.done}/${member.total}회차 사용 · $ownerLabel',
+                    hasRegistration
+                        ? '${member.done}/${member.total}회차 사용 · $ownerLabel'
+                        : '등록권 없음 · $ownerLabel',
                     style: AppTextStyles.caption.copyWith(fontSize: 11),
                   ),
                 ],
@@ -1409,13 +1760,17 @@ class _PickRow extends StatelessWidget {
             Container(
               padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: AppColors.gray100,
+                color: member.canSign
+                    ? AppColors.gray100
+                    : AppColors.error.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(100),
               ),
               child: Text(
-                '$remain회 남음',
+                member.canSign ? '${member.remaining}회 남음' : '재등록 필요',
                 style: AppTextStyles.caption.copyWith(
-                  color: AppColors.textSecondary,
+                  color: member.canSign
+                      ? AppColors.textSecondary
+                      : AppColors.error,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -1446,33 +1801,47 @@ class _SignScreen extends StatefulWidget {
 class _SignScreenState extends State<_SignScreen> {
   final List<List<Offset>> _strokes = [];
 
-  /// 완료 시 기록에 남길 패드 크기
+  /// 서명 당시 패드 크기 — 이 크기로 PNG를 굽는다
   Size _padSize = Size.zero;
+
+  bool _saving = false;
 
   bool get _signed => _strokes.any((stroke) => stroke.length > 1);
 
   void _clear() => setState(_strokes.clear);
 
-  void _complete() {
+  Future<void> _complete() async {
     if (!_signed) {
       AppToast.show(context, '먼저 싸인을 받아주세요');
       return;
     }
+    if (_saving) return;
+
     final member = widget.member;
-    member.done += 1;
-    _signs.add(
-      _LessonSign(
-        member: member.name,
-        round: member.done,
-        total: member.total,
-        isNew: member.isNew,
-        time: DateTime.now(),
-        strokes: [for (final stroke in _strokes) List.of(stroke)],
-        padSize: _padSize,
-      ),
-    );
-    AppToast.show(context, '${member.name}님 ${member.done}회차 수업이 기록되었습니다');
-    Navigator.pop(context, true);
+    final registration = member.registration;
+    if (registration == null) {
+      AppToast.show(context, '등록권이 없어 기록할 수 없어요');
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      final image = await _encodeSignature(_strokes, _padSize);
+      final result = await SessionSignApi.create(
+        registrationId: registration.id,
+        signatureBase64: image,
+      );
+      if (!mounted) return;
+      AppToast.show(
+        context,
+        '${member.name}님 ${result.sign.sessionNo}회차 수업이 기록되었습니다',
+      );
+      Navigator.pop(context, true);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      AppToast.show(context, messageOf(error));
+    }
   }
 
   @override
@@ -1621,10 +1990,10 @@ class _SignScreenState extends State<_SignScreen> {
                 Expanded(
                   child: BottomActionButton(
                     id: 'sign-done',
-                    label: '싸인 완료',
+                    label: _saving ? '기록 중...' : '싸인 완료',
                     // 서명해야 채워진 상태가 되고,
                     // 미서명 시 동작은 _complete에서 무시한다
-                    filled: _signed,
+                    filled: _signed && !_saving,
                     onPressed: _complete,
                   ),
                 ),
@@ -1637,19 +2006,17 @@ class _SignScreenState extends State<_SignScreen> {
   }
 }
 
-/// 서명 획을 그리는 페인터 — sourceSize가 있으면 미리보기용으로 비율 축소
+/// 서명 획을 그리는 페인터
 class _SignPainter extends CustomPainter {
   _SignPainter({
     required this.strokes,
     required this.color,
     required this.strokeWidth,
-    this.sourceSize,
   });
 
   final List<List<Offset>> strokes;
   final Color color;
   final double strokeWidth;
-  final Size? sourceSize;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1659,19 +2026,6 @@ class _SignPainter extends CustomPainter {
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
-
-    final source = sourceSize;
-    if (source != null && source.width > 0 && source.height > 0) {
-      final scale = (size.width / source.width) < (size.height / source.height)
-          ? size.width / source.width
-          : size.height / source.height;
-      // 축소 후 가운데 정렬
-      canvas.translate(
-        (size.width - source.width * scale) / 2,
-        (size.height - source.height * scale) / 2,
-      );
-      canvas.scale(scale);
-    }
 
     for (final stroke in strokes) {
       if (stroke.length < 2) continue;

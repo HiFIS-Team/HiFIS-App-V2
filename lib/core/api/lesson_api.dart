@@ -1,0 +1,335 @@
+import 'api_client.dart';
+
+/// 등록 종류 — 서버 `RegistrationType`
+enum RegistrationType {
+  newMember('NEW', '신규'),
+  renewal('RENEWAL', '재등록');
+
+  const RegistrationType(this.wire, this.label);
+
+  final String wire;
+  final String label;
+
+  static RegistrationType parse(String? value) =>
+      RegistrationType.values.firstWhere(
+        (t) => t.wire == value,
+        orElse: () => RegistrationType.newMember,
+      );
+}
+
+/// 등록권 상태 — 서버 `RegistrationStatus`
+///
+/// 회차를 다 쓰면 서버가 알아서 `EXPIRED` 로 바꾼다.
+enum RegistrationStatus {
+  active('ACTIVE'),
+  expired('EXPIRED');
+
+  const RegistrationStatus(this.wire);
+
+  final String wire;
+
+  static RegistrationStatus parse(String? value) =>
+      RegistrationStatus.values.firstWhere(
+        (s) => s.wire == value,
+        orElse: () => RegistrationStatus.active,
+      );
+}
+
+/// 센터 회원 (서버 `MemberOut`)
+class Member {
+  Member({
+    required this.id,
+    required this.name,
+    required this.phone,
+    required this.branchId,
+    required this.ownerTrainerId,
+    required this.registeredAt,
+    this.referrerMemberId,
+    this.memo,
+  });
+
+  factory Member.fromJson(Map<String, dynamic> json) => Member(
+    id: json['id'] as String,
+    name: json['name'] as String,
+    phone: json['phone'] as String,
+    branchId: json['branchId'] as String,
+    ownerTrainerId: json['ownerTrainerId'] as String,
+    registeredAt: DateTime.parse(json['registeredAt'] as String).toLocal(),
+    referrerMemberId: json['referrerMemberId'] as String?,
+    memo: json['memo'] as String?,
+  );
+
+  final String id;
+  final String name;
+  final String phone;
+  final String branchId;
+
+  /// 담당 트레이너 — 매출이 이 사람에게 붙는다
+  final String ownerTrainerId;
+
+  /// 소개한 회원 — 이름이 아니라 회원 id 다
+  final String? referrerMemberId;
+
+  final DateTime registeredAt;
+  final String? memo;
+}
+
+/// 등록권 한 건 (서버 `RegistrationOut`)
+///
+/// 회원이 결제한 수업 묶음이다. 재등록하면 새 등록권이 하나 더 생긴다.
+class Registration {
+  Registration({
+    required this.id,
+    required this.memberId,
+    required this.trainerId,
+    required this.type,
+    required this.totalSessions,
+    required this.usedSessions,
+    required this.pricePaid,
+    required this.sessionUnitPrice,
+    required this.status,
+    required this.purchasedAt,
+  });
+
+  factory Registration.fromJson(Map<String, dynamic> json) => Registration(
+    id: json['id'] as String,
+    memberId: json['memberId'] as String,
+    trainerId: json['trainerId'] as String,
+    type: RegistrationType.parse(json['type'] as String?),
+    totalSessions: json['totalSessions'] as int,
+    usedSessions: json['usedSessions'] as int,
+    pricePaid: json['pricePaid'] as int,
+    sessionUnitPrice: json['sessionUnitPrice'] as int,
+    status: RegistrationStatus.parse(json['status'] as String?),
+    purchasedAt: DateTime.parse(json['purchasedAt'] as String).toLocal(),
+  );
+
+  final String id;
+  final String memberId;
+  final String trainerId;
+  final RegistrationType type;
+
+  /// 등록한 총 회차
+  final int totalSessions;
+
+  /// 싸인으로 소진된 회차
+  final int usedSessions;
+
+  /// 결제액
+  final int pricePaid;
+
+  /// 회당 단가 — 결제액 ÷ 회차
+  final int sessionUnitPrice;
+
+  final RegistrationStatus status;
+  final DateTime purchasedAt;
+
+  int get remaining => totalSessions - usedSessions;
+
+  bool get exhausted => status == RegistrationStatus.expired || remaining <= 0;
+}
+
+/// 세션 싸인 한 건 (서버 `SessionSignOut`)
+///
+/// 회원 이름·총 회차는 여기 없다 — [Member]·[Registration] 을 따로 받아
+/// id 로 맞춰야 한다.
+class SessionSign {
+  SessionSign({
+    required this.id,
+    required this.registrationId,
+    required this.memberId,
+    required this.performedByTrainerId,
+    required this.sessionNo,
+    required this.signatureUrl,
+    required this.signedAt,
+  });
+
+  factory SessionSign.fromJson(Map<String, dynamic> json) => SessionSign(
+    id: json['id'] as String,
+    registrationId: json['registrationId'] as String,
+    memberId: json['memberId'] as String,
+    performedByTrainerId: json['performedByTrainerId'] as String,
+    sessionNo: json['sessionNo'] as int,
+    signatureUrl: json['signatureUrl'] as String,
+    signedAt: DateTime.parse(json['signedAt'] as String).toLocal(),
+  );
+
+  final String id;
+  final String registrationId;
+  final String memberId;
+
+  /// 수업을 한 트레이너 — 담당과 다를 수 있다 (대타)
+  final String performedByTrainerId;
+
+  /// 몇 회차인지 (1부터)
+  final int sessionNo;
+
+  /// 서명 이미지 — `/files/...?exp=&sig=` 꼴의 상대 경로
+  ///
+  /// 서명(HMAC)이 곧 인증이라 헤더 없이 `<img>` 로 바로 뜬다.
+  /// 대신 **7일이 지나면 403** 이라, 목록을 다시 받아 새 URL을 얻어야 한다.
+  final String signatureUrl;
+
+  final DateTime signedAt;
+
+  /// 화면에 띄울 전체 주소
+  String get signatureFullUrl => fileUrl(signatureUrl);
+}
+
+/// 싸인 저장 결과 — 갱신된 등록권이 같이 온다 (usedSessions 가 올라간 상태)
+class SessionSignResult {
+  SessionSignResult({required this.sign, required this.registration});
+
+  factory SessionSignResult.fromJson(Map<String, dynamic> json) =>
+      SessionSignResult(
+        sign: SessionSign.fromJson(
+          (json['sign'] as Map).cast<String, dynamic>(),
+        ),
+        registration: Registration.fromJson(
+          (json['registration'] as Map).cast<String, dynamic>(),
+        ),
+      );
+
+  final SessionSign sign;
+  final Registration registration;
+}
+
+/// `2026-07` — 서버 `period` 쿼리 형식
+String periodKey(DateTime date) =>
+    '${date.year.toString().padLeft(4, '0')}-'
+    '${date.month.toString().padLeft(2, '0')}';
+
+/// `/members` — 센터 회원
+///
+/// 목록은 지점 스코프다. 점장·직원은 본인 지점만, 대표·관리자는 전 지점.
+class MemberApi {
+  MemberApi._();
+
+  static Future<List<Member>> list({
+    String? branchId,
+    String? ownerTrainerId,
+    String? query,
+  }) async {
+    final rows = await ApiClient.instance.getList(
+      '/members',
+      query: {
+        'branchId': ?branchId,
+        'ownerTrainerId': ?ownerTrainerId,
+        if (query != null && query.isNotEmpty) 'q': query,
+      },
+    );
+    return [
+      for (final row in rows)
+        Member.fromJson((row as Map).cast<String, dynamic>()),
+    ];
+  }
+
+  static Future<Member> create({
+    required String name,
+    required String phone,
+    required String branchId,
+    required String ownerTrainerId,
+    String? referrerMemberId,
+    String? memo,
+  }) async {
+    final data = await ApiClient.instance.post(
+      '/members',
+      body: {
+        'name': name,
+        'phone': phone,
+        'branchId': branchId,
+        'ownerTrainerId': ownerTrainerId,
+        'referrerMemberId': ?referrerMemberId,
+        'memo': ?memo,
+      },
+    );
+    return Member.fromJson(data!);
+  }
+}
+
+/// `/registrations` — 등록권 (급여 인센티브 산출의 입력값)
+class RegistrationApi {
+  RegistrationApi._();
+
+  static Future<List<Registration>> list({
+    String? trainerId,
+    RegistrationType? type,
+    String? period,
+  }) async {
+    final rows = await ApiClient.instance.getList(
+      '/registrations',
+      query: {'trainerId': ?trainerId, 'type': ?type?.wire, 'period': ?period},
+    );
+    return [
+      for (final row in rows)
+        Registration.fromJson((row as Map).cast<String, dynamic>()),
+    ];
+  }
+
+  /// 등록권 발급 — 직원은 본인 담당(`trainerId` = 본인)만 만들 수 있다
+  static Future<Registration> create({
+    required String memberId,
+    required String trainerId,
+    required RegistrationType type,
+    required int totalSessions,
+    required int pricePaid,
+    required int sessionUnitPrice,
+  }) async {
+    final data = await ApiClient.instance.post(
+      '/registrations',
+      body: {
+        'memberId': memberId,
+        'trainerId': trainerId,
+        'type': type.wire,
+        'totalSessions': totalSessions,
+        'pricePaid': pricePaid,
+        'sessionUnitPrice': sessionUnitPrice,
+      },
+    );
+    return Registration.fromJson(data!);
+  }
+}
+
+/// `/session-signs` — 세션 싸인
+class SessionSignApi {
+  SessionSignApi._();
+
+  static Future<List<SessionSign>> list({
+    String? trainerId,
+    String? memberId,
+    String? period,
+  }) async {
+    final rows = await ApiClient.instance.getList(
+      '/session-signs',
+      query: {
+        'trainerId': ?trainerId,
+        'memberId': ?memberId,
+        'period': ?period,
+      },
+    );
+    return [
+      for (final row in rows)
+        SessionSign.fromJson((row as Map).cast<String, dynamic>()),
+    ];
+  }
+
+  /// 싸인 저장 — 회차가 1 올라가고 수업왕 점수가 2점 쌓인다
+  ///
+  /// [signatureBase64] 는 PNG 를 base64 로 만든 것. 서버가 파일로 떨군다.
+  /// [performedByTrainerId] 를 안 주면 요청한 사람이 수행자가 된다 (대타는 지정).
+  static Future<SessionSignResult> create({
+    required String registrationId,
+    required String signatureBase64,
+    String? performedByTrainerId,
+  }) async {
+    final data = await ApiClient.instance.post(
+      '/session-signs',
+      body: {
+        'registrationId': registrationId,
+        'signatureBase64': signatureBase64,
+        'performedByTrainerId': ?performedByTrainerId,
+      },
+    );
+    return SessionSignResult.fromJson(data!);
+  }
+}

@@ -23,6 +23,13 @@ String get apiBaseUrl {
   return 'http://localhost:8001';
 }
 
+/// 서버가 준 파일 경로(`/files/...?exp=&sig=`)를 띄울 수 있는 주소로
+///
+/// 서명(HMAC)이 URL 안에 있어서 헤더 없이 `Image.network` 로 바로 뜬다.
+/// 대신 서명이 7일 뒤 만료되므로, 오래 들고 있던 경로는 목록을 다시 받아야 한다.
+String fileUrl(String path) =>
+    path.startsWith('http') ? path : '$apiBaseUrl$path';
+
 /// 서버와 이야기하는 창구 하나
 ///
 /// - 요청마다 access 토큰을 붙인다
