@@ -51,42 +51,6 @@ class _PayslipFormState extends State<_PayslipForm> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        _FormLabel('근무 실적'),
-        SizedBox(height: 8),
-        Container(
-          padding: EdgeInsets.fromLTRB(16, 14, 16, 14),
-          decoration: BoxDecoration(
-            color: AppColors.gray50,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            children: [
-              _fact('PT 세션', '${payslip.sessions}회'),
-              SizedBox(height: 8),
-              _fact('신규 등록', '${payslip.newSignups}건'),
-              SizedBox(height: 8),
-              _fact('재등록', '${payslip.reSignups}건'),
-              SizedBox(height: 10),
-              Row(
-                children: [
-                  Icon(
-                    CupertinoIcons.info_circle_fill,
-                    size: 13,
-                    color: AppColors.gray400,
-                  ),
-                  SizedBox(width: 5),
-                  Expanded(
-                    child: Text(
-                      '수업·근태 기록에서 회사가 집계한 값이라 고칠 수 없어요.',
-                      style: AppTextStyles.caption.copyWith(fontSize: 12),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        SizedBox(height: 16),
         _FormLabel('신청 금액'),
         SizedBox(height: 8),
         Container(
@@ -128,6 +92,23 @@ class _PayslipFormState extends State<_PayslipForm> {
             ],
           ),
         ),
+        SizedBox(height: 8),
+        Row(
+          children: [
+            Icon(
+              CupertinoIcons.info_circle,
+              size: 13,
+              color: AppColors.gray400,
+            ),
+            SizedBox(width: 5),
+            Expanded(
+              child: Text(
+                '세션·등록 건수는 수업 기록에서 회사가 집계한 값이라 고칠 수 없어요.',
+                style: AppTextStyles.caption.copyWith(fontSize: 12),
+              ),
+            ),
+          ],
+        ),
         SizedBox(height: 16),
         _FormLabel('특이사항 (선택)'),
         SizedBox(height: 8),
@@ -139,7 +120,7 @@ class _PayslipFormState extends State<_PayslipForm> {
           ),
           child: TextField(
             controller: _note,
-            maxLines: 3,
+            maxLines: 2,
             style: AppTextStyles.body2,
             cursorColor: AppColors.primary,
             decoration: InputDecoration(
@@ -153,13 +134,8 @@ class _PayslipFormState extends State<_PayslipForm> {
         SizedBox(height: 14),
         // 실제 입금액이 다르다는 건 나중에 문의로 돌아오는 부분이라 눈에 띄게
         _TaxNotice(
-          '위 금액은 세금·보험 공제 전이에요.\n'
-          '4대보험·소득세는 회사에서 따로 떼고 ${_dayLabel(payslip.payDay)}에 입금돼요.',
-        ),
-        SizedBox(height: 10),
-        Text(
-          '제출하면 대표 승인 후 지급 처리돼요.',
-          style: AppTextStyles.caption.copyWith(height: 1.5),
+          '위 금액은 세금·보험 공제 전이에요. 4대보험·소득세를 회사에서 따로 뗀 뒤 '
+          '대표 승인을 거쳐 ${_dayLabel(payslip.payDay)}에 입금돼요.',
         ),
       ],
     );
@@ -218,16 +194,6 @@ class _PayslipFormState extends State<_PayslipForm> {
       ),
     );
   }
-
-  Widget _fact(String label, String value) => Row(
-    children: [
-      Expanded(child: Text(label, style: AppTextStyles.body2)),
-      Text(
-        value,
-        style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w700),
-      ),
-    ],
-  );
 
   Widget _amountRow(_PayItem item) => Row(
     children: [
