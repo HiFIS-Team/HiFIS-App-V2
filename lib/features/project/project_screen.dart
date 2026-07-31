@@ -13,6 +13,7 @@ import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/avatar.dart';
 import '../../core/widgets/glass_bottom_button.dart';
+import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/pressable.dart';
@@ -424,6 +425,33 @@ class _EmptyDetail extends StatelessWidget {
 
 // ── 우측 상세 ──
 
+/// 기한 연장 신청 — 승인 전까지 마감일은 그대로다
+///
+/// PC 머리말의 글자 버튼과 폰 상단 글래스 버튼이 같이 쓴다.
+Future<void> _extendProject(
+  BuildContext context,
+  _Project project,
+  VoidCallback onChanged,
+) async {
+  final request = await _showExtensionDialog(context, project);
+  if (request == null) return;
+  final before = _date(project.due);
+  project.request = request;
+  project.events.insert(
+    0,
+    _Event(
+      author: me,
+      text: '기한 연장 신청 ($before → ${_date(request.due)})',
+      time: DateTime.now(),
+    ),
+  );
+  onChanged();
+}
+
+/// 연장 신청을 올릴 수 있는 상태 (끝났거나 이미 올린 신청이 있으면 못 올린다)
+bool _canExtendProject(_Project project) =>
+    project.phase != _Phase.done && project.request == null;
+
 class _ProjectDetail extends StatelessWidget {
   _ProjectDetail({
     super.key,
@@ -480,13 +508,8 @@ class _ProjectDetail extends StatelessWidget {
   }
 
   /// 기한 연장 신청 — 승인 전까지 마감일은 그대로다
-  Future<void> _requestExtension(BuildContext context) async {
-    final request = await _showExtensionDialog(context, project);
-    if (request == null) return;
-    project.request = request;
-    _log('기한 연장 신청 (${_date(project.due)} → ${_date(request.due)})');
-    onChanged();
-  }
+  Future<void> _requestExtension(BuildContext context) =>
+      _extendProject(context, project, onChanged);
 
   /// 승인·반려 모두 사유를 남겨야 처리된다
   Future<void> _decide(BuildContext context, {required bool approve}) async {
@@ -514,33 +537,22 @@ class _ProjectDetail extends StatelessWidget {
   }
 
   /// 연장 신청 버튼 (끝난 프로젝트나 이미 올린 신청이 있으면 감춘다)
-  ///
-  /// 자주 쓰는 동작이 아니라 글자로 두면 기간 옆에 붙어 어수선하다.
-  /// 오른쪽 끝에 아이콘으로 세우고 무엇인지는 툴팁으로 알린다.
-  Widget _extendButton(BuildContext context) => Tooltip(
-    message: '기한 연장 신청',
-    child: Pressable(
-      onTap: () => _requestExtension(context),
-      scale: 0.92,
-      child: Container(
-        width: 30,
-        height: 30,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: AppColors.primaryLight,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(
-          CupertinoIcons.calendar_badge_plus,
-          size: 15,
-          color: AppColors.primary,
-        ),
+  Widget _extendButton(BuildContext context) => Pressable(
+    onTap: () => _requestExtension(context),
+    scale: 0.94,
+    pressedColor: AppColors.gray100,
+    borderRadius: BorderRadius.circular(100),
+    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+    child: Text(
+      '기한 연장',
+      style: AppTextStyles.caption.copyWith(
+        color: AppColors.primary,
+        fontWeight: FontWeight.w700,
       ),
     ),
   );
 
-  bool get _canExtend =>
-      project.phase != _Phase.done && project.request == null;
+  bool get _canExtend => _canExtendProject(project);
 
   /// 데스크톱 머리말 — 한 줄에 이름·D-day, 오른쪽 끝에 참여자
   List<Widget> _desktopHead(BuildContext context, int dday) => [
@@ -578,16 +590,11 @@ class _ProjectDetail extends StatelessWidget {
     SizedBox(height: 6),
     Row(
       children: [
-        Expanded(
-          child: Text(
-            '${_date(project.start)} ~ ${_date(project.due)} · 담당 ${project.owner}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppTextStyles.caption,
-          ),
+        Text(
+          '${_date(project.start)} ~ ${_date(project.due)} · 담당 ${project.owner}',
+          style: AppTextStyles.caption,
         ),
-        // 위 참여자 줄과 같은 오른쪽 끝에 세운다
-        if (_canExtend) ...[SizedBox(width: 12), _extendButton(context)],
+        if (_canExtend) ...[SizedBox(width: 8), _extendButton(context)],
       ],
     ),
     if (project.desc.isNotEmpty) ...[
@@ -638,12 +645,9 @@ class _ProjectDetail extends StatelessWidget {
       ),
     ],
     SizedBox(height: 12),
+    // 연장 신청은 상단 글래스 버튼으로 올라가 여기엔 참여자만 남는다
     Row(
-      children: [
-        _MemberBar(project: project, onChanged: onChanged),
-        Spacer(),
-        if (_canExtend) _extendButton(context),
-      ],
+      children: [_MemberBar(project: project, onChanged: onChanged)],
     ),
   ];
 

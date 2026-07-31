@@ -186,6 +186,15 @@ class _ProjectDetailScreenState extends State<_ProjectDetailScreen> {
   Widget build(BuildContext context) {
     return PhoneDetailScaffold(
       title: '프로젝트',
+      // 연장 신청은 자주 쓰는 동작이 아니라 본문 대신 상단 글래스 버튼에 둔다
+      actions: [
+        if (_canExtendProject(widget.project))
+          GlassIconButton(
+            symbol: 'calendar.badge.plus',
+            onPressed: () =>
+                _extendProject(context, widget.project, () => setState(() {})),
+          ),
+      ],
       child: _ProjectDetail(
         project: widget.project,
         onChanged: () => setState(() {}),
