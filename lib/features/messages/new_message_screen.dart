@@ -35,7 +35,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
 
   static final List<_Member> _members = [
     _Member('이준승', '센터', '대표', Color(0xFF7C5CFC)),
-    _Member('차민석', '센터', '개발', Color(0xFF00A8B5)),
+    _Member('이준경', '센터', '개발', Color(0xFF00A8B5)),
     _Member('민중기', '센터', '점장', AppColors.success),
     _Member('박준현', '센터', '트레이너', AppColors.warning),
     _Member('유찬빈', '센터', '트레이너', AppColors.primary),

@@ -176,7 +176,7 @@ final _submitted = <String>{};
 const _persons = [
   _Person(_me, '본인 평가', AppColors.primary, isSelf: true),
   _Person('이준승', '대표', Color(0xFF7C5CFC)),
-  _Person('차민석', '개발', Color(0xFF00A8B5)),
+  _Person('이준경', '개발', Color(0xFF00A8B5)),
   _Person('민중기', '점장', AppColors.success),
   _Person('박준현', '트레이너', AppColors.warning),
   _Person('유찬빈', '트레이너', Color(0xFF5C7CFA)),

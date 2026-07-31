@@ -150,13 +150,14 @@ class _GlassInputBarState extends State<GlassInputBar> {
                         duration: Duration(milliseconds: 220),
                         switchInCurve: Curves.easeOutBack,
                         switchOutCurve: Curves.easeIn,
-                        transitionBuilder: (child, animation) => ScaleTransition(
-                          scale: animation,
-                          child: FadeTransition(
-                            opacity: animation,
-                            child: child,
-                          ),
-                        ),
+                        transitionBuilder: (child, animation) =>
+                            ScaleTransition(
+                              scale: animation,
+                              child: FadeTransition(
+                                opacity: animation,
+                                child: child,
+                              ),
+                            ),
                         child: _hasText
                             ? GestureDetector(
                                 key: ValueKey('send'),

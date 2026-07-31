@@ -2783,7 +2783,7 @@ List<_Project> _seedProjects() {
       owner: '이준승',
       start: day(2),
       due: day(23),
-      members: [me, '이준승', '민중기', '차민석', '박준현', '전상현'],
+      members: [me, '이준승', '민중기', '이준경', '박준현', '전상현'],
       todos: [
         _Todo(text: '공사 업체 선정', assignee: '이준승'),
         _Todo(text: '공사 기간 회원 안내문', assignee: '민중기'),
@@ -2806,10 +2806,10 @@ List<_Project> _seedProjects() {
       owner: '민중기',
       start: day(-25),
       due: day(-4),
-      members: [me, '민중기', '차민석'],
+      members: [me, '민중기', '이준경'],
       todos: [
         _Todo(text: '소방 설비 점검', assignee: '민중기', done: true),
-        _Todo(text: '전기 안전 진단', assignee: '차민석'),
+        _Todo(text: '전기 안전 진단', assignee: '이준경'),
         _Todo(text: '점검 결과 보고서 제출', assignee: me),
       ],
       events: [_Event(author: '민중기', text: "'소방 설비 점검' 완료", time: ago(120))],

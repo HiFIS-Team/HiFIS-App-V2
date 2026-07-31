@@ -64,7 +64,7 @@ final _members = <_LessonMember>[
 /// 다른 트레이너 담당 회원 (세션 싸인 받기의 전체 탭에서만 노출)
 final _otherMembers = <_LessonMember>[
   _LessonMember(
-    name: '정다은',
+    name: '윤소라',
     color: _palette[3],
     total: 20,
     done: 3,

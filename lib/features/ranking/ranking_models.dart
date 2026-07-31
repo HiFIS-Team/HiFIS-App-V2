@@ -151,7 +151,7 @@ const _rankers = [
     lastRank: [6, 6, 4, 1, 5],
   ),
   _Ranker(
-    name: '정다은',
+    name: '문명진',
     team: '마케팅',
     branch: '강남점',
     revenue: 7300000,
@@ -166,7 +166,7 @@ const _rankers = [
     lastRank: [7, 7, 6, 6, 7],
   ),
   _Ranker(
-    name: '차민석',
+    name: '이준경',
     team: '개발',
     branch: '강남점',
     revenue: 0,
@@ -181,7 +181,7 @@ const _rankers = [
     lastRank: [8, 8, 7, 7, 6],
   ),
   _Ranker(
-    name: '문가온',
+    name: '이지영',
     team: '트레이너',
     branch: '잠실점',
     revenue: 17600000,
@@ -196,7 +196,7 @@ const _rankers = [
     lastRank: [1, 1, 2, 1, 1],
   ),
   _Ranker(
-    name: '배시현',
+    name: '김재훈',
     team: 'FC',
     branch: '잠실점',
     revenue: 12100000,
