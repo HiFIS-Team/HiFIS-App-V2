@@ -1,21 +1,6 @@
 import '../data/employee.dart';
 import 'api_client.dart';
 
-/// 회원가입 결과 — 초대키로 바로 가입됐는지, 승인을 기다리는지
-enum SignupResult {
-  joined('JOINED'),
-  pending('PENDING');
-
-  const SignupResult(this.wire);
-
-  final String wire;
-
-  static SignupResult parse(String? value) => SignupResult.values.firstWhere(
-    (r) => r.wire == value,
-    orElse: () => SignupResult.pending,
-  );
-}
-
 /// 로그인 응답 — 토큰 두 장과 내 정보
 class LoginResult {
   LoginResult({
@@ -52,26 +37,23 @@ class AuthApi {
     );
   }
 
-  /// 회원가입 — 초대키가 유효하면 바로 가입되고, 없으면 승인 대기로 넘어간다
-  static Future<SignupResult> signup({
+  /// 회원가입 — 유효한 초대키가 있어야 한다 (없으면 서버가 400)
+  static Future<void> signup({
     required String name,
     required String email,
     required String password,
     required String phone,
-    String? inviteKey,
-  }) async {
-    final data = await _client.post(
-      '/auth/signup',
-      body: {
-        'name': name,
-        'email': email,
-        'password': password,
-        'phone': phone,
-        if (inviteKey != null && inviteKey.isNotEmpty) 'inviteKey': inviteKey,
-      },
-    );
-    return SignupResult.parse(data?['result'] as String?);
-  }
+    required String inviteKey,
+  }) => _client.post(
+    '/auth/signup',
+    body: {
+      'name': name,
+      'email': email,
+      'password': password,
+      'phone': phone,
+      'inviteKey': inviteKey,
+    },
+  );
 
   static Future<Employee> me() async =>
       Employee.fromJson(await _client.get('/auth/me'));

@@ -1,18 +1,9 @@
 part of 'auth_screen.dart';
 
-/// 회원가입 결과 — 로그인 화면이 안내 문구를 고르는 데 쓴다
-class _SignupOutcome {
-  _SignupOutcome(this.email, this.result);
-
-  final String email;
-  final SignupResult result;
-}
-
 /// 회원가입 — 초대키를 받은 직원만 가입할 수 있다
 ///
-/// 서버는 초대키 없이도 승인 대기(PENDING)로 받아 주지만, 앱은 초대키를
-/// 필수로 받는다. 닫힐 때 가입한 이메일과 결과를 돌려주므로 로그인 화면이
-/// 이메일을 채워 두고 안내를 띄운다.
+/// 성공하면 가입한 이메일을 돌려주며 닫힌다. 로그인 화면이 그 이메일을
+/// 채워 두기 때문에 바로 로그인할 수 있다.
 class _SignupScreen extends StatefulWidget {
   _SignupScreen();
 
@@ -126,7 +117,7 @@ class _SignupScreenState extends State<_SignupScreen> {
 
     setState(() => _busy = true);
     try {
-      final result = await AuthApi.signup(
+      await AuthApi.signup(
         name: name,
         email: email,
         password: _password.text,
@@ -134,7 +125,7 @@ class _SignupScreenState extends State<_SignupScreen> {
         inviteKey: invite,
       );
       if (!mounted) return;
-      Navigator.pop(context, _SignupOutcome(email, result));
+      Navigator.pop(context, email);
     } catch (error) {
       if (!mounted) return;
       // 이메일 중복·초대키 만료 등 서버가 알려준 이유를 해당 칸에 붙인다

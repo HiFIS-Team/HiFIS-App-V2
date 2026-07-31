@@ -80,23 +80,18 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _openSignup() async {
-    final outcome = await Navigator.push<_SignupOutcome>(
+    final email = await Navigator.push<String>(
       context,
       CupertinoPageRoute(builder: (_) => _SignupScreen()),
     );
-    if (outcome == null || !mounted) return;
+    if (email == null || !mounted) return;
 
     // 가입한 이메일로 바로 로그인할 수 있게 채워 준다
     setState(() {
-      _email.text = outcome.email;
+      _email.text = email;
       _emailError = null;
     });
-    AppToast.show(
-      context,
-      outcome.result == SignupResult.joined
-          ? '가입이 완료됐어요. 로그인해 주세요'
-          : '가입 신청이 접수됐어요. 관리자 승인 후 로그인할 수 있어요',
-    );
+    AppToast.show(context, '가입이 완료됐어요. 로그인해 주세요');
   }
 
   Future<void> _openReset() async {
