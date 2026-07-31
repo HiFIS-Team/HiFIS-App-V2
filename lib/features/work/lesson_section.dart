@@ -225,21 +225,15 @@ void _showSignDetail(BuildContext context, _LessonSign sign) {
 }
 
 class _LessonSectionState extends State<LessonSection> {
-  /// 회원 등록 화면을 연다
+  /// 회원 등록 화면을 연다 — 폰은 밀려 들어오고 PC는 모달로 뜬다
   Future<void> _register() async {
-    final added = await Navigator.push<bool>(
-      context,
-      CupertinoPageRoute(builder: (_) => _RegisterScreen()),
-    );
+    final added = await showFullPage<bool>(context, (_) => _RegisterScreen());
     if (added == true && mounted) setState(() {});
   }
 
   /// 회원을 골라 싸인을 받는다
   Future<void> _pickAndSign() async {
-    await Navigator.push(
-      context,
-      CupertinoPageRoute(builder: (_) => _PickMemberScreen()),
-    );
+    await showFullPage<void>(context, (_) => _PickMemberScreen());
     // 싸인이 추가됐을 수 있으니 갱신한다
     if (mounted) setState(() {});
   }
@@ -1250,10 +1244,13 @@ class _PickMemberScreenState extends State<_PickMemberScreen> {
   }
 
   /// 회원을 누르면 바로 서명 화면으로 이동한다
+  ///
+  /// 선택 화면이 PC에서 모달이라 서명도 모달로 겹쳐 띄운다.
+  /// (여기서 push를 쓰면 모달 밖 루트로 나가 창 전체를 덮는다)
   Future<void> _open(_LessonMember member) async {
-    final done = await Navigator.push<bool>(
+    final done = await showFullPage<bool>(
       context,
-      CupertinoPageRoute(builder: (_) => _SignScreen(member: member)),
+      (_) => _SignScreen(member: member),
     );
     // 싸인을 받았으면 선택 화면도 닫고 업무 탭으로 돌아간다
     if (done == true && mounted) Navigator.pop(context);
