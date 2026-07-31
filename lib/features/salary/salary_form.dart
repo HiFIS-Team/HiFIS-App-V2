@@ -350,10 +350,11 @@ class _StatusNotice extends StatelessWidget {
     };
 
     return Container(
-      padding: EdgeInsets.fromLTRB(16, 14, 16, 14),
+      padding: EdgeInsets.fromLTRB(22, 20, 22, 20),
       decoration: BoxDecoration(
         color: status.color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(14),
+        // 옆 지급 카드와 같은 네모로 보이게 모서리를 맞춘다
+        borderRadius: BorderRadius.circular(24),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -391,7 +392,10 @@ class _StatusNotice extends StatelessWidget {
               height: 1.5,
             ),
           ),
-          SizedBox(height: 12),
+          // 데스크톱은 옆 카드와 높이를 맞추느라 남는 공간이 생긴다.
+          // 버튼을 아래로 밀어 붙여 빈자리가 위쪽 설명 아래로 모이게 한다
+          if (isDesktop) Spacer() else SizedBox(height: 12),
+          if (isDesktop) SizedBox(height: 12),
           Pressable(
             onTap: onAction,
             scale: 0.97,

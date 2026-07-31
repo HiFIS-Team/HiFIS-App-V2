@@ -94,27 +94,28 @@ class _SalaryScreenState extends State<SalaryScreen> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(flex: 3, child: _SummaryCard(payslip: current)),
+                  Expanded(child: _SummaryCard(payslip: current)),
                   SizedBox(width: 16),
-                  Expanded(flex: 4, child: _TrendCard()),
+                  Expanded(child: _TrendCard()),
                 ],
               ),
             ),
             SizedBox(height: 16),
-            // 늘리지 않고 각자 높이대로 — 안내가 짧아 늘리면 아래가 빈다
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: _PayCard(payslip: current)),
-                SizedBox(width: 16),
-                Expanded(
-                  child: _StatusNotice(
-                    payslip: current,
-                    onSubmit: () => _submit(current),
-                    onCancel: () => _cancel(current),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: _PayCard(payslip: current)),
+                  SizedBox(width: 16),
+                  Expanded(
+                    child: _StatusNotice(
+                      payslip: current,
+                      onSubmit: () => _submit(current),
+                      onCancel: () => _cancel(current),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             SizedBox(height: 16),
             _HistoryCard(onOpenAll: () => _openHistory(context)),
