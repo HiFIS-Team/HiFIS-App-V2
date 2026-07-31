@@ -525,53 +525,65 @@ class _TeamChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 지금 범위에 아무도 없는 팀은 칩을 만들지 않는다
-    final teams = _teams.where((t) => _countOf(t) > 0 || t == selected);
-
+    // 탭을 옮길 때마다 칩이 늘었다 줄었다 하면 자리를 못 외운다.
+    // 팀은 항상 같은 자리에 두고, 아무도 없으면 0으로 알린다.
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: [
-        for (final team in teams)
-          Pressable(
-            onTap: () => onSelect(team),
-            scale: 0.96,
-            child: AnimatedContainer(
-              duration: Duration(milliseconds: 140),
-              height: 38,
-              padding: EdgeInsets.symmetric(horizontal: 14),
-              decoration: BoxDecoration(
-                color: team == selected ? AppColors.primary : AppColors.gray100,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              // 칸이 남는 폭을 다 먹지 않게 내용만큼만 잡는다
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    team,
-                    style: AppTextStyles.label.copyWith(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: team == selected
-                          ? Colors.white
-                          : AppColors.gray600,
-                    ),
+        for (final team in _teams)
+          Builder(
+            builder: (context) {
+              final count = _countOf(team);
+              final on = team == selected;
+              // 비어 있는 팀은 눌러도 볼 게 없어 한 톤 흐리게 둔다
+              final empty = count == 0 && !on;
+
+              return Pressable(
+                onTap: () => onSelect(team),
+                scale: 0.96,
+                child: AnimatedContainer(
+                  duration: Duration(milliseconds: 140),
+                  height: 38,
+                  padding: EdgeInsets.symmetric(horizontal: 14),
+                  decoration: BoxDecoration(
+                    color: on ? AppColors.primary : AppColors.gray100,
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  SizedBox(width: 6),
-                  Text(
-                    '${_countOf(team)}',
-                    style: AppTextStyles.caption.copyWith(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: team == selected
-                          ? Colors.white.withValues(alpha: 0.8)
-                          : AppColors.gray400,
-                    ),
+                  // 칸이 남는 폭을 다 먹지 않게 내용만큼만 잡는다
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        team,
+                        style: AppTextStyles.label.copyWith(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: on
+                              ? Colors.white
+                              : empty
+                              ? AppColors.gray400
+                              : AppColors.gray600,
+                        ),
+                      ),
+                      SizedBox(width: 6),
+                      Text(
+                        '$count',
+                        style: AppTextStyles.caption.copyWith(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: on
+                              ? Colors.white.withValues(alpha: 0.8)
+                              : empty
+                              ? AppColors.gray300
+                              : AppColors.gray400,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           ),
       ],
     );
