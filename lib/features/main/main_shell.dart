@@ -12,7 +12,6 @@ import '../../core/widgets/app_tab_bar.dart';
 import '../../core/widgets/pressable.dart';
 import 'desktop_sidebar.dart';
 import '../../core/widgets/glass_icon_button.dart';
-import '../../core/widgets/placeholder_screen.dart';
 import '../../core/widgets/lazy_indexed_stack.dart';
 import '../approval/approval_screen.dart';
 import '../documents/document_screen.dart';
@@ -27,6 +26,7 @@ import '../notice/notice_screen.dart';
 import '../notifications/notification_screen.dart';
 import '../profile/profile_screen.dart';
 import '../project/project_screen.dart';
+import '../ranking/ranking_screen.dart';
 import '../schedule/schedule_screen.dart';
 import '../salary/salary_screen.dart';
 import '../staff/staff_screen.dart';
@@ -105,7 +105,7 @@ class _MainShellState extends State<MainShell> {
     AttendanceScreen(),
     SalaryScreen(),
     NoticeScreen(),
-    PlaceholderScreen(emoji: '🏆', title: '랭킹'),
+    RankingScreen(),
   ];
 
   bool _subMenu = false;
@@ -148,7 +148,7 @@ class _MainShellState extends State<MainShell> {
     AttendanceScreen(),
     SalaryScreen(),
     NoticeScreen(),
-    PlaceholderScreen(emoji: '🏆', title: '랭킹'),
+    RankingScreen(),
   ];
 
   /// 사이드바 선택 인덱스 (_desktopPages 순서 기준)
