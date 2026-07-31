@@ -17,15 +17,20 @@ import '../../core/widgets/glass_bottom_button.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/pressable.dart';
 import '../../core/widgets/progress_bar.dart';
+import '../../core/widgets/see_all_button.dart';
 
 /// 동료 평가 탭 콘텐츠
 ///
-/// 같은 지점 사람이 한 줄씩 나열되고, 줄을 누르면 평가 화면으로 이동한다.
+/// 보는 사람에 따라 화면이 갈린다.
+/// - **직원·점장** — 같은 지점 사람이 한 줄씩 나열되고 눌러서 평가를 쓴다
+/// - **대표·관리자** — 평가를 쓰지 않는다. 대신 누가 냈는지 현황만 본다
+///   (면담할 때 쓰는 자료다)
+///
 /// 점수는 항목마다 별 5개로 매기고, 별 하나의 가치가 대상에 따라 다르다
 /// (본인 1점 → 전체 최대 25점 / 동료 4점 → 전체 최대 100점).
 ///
-/// **한 번 내면 고칠 수 없다** — 이미 낸 사람 줄을 누르면 그때 쓴 내용을
-/// 읽기만 한다.
+/// 평가는 **달마다 새로 쓴다.** 한 달 안에서는 같은 사람에게 한 번만 낼 수
+/// 있고 낸 뒤에는 못 고친다 — 다시 누르면 그때 쓴 내용을 읽기만 한다.
 class PeerReviewSection extends StatefulWidget {
   PeerReviewSection({super.key});
 
@@ -42,7 +47,13 @@ class _PeerReviewSectionState extends State<PeerReviewSection> {
   /// 이번 달에 내가 낸 평가 (받는 사람 id → 평가)
   Map<String, PeerReview> _mine = const {};
 
+  /// 이번 달 전체 평가 — 대표·관리자의 제출 현황에 쓴다
+  List<PeerReview> _all = const [];
+
   String get _period => periodKey(DateTime.now());
+
+  /// 평가를 쓰는 사람인가 — 대표·관리자는 현황만 본다
+  bool get _canReview => currentUser?.role.doesFieldWork ?? false;
 
   @override
   void initState() {
@@ -57,6 +68,7 @@ class _PeerReviewSectionState extends State<PeerReviewSection> {
       if (!mounted) return;
       setState(() {
         _targets = _targetsOf(me);
+        _all = reviews;
         // 점장·대표는 지점 전체 평가가 오므로 내가 쓴 것만 남긴다
         _mine = {
           for (final review in reviews)
@@ -74,13 +86,18 @@ class _PeerReviewSectionState extends State<PeerReviewSection> {
     }
   }
 
-  /// 평가 대상 — 같은 지점의 재직 중인 사람, 본인이 맨 앞
+  /// 평가 대상 — 같은 지점에서 **현장 업무를 하는 사람**(직원·점장), 본인이 맨 앞
+  ///
+  /// 대표·관리자는 운영 전담이라 평가하지도, 평가받지도 않는다.
   static List<Employee> _targetsOf(Employee? me) {
-    if (me == null) return const [];
+    if (me == null || !me.role.doesFieldWork) return const [];
     return [
       me,
       for (final employee in StaffDirectory.instance.employees)
-        if (employee.branchId == me.branchId && employee.id != me.id) employee,
+        if (employee.branchId == me.branchId &&
+            employee.id != me.id &&
+            employee.role.doesFieldWork)
+          employee,
     ];
   }
 
@@ -112,6 +129,9 @@ class _PeerReviewSectionState extends State<PeerReviewSection> {
         ),
       );
     }
+
+    // 대표·관리자는 평가를 쓰지 않는다 — 누가 냈는지만 본다
+    if (!_canReview) return _SubmissionCard(reviews: _all, period: _period);
 
     // 아직 안 한 사람이 위로 온다 — 무엇이 남았는지가 이 화면의 용건이다
     final pending = [
@@ -181,12 +201,321 @@ class _PeerReviewSectionState extends State<PeerReviewSection> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// 제출 현황 (대표·관리자)
+// ---------------------------------------------------------------------------
+
+/// 평가를 내야 하는 사람 전원 (직원·점장)
+///
+/// 대표·관리자는 평가를 쓰지 않으므로 분모에서 빠진다.
+List<Employee> _reviewers() => [
+  for (final employee in StaffDirectory.instance.employees)
+    if (employee.role.doesFieldWork) employee,
+];
+
+/// 한 사람의 이번 달 제출 현황
+class _Submission {
+  _Submission({required this.person, required this.done, required this.quota});
+
+  final Employee person;
+
+  /// 이번 달에 낸 평가 수
+  final int done;
+
+  /// 내야 하는 수 — 본인 지점에서 평가할 사람 수 (자기 자신 포함)
+  final int quota;
+
+  bool get complete => quota > 0 && done >= quota;
+}
+
+/// 사람별 제출 현황 — 안 낸 사람이 위로 온다
+///
+/// 이 화면을 여는 이유가 "누가 아직 안 냈나" 이므로 그 순서로 세운다.
+List<_Submission> _submissionsOf(List<PeerReview> reviews) {
+  final reviewers = _reviewers();
+
+  // 지점마다 평가할 사람 수가 다르다 — 분모를 지점별로 센다
+  final quota = <String, int>{};
+  for (final employee in reviewers) {
+    quota[employee.branchId] = (quota[employee.branchId] ?? 0) + 1;
+  }
+  final counts = <String, int>{};
+  for (final review in reviews) {
+    counts[review.reviewerId] = (counts[review.reviewerId] ?? 0) + 1;
+  }
+
+  return [
+    for (final employee in reviewers)
+      _Submission(
+        person: employee,
+        done: counts[employee.id] ?? 0,
+        quota: quota[employee.branchId] ?? 0,
+      ),
+  ]..sort((a, b) {
+    if (a.complete != b.complete) return a.complete ? 1 : -1;
+    return a.done.compareTo(b.done);
+  });
+}
+
+/// 대표·관리자가 보는 화면 — 이번 달 누가 평가를 냈는지
+class _SubmissionCard extends StatelessWidget {
+  _SubmissionCard({required this.reviews, required this.period});
+
+  final List<PeerReview> reviews;
+  final String period;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = _submissionsOf(reviews);
+    final done = rows.where((r) => r.complete).length;
+    // 카드에는 다섯 명만 — 나머지는 전체 보기에서
+    final head = rows.take(5).toList();
+
+    return Column(
+      children: [
+        _ReviewProgress(
+          done: done,
+          total: rows.length,
+          finishedText: '모두 제출했어요',
+          pendingLabel: (left) => '아직 $left명이 안 냈어요',
+        ),
+        SizedBox(height: 16),
+        Container(
+          width: double.infinity,
+          padding: EdgeInsets.fromLTRB(20, 20, 20, 10),
+          decoration: AppDecorations.card(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4),
+                child: Row(
+                  children: [
+                    Expanded(child: Text('제출 현황', style: AppTextStyles.label)),
+                    SeeAllButton(
+                      onTap: () => showFullPage<void>(
+                        context,
+                        (_) => _SubmissionScreen(rows: rows),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 8),
+              if (rows.isEmpty)
+                Padding(
+                  padding: EdgeInsets.fromLTRB(4, 16, 4, 22),
+                  child: Text(
+                    '평가 대상 인원이 없어요',
+                    style: AppTextStyles.body2.copyWith(
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                )
+              else
+                for (var i = 0; i < head.length; i++) ...[
+                  if (i > 0) Divider(height: 1, color: AppColors.divider),
+                  _SubmissionRow(row: head[i]),
+                ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 제출 현황 전체 — 면담 준비할 때 훑어보는 목록
+class _SubmissionScreen extends StatelessWidget {
+  _SubmissionScreen({required this.rows});
+
+  final List<_Submission> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    final done = rows.where((r) => r.complete).length;
+
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      body: Stack(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 상단 고정 타이틀 영역만큼 비워둔다
+                SizedBox(height: 56),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(24, 12, 24, 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${DateTime.now().month}월 동료 평가',
+                          style: AppTextStyles.caption,
+                        ),
+                      ),
+                      Text(
+                        '$done / ${rows.length}명 제출',
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(height: 1, color: AppColors.gray100),
+                Expanded(
+                  child: ListView.separated(
+                    padding: EdgeInsets.fromLTRB(
+                      20,
+                      8,
+                      20,
+                      MediaQuery.paddingOf(context).bottom + 24,
+                    ),
+                    itemCount: rows.length,
+                    separatorBuilder: (_, _) =>
+                        Divider(height: 1, color: AppColors.divider),
+                    itemBuilder: (_, index) => _SubmissionRow(row: rows[index]),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // 상단 중앙 고정 타이틀 (터치는 아래로 통과)
+          IgnorePointer(
+            child: SafeArea(
+              bottom: false,
+              child: SizedBox(
+                height: 56,
+                child: Center(
+                  child: Text('제출 현황', style: AppTextStyles.title3),
+                ),
+              ),
+            ),
+          ),
+          // 좌측 상단 고정 뒤로가기 글래스 버튼
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: EdgeInsets.only(top: 8, left: 16),
+              child: GlassIconButton(
+                symbol: 'chevron.backward',
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 제출 현황 한 줄 — 이름·직급과 낸 건수
+class _SubmissionRow extends StatelessWidget {
+  _SubmissionRow({required this.row});
+
+  final _Submission row;
+
+  @override
+  Widget build(BuildContext context) {
+    final person = row.person;
+    final color = person.color ?? avatarColorFor(person.name);
+    final complete = row.complete;
+    // 한 건도 안 낸 사람이 이 화면의 용건이라 눈에 띄게 둔다
+    final untouched = row.done == 0;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: complete ? color.withValues(alpha: 0.35) : color,
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              person.name.characters.first,
+              style: TextStyle(
+                fontFamily: AppTextStyles.fontFamily,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  person.name,
+                  style: AppTextStyles.body2.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  person.rank.label,
+                  style: AppTextStyles.caption.copyWith(fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            '${row.done} / ${row.quota}건',
+            style: AppTextStyles.body2.copyWith(
+              fontWeight: FontWeight.w700,
+              color: complete
+                  ? AppColors.success
+                  : untouched
+                  ? AppColors.error
+                  : AppColors.primary,
+            ),
+          ),
+          SizedBox(width: 8),
+          Icon(
+            complete
+                ? CupertinoIcons.checkmark_circle_fill
+                : CupertinoIcons.circle,
+            size: 16,
+            color: complete ? AppColors.success : AppColors.gray300,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 평가 작성 (직원·점장)
+// ---------------------------------------------------------------------------
+
 /// 이번 달 평가 진행 — 몇 명 중 몇 명을 마쳤는지
 class _ReviewProgress extends StatelessWidget {
-  _ReviewProgress({required this.done, required this.total});
+  _ReviewProgress({
+    required this.done,
+    required this.total,
+    this.finishedText = '이번 달 평가를 모두 마쳤어요',
+    this.pendingLabel = _defaultPending,
+  });
 
   final int done;
   final int total;
+
+  /// 다 끝났을 때 아래에 뜨는 문구
+  final String finishedText;
+
+  /// 남았을 때 뜨는 문구 (남은 인원을 받는다)
+  final String Function(int left) pendingLabel;
+
+  static String _defaultPending(int left) => '$left명 남았어요';
 
   @override
   Widget build(BuildContext context) {
@@ -235,7 +564,7 @@ class _ReviewProgress extends StatelessWidget {
               SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  finished ? '이번 달 평가를 모두 마쳤어요' : '$left명 남았어요',
+                  finished ? finishedText : pendingLabel(left),
                   style: AppTextStyles.caption.copyWith(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,

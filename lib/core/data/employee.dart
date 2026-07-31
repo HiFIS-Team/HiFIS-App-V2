@@ -23,6 +23,12 @@ enum Role {
 
   /// 남에게 기여 점수를 줄 수 있는가 (마스터~매니저)
   bool get canGrant => strong;
+
+  /// 현장 업무를 하는 사람인가 — 직원과 점장
+  ///
+  /// 세션 싸인·환경정비·동료 평가를 남길 수 있고, 동료 평가의 대상도 된다.
+  /// 대표·관리자는 운영 전담이라 서버가 이 셋을 막는다.
+  bool get doesFieldWork => this == Role.member || this == Role.manager;
 }
 
 /// 직급 — 서버 `Rank` 와 같은 값
