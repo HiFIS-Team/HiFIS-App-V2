@@ -185,13 +185,31 @@ class _LessonSign {
   String get imageUrl => source.signatureFullUrl;
 }
 
+/// 서명 이미지를 화면 배율의 몇 배까지 키워 구울지
+///
+/// 3배면 어느 기기든 화면에 보이는 만큼은 선명하다. 그 위로는 파일만
+/// 커지고 눈에 띄는 차이가 없어서 잘라 둔다.
+const _signatureMaxScale = 3.0;
+
 /// 서명 획을 PNG base64 로 만든다 — 서버는 좌표가 아니라 이미지를 받는다
 ///
 /// 그림으로 저장해야 나중에 그리는 코드가 바뀌어도 회원이 실제로 쓴
 /// 싸인이 그대로 남는다. 좌표만 두면 증거로 쓸 수 없다.
-Future<String> _encodeSignature(List<List<Offset>> strokes, Size size) async {
+///
+/// [pixelRatio] 는 화면 배율. 논리 크기 그대로 구우면 레티나에서 그린 것보다
+/// 해상도가 절반~1/3로 떨어져 확대했을 때 뭉갠다. 서명은 나중에 본인 확인
+/// 자료로 꺼내 보는 것이라 그린 대로 남아야 한다.
+Future<String> _encodeSignature(
+  List<List<Offset>> strokes,
+  Size size, {
+  required double pixelRatio,
+}) async {
+  final scale = pixelRatio.clamp(1.0, _signatureMaxScale);
   final recorder = ui.PictureRecorder();
   final canvas = Canvas(recorder);
+  // 좌표는 논리 크기 그대로 두고 캔버스만 키운다 — 획 두께도 같이 커져서
+  // 화면에서 본 모양 그대로 해상도만 올라간다
+  canvas.scale(scale);
   // 배경을 깔아 준다 — 투명 PNG 는 어두운 배경에서 획이 안 보인다
   canvas.drawRect(
     Rect.fromLTWH(0, 0, size.width, size.height),
@@ -204,8 +222,8 @@ Future<String> _encodeSignature(List<List<Offset>> strokes, Size size) async {
   ).paint(canvas, size);
 
   final image = await recorder.endRecording().toImage(
-    size.width.round(),
-    size.height.round(),
+    (size.width * scale).round(),
+    (size.height * scale).round(),
   );
   final data = await image.toByteData(format: ui.ImageByteFormat.png);
   image.dispose();
@@ -1824,9 +1842,16 @@ class _SignScreenState extends State<_SignScreen> {
       return;
     }
 
+    // 굽기 전에 읽어 둔다 — await 뒤에는 context 를 쓰지 않는다
+    final pixelRatio = MediaQuery.devicePixelRatioOf(context);
+
     setState(() => _saving = true);
     try {
-      final image = await _encodeSignature(_strokes, _padSize);
+      final image = await _encodeSignature(
+        _strokes,
+        _padSize,
+        pixelRatio: pixelRatio,
+      );
       final result = await SessionSignApi.create(
         registrationId: registration.id,
         signatureBase64: image,
