@@ -60,6 +60,9 @@ flutter_launcher_icons:
   ios: true
   image_path: assets/icon/app_icon.png
   remove_alpha_ios: true
+  # macOS·윈도우는 여기서 만들지 않는다 — 둘 다 이 도구 출력이 부족해서 직접 만들었다.
+  # macOS는 여백 있는 라운드 사각형이 필요하고(apple/macos.md 4번),
+  # 윈도우는 이 도구가 .ico 에 크기를 한 장만 넣어 작은 아이콘이 뭉갠다(windows/windows.md 5번).
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
