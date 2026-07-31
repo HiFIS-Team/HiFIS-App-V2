@@ -5,12 +5,11 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/theme/theme_controller.dart';
-import '../auth/auth_session.dart';
 import '../../core/util/platform.dart';
-import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/pressable.dart';
 import '../../core/widgets/top_frost.dart';
+import '../auth/logout.dart';
 
 /// 내 프로필 화면 (목업)
 ///
@@ -831,21 +830,6 @@ class _PasswordCard extends StatelessWidget {
 class _LogoutCard extends StatelessWidget {
   _LogoutCard();
 
-  Future<void> _logout(BuildContext context) async {
-    final ok = await showConfirmDialog(
-      context,
-      title: '로그아웃할까요?',
-      message: '다음에 들어올 때 다시 로그인해야 해요.',
-      confirmLabel: '로그아웃',
-    );
-    if (!ok || !context.mounted) return;
-
-    // 프로필 화면은 메인 위에 얹혀 있다. 먼저 걷어내야 화면이
-    // 남은 채로 로그인 화면이 갈아 끼워지는 일이 없다.
-    Navigator.of(context, rootNavigator: true).popUntil((r) => r.isFirst);
-    await AuthSession.instance.signOut();
-  }
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -865,7 +849,7 @@ class _LogoutCard extends StatelessWidget {
           Align(
             alignment: Alignment.centerLeft,
             child: Pressable(
-              onTap: () => _logout(context),
+              onTap: () => confirmLogout(context),
               scale: 0.94,
               child: Container(
                 height: 48,

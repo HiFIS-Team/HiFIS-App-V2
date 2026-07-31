@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/pressable.dart';
+import '../auth/logout.dart';
 
 /// macOS 데스크톱용 좌측 사이드바 내비게이션 (인스타그램 데스크톱 패턴)
 ///
@@ -124,7 +125,9 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
                 ),
               ),
             ),
-            // 스크롤 영역 밖이라 어떤 상황에도 마지막 항목 아래 여백이 유지된다
+            // 스크롤 영역 밖이라 창이 낮아도 늘 같은 자리에 남는다
+            _bottomDivider(),
+            _logoutItem(),
             SizedBox(height: 14),
           ],
         ),
@@ -207,8 +210,45 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
     );
   }
 
-  Widget _item(int index, (IconData, String) item) {
-    final selected = index == widget.selectedIndex;
+  Widget _item(int index, (IconData, String) item) => _row(
+    index: index,
+    icon: item.$1,
+    label: item.$2,
+    selected: index == widget.selectedIndex,
+    onTap: () => widget.onSelect(index),
+  );
+
+  /// 맨 아래 로그아웃 — 화면 이동이 아니라서 선택 표시가 없다.
+  /// 호버 구분용 자리만 -1로 잡아 둔다 (메뉴 인덱스와 안 겹치게)
+  Widget _logoutItem() => _row(
+    index: -1,
+    icon: Icons.logout_rounded,
+    label: '로그아웃',
+    selected: false,
+    onTap: () => confirmLogout(context),
+  );
+
+  /// 펼치면 사이드바 폭에 맞춰 늘어나는 헤어라인
+  Widget _bottomDivider() => SizedBox(
+    height: 18,
+    child: Center(
+      child: AnimatedContainer(
+        duration: Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+        width: _hovered ? 208 : 24,
+        height: 1,
+        color: AppColors.gray100,
+      ),
+    ),
+  );
+
+  Widget _row({
+    required int index,
+    required IconData icon,
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
     final hovered = index == _hoverIndex;
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 12, vertical: 2),
@@ -221,7 +261,7 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
           scale: 0.97,
           pressedColor: AppColors.gray100,
           borderRadius: BorderRadius.circular(10),
-          onTap: () => widget.onSelect(index),
+          onTap: onTap,
           // 호버 배경은 애니메이션 없이 즉시 — 페이드가 있으면 커서를
           // 빠르게 지나갈 때 이전 항목의 배경이 잔상처럼 깜빡인다
           child: Container(
@@ -239,7 +279,7 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
                 SizedBox(
                   width: 20,
                   child: Icon(
-                    item.$1,
+                    icon,
                     size: 20,
                     color: selected ? AppColors.primary : AppColors.gray500,
                   ),
@@ -250,7 +290,7 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
                       Padding(
                         padding: EdgeInsets.only(left: 10),
                         child: Text(
-                          item.$2,
+                          label,
                           maxLines: 1,
                           softWrap: false,
                           overflow: TextOverflow.clip,
