@@ -39,7 +39,8 @@ class _AuthScaffold extends StatelessWidget {
           style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
         ),
       ],
-      SizedBox(height: 28),
+      // 데스크톱은 카드가 창 안에 통째로 들어가야 해서 조금 좁힌다
+      SizedBox(height: isDesktop ? 22 : 28),
     ],
   );
 
@@ -69,11 +70,11 @@ class _AuthScaffold extends StatelessWidget {
         backgroundColor: AppColors.background,
         body: Center(
           child: SingleChildScrollView(
-            padding: EdgeInsets.symmetric(vertical: 40),
+            padding: EdgeInsets.symmetric(vertical: 28),
             child: ConstrainedBox(
               constraints: BoxConstraints(maxWidth: width),
               child: Container(
-                padding: EdgeInsets.fromLTRB(36, 32, 36, 36),
+                padding: EdgeInsets.fromLTRB(36, 30, 36, 30),
                 decoration: AppDecorations.card(),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

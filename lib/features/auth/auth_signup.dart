@@ -145,10 +145,11 @@ class _SignupScreenState extends State<_SignupScreen> {
   Widget build(BuildContext context) {
     if (!isDesktop) return _buildPhone();
 
+    // 데스크톱은 뒤로 버튼을 위에 두지 않는다 — 카드가 그만큼 길어져
+    // 창 안에 안 들어가고 스크롤이 생긴다. 대신 아래에 로그인 링크를 둔다.
     return _AuthScaffold(
       title: '회원가입',
       caption: '초대키를 받은 직원만 가입할 수 있어요.',
-      onBack: () => Navigator.pop(context),
       // 짝지은 칸을 나란히 두려면 폭이 있어야 한다
       width: 560,
       children: [
@@ -231,8 +232,26 @@ class _SignupScreenState extends State<_SignupScreen> {
             style: AppTextStyles.caption.copyWith(color: AppColors.error),
           ),
         ],
-        SizedBox(height: 24),
+        SizedBox(height: 20),
         _AuthButton(label: '가입하기', onTap: _submit, busy: _busy),
+        SizedBox(height: 14),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              '이미 계정이 있나요?',
+              style: AppTextStyles.label.copyWith(
+                color: AppColors.textTertiary,
+              ),
+            ),
+            SizedBox(width: 6),
+            _AuthTextButton(
+              label: '로그인',
+              onTap: () => Navigator.pop(context),
+              strong: true,
+            ),
+          ],
+        ),
       ],
     );
   }
