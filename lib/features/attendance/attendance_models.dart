@@ -31,7 +31,13 @@ enum _DayStatus {
 
 /// 하루치 근태 기록
 class _Day {
-  _Day({required this.date, required this.status, this.checkIn, this.checkOut});
+  _Day({
+    required this.date,
+    required this.status,
+    this.checkIn,
+    this.checkOut,
+    this.workMinutes,
+  });
 
   /// 서버 기록에서 만든다
   ///
@@ -63,6 +69,7 @@ class _Day {
       status: status,
       checkIn: checkIn,
       checkOut: checkOut,
+      workMinutes: record.workMinutes,
     );
   }
 
@@ -73,16 +80,19 @@ class _Day {
   final DateTime? checkIn;
   final DateTime? checkOut;
 
-  /// 실제 근무 시간 — 휴게 1시간을 뺀다
+  /// 서버가 계산한 근무 분 — 급여가 이 값을 쓴다
+  final int? workMinutes;
+
+  /// 근무 시간 — 출근부터 퇴근까지 그대로다 (휴게 시간을 빼지 않는다)
+  ///
+  /// 급여가 기본급 기준이라 휴게를 빼면 화면 시간과 급여 시간이 어긋난다.
+  /// 서버가 준 값이 있으면 그걸 쓰고, 없을 때만 직접 뺀다.
   Duration get worked {
+    if (workMinutes != null) return Duration(minutes: workMinutes!);
     if (checkIn == null || checkOut == null) return Duration.zero;
-    final gap = checkOut!.difference(checkIn!);
-    return gap > _breakTime ? gap - _breakTime : gap;
+    return checkOut!.difference(checkIn!);
   }
 }
-
-/// 점심 휴게 시간 (근무 시간에서 제외한다)
-const _breakTime = Duration(hours: 1);
 
 /// 근무 시간이 설정 안 된 사람에게 쓰는 기본 출근 시각
 const _startHour = 9;

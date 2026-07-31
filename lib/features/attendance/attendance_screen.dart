@@ -692,7 +692,7 @@ class _DayDialog extends StatelessWidget {
             ),
             SizedBox(height: 8),
             Text(
-              '휴게 1시간을 뺀 시간이에요',
+              '출근부터 퇴근까지의 시간이에요',
               style: AppTextStyles.caption.copyWith(fontSize: 11),
             ),
           ] else
