@@ -2,20 +2,29 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/api/api_exception.dart';
+import '../../core/api/home_api.dart';
+import '../../core/data/current_user.dart';
 import '../../core/data/staff.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/pressable.dart';
 import '../../core/widgets/see_all_button.dart';
 import '../notice/notice_screen.dart';
 import '../project/project_screen.dart';
 
-/// 홈 화면 (디자인 시스템 데모용 샘플)
+/// 홈 화면 — 모든 직원이 처음 보는 화면
 ///
-/// 데이터는 전부 하드코딩된 목업이며, 기능 개발 시 실제 데이터로 교체한다.
+/// 오늘 근무와 이번 달 점수는 `/me/home` 에서 온다. 지점 집계인 `/dashboard`
+/// 와 달리 권한 없이 본인 것만 주는 요약이라 직급에 상관없이 열린다.
+///
+/// 프로젝트·공지 **목록**은 아직 목업이다. 서버가 홈 요약으로 주는 것은
+/// 개수뿐이고 목록은 각 탭 화면과 같은 데이터를 써야 해서,
+/// 그 화면들을 연동할 때 홈 카드도 같이 붙인다.
 class HomeScreen extends StatefulWidget {
   HomeScreen({super.key, this.onOpenProjects, this.onOpenNotices});
 
@@ -27,7 +36,59 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
+  /// 오늘 요약 — 도착 전에는 null 이라 근무 카드가 빈 상태로 그려진다
+  ///
+  /// 첫 화면이라 통째로 로딩을 돌리면 앱을 열 때마다 빈 화면을 보게 된다.
+  /// 인사말·시계는 기기에서 바로 나오므로 그대로 두고 숫자만 채운다.
+  HomeSummary? _summary;
+
+  /// 마지막으로 받아온 시각 — 창을 옮길 때마다 다시 부르지 않게 막는다
+  DateTime? _loadedAt;
+
+  /// 다시 받기까지 두는 최소 간격
+  ///
+  /// macOS 는 **창이 포커스만 잃어도** inactive → resumed 가 오간다.
+  /// 그대로 두면 다른 앱을 잠깐 볼 때마다 요청이 나간다 (실제로 몇 초 간격으로
+  /// 나갔다). 오늘 근태는 그렇게 자주 바뀌지 않는다.
+  static const _minReloadGap = Duration(minutes: 1);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// 앱을 다시 열면 다시 받는다 — 배경에 둔 사이 출퇴근이나 날짜가 바뀐다
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    final at = _loadedAt;
+    if (at != null && DateTime.now().difference(at) < _minReloadGap) return;
+    _load();
+  }
+
+  Future<void> _load() async {
+    if (currentUser == null) return;
+    // 실패해도 찍어 둔다 — 서버가 죽어 있을 때 포커스마다 재시도하지 않게
+    _loadedAt = DateTime.now();
+    try {
+      final summary = await HomeApi.summary();
+      if (!mounted) return;
+      setState(() => _summary = summary);
+    } catch (error) {
+      if (!mounted) return;
+      AppToast.show(context, messageOf(error));
+    }
+  }
+
   /// 상세를 보고 돌아오면 진행률·읽음 표시가 바뀌어 있을 수 있다
   void _refresh() {
     if (mounted) setState(() {});
@@ -45,9 +106,9 @@ class _HomeScreenState extends State<HomeScreen> {
             child: ListView(
               padding: EdgeInsets.fromLTRB(20, 64, 20, bottomBarInset(context)),
               children: [
-                _GreetingCard(),
+                _GreetingCard(summary: _summary),
                 SizedBox(height: 16),
-                _HeroStatusCard(),
+                _HeroStatusCard(attendance: _summary?.attendance),
                 SizedBox(height: 16),
                 if (desktop)
                   // 두 카드의 높이를 큰 쪽에 맞춰 같게 만든다
@@ -94,7 +155,9 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class _GreetingCard extends StatelessWidget {
-  _GreetingCard();
+  _GreetingCard({this.summary});
+
+  final HomeSummary? summary;
 
   String get _todayLabel {
     final now = DateTime.now();
@@ -111,7 +174,12 @@ class _GreetingCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(_todayLabel, style: AppTextStyles.caption),
+          Row(
+            children: [
+              Expanded(child: Text(_todayLabel, style: AppTextStyles.caption)),
+              if (summary != null) _ScoreChip(summary: summary!),
+            ],
+          ),
           SizedBox(height: 4),
           Text('좋은 아침이에요 👋', style: AppTextStyles.title1),
           // 이름에만 브랜드 그라데이션 포인트
@@ -128,18 +196,56 @@ class _GreetingCard extends StatelessWidget {
   }
 }
 
+/// 이번 달 내 점수 — 점수 원장 전 항목 합계
+class _ScoreChip extends StatelessWidget {
+  _ScoreChip({required this.summary});
+
+  final HomeSummary summary;
+
+  /// `2026-07` → `7월`
+  String get _monthLabel {
+    final month = int.tryParse(summary.period.split('-').last);
+    return month == null ? '이번 달' : '$month월';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.gray50,
+        borderRadius: BorderRadius.all(Radius.circular(100)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(_monthLabel, style: AppTextStyles.caption),
+          SizedBox(width: 6),
+          Text(
+            '${summary.monthScore}점',
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 오늘 근무 카드 — 실시간 시계 + 서버가 판정한 오늘 근태
 class _HeroStatusCard extends StatefulWidget {
-  _HeroStatusCard();
+  _HeroStatusCard({required this.attendance});
+
+  /// 아직 안 왔으면 null — 시계만 돌고 나머지는 빈 칸으로 그린다
+  final HomeAttendance? attendance;
 
   @override
   State<_HeroStatusCard> createState() => _HeroStatusCardState();
 }
 
 class _HeroStatusCardState extends State<_HeroStatusCard> {
-  // 목업 근무 시간 (근태 기능 연동 시 실제 출퇴근 기록으로 교체)
-  static const _checkInHour = 9;
-  static const _checkOutHour = 18;
-
   late final Timer _timer;
 
   @override
@@ -155,45 +261,45 @@ class _HeroStatusCardState extends State<_HeroStatusCard> {
     super.dispose();
   }
 
+  /// 근무 시간 대비 진행률 (0.0~1.0)
+  ///
+  /// 근무 시간이 설정 안 된 사람은 기준이 없어서 null 이다.
+  /// 퇴근을 찍었으면 그 시각까지, 아니면 지금까지로 잰다.
+  double? get _rate {
+    final start = _minutesOf(currentUser?.shiftStart);
+    final end = _minutesOf(currentUser?.shiftEnd);
+    if (start == null || end == null || end <= start) return null;
+
+    final attendance = widget.attendance;
+    if (attendance?.checkIn == null) return 0;
+
+    final at = attendance!.checkOut ?? DateTime.now();
+    final elapsed = at.hour * 60 + at.minute - start;
+    return (elapsed / (end - start)).clamp(0.0, 1.0);
+  }
+
+  /// 게이지 아래 가운데 글자 — 퇴근했으면 근무 시간, 아니면 진행률
+  String _progressText(double rate) {
+    final minutes = widget.attendance?.workMinutes;
+    if (minutes == null) return '${(rate * 100).round()}%';
+    final hours = minutes ~/ 60;
+    return hours > 0 ? '$hours시간 ${minutes % 60}분' : '$minutes분';
+  }
+
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final checkIn = DateTime(now.year, now.month, now.day, _checkInHour);
-    final checkOut = DateTime(now.year, now.month, now.day, _checkOutHour);
-    final total = checkOut.difference(checkIn);
-
-    var elapsed = now.isBefore(checkIn)
-        ? Duration.zero
-        : now.difference(checkIn);
-    if (elapsed > total) elapsed = total;
-    final remaining = total - elapsed;
-    final rate = elapsed.inMinutes / total.inMinutes;
-
-    // 상태 4종: 미출근/퇴근(회색), 출근(초록), 휴게(주황)
-    // 목업 기준 — 근무 09~18시, 휴게 12~13시. 근태 연동 시 실제 상태로 교체.
-    final String status;
-    final Color statusColor;
-    if (now.isBefore(checkIn)) {
-      status = '미출근';
-      statusColor = AppColors.gray500;
-    } else if (!now.isBefore(checkOut)) {
-      status = '퇴근';
-      statusColor = AppColors.gray500;
-    } else if (now.hour == 12) {
-      status = '휴게';
-      statusColor = AppColors.warning;
-    } else {
-      status = '출근';
-      statusColor = AppColors.success;
-    }
-
-    // 실제 출퇴근 스캔 기록 자리 (바코드 스캔 연동 시 스캔 시각으로 교체)
-    final checkInText = elapsed > Duration.zero ? '09:00' : '--:--';
-    final checkOutText = remaining == Duration.zero ? '18:00' : '--:--';
-    final percentText = '${(rate * 100).round()}%';
-
     final timeText =
-        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
+        '${_pad(now.hour)}:${_pad(now.minute)}:${_pad(now.second)}';
+
+    final attendance = widget.attendance;
+    final badge = _statusBadge(attendance);
+    final rate = _rate;
+    // 쉬는 날은 근무 시간·스캔 기록이 다 비어서 게이지가 의미 없다
+    final resting =
+        attendance?.status == AttendanceStatus.dayOff ||
+        attendance?.status == AttendanceStatus.onLeave;
+    final showGauge = rate != null && !resting;
 
     return Container(
       padding: EdgeInsets.all(24),
@@ -203,20 +309,21 @@ class _HeroStatusCardState extends State<_HeroStatusCard> {
           Row(
             children: [
               Expanded(child: Text('오늘 근무', style: AppTextStyles.label)),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.all(Radius.circular(100)),
-                ),
-                child: Text(
-                  status,
-                  style: AppTextStyles.caption.copyWith(
-                    color: statusColor,
-                    fontWeight: FontWeight.w600,
+              if (badge != null)
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: badge.color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.all(Radius.circular(100)),
+                  ),
+                  child: Text(
+                    badge.label,
+                    style: AppTextStyles.caption.copyWith(
+                      color: badge.color,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
           SizedBox(height: 16),
@@ -232,39 +339,90 @@ class _HeroStatusCardState extends State<_HeroStatusCard> {
               fontFeatures: [FontFeature.tabularFigures()],
             ),
           ),
-          SizedBox(height: 20),
-          _WorkGauge(rate: rate),
-          SizedBox(height: 10),
-          // 근무 시작 시간 — 진행률 — 종료 시간
-          Row(
-            children: [
-              Text('09:00', style: AppTextStyles.caption),
-              Spacer(),
-              Text(
-                percentText,
-                style: AppTextStyles.label.copyWith(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w700,
+          if (showGauge) ...[
+            SizedBox(height: 20),
+            _WorkGauge(rate: rate),
+            SizedBox(height: 10),
+            // 근무 시작 시간 — 진행률 — 종료 시간
+            Row(
+              children: [
+                Text(currentUser!.shiftStart!, style: AppTextStyles.caption),
+                Spacer(),
+                Text(
+                  _progressText(rate),
+                  style: AppTextStyles.label.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
-              Spacer(),
-              Text('18:00', style: AppTextStyles.caption),
-            ],
-          ),
-          SizedBox(height: 18),
-          // 실제 출퇴근 스캔 기록
-          Row(
-            children: [
-              _ScanRecord(label: '출근', time: checkInText),
-              Spacer(),
-              _ScanRecord(label: '퇴근', time: checkOutText),
-            ],
-          ),
+                Spacer(),
+                Text(currentUser!.shiftEnd!, style: AppTextStyles.caption),
+              ],
+            ),
+          ],
+          if (!resting) ...[
+            SizedBox(height: 18),
+            // 실제 출퇴근 스캔 기록
+            Row(
+              children: [
+                _ScanRecord(label: '출근', time: _hhmm(attendance?.checkIn)),
+                Spacer(),
+                _ScanRecord(label: '퇴근', time: _hhmm(attendance?.checkOut)),
+              ],
+            ),
+          ],
         ],
       ),
     );
   }
 }
+
+/// 오늘 근태를 배지 한 줄로 옮긴다 — 아직 안 왔으면 배지를 안 그린다
+///
+/// 서버가 열 가지를 판정해 주는데 홈은 지금 어떤 상태인지만 보면 되므로
+/// 라벨을 짧게 줄인다. 어느 날 무슨 일이 있었는지는 근태 화면에서 본다.
+({String label, Color color})? _statusBadge(HomeAttendance? attendance) {
+  if (attendance == null) return null;
+  final status = attendance.status;
+  // 근무일인데 기록이 없는 상태 — 서버는 오늘을 결근으로 찍지 않는다
+  if (status == null) return (label: '출근 전', color: AppColors.gray500);
+  return switch (status) {
+    AttendanceStatus.inProgress => (label: '근무 중', color: AppColors.success),
+    AttendanceStatus.normal => (label: '퇴근', color: AppColors.gray500),
+    AttendanceStatus.late => (label: '지각', color: AppColors.warning),
+    AttendanceStatus.earlyLeave => (label: '조기 퇴근', color: AppColors.warning),
+    AttendanceStatus.lateAndEarly => (
+      label: '지각·조기 퇴근',
+      color: AppColors.warning,
+    ),
+    AttendanceStatus.noCheckout => (label: '퇴근 누락', color: AppColors.error),
+    AttendanceStatus.absent => (label: '결근', color: AppColors.error),
+    AttendanceStatus.onLeave => (
+      // 반차면 오전·오후까지, 아니면 연차·병가 같은 종류를 그대로 쓴다
+      label:
+          attendance.halfPeriod?.label ?? attendance.leaveType?.label ?? '휴가',
+      color: AppColors.primary,
+    ),
+    AttendanceStatus.dayOff => (label: '휴무', color: AppColors.gray500),
+    AttendanceStatus.unknown => (label: '판정 불가', color: AppColors.gray500),
+  };
+}
+
+/// `09:00` → 분. 형식이 다르거나 비어 있으면 null
+int? _minutesOf(String? hhmm) {
+  final parts = hhmm?.split(':');
+  if (parts == null || parts.length != 2) return null;
+  final hour = int.tryParse(parts[0]);
+  final minute = int.tryParse(parts[1]);
+  if (hour == null || minute == null) return null;
+  return hour * 60 + minute;
+}
+
+/// 스캔 시각 — 안 찍혔으면 `--:--`
+String _hhmm(DateTime? at) =>
+    at == null ? '--:--' : '${_pad(at.hour)}:${_pad(at.minute)}';
+
+String _pad(int value) => value.toString().padLeft(2, '0');
 
 class _ScanRecord extends StatelessWidget {
   _ScanRecord({required this.label, required this.time});
