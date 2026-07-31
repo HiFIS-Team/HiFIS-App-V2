@@ -73,15 +73,19 @@ class _ContributionSectionState extends State<ContributionSection> {
 
 /// 기여 항목 네 가지
 enum _Kind {
-  idea('창의적 아이디어', CupertinoIcons.lightbulb_fill),
-  goal('자발적 목표 업무', CupertinoIcons.flag_fill),
-  extra('근무 외 출근', CupertinoIcons.clock_fill),
-  sales('매출 성과', CupertinoIcons.chart_bar_fill);
+  idea('창의적 아이디어', CupertinoIcons.lightbulb_fill, 3),
+  goal('자발적 목표 업무', CupertinoIcons.flag_fill, 10),
+  extra('근무 외 출근', CupertinoIcons.clock_fill, 0),
+  sales('매출 성과', CupertinoIcons.chart_bar_fill, 0);
 
-  const _Kind(this.label, this.icon);
+  const _Kind(this.label, this.icon, this.points);
 
   final String label;
   final IconData icon;
+
+  /// 한 건당 점수 — 부여 항목은 값이 정해져 있어 줄 때 고르지 않는다.
+  /// 자동 항목은 근태·매출 규칙으로 계산돼 들어오므로 0으로 둔다.
+  final int points;
 
   /// 마스터~매니저가 보고 직접 주는 항목인지.
   /// 나머지 둘은 근태·매출 기록에서 자동으로 들어온다.
@@ -120,9 +124,6 @@ class _Contribution {
   final String? by;
 }
 
-/// 부여할 때 고를 수 있는 점수
-const _pointOptions = [5, 10, 15, 20];
-
 /// 이번 달 기여 기록 (목업). 탭을 오가도 유지되도록 모듈 전역으로 둔다.
 final _contributions = <_Contribution>[..._seed()];
 
@@ -134,7 +135,7 @@ List<_Contribution> _seed() {
       name: me,
       kind: _Kind.idea,
       title: '락커 회전율 안내 문구 제안',
-      points: 15,
+      points: 3,
       date: at(4),
       by: '이준승',
     ),
@@ -142,7 +143,7 @@ List<_Contribution> _seed() {
       name: me,
       kind: _Kind.goal,
       title: '신규 회원 온보딩 문서 정리',
-      points: 20,
+      points: 10,
       date: at(11),
       by: '민중기',
     ),
@@ -171,7 +172,7 @@ List<_Contribution> _seed() {
       name: '박준현',
       kind: _Kind.idea,
       title: 'GX 시간표 개편 제안',
-      points: 10,
+      points: 3,
       date: at(9),
       by: '이준승',
     ),
@@ -668,7 +669,6 @@ class _GrantScreen extends StatefulWidget {
 class _GrantScreenState extends State<_GrantScreen> {
   _Kind _kind = _Kind.idea;
   String? _target;
-  int _points = 10;
   final _title = TextEditingController();
 
   /// 본인에게는 줄 수 없다
@@ -694,17 +694,18 @@ class _GrantScreenState extends State<_GrantScreen> {
       return;
     }
     FocusScope.of(context).unfocus();
+    // 점수는 항목마다 정해져 있어 주는 사람이 고르지 않는다
     _contributions.add(
       _Contribution(
         name: _target!,
         kind: _kind,
         title: _title.text.trim(),
-        points: _points,
+        points: _kind.points,
         date: DateTime.now(),
         by: me,
       ),
     );
-    AppToast.show(context, '$_target님에게 $_points점을 줬어요');
+    AppToast.show(context, '$_target님에게 ${_kind.points}점을 줬어요');
     Navigator.pop(context, true);
   }
 
@@ -774,17 +775,6 @@ class _GrantScreenState extends State<_GrantScreen> {
                     ),
                   ),
                 ),
-                SizedBox(height: 20),
-                _label('점수'),
-                SizedBox(height: 8),
-                Row(
-                  children: [
-                    for (final point in _pointOptions) ...[
-                      if (point != _pointOptions.first) SizedBox(width: 8),
-                      Expanded(child: _pointButton(point)),
-                    ],
-                  ],
-                ),
               ],
             ),
           ),
@@ -830,14 +820,16 @@ class _GrantScreenState extends State<_GrantScreen> {
     ),
   );
 
+  /// 항목 버튼 — 점수가 항목에 붙어 있으므로 여기에 같이 적는다
   Widget _kindButton(_Kind kind) {
     final on = kind == _kind;
+    final color = on ? AppColors.primary : AppColors.gray500;
+
     return Pressable(
       onTap: () => setState(() => _kind = kind),
       scale: 0.97,
       child: Container(
-        height: 52,
-        alignment: Alignment.center,
+        padding: EdgeInsets.fromLTRB(14, 14, 14, 14),
         decoration: BoxDecoration(
           color: on ? AppColors.primaryLight : AppColors.gray50,
           borderRadius: BorderRadius.circular(14),
@@ -845,25 +837,28 @@ class _GrantScreenState extends State<_GrantScreen> {
             color: on ? AppColors.primary : Colors.transparent,
           ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              kind.icon,
-              size: 14,
-              color: on ? AppColors.primary : AppColors.gray500,
+            Icon(kind.icon, size: 16, color: color),
+            SizedBox(height: 10),
+            Text(
+              kind.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.body2.copyWith(
+                fontSize: 14,
+                fontWeight: on ? FontWeight.w700 : FontWeight.w500,
+                color: on ? AppColors.primary : AppColors.textSecondary,
+              ),
             ),
-            SizedBox(width: 7),
-            Flexible(
-              child: Text(
-                kind.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppTextStyles.body2.copyWith(
-                  fontSize: 14,
-                  fontWeight: on ? FontWeight.w700 : FontWeight.w500,
-                  color: on ? AppColors.primary : AppColors.textSecondary,
-                ),
+            SizedBox(height: 2),
+            Text(
+              '${kind.points}점',
+              style: AppTextStyles.caption.copyWith(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: on ? AppColors.primary : AppColors.gray400,
               ),
             ),
           ],
@@ -902,29 +897,6 @@ class _GrantScreenState extends State<_GrantScreen> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _pointButton(int point) {
-    final on = point == _points;
-    return Pressable(
-      onTap: () => setState(() => _points = point),
-      scale: 0.95,
-      child: Container(
-        height: 48,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: on ? AppColors.primary : AppColors.gray50,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Text(
-          '$point점',
-          style: AppTextStyles.body2.copyWith(
-            fontWeight: FontWeight.w700,
-            color: on ? Colors.white : AppColors.textSecondary,
-          ),
         ),
       ),
     );
