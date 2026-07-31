@@ -6,6 +6,7 @@ import '../../core/api/auth_api.dart';
 import '../../core/api/token_store.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
+import '../../core/data/staff_directory.dart';
 
 /// 로그인 세션
 ///
@@ -52,6 +53,7 @@ class AuthSession extends ValueNotifier<bool> {
       me = await AuthApi.me();
       currentUser = me;
       email = me!.email;
+      await StaffDirectory.instance.load();
       value = true;
     } catch (_) {
       // 서버가 꺼져 있거나 토큰이 죽었다 — 조용히 로그인 화면부터 시작한다
@@ -80,6 +82,7 @@ class AuthSession extends ValueNotifier<bool> {
     this.autoLogin = autoLogin;
     me = result.employee;
     currentUser = me;
+    await StaffDirectory.instance.load();
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyEmail, email);
@@ -101,6 +104,7 @@ class AuthSession extends ValueNotifier<bool> {
     await TokenStore.instance.clear();
     me = null;
     currentUser = null;
+    StaffDirectory.instance.clear();
     value = false;
   }
 }

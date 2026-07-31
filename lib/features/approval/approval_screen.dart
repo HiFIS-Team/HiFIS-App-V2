@@ -1254,7 +1254,16 @@ enum _State {
 }
 
 /// 결재는 최고관리자(대표)가 처리한다
-final _admin = staffList.firstWhere((s) => s.role == '대표').name;
+///
+/// 서버 명단에는 대표 직급이 없을 수도 있어서 못 찾으면 첫 사람으로 떨어진다.
+/// (상수로 두면 명단을 받아오기 전 값에 굳어 버리므로 getter 다.)
+String get _admin {
+  final staff = staffList;
+  if (staff.isEmpty) return me;
+  return staff
+      .firstWhere((s) => s.role == '대표', orElse: () => staff.first)
+      .name;
+}
 
 /// 결재 문서 한 건
 class _Doc {

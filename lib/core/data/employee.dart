@@ -1,3 +1,5 @@
+import 'dart:ui' show Color;
+
 /// 권한 — 서버 `Role` 과 같은 값. MASTER > ADMIN > MANAGER > MEMBER
 enum Role {
   master('MASTER', '대표'),
@@ -102,4 +104,15 @@ class Employee {
   final String? shiftEnd;
 
   bool get needsSchedule => shiftStart == null || shiftEnd == null;
+
+  /// 아바타 색 — 서버가 `#RRGGBB` 로 준다
+  ///
+  /// 서버 값이 `neutral` 처럼 색이 아닐 수도 있어서 못 읽으면 null 이다.
+  /// 그 경우 이름에서 색을 만들어 쓴다 (`staff.dart`의 `staffOf` 참고).
+  Color? get color {
+    final hex = avatarColor.replaceFirst('#', '');
+    if (hex.length != 6) return null;
+    final value = int.tryParse(hex, radix: 16);
+    return value == null ? null : Color(0xFF000000 | value);
+  }
 }
