@@ -61,18 +61,20 @@ class _SalaryScreenState extends State<SalaryScreen> {
   Widget build(BuildContext context) {
     final current = _payslips.first;
 
+    // 폰은 이번 달 금액을 본 다음 바로 신청서를 낼 수 있게
+    // 요약 카드 뒤에 신청 칸을 붙이고, 지난 흐름은 그 아래로 미룬다
     final content = [
       _SummaryCard(payslip: current),
-      SizedBox(height: 12),
-      _TrendCard(),
-      SizedBox(height: 12),
-      _PayCard(payslip: current),
       SizedBox(height: 12),
       _StatusNotice(
         payslip: current,
         onSubmit: () => _submit(current),
         onCancel: () => _cancel(current),
       ),
+      SizedBox(height: 12),
+      _TrendCard(),
+      SizedBox(height: 12),
+      _PayCard(payslip: current),
       SizedBox(height: 12),
       _HistoryCard(onOpenAll: () => _openHistory(context)),
     ];

@@ -203,8 +203,12 @@ class _MonthSummary extends StatelessWidget {
             children: [
               _stat('근무일', '$worked일', AppColors.textPrimary),
               _divider(),
-              _stat('총 근무', _duration(total), AppColors.primary),
-              _divider(),
+              // 폰은 칸이 좁아 네 개면 숫자가 줄어든다.
+              // 총 근무는 아래 날짜별 목록에서 다시 볼 수 있어 여기서 뺀다
+              if (isDesktop) ...[
+                _stat('총 근무', _duration(total), AppColors.primary),
+                _divider(),
+              ],
               _stat(
                 '지각',
                 '$late회',
