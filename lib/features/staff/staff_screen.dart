@@ -108,18 +108,13 @@ class _StaffScreenState extends State<StaffScreen> {
     AppToast.show(context, '$label을 복사했어요');
   }
 
-  /// 전체는 팀을 나누지 않고 한 판에 쭉 나열하고,
-  /// 팀을 고르면 그 팀 머리말과 함께 보여준다
-  List<Widget> _body(List<_Member> list) {
-    final body = _grid ? _cards(list) : _rows(list);
-    if (_team == '전체') return [body];
-
-    return [
-      _SectionHeader(title: _team, count: list.length),
-      SizedBox(height: 12),
-      body,
-    ];
-  }
+  /// 팀을 나누지 않고 한 판에 쭉 나열한다.
+  /// 머리말은 지금 무엇을 보고 있는지 알려주므로 전체일 때도 붙인다.
+  List<Widget> _body(List<_Member> list) => [
+    _SectionHeader(title: _team, count: list.length),
+    SizedBox(height: 12),
+    if (_grid) _cards(list) else _rows(list),
+  ];
 
   Widget _cards(List<_Member> list) => LayoutBuilder(
     builder: (context, constraints) {
