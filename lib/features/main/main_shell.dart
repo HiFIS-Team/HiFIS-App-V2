@@ -28,6 +28,7 @@ import '../notifications/notification_screen.dart';
 import '../profile/profile_screen.dart';
 import '../project/project_screen.dart';
 import '../schedule/schedule_screen.dart';
+import '../salary/salary_screen.dart';
 import '../staff/staff_screen.dart';
 
 /// 하단 탭바와 탭별 화면을 관리하는 루트 셸
@@ -102,7 +103,7 @@ class _MainShellState extends State<MainShell> {
 
   List<Widget> get _subPages => [
     AttendanceScreen(),
-    PlaceholderScreen(emoji: '💰', title: '급여'),
+    SalaryScreen(),
     NoticeScreen(),
     PlaceholderScreen(emoji: '🏆', title: '랭킹'),
   ];
@@ -145,7 +146,7 @@ class _MainShellState extends State<MainShell> {
     ApprovalScreen(),
     StaffScreen(),
     AttendanceScreen(),
-    PlaceholderScreen(emoji: '💰', title: '급여'),
+    SalaryScreen(),
     NoticeScreen(),
     PlaceholderScreen(emoji: '🏆', title: '랭킹'),
   ];
