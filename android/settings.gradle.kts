@@ -19,7 +19,11 @@ pluginManagement {
 
 plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
-    id("com.android.application") version "9.0.1" apply false
+    // AGP 9로 올리면 안드로이드 빌드가 깨진다 — file_picker는 AGP 9 이상에서
+    // KGP를 스스로 적용하지 않아 built-in Kotlin을 켜야 하는데, desktop_drop은
+    // kotlin-android를 무조건 적용해서 built-in Kotlin과 충돌한다.
+    // 두 패키지 모두 최신이라 올려서 풀 수 없으므로 AGP를 8.x에 묶어둔다.
+    id("com.android.application") version "8.13.0" apply false
     id("org.jetbrains.kotlin.android") version "2.3.20" apply false
 }
 
