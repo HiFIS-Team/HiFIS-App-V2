@@ -69,7 +69,8 @@ class _PeerReviewSectionState extends State<PeerReviewSection> {
       setState(() {
         _targets = _targetsOf(me);
         _all = reviews;
-        // 점장·대표는 지점 전체 평가가 오므로 내가 쓴 것만 남긴다
+        // 대표·관리자는 남이 쓴 평가까지 오므로 내가 쓴 것만 남긴다
+        // (직원·점장에게는 어차피 본인 것만 온다)
         _mine = {
           for (final review in reviews)
             if (review.reviewerId == me?.id) review.revieweeId: review,
