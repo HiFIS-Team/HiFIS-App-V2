@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/glass_bottom_button.dart';
 import '../../core/widgets/glass_icon_button.dart';
@@ -24,10 +25,11 @@ class PeerReviewSection extends StatefulWidget {
 }
 
 class _PeerReviewSectionState extends State<PeerReviewSection> {
+  /// 평가 작성 — 폰은 밀려 들어오고 PC는 모달로 뜬다
   Future<void> _openForm(_Person person) async {
-    await Navigator.push<bool>(
+    await showFullPage<bool>(
       context,
-      CupertinoPageRoute(builder: (_) => _PeerReviewFormScreen(person: person)),
+      (_) => _PeerReviewFormScreen(person: person),
     );
     // 제출하고 돌아왔을 수 있으니 진행 상황을 새로 그린다
     if (mounted) setState(() {});
