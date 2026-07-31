@@ -195,16 +195,20 @@ class _SummaryCard extends StatelessWidget {
           Row(
             children: [
               Icon(
-                CupertinoIcons.info_circle,
+                CupertinoIcons.exclamationmark_circle_fill,
                 size: 13,
-                color: AppColors.gray400,
+                color: AppColors.error,
               ),
               SizedBox(width: 5),
               Expanded(
                 child: Text(
                   // 실제 입금액과 다르다는 걸 금액 바로 아래에서 알린다
                   '세금·보험 공제 전 금액이에요',
-                  style: AppTextStyles.caption.copyWith(fontSize: 12),
+                  style: AppTextStyles.caption.copyWith(
+                    fontSize: 12,
+                    color: AppColors.error,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],

@@ -86,7 +86,7 @@ class _PayslipFormState extends State<_PayslipForm> {
             ],
           ),
         ),
-        SizedBox(height: 20),
+        SizedBox(height: 16),
         _FormLabel('신청 금액'),
         SizedBox(height: 8),
         Container(
@@ -128,7 +128,7 @@ class _PayslipFormState extends State<_PayslipForm> {
             ],
           ),
         ),
-        SizedBox(height: 20),
+        SizedBox(height: 16),
         _FormLabel('특이사항 (선택)'),
         SizedBox(height: 8),
         Container(
@@ -150,10 +150,15 @@ class _PayslipFormState extends State<_PayslipForm> {
             ),
           ),
         ),
-        SizedBox(height: 16),
+        SizedBox(height: 14),
+        // 실제 입금액이 다르다는 건 나중에 문의로 돌아오는 부분이라 눈에 띄게
+        _TaxNotice(
+          '위 금액은 세금·보험 공제 전이에요.\n'
+          '4대보험·소득세는 회사에서 따로 떼고 ${_dayLabel(payslip.payDay)}에 입금돼요.',
+        ),
+        SizedBox(height: 10),
         Text(
-          '제출하면 대표 승인 후 ${_dayLabel(payslip.payDay)}에 지급돼요.\n'
-          '세금·보험 공제는 회사에서 따로 처리해서 실제 입금액과는 달라요.',
+          '제출하면 대표 승인 후 지급 처리돼요.',
           style: AppTextStyles.caption.copyWith(height: 1.5),
         ),
       ],
@@ -161,8 +166,8 @@ class _PayslipFormState extends State<_PayslipForm> {
 
     if (isDesktop) {
       return Container(
-        width: dialogWidth(context, 460),
-        padding: EdgeInsets.fromLTRB(24, 24, 24, 20),
+        width: dialogWidth(context, 400),
+        padding: EdgeInsets.fromLTRB(22, 22, 22, 18),
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(20),
@@ -172,10 +177,10 @@ class _PayslipFormState extends State<_PayslipForm> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('${payslip.month.month}월 급여 신청서', style: AppTextStyles.title3),
-            SizedBox(height: 20),
+            SizedBox(height: 16),
             // 창이 낮으면 폼이 잘리므로 안쪽만 스크롤한다
             Flexible(child: SingleChildScrollView(child: body)),
-            SizedBox(height: 20),
+            SizedBox(height: 16),
             Row(
               children: [
                 Expanded(
@@ -226,26 +231,33 @@ class _PayslipFormState extends State<_PayslipForm> {
 
   Widget _amountRow(_PayItem item) => Row(
     children: [
-      Text(
-        item.label,
-        style: AppTextStyles.caption.copyWith(color: AppColors.primary),
-      ),
-      if (item.note != null) ...[
-        SizedBox(width: 6),
-        Flexible(
-          child: Text(
-            item.note!,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppTextStyles.caption.copyWith(
-              fontSize: 12,
-              color: AppColors.primary.withValues(alpha: 0.7),
+      // 항목과 근거를 한 덩어리로 — Flexible과 Spacer를 따로 두면
+      // 둘이 남는 폭을 나눠 가져 금액 위치가 줄마다 달라진다
+      Expanded(
+        child: Row(
+          children: [
+            Text(
+              item.label,
+              style: AppTextStyles.caption.copyWith(color: AppColors.primary),
             ),
-          ),
+            if (item.note != null) ...[
+              SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  item.note!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.caption.copyWith(
+                    fontSize: 12,
+                    color: AppColors.primary.withValues(alpha: 0.7),
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
-      ],
-      Spacer(),
-      SizedBox(width: 8),
+      ),
+      SizedBox(width: 10),
       Text(
         _won(item.amount),
         style: AppTextStyles.caption.copyWith(
@@ -255,6 +267,46 @@ class _PayslipFormState extends State<_PayslipForm> {
       ),
     ],
   );
+}
+
+/// 공제 전 금액이라는 경고 — 실제 입금액과 다른 이유를 짚어 준다
+class _TaxNotice extends StatelessWidget {
+  _TaxNotice(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: AppColors.error.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            CupertinoIcons.exclamationmark_circle_fill,
+            size: 14,
+            color: AppColors.error,
+          ),
+          SizedBox(width: 7),
+          Expanded(
+            child: Text(
+              text,
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.error,
+                fontWeight: FontWeight.w500,
+                height: 1.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _FormLabel extends StatelessWidget {
