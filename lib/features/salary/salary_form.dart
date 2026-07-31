@@ -146,7 +146,7 @@ class _PayslipFormState extends State<_PayslipForm> {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
-              '프리랜서는 4대보험 대신 사업소득세 3.3%가 원천징수돼요.',
+              '프리랜서는 4대보험 가입 대상이 아니라 공제 없이 전액 지급돼요.',
               style: AppTextStyles.caption.copyWith(height: 1.5),
             ),
           ),

@@ -70,14 +70,12 @@ class _CompanyTerms {
     required this.sessionRate,
     required this.newBonus,
     required this.reBonus,
-    required this.meal,
   });
 
   final int base;
   final int sessionRate;
   final int newBonus;
   final int reBonus;
-  final int meal;
 }
 
 const _companyBase = _CompanyTerms(
@@ -85,7 +83,6 @@ const _companyBase = _CompanyTerms(
   sessionRate: 15000,
   newBonus: 50000,
   reBonus: 20000,
-  meal: 100000,
 );
 
 /// 한 달치 급여 신청서 (목업)
@@ -133,7 +130,7 @@ class _Payslip {
   bool get submitted => status != _PayStatus.draft;
 
   String get insuranceLabel => type == _EmployType.freelance
-      ? '사업소득 3.3%'
+      ? '4대보험 대상 아님'
       : insurances.isEmpty
       ? '보험 미가입'
       : insurances.map((i) => i.label).join(', ');
@@ -156,42 +153,31 @@ class _Payslip {
       reSignups * _companyBase.reBonus,
       note: '$reSignups건 × ${_amount(_companyBase.reBonus)}',
     ),
-    _PayItem('식대', _companyBase.meal, note: '비과세'),
   ];
 
-  /// 공제 항목 — 신청서에 적어 낸 조건대로만
+  /// 공제 항목 — 신청서에 가입했다고 적어 낸 4대보험만 뗀다.
+  /// 소득세는 회사가 따로 처리하므로 여기서 다루지 않는다.
   List<_PayItem> get deductions {
-    // 식대는 비과세라 과세 대상에서 뺀다
-    final taxable = gross - _companyBase.meal;
-    int cut(num value) => (value ~/ 10) * 10;
+    // 프리랜서는 4대보험 대상이 아니라 뗄 게 없다
+    if (type == _EmployType.freelance) return const [];
 
-    // 프리랜서는 사업소득 3.3% 원천징수로 끝난다
-    if (type == _EmployType.freelance) {
-      return [
-        _PayItem('사업소득세', cut(taxable * 0.03), note: '3%'),
-        _PayItem('지방소득세', cut(taxable * 0.003), note: '0.3%'),
-      ];
-    }
+    final pay = gross;
+    int cut(num value) => (value ~/ 10) * 10;
 
     final items = <_PayItem>[];
     if (insurances.contains(_Insurance.pension)) {
-      items.add(_PayItem('국민연금', cut(taxable * 0.045), note: '4.5%'));
+      items.add(_PayItem('국민연금', cut(pay * 0.045), note: '4.5%'));
     }
     if (insurances.contains(_Insurance.health)) {
-      final health = cut(taxable * 0.03545);
+      final health = cut(pay * 0.03545);
       items
         ..add(_PayItem('건강보험', health, note: '3.545%'))
         ..add(_PayItem('장기요양', cut(health * 0.1295), note: '건강보험의 12.95%'));
     }
     if (insurances.contains(_Insurance.employment)) {
-      items.add(_PayItem('고용보험', cut(taxable * 0.009), note: '0.9%'));
+      items.add(_PayItem('고용보험', cut(pay * 0.009), note: '0.9%'));
     }
-
-    final rate = type == _EmployType.regular ? 0.031 : 0.006;
-    final incomeTax = cut(taxable * rate);
-    return items
-      ..add(_PayItem('소득세', incomeTax))
-      ..add(_PayItem('지방소득세', cut(incomeTax * 0.1), note: '소득세의 10%'));
+    return items;
   }
 
   int get gross => pays.fold(0, (sum, item) => sum + item.amount);
