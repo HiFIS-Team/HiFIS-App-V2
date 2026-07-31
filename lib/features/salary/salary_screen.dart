@@ -97,25 +97,18 @@ class _SalaryScreenState extends State<SalaryScreen> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(
-                    flex: 3,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _SummaryCard(payslip: current),
-                        SizedBox(height: 16),
-                        _StatusNotice(
-                          payslip: current,
-                          onSubmit: () => _submit(current),
-                          onCancel: () => _cancel(current),
-                        ),
-                      ],
-                    ),
-                  ),
+                  Expanded(flex: 3, child: _SummaryCard(payslip: current)),
                   SizedBox(width: 16),
                   Expanded(flex: 4, child: _TrendCard()),
                 ],
               ),
+            ),
+            // 안내는 두 카드 아래 한 줄로 — 왼쪽에 쌓으면 옆 그래프 카드만 늘어난다
+            SizedBox(height: 16),
+            _StatusNotice(
+              payslip: current,
+              onSubmit: () => _submit(current),
+              onCancel: () => _cancel(current),
             ),
             SizedBox(height: 16),
             IntrinsicHeight(
@@ -316,8 +309,8 @@ class _TrendCard extends StatelessWidget {
           ),
           SizedBox(height: 18),
           SizedBox(
-            // 금액(15) + 6 + 막대(최대 60) + 8 + 월(15)이 들어갈 높이
-            height: 108,
+            // 금액(15) + 6 + 막대(최대 78) + 8 + 월(15)이 들어갈 높이
+            height: 126,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -364,8 +357,8 @@ class _Bar extends StatelessWidget {
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 5),
           child: Container(
-            // 가장 높은 달을 60으로 두고 비율로 깎는다
-            height: 20 + 40 * ratio,
+            // 가장 높은 달을 78로 두고 비율로 깎는다
+            height: 26 + 52 * ratio,
             decoration: BoxDecoration(
               color: current ? AppColors.primary : AppColors.gray100,
               borderRadius: BorderRadius.circular(6),
