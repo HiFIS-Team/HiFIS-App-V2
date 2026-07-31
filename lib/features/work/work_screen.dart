@@ -656,12 +656,12 @@ class _ChecklistCard extends StatelessWidget {
               final columns = isDesktop
                   ? (constraints.maxWidth / 220).floor().clamp(2, 4)
                   : 2;
-              // 안드로이드는 화면이 좁아 칩마다 글자가 제각각 줄어들었다
-              // ('화장실청소'만 작아 보이는 문제). 제일 긴 라벨에 맞춘
-              // 한 가지 크기를 모든 칩이 같이 쓴다.
+              // 칩마다 글자를 알아서 줄이면 긴 라벨('화장실청소')만 작아 보인다.
+              // 제일 긴 라벨이 들어가는 크기를 구해 모든 칩이 같이 쓴다 —
+              // 폰은 칸이 좁아 애플·안드로이드 모두 필요하다.
               final chipWidth =
                   (constraints.maxWidth - 10 * (columns - 1)) / columns;
-              final fontSize = isApple ? null : _chipFontSize(items, chipWidth);
+              final fontSize = _chipFontSize(items, chipWidth);
               return Column(
                 children: [
                   for (var i = 0; i < items.length; i += columns) ...[
@@ -731,15 +731,15 @@ class _CountChip extends StatelessWidget {
     required this.label,
     required this.count,
     required this.onAdjust,
-    this.fontSize,
+    required this.fontSize,
   });
 
   final String label;
   final int count;
   final ValueChanged<int> onAdjust;
 
-  /// 모든 칩이 함께 쓰는 글자 크기 (없으면 기본 14)
-  final double? fontSize;
+  /// 모든 칩이 함께 쓰는 글자 크기 — 길이와 상관없이 같아 보이게 한다
+  final double fontSize;
 
   /// 좌우 −/+ 버튼 한 개의 폭
   static const double buttonWidth = 42;
@@ -770,22 +770,19 @@ class _CountChip extends StatelessWidget {
             color: active ? AppColors.error : AppColors.gray300,
             onTap: () => onAdjust(-1),
           ),
+          // 칸에 맞춰 글자를 줄이는(FittedBox) 방식은 라벨 길이마다 크기가
+          // 달라져서 쓰지 않는다. 모두 같은 크기로 그린다.
           Expanded(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    label,
-                    maxLines: 1,
-                    style: AppTextStyles.body2.copyWith(
-                      fontSize: fontSize ?? 14,
-                      color: active ? AppColors.primary : AppColors.textPrimary,
-                      fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                    ),
-                  ),
-                ],
+            child: Center(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.body2.copyWith(
+                  fontSize: fontSize,
+                  color: active ? AppColors.primary : AppColors.textPrimary,
+                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                ),
               ),
             ),
           ),
