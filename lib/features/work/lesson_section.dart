@@ -8,7 +8,6 @@ import '../../core/api/api_exception.dart';
 import '../../core/api/lesson_api.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/staff.dart';
-import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -52,17 +51,39 @@ class _LessonStore {
 
   List<Member> members = const [];
   List<Registration> registrations = const [];
+
+  /// 이번 달 싸인 — 지난 달은 기록 화면에서 따로 받는다
+  ///
+  /// 한 트레이너가 월 50회면 1년에 600건이라, 전부 받으면 화면 열 때마다
+  /// 그게 다 넘어온다. 달로 잘라 받는다.
   List<SessionSign> signs = const [];
 
   Future<void> load() async {
+    final now = DateTime.now();
     // 셋 다 서로를 안 기다려도 되니 같이 띄운다
     final memberRequest = MemberApi.list();
     final registrationRequest = RegistrationApi.list();
-    final signRequest = SessionSignApi.list(trainerId: currentUser?.id);
+    final signRequest = SessionSignApi.list(
+      trainerId: currentUser?.id,
+      period: periodKey(now),
+    );
 
     members = await memberRequest;
     registrations = await registrationRequest;
     signs = await signRequest;
+  }
+
+  /// 싸인에 회원 이름과 등록권을 붙인다 — 기록 화면도 이걸 쓴다
+  List<_LessonSign> decorate(List<SessionSign> rows) {
+    final decorated = [
+      for (final sign in rows)
+        _LessonSign(
+          source: sign,
+          memberName: memberOf(sign.memberId)?.name ?? '알 수 없음',
+          registration: registrationOf(sign.registrationId),
+        ),
+    ];
+    return decorated..sort((a, b) => b.time.compareTo(a.time));
   }
 
   Member? memberOf(String id) {
@@ -81,53 +102,40 @@ class _LessonStore {
 
   /// 회원이 지금 쓰는 등록권
   ///
-  /// 회차가 남은 것 중 가장 최근 것. 다 썼으면 마지막 등록권을 준다 —
-  /// "20/20회차 사용"까지는 보여줘야 재등록하러 갈 수 있다.
+  /// 회차가 남은 것 중 **먼저 산 것**. 다 쓰기 전에 재등록하면 등록권이
+  /// 잠깐 둘이 되는데, 남은 회차를 흘리지 않으려면 먼저 산 걸 먼저 써야 한다.
+  /// 남은 게 하나도 없으면 마지막 등록권을 준다 — "20/20회차 사용"까지는
+  /// 보여줘야 재등록하러 갈 수 있다.
   Registration? currentRegistrationOf(String memberId) {
-    Registration? fallback;
+    Registration? active;
+    Registration? latest;
     for (final registration in registrations) {
       if (registration.memberId != memberId) continue;
-      if (!registration.exhausted) {
-        if (fallback == null ||
-            fallback.exhausted ||
-            registration.purchasedAt.isAfter(fallback.purchasedAt)) {
-          fallback = registration;
-        }
-      } else if (fallback == null ||
-          (fallback.exhausted &&
-              registration.purchasedAt.isAfter(fallback.purchasedAt))) {
-        fallback = registration;
+      if (latest == null ||
+          registration.purchasedAt.isAfter(latest.purchasedAt)) {
+        latest = registration;
+      }
+      if (registration.exhausted) continue;
+      if (active == null ||
+          registration.purchasedAt.isBefore(active.purchasedAt)) {
+        active = registration;
       }
     }
-    return fallback;
+    return active ?? latest;
   }
-
-  _LessonMember _wrap(Member member) => _LessonMember(
-    source: member,
-    registration: currentRegistrationOf(member.id),
-  );
 
   /// 내가 담당하는 회원
   List<_LessonMember> get myMembers => [
     for (final member in members)
-      if (member.ownerTrainerId == currentUser?.id) _wrap(member),
+      if (member.ownerTrainerId == currentUser?.id)
+        _LessonMember(
+          source: member,
+          registration: currentRegistrationOf(member.id),
+        ),
   ];
 
-  /// 지점 전체 회원 (대타로 싸인 받을 때)
-  List<_LessonMember> get allMembers => [for (final m in members) _wrap(m)];
-
-  /// 내가 받은 싸인 — 회원·등록권을 붙여서
-  List<_LessonSign> get mySigns {
-    final rows = [
-      for (final sign in signs)
-        _LessonSign(
-          source: sign,
-          memberName: memberOf(sign.memberId)?.name ?? '알 수 없음',
-          registration: registrationOf(sign.registrationId),
-        ),
-    ];
-    return rows..sort((a, b) => b.time.compareTo(a.time));
-  }
+  /// 이번 달 내 싸인 — 회원·등록권을 붙여서
+  List<_LessonSign> get mySigns => decorate(signs);
 }
 
 /// 화면이 다루는 회원 한 명 — 서버 회원에 지금 쓰는 등록권을 붙인 것
@@ -152,14 +160,6 @@ class _LessonMember {
 
   /// 싸인을 더 받을 수 있는가 — 등록권이 없거나 회차를 다 쓰면 못 받는다
   bool get canSign => registration != null && !registration!.exhausted;
-
-  bool get mine => source.ownerTrainerId == currentUser?.id;
-
-  /// 담당 트레이너 이름 — 내 담당이면 빈 문자열
-  String get owner {
-    if (mine) return '';
-    return StaffDirectory.instance.byId(source.ownerTrainerId)?.name ?? '';
-  }
 }
 
 /// 세션 기록 한 줄 — 싸인에 회원 이름과 등록권을 붙여 놓은 것
@@ -702,7 +702,70 @@ class _SignRow extends StatelessWidget {
   }
 }
 
-/// 세션 기록 전체 화면 — 옆에서 슬라이드되어 열리고 날짜별로 묶어 보여준다
+/// 기록 화면 상단의 달 넘김 줄
+class _MonthBar extends StatelessWidget {
+  _MonthBar({
+    required this.month,
+    required this.count,
+    required this.loading,
+    required this.onPrev,
+    required this.onNext,
+  });
+
+  final DateTime month;
+  final int count;
+  final bool loading;
+  final VoidCallback onPrev;
+
+  /// null 이면 더 갈 데가 없다 (이번 달)
+  final VoidCallback? onNext;
+
+  Widget _arrow(IconData icon, VoidCallback? onTap) {
+    final enabled = onTap != null;
+    return Pressable(
+      onTap: onTap ?? () {},
+      scale: enabled ? 0.9 : 1,
+      child: Padding(
+        padding: EdgeInsets.all(8),
+        child: Icon(
+          icon,
+          size: 15,
+          color: enabled ? AppColors.textSecondary : AppColors.gray300,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 6, 24, 6),
+      child: Row(
+        children: [
+          _arrow(CupertinoIcons.chevron_left, onPrev),
+          Text(
+            '${month.year}년 ${month.month}월',
+            style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w700),
+          ),
+          _arrow(CupertinoIcons.chevron_right, onNext),
+          Spacer(),
+          Text(
+            loading ? '불러오는 중' : '총 $count건',
+            style: AppTextStyles.caption.copyWith(
+              color: loading ? AppColors.textTertiary : AppColors.primary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 세션 기록 전체 화면 — 달을 넘겨 가며 날짜별로 묶어 보여준다
+///
+/// 싸인은 달마다 따로 받는다. 한 번에 다 받으면 해가 갈수록
+/// 화면 열 때마다 몇 백 건씩 넘어온다.
 class _SignHistoryScreen extends StatefulWidget {
   @override
   State<_SignHistoryScreen> createState() => _SignHistoryScreenState();
@@ -711,16 +774,53 @@ class _SignHistoryScreen extends StatefulWidget {
 class _SignHistoryScreenState extends State<_SignHistoryScreen> {
   final _search = TextEditingController();
 
+  late DateTime _month;
+  List<_LessonSign> _rows = const [];
+  bool _loading = true;
+
   @override
   void initState() {
     super.initState();
+    final now = DateTime.now();
+    _month = DateTime(now.year, now.month);
     _search.addListener(() => setState(() {}));
+    _fetch();
   }
 
   @override
   void dispose() {
     _search.dispose();
     super.dispose();
+  }
+
+  /// 다음 달로 못 넘어간다 — 아직 오지 않은 달이라 볼 게 없다
+  bool get _atLatest {
+    final now = DateTime.now();
+    return _month.year == now.year && _month.month == now.month;
+  }
+
+  Future<void> _fetch() async {
+    setState(() => _loading = true);
+    try {
+      final rows = await SessionSignApi.list(
+        trainerId: currentUser?.id,
+        period: periodKey(_month),
+      );
+      if (!mounted) return;
+      setState(() {
+        _rows = _LessonStore.instance.decorate(rows);
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      AppToast.show(context, messageOf(error));
+    }
+  }
+
+  void _shiftMonth(int delta) {
+    setState(() => _month = DateTime(_month.year, _month.month + delta));
+    _fetch();
   }
 
   /// 오늘/어제/그 외 날짜 라벨
@@ -736,7 +836,7 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final all = _LessonStore.instance.mySigns;
+    final all = _rows;
     final query = _search.text.trim();
     final sorted = all
         .where((s) => query.isEmpty || s.memberName.contains(query))
@@ -780,29 +880,30 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen> {
               children: [
                 // 상단 고정 타이틀 영역만큼 비워둔다
                 SizedBox(height: 56),
-                Padding(
-                  padding: EdgeInsets.fromLTRB(24, 12, 24, 12),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text('받은 싸인 기록', style: AppTextStyles.caption),
-                      ),
-                      Text(
-                        '총 ${sorted.length}건',
-                        style: AppTextStyles.caption.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
+                _MonthBar(
+                  month: _month,
+                  count: sorted.length,
+                  loading: _loading,
+                  onPrev: () => _shiftMonth(-1),
+                  // 아직 오지 않은 달은 볼 게 없으니 막는다
+                  onNext: _atLatest ? null : () => _shiftMonth(1),
                 ),
                 Container(height: 1, color: AppColors.gray100),
-                if (sorted.isEmpty)
+                if (_loading)
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(24, 40, 24, 44),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.4,
+                        valueColor: AlwaysStoppedAnimation(AppColors.primary),
+                      ),
+                    ),
+                  )
+                else if (sorted.isEmpty)
                   Padding(
                     padding: EdgeInsets.fromLTRB(24, 32, 24, 44),
                     child: Text(
-                      all.isEmpty ? '아직 받은 싸인이 없어요' : '검색 결과가 없어요',
+                      all.isEmpty ? '이 달에 받은 싸인이 없어요' : '검색 결과가 없어요',
                       style: AppTextStyles.body2.copyWith(
                         color: AppColors.textTertiary,
                       ),
@@ -1565,15 +1666,16 @@ class _PickerField extends StatelessWidget {
 }
 
 /// 싸인 받을 회원 선택 화면
+///
+/// 내 담당 회원만 나온다. 남의 회원 싸인을 대신 받으면 서버가 커미션과
+/// 수업왕 점수를 **수행한 사람** 기준으로 붙여서 매출 귀속이 어긋난다.
+/// 우리는 대타로 수업하는 일이 없다.
 class _PickMemberScreen extends StatefulWidget {
   @override
   State<_PickMemberScreen> createState() => _PickMemberScreenState();
 }
 
 class _PickMemberScreenState extends State<_PickMemberScreen> {
-  /// true면 전체(다른 담당 포함) 목록
-  bool _all = false;
-
   final _search = TextEditingController();
 
   @override
@@ -1589,8 +1691,7 @@ class _PickMemberScreenState extends State<_PickMemberScreen> {
   }
 
   List<_LessonMember> get _filtered {
-    final store = _LessonStore.instance;
-    final base = _all ? store.allMembers : store.myMembers;
+    final base = _LessonStore.instance.myMembers;
     final query = _search.text.trim();
     if (query.isEmpty) return base;
     return base.where((m) => m.name.contains(query)).toList();
@@ -1622,7 +1723,6 @@ class _PickMemberScreenState extends State<_PickMemberScreen> {
   @override
   Widget build(BuildContext context) {
     final list = _filtered;
-    final mineCount = _LessonStore.instance.myMembers.length;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -1634,22 +1734,23 @@ class _PickMemberScreenState extends State<_PickMemberScreen> {
               children: [
                 // 상단 고정 타이틀 영역만큼 비워둔다
                 SizedBox(height: 56),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(24, 12, 24, 12),
+                  child: Text(
+                    '내 담당 회원 ${list.length}명',
+                    style: AppTextStyles.caption,
+                  ),
+                ),
+                Container(height: 1, color: AppColors.gray100),
                 Expanded(
                   child: ListView(
                     padding: EdgeInsets.fromLTRB(
                       20,
-                      8,
+                      12,
                       20,
                       MediaQuery.paddingOf(context).bottom + 96,
                     ),
                     children: [
-                      ModeSwitch(
-                        left: '내 담당 ($mineCount)',
-                        right: '전체',
-                        value: _all,
-                        onChanged: (v) => setState(() => _all = v),
-                      ),
-                      SizedBox(height: 12),
                       if (list.isEmpty)
                         Padding(
                           padding: EdgeInsets.fromLTRB(4, 10, 4, 10),
@@ -1713,7 +1814,6 @@ class _PickRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ownerLabel = member.mine ? '내 담당' : '${member.owner} 담당';
     final hasRegistration = member.registration != null;
 
     return Pressable(
@@ -1767,8 +1867,8 @@ class _PickRow extends StatelessWidget {
                   SizedBox(height: 2),
                   Text(
                     hasRegistration
-                        ? '${member.done}/${member.total}회차 사용 · $ownerLabel'
-                        : '등록권 없음 · $ownerLabel',
+                        ? '${member.done}/${member.total}회차 사용'
+                        : '등록권 없음',
                     style: AppTextStyles.caption.copyWith(fontSize: 11),
                   ),
                 ],
