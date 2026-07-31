@@ -12,6 +12,7 @@ import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/pressable.dart';
+import '../../core/widgets/see_all_button.dart';
 import 'lesson_section.dart';
 import 'peer_review_section.dart';
 import 'praise_section.dart';
@@ -86,13 +87,16 @@ class _WorkScreenState extends State<WorkScreen> {
   }
 
   /// 오늘 수행 내역 — 폰은 밀려 들어오는 화면, PC는 모달로 열린다
-  void _showHistory({bool all = false}) {
+  ///
+  /// [tabs]를 끄면 [all]로 지정한 쪽만 보여준다 (데스크톱 카드에서 열 때).
+  void _showHistory({bool all = false, bool tabs = true}) {
     showFullPage<void>(
       context,
       (_) => _HistoryScreen(
         myLogs: List.of(_logs),
         allLogs: [..._logs, ..._teamLogs],
         initialAll: all,
+        tabs: tabs,
       ),
     );
   }
@@ -300,7 +304,7 @@ class _WorkScreenState extends State<WorkScreen> {
                         logs: _logs,
                         showName: false,
                         emptyText: '오늘 완료한 항목이 없어요',
-                        onOpenAll: () => _showHistory(all: false),
+                        onOpenAll: () => _showHistory(all: false, tabs: false),
                       ),
                     ),
                     SizedBox(width: 16),
@@ -310,7 +314,7 @@ class _WorkScreenState extends State<WorkScreen> {
                         logs: [..._logs, ..._teamLogs],
                         showName: true,
                         emptyText: '오늘 완료된 항목이 없어요',
-                        onOpenAll: () => _showHistory(all: true),
+                        onOpenAll: () => _showHistory(all: true, tabs: false),
                       ),
                     ),
                   ],
@@ -981,31 +985,7 @@ class _HistoryCardState extends State<_HistoryCard> {
                     ),
                   ),
                 ),
-                Pressable(
-                  onTap: widget.onOpenAll,
-                  scale: 0.92,
-                  pressedColor: AppColors.gray100,
-                  borderRadius: BorderRadius.circular(100),
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '전체 보기',
-                        style: AppTextStyles.caption.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      SizedBox(width: 2),
-                      Icon(
-                        CupertinoIcons.chevron_right,
-                        size: 11,
-                        color: AppColors.primary,
-                      ),
-                    ],
-                  ),
-                ),
+                SeeAllButton(onTap: widget.onOpenAll),
               ],
             ),
           ),
@@ -1044,27 +1024,34 @@ class _HistoryCardState extends State<_HistoryCard> {
   }
 }
 
-/// 오늘 수행 내역 화면 — 옆에서 슬라이드되어 열리고,
-/// 내 내역/전체 내역 탭을 전환하며 최근 기록이 위로 오도록 보여준다
+/// 오늘 수행 내역 화면 — 옆에서 슬라이드되어 열린다
+///
+/// 폰은 들어오는 문이 하나뿐이라 내 내역/전체 내역 탭으로 오간다.
+/// 데스크톱은 두 카드가 각각 '전체 보기'를 갖고 있어서, 누른 쪽만
+/// 열어 준다 ([tabs]가 false) — 눌렀는데 다른 것까지 나오면 헷갈린다.
 class _HistoryScreen extends StatefulWidget {
   _HistoryScreen({
     required this.myLogs,
     required this.allLogs,
     this.initialAll = false,
+    this.tabs = true,
   });
 
   final List<_WorkLog> myLogs;
   final List<_WorkLog> allLogs;
 
-  /// 어느 탭으로 열지 (데스크톱은 누른 카드에 맞춰 연다)
+  /// 어느 쪽으로 열지 (데스크톱은 누른 카드에 맞춰 연다)
   final bool initialAll;
+
+  /// 내 내역·전체 내역 전환 탭을 보여줄지
+  final bool tabs;
 
   @override
   State<_HistoryScreen> createState() => _HistoryScreenState();
 }
 
 class _HistoryScreenState extends State<_HistoryScreen> {
-  /// true면 전체 내역 탭
+  /// true면 전체 내역
   late bool _all = widget.initialAll;
 
   static const _weekdays = ['월', '화', '수', '목', '금', '토', '일'];
@@ -1102,28 +1089,29 @@ class _HistoryScreenState extends State<_HistoryScreen> {
                     ],
                   ),
                 ),
-                SizedBox(height: 8),
+                SizedBox(height: widget.tabs ? 8 : 14),
                 // 내 내역 / 전체 내역 전환 탭 (업무 탭과 같은 밑줄 스타일)
-                Row(
-                  children: [
-                    Expanded(
-                      child: _WorkTab(
-                        label: '내 내역',
-                        selected: !_all,
-                        expand: true,
-                        onTap: () => setState(() => _all = false),
+                if (widget.tabs)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _WorkTab(
+                          label: '내 내역',
+                          selected: !_all,
+                          expand: true,
+                          onTap: () => setState(() => _all = false),
+                        ),
                       ),
-                    ),
-                    Expanded(
-                      child: _WorkTab(
-                        label: '전체 내역',
-                        selected: _all,
-                        expand: true,
-                        onTap: () => setState(() => _all = true),
+                      Expanded(
+                        child: _WorkTab(
+                          label: '전체 내역',
+                          selected: _all,
+                          expand: true,
+                          onTap: () => setState(() => _all = true),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
                 Container(height: 1, color: AppColors.gray100),
                 if (sorted.isEmpty)
                   Padding(
@@ -1163,7 +1151,14 @@ class _HistoryScreenState extends State<_HistoryScreen> {
               child: SizedBox(
                 height: 56,
                 child: Center(
-                  child: Text('오늘 내역', style: AppTextStyles.title3),
+                  child: Text(
+                    widget.tabs
+                        ? '오늘 내역'
+                        : _all
+                        ? '전체 내역'
+                        : '내 내역',
+                    style: AppTextStyles.title3,
+                  ),
                 ),
               ),
             ),

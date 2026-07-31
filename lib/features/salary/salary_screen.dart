@@ -11,6 +11,7 @@ import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/glass_bottom_button.dart';
 import '../../core/widgets/phone_scaffold.dart';
 import '../../core/widgets/pressable.dart';
+import '../../core/widgets/see_all_button.dart';
 
 part 'salary_models.dart';
 part 'salary_form.dart';
@@ -482,26 +483,7 @@ class _HistoryCard extends StatelessWidget {
           Row(
             children: [
               Expanded(child: Text('지난 명세서', style: AppTextStyles.label)),
-              Pressable(
-                onTap: onOpenAll,
-                scale: 0.94,
-                child: Row(
-                  children: [
-                    Text(
-                      '전체 보기',
-                      style: AppTextStyles.caption.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      size: 16,
-                      color: AppColors.gray400,
-                    ),
-                  ],
-                ),
-              ),
+              SeeAllButton(onTap: onOpenAll),
             ],
           ),
           SizedBox(height: 4),

@@ -10,6 +10,7 @@ import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/glass_search_bar.dart';
 import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/pressable.dart';
+import '../../core/widgets/see_all_button.dart';
 
 /// 회원 친절도 탭 콘텐츠 (목업)
 ///
@@ -109,31 +110,7 @@ class _PraiseSectionState extends State<PraiseSection> {
                         ],
                       ),
                     ),
-                    Pressable(
-                      onTap: _openHistory,
-                      scale: 0.92,
-                      pressedColor: AppColors.gray100,
-                      borderRadius: BorderRadius.circular(100),
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '전체 보기',
-                            style: AppTextStyles.caption.copyWith(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          SizedBox(width: 2),
-                          Icon(
-                            CupertinoIcons.chevron_right,
-                            size: 11,
-                            color: AppColors.primary,
-                          ),
-                        ],
-                      ),
-                    ),
+                    SeeAllButton(onTap: _openHistory),
                   ],
                 ),
               ),
@@ -965,31 +942,7 @@ class _SurveyCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                Pressable(
-                  onTap: onOpenAll,
-                  scale: 0.92,
-                  pressedColor: AppColors.gray100,
-                  borderRadius: BorderRadius.circular(100),
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '전체 보기',
-                        style: AppTextStyles.caption.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      SizedBox(width: 2),
-                      Icon(
-                        CupertinoIcons.chevron_right,
-                        size: 11,
-                        color: AppColors.primary,
-                      ),
-                    ],
-                  ),
-                ),
+                SeeAllButton(onTap: onOpenAll),
               ],
             ),
           ),

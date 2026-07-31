@@ -154,31 +154,7 @@ class _LeaveList extends StatelessWidget {
                     ),
                   ),
                 ),
-                Pressable(
-                  onTap: onOpenAll,
-                  scale: 0.92,
-                  pressedColor: AppColors.gray100,
-                  borderRadius: BorderRadius.circular(100),
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '전체 보기',
-                        style: AppTextStyles.caption.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      SizedBox(width: 2),
-                      Icon(
-                        CupertinoIcons.chevron_right,
-                        size: 11,
-                        color: AppColors.primary,
-                      ),
-                    ],
-                  ),
-                ),
+                SeeAllButton(onTap: onOpenAll),
               ],
             ),
           ),
