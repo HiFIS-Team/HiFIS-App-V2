@@ -26,25 +26,11 @@ class _AuthScaffold extends StatelessWidget {
   /// 데스크톱 카드 폭 — 입력이 많은 화면은 넓혀서 두 줄로 나눈다
   final double width;
 
-  Widget _header() => Column(
+  /// 폰은 뒤로 버튼을 화면 위에 따로 고정하므로 [showBack]으로 뺀다
+  Widget _header({required bool showBack}) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      if (onBack != null) ...[
-        Pressable(
-          onTap: onBack!,
-          scale: 0.9,
-          child: SizedBox(
-            width: 36,
-            height: 36,
-            child: Icon(
-              Icons.arrow_back_ios_new_rounded,
-              size: 19,
-              color: AppColors.textPrimary,
-            ),
-          ),
-        ),
-        SizedBox(height: 10),
-      ],
+      if (onBack != null && showBack) ...[_backButton(), SizedBox(height: 10)],
       Text(title!, style: AppTextStyles.title1),
       if (caption != null) ...[
         SizedBox(height: 8),
@@ -57,9 +43,26 @@ class _AuthScaffold extends StatelessWidget {
     ],
   );
 
+  Widget _backButton() => Pressable(
+    onTap: onBack!,
+    scale: 0.9,
+    child: SizedBox(
+      width: 36,
+      height: 36,
+      child: Icon(
+        Icons.arrow_back_ios_new_rounded,
+        size: 19,
+        color: AppColors.textPrimary,
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
-    final content = <Widget>[if (title != null) _header(), ...children];
+    final content = <Widget>[
+      if (title != null) _header(showBack: isDesktop),
+      ...children,
+    ];
 
     if (isDesktop) {
       return Scaffold(
@@ -83,13 +86,45 @@ class _AuthScaffold extends StatelessWidget {
       );
     }
 
+    // 폰 — 뒤로 버튼만 위에 붙이고 나머지는 남은 높이 가운데에 둔다.
+    // 화면 맨 위에 딱 붙으면 허전해서, 짧은 화면(로그인·비밀번호 찾기)은
+    // 가운데로 내려오고 긴 화면(회원가입)은 그대로 스크롤로 넘어간다.
+    // 아래 여백을 위보다 넉넉히 줘서 눈높이보다 살짝 위에 오게 했다.
+    const padding = EdgeInsets.fromLTRB(24, 24, 24, 56);
+
     return Scaffold(
       backgroundColor: AppColors.surface,
       body: SafeArea(
-        child: ListView(
-          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          padding: EdgeInsets.fromLTRB(24, 12, 24, 40),
-          children: content,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (onBack != null)
+              Padding(
+                padding: EdgeInsets.only(left: 18, top: 4),
+                child: _backButton(),
+              ),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: padding,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      // 키보드가 올라오면 높이가 줄어드니 음수를 막는다
+                      minHeight: (constraints.maxHeight - padding.vertical)
+                          .clamp(0.0, double.infinity),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: content,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
