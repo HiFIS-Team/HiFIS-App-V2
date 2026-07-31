@@ -74,11 +74,14 @@ class _RankingScreenState extends State<RankingScreen> {
     final podium = _Podium(top: top, metric: _metric);
 
     // 다른 지점을 보고 있으면 내 순위가 없다 — 그때는 시상대만 넓게 쓴다
-    final mine = entries.where((e) => e.ranker.isMe).toList();
-    final myCard = mine.isEmpty
+    final at = entries.indexWhere((e) => e.ranker.isMe);
+    final myCard = at < 0
         ? null
         : _MyRankCard(
-            entry: mine.first,
+            entry: entries[at],
+            // 따라잡을 앞사람 — 1위면 뒤에서 쫓아오는 사람을 대신 보여준다
+            above: at > 0 ? entries[at - 1] : null,
+            below: at < entries.length - 1 ? entries[at + 1] : null,
             metric: _metric,
             total: entries.length,
           );
@@ -307,9 +310,20 @@ class _BranchPicker extends StatelessWidget {
 
 /// 맨 위 내 순위 카드 — 등수 · 지난달 대비 · 이번 달 값
 class _MyRankCard extends StatelessWidget {
-  _MyRankCard({required this.entry, required this.metric, required this.total});
+  _MyRankCard({
+    required this.entry,
+    required this.above,
+    required this.below,
+    required this.metric,
+    required this.total,
+  });
 
   final _Entry entry;
+
+  /// 바로 위·아래 사람 (없으면 null)
+  final _Entry? above;
+  final _Entry? below;
+
   final _Metric metric;
 
   /// 이 지점에서 순위에 오른 사람 수 (상위 몇 %인지 계산에 쓴다)
@@ -408,7 +422,87 @@ class _MyRankCard extends StatelessWidget {
                   ),
                 ],
               ),
+              SizedBox(height: 12),
+              _ChaseLine(
+                entry: entry,
+                above: above,
+                below: below,
+                metric: metric,
+              ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 다음 순위까지 얼마나 남았는지 — 카드 맨 아래 한 줄
+///
+/// 순위만 보여주면 뭘 해야 할지 모른다. 바로 위 사람과의 차이를
+/// 그 항목의 단위(만원·회·건…)로 바꿔서 "얼마 더"를 알려 준다.
+/// 이미 1위면 쫓아오는 사람과의 여유를 대신 보여준다.
+class _ChaseLine extends StatelessWidget {
+  _ChaseLine({
+    required this.entry,
+    required this.above,
+    required this.below,
+    required this.metric,
+  });
+
+  final _Entry entry;
+  final _Entry? above;
+  final _Entry? below;
+  final _Metric metric;
+
+  @override
+  Widget build(BuildContext context) {
+    final chasing = above != null;
+    final target = above ?? below;
+
+    // 혼자면 비교할 상대가 없다
+    if (target == null) return SizedBox.shrink();
+
+    final gap = chasing
+        ? target.value - entry.value
+        : entry.value - target.value;
+    final color = chasing ? AppColors.primary : AppColors.success;
+
+    final text = gap <= 0
+        ? '${target.ranker.name}님과 동점이에요'
+        : chasing
+        ? '${target.rank}위 ${target.ranker.name}까지 '
+              '${_gapLabel(metric, gap, entry.ranker)} 남았어요'
+        : '${target.rank}위와 ${_gapLabel(metric, gap, entry.ranker)} 차이로 앞서요';
+
+    return Container(
+      height: 40,
+      padding: EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            chasing
+                ? CupertinoIcons.arrow_up_right
+                : CupertinoIcons.checkmark_seal_fill,
+            size: 13,
+            color: color,
+          ),
+          SizedBox(width: 7),
+          Expanded(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.caption.copyWith(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
           ),
         ],
       ),

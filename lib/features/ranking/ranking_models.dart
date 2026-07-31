@@ -286,6 +286,21 @@ String _format(_Metric metric, double value) => switch (metric) {
   _Metric.overall => '${value.round()}점',
 };
 
+/// 앞사람과의 차이를 "더 해야 하는 양"으로 바꾼다
+///
+/// 프로젝트 달성만 %를 그대로 보여주면 뭘 해야 할지 모르므로
+/// 내가 맡은 건수 기준으로 몇 건을 더 끝내야 하는지로 환산한다.
+String _gapLabel(_Metric metric, double gap, _Ranker r) => switch (metric) {
+  _Metric.revenue => '${_comma((gap / 10000).ceil())}만원',
+  _Metric.kindness => '${gap.ceil()}점',
+  _Metric.project =>
+    r.projectTotal == 0
+        ? '${gap.ceil()}%'
+        : '${(gap * r.projectTotal / 100).ceil()}건',
+  _Metric.care => '${gap.ceil()}회',
+  _Metric.overall => '${gap.ceil()}점',
+};
+
 /// 1234 → '1,234'
 String _comma(int value) {
   final digits = value.toString();
