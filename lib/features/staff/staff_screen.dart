@@ -200,20 +200,28 @@ class _StaffScreenState extends State<StaffScreen> {
             SizedBox(height: 20),
             _MyCard(branch: _branch),
             SizedBox(height: 16),
-            SegmentedTabs(
-              labels: [
-                for (final e in _Employment.values)
-                  '${e.label} ${_members.where((m) => _inBranch(m) && m.employment == e).length}',
+            // 큰 구분(재직 상태)과 검색을 한 줄에, 그 아래 팀 칩 — 두 층으로 끝낸다
+            Row(
+              children: [
+                SizedBox(
+                  width: 340,
+                  child: SegmentedTabs(
+                    labels: [
+                      for (final e in _Employment.values)
+                        '${e.label} ${_members.where((m) => _inBranch(m) && m.employment == e).length}',
+                    ],
+                    selected: _tab,
+                    onSelect: (i) => setState(() {
+                      _tab = i;
+                      _team = '전체';
+                    }),
+                  ),
+                ),
+                Spacer(),
+                _SearchBar(onChanged: (q) => setState(() => _query = q)),
               ],
-              selected: _tab,
-              onSelect: (i) => setState(() {
-                _tab = i;
-                _team = '전체';
-              }),
             ),
-            SizedBox(height: 16),
-            _SearchBar(onChanged: (q) => setState(() => _query = q)),
-            SizedBox(height: 12),
+            SizedBox(height: 14),
             Row(
               children: [
                 Expanded(
@@ -230,7 +238,7 @@ class _StaffScreenState extends State<StaffScreen> {
                 ),
               ],
             ),
-            SizedBox(height: 24),
+            SizedBox(height: 22),
             if (list.isEmpty)
               EmptyCard(
                 icon: CupertinoIcons.person_2,
@@ -394,9 +402,8 @@ class _BranchPicker extends StatelessWidget {
       height: 38,
       padding: EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: AppColors.gray100,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.gray200),
       ),
       child: Center(widthFactor: 1, child: label),
     );
@@ -466,13 +473,13 @@ class _SearchBarState extends State<_SearchBar> {
   @override
   Widget build(BuildContext context) {
     return Container(
+      width: 280,
       height: 48,
       padding: EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        // 화면 배경이 gray50과 같은 색이라 흰 면 + 테두리로 띄운다
-        color: AppColors.surface,
+        // 흰 카드와 겹쳐 보이지 않게 배경 위에 눕히는 회색 면
+        color: AppColors.gray100,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.gray200),
       ),
       child: Row(
         children: [
@@ -485,7 +492,7 @@ class _SearchBarState extends State<_SearchBar> {
               cursorColor: AppColors.primary,
               onChanged: widget.onChanged,
               decoration: InputDecoration(
-                hintText: '이름·이메일·팀·직무로 검색',
+                hintText: '이름·이메일 검색',
                 hintStyle: AppTextStyles.body2.copyWith(
                   color: AppColors.gray400,
                 ),
@@ -534,13 +541,8 @@ class _TeamChips extends StatelessWidget {
               height: 38,
               padding: EdgeInsets.symmetric(horizontal: 14),
               decoration: BoxDecoration(
-                color: team == selected ? AppColors.primary : AppColors.surface,
+                color: team == selected ? AppColors.primary : AppColors.gray100,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: team == selected
-                      ? AppColors.primary
-                      : AppColors.gray200,
-                ),
               ),
               // 칸이 남는 폭을 다 먹지 않게 내용만큼만 잡는다
               child: Row(
@@ -960,8 +962,10 @@ class _ChatButton extends StatelessWidget {
         height: 40,
         padding: EdgeInsets.symmetric(horizontal: 14),
         alignment: Alignment.center,
+        // 카드마다 있는 버튼이라 진한 파랑이면 화면이 파랗게 도배된다.
+        // 연한 파랑 면에 파란 글씨로 눌러 둔다.
         decoration: BoxDecoration(
-          color: AppColors.primary,
+          color: AppColors.primaryLight,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -970,14 +974,14 @@ class _ChatButton extends StatelessWidget {
             Icon(
               CupertinoIcons.chat_bubble_fill,
               size: 14,
-              color: Colors.white,
+              color: AppColors.primary,
             ),
             SizedBox(width: 6),
             Text(
               '메시지',
               style: AppTextStyles.label.copyWith(
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
               ),
             ),
           ],
@@ -1005,11 +1009,8 @@ class _SmallButton extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: 14),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: filled ? AppColors.primary : AppColors.surface,
+          color: filled ? AppColors.primary : AppColors.gray100,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: filled ? AppColors.primary : AppColors.gray200,
-          ),
         ),
         child: Center(
           widthFactor: 1,
@@ -1018,7 +1019,7 @@ class _SmallButton extends StatelessWidget {
             maxLines: 1,
             style: AppTextStyles.label.copyWith(
               fontWeight: FontWeight.w600,
-              color: filled ? Colors.white : AppColors.textPrimary,
+              color: filled ? Colors.white : AppColors.gray700,
             ),
           ),
         ),
@@ -1044,9 +1045,8 @@ class _IconAction extends StatelessWidget {
         height: 40,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: AppColors.gray100,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.gray200),
         ),
         child: Icon(icon, size: 15, color: AppColors.gray600),
       ),
