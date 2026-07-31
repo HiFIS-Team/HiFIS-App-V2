@@ -200,7 +200,8 @@ class _StaffScreenState extends State<StaffScreen> {
             SizedBox(height: 20),
             _MyCard(branch: _branch),
             SizedBox(height: 16),
-            // 큰 구분(재직 상태)과 검색을 한 줄에, 그 아래 팀 칩 — 두 층으로 끝낸다
+            // 큰 구분(재직 상태)이 위, 그 아래 팀·검색·보기 전환 — 두 층으로 끝낸다.
+            // Row로 감싸야 세그먼트가 왼쪽에 붙는다 (ListView는 폭을 꽉 채운다)
             Row(
               children: [
                 SizedBox(
@@ -217,11 +218,10 @@ class _StaffScreenState extends State<StaffScreen> {
                     }),
                   ),
                 ),
-                Spacer(),
-                _SearchBar(onChanged: (q) => setState(() => _query = q)),
               ],
             ),
             SizedBox(height: 14),
+            // 팀 필터와 검색·보기 전환을 한 줄에 — 고르는 일이 한자리에 모인다
             Row(
               children: [
                 Expanded(
@@ -232,6 +232,8 @@ class _StaffScreenState extends State<StaffScreen> {
                   ),
                 ),
                 SizedBox(width: 12),
+                _SearchBar(onChanged: (q) => setState(() => _query = q)),
+                SizedBox(width: 8),
                 _ViewToggle(
                   grid: _grid,
                   onChanged: (value) => setState(() => _grid = value),
@@ -473,27 +475,28 @@ class _SearchBarState extends State<_SearchBar> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 280,
-      height: 48,
-      padding: EdgeInsets.symmetric(horizontal: 16),
+      width: 240,
+      height: 38,
+      padding: EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
         // 흰 카드와 겹쳐 보이지 않게 배경 위에 눕히는 회색 면
         color: AppColors.gray100,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
-          Icon(CupertinoIcons.search, size: 16, color: AppColors.gray500),
-          SizedBox(width: 10),
+          Icon(CupertinoIcons.search, size: 15, color: AppColors.gray500),
+          SizedBox(width: 8),
           Expanded(
             child: TextField(
               controller: _controller,
-              style: AppTextStyles.body2,
+              style: AppTextStyles.body2.copyWith(fontSize: 14),
               cursorColor: AppColors.primary,
               onChanged: widget.onChanged,
               decoration: InputDecoration(
                 hintText: '이름·이메일 검색',
                 hintStyle: AppTextStyles.body2.copyWith(
+                  fontSize: 14,
                   color: AppColors.gray400,
                 ),
                 border: InputBorder.none,
