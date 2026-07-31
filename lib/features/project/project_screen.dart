@@ -514,17 +514,27 @@ class _ProjectDetail extends StatelessWidget {
   }
 
   /// 연장 신청 버튼 (끝난 프로젝트나 이미 올린 신청이 있으면 감춘다)
-  Widget _extendButton(BuildContext context) => Pressable(
-    onTap: () => _requestExtension(context),
-    scale: 0.94,
-    pressedColor: AppColors.gray100,
-    borderRadius: BorderRadius.circular(100),
-    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-    child: Text(
-      '기한 연장',
-      style: AppTextStyles.caption.copyWith(
-        color: AppColors.primary,
-        fontWeight: FontWeight.w700,
+  ///
+  /// 자주 쓰는 동작이 아니라 글자로 두면 기간 옆에 붙어 어수선하다.
+  /// 오른쪽 끝에 아이콘으로 세우고 무엇인지는 툴팁으로 알린다.
+  Widget _extendButton(BuildContext context) => Tooltip(
+    message: '기한 연장 신청',
+    child: Pressable(
+      onTap: () => _requestExtension(context),
+      scale: 0.92,
+      child: Container(
+        width: 30,
+        height: 30,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppColors.primaryLight,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(
+          CupertinoIcons.calendar_badge_plus,
+          size: 15,
+          color: AppColors.primary,
+        ),
       ),
     ),
   );
@@ -568,11 +578,16 @@ class _ProjectDetail extends StatelessWidget {
     SizedBox(height: 6),
     Row(
       children: [
-        Text(
-          '${_date(project.start)} ~ ${_date(project.due)} · 담당 ${project.owner}',
-          style: AppTextStyles.caption,
+        Expanded(
+          child: Text(
+            '${_date(project.start)} ~ ${_date(project.due)} · 담당 ${project.owner}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.caption,
+          ),
         ),
-        if (_canExtend) ...[SizedBox(width: 8), _extendButton(context)],
+        // 위 참여자 줄과 같은 오른쪽 끝에 세운다
+        if (_canExtend) ...[SizedBox(width: 12), _extendButton(context)],
       ],
     ),
     if (project.desc.isNotEmpty) ...[
