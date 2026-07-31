@@ -7,6 +7,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
 import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/app_toast.dart';
+import '../../core/widgets/desktop_header.dart';
 import '../../core/widgets/glass_bottom_button.dart';
 import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/phone_scaffold.dart';
@@ -123,8 +124,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         child: ListView(
           padding: EdgeInsets.fromLTRB(24, 64, 24, 32),
           children: [
-            Text('근태·월차', style: AppTextStyles.title1),
-            SizedBox(height: 20),
+            DesktopHeader(title: '근태·월차', subtitle: '이번 달 근무 기록과 월차를 관리해요'),
+            SizedBox(height: 22),
             IntrinsicHeight(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,

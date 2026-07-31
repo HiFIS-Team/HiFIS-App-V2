@@ -9,6 +9,7 @@ import '../../core/util/platform.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/app_toast.dart';
+import '../../core/widgets/desktop_header.dart';
 import '../../core/widgets/glass_bottom_button.dart';
 import '../../core/widgets/phone_scaffold.dart';
 import '../../core/widgets/pressable.dart';
@@ -91,8 +92,8 @@ class _SalaryScreenState extends State<SalaryScreen> {
         child: ListView(
           padding: EdgeInsets.fromLTRB(24, 64, 24, 32),
           children: [
-            Text('급여', style: AppTextStyles.title1),
-            SizedBox(height: 20),
+            DesktopHeader(title: '급여', subtitle: '이번 달 급여를 신청하고 지난 명세서를 확인해요'),
+            SizedBox(height: 22),
             // 폭이 남으니 이번 달 요약과 추이를 나란히 둔다
             IntrinsicHeight(
               child: Row(

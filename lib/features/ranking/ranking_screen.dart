@@ -7,6 +7,7 @@ import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
 import '../../core/widgets/avatar.dart';
+import '../../core/widgets/desktop_header.dart';
 import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/phone_scaffold.dart';
@@ -136,24 +137,15 @@ class _RankingScreenState extends State<RankingScreen> {
         child: ListView(
           padding: EdgeInsets.fromLTRB(24, 64, 24, 32),
           children: [
-            Row(
-              children: [
-                Text('랭킹', style: AppTextStyles.title1),
-                SizedBox(width: 10),
-                Text(
-                  _month,
-                  style: AppTextStyles.body2.copyWith(
-                    color: AppColors.textTertiary,
-                  ),
-                ),
-                Spacer(),
-                _BranchPicker(
-                  selected: _branch,
-                  onSelect: (branch) => setState(() => _branch = branch),
-                ),
-              ],
+            DesktopHeader(
+              title: '랭킹',
+              subtitle: '$_month 실적 기준으로 줄 세웠어요',
+              trailing: _BranchPicker(
+                selected: _branch,
+                onSelect: (branch) => setState(() => _branch = branch),
+              ),
             ),
-            SizedBox(height: 20),
+            SizedBox(height: 22),
             _tabs(),
             SizedBox(height: 16),
             if (entries.isEmpty)

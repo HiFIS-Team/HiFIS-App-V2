@@ -10,6 +10,7 @@ import '../../core/util/platform.dart';
 import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/avatar.dart';
+import '../../core/widgets/desktop_header.dart';
 import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/phone_scaffold.dart';
@@ -180,21 +181,19 @@ class _StaffScreenState extends State<StaffScreen> {
         child: ListView(
           padding: EdgeInsets.fromLTRB(24, 64, 24, 32),
           children: [
-            Row(
-              children: [
-                Text('직원', style: AppTextStyles.title1),
-                Spacer(),
-                // 지점은 한 번에 한 곳만 보므로 목록에서 골라 바꾼다
-                _BranchPicker(
-                  selected: _branch,
-                  onSelect: (branch) => setState(() {
-                    _branch = branch;
-                    _team = '전체';
-                  }),
-                ),
-              ],
+            DesktopHeader(
+              title: '직원',
+              subtitle: '지점 구성원을 찾아보고 바로 연락해요',
+              // 지점은 한 번에 한 곳만 보므로 목록에서 골라 바꾼다
+              trailing: _BranchPicker(
+                selected: _branch,
+                onSelect: (branch) => setState(() {
+                  _branch = branch;
+                  _team = '전체';
+                }),
+              ),
             ),
-            SizedBox(height: 20),
+            SizedBox(height: 22),
             _MyCard(branch: _branch),
             SizedBox(height: 16),
             // 재직 상태를 오른쪽 끝에 맞춰 아래 검색+보기 전환과 한 기둥으로 세운다.

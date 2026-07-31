@@ -9,6 +9,7 @@ import '../../core/util/platform.dart';
 import '../../core/util/sf_symbols.dart';
 import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/app_toast.dart';
+import '../../core/widgets/desktop_header.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/pressable.dart';
@@ -222,8 +223,8 @@ class _WorkScreenState extends State<WorkScreen> {
           child: ListView(
             padding: EdgeInsets.fromLTRB(24, 64, 24, 32),
             children: [
-              Text('업무', style: AppTextStyles.title1),
-              SizedBox(height: 20),
+              DesktopHeader(title: '업무', subtitle: '이번 달 평가 항목을 확인하고 기록해요'),
+              SizedBox(height: 22),
               _tabs(),
               SizedBox(height: 16),
               _content(item),
