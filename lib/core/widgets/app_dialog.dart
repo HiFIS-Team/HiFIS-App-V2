@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../util/platform.dart';
-import 'pressable.dart';
+import 'app_button.dart';
 
 /// '전체 보기'처럼 목록을 통째로 여는 화면 띄우기
 ///
@@ -176,62 +176,24 @@ class _ConfirmCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: _ConfirmButton(
+                child: AppButton(
                   label: cancelLabel,
-                  color: AppColors.gray100,
-                  textColor: AppColors.textSecondary,
                   onTap: () => Navigator.pop(context, false),
                 ),
               ),
               SizedBox(width: 8),
               Expanded(
-                child: _ConfirmButton(
+                child: AppButton(
                   label: confirmLabel,
-                  color: destructive ? AppColors.error : AppColors.primary,
-                  textColor: Colors.white,
+                  filled: true,
+                  // 되돌리기 어려운 동작이면 빨갛게
+                  color: destructive ? AppColors.error : null,
                   onTap: () => Navigator.pop(context, true),
                 ),
               ),
             ],
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _ConfirmButton extends StatelessWidget {
-  _ConfirmButton({
-    required this.label,
-    required this.color,
-    required this.textColor,
-    required this.onTap,
-  });
-
-  final String label;
-  final Color color;
-  final Color textColor;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Pressable(
-      onTap: onTap,
-      scale: 0.96,
-      child: Container(
-        height: 50,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.body2.copyWith(
-            color: textColor,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
       ),
     );
   }

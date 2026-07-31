@@ -160,18 +160,14 @@ class _PayslipFormState extends State<_PayslipForm> {
             Row(
               children: [
                 Expanded(
-                  child: _DialogButton(
+                  child: AppButton(
                     label: '취소',
                     onTap: () => Navigator.pop(context),
                   ),
                 ),
                 SizedBox(width: 8),
                 Expanded(
-                  child: _DialogButton(
-                    label: '제출',
-                    filled: true,
-                    onTap: _submit,
-                  ),
+                  child: AppButton(label: '제출', filled: true, onTap: _submit),
                 ),
               ],
             ),
@@ -288,41 +284,6 @@ class _FormLabel extends StatelessWidget {
       fontWeight: FontWeight.w600,
     ),
   );
-}
-
-class _DialogButton extends StatelessWidget {
-  _DialogButton({
-    required this.label,
-    required this.onTap,
-    this.filled = false,
-  });
-
-  final String label;
-  final VoidCallback onTap;
-  final bool filled;
-
-  @override
-  Widget build(BuildContext context) {
-    return Pressable(
-      onTap: onTap,
-      scale: 0.96,
-      child: Container(
-        height: 50,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: filled ? AppColors.primary : AppColors.gray100,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.body2.copyWith(
-            fontWeight: FontWeight.w700,
-            color: filled ? Colors.white : AppColors.textSecondary,
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 /// 급여 신청서 작성·제출 상태 안내

@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
+import '../util/platform.dart';
 import '../util/sf_symbols.dart';
+import 'app_button.dart';
 import 'pressable.dart';
 
 /// 화면 아래 고정 버튼 — 바깥 여백 없이 버튼만 그린다
@@ -11,6 +13,10 @@ import 'pressable.dart';
 /// 애플은 네이티브 리퀴드 글래스(CNButton)를 쓰고, 글래스가 없는
 /// 안드로이드는 **반투명이 아니라 또렷한 단색**으로 대체한다.
 /// (반투명 + 블러로 두면 뒤 콘텐츠에 묻혀 버튼이 안 보인다.)
+///
+/// 데스크톱은 글래스도 캡슐도 쓰지 않고 팝업·모달과 같은 [AppButton]으로
+/// 그린다. 글래스는 떠 있는 탭바 위에 얹히라고 만든 재질이라 흰 모달
+/// 바닥에서는 흐릿하게 뜨고, PC의 다른 버튼들과도 따로 논다.
 class BottomActionButton extends StatelessWidget {
   BottomActionButton({
     super.key,
@@ -45,6 +51,17 @@ class BottomActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (isDesktop) {
+      return AppButton(
+        label: label,
+        onTap: onPressed,
+        filled: filled,
+        // 조건이 아직 안 갖춰진 상태 — 눌리는 자리라는 건 보이게 둔다
+        color: !filled && tinted ? AppColors.gray200 : null,
+        textColor: !filled && tinted ? AppColors.gray700 : null,
+        shrinkWrap: shrinkWrap,
+      );
+    }
     if (isApple) {
       return CNButton(
         // 테마 전환 시 설정 유실 버그 회피용 재생성 키
