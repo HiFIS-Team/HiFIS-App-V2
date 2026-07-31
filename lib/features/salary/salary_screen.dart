@@ -1,26 +1,71 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
 import '../../core/widgets/app_dialog.dart';
+import '../../core/widgets/app_toast.dart';
+import '../../core/widgets/empty_card.dart';
+import '../../core/widgets/glass_bottom_button.dart';
+import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/phone_scaffold.dart';
 import '../../core/widgets/pressable.dart';
 
 part 'salary_models.dart';
+part 'salary_request.dart';
 
 /// 급여 화면 (목업)
 ///
 /// 내 급여만 본다. 이번 달 받을 돈이 맨 위에 있고, 그 아래로 어떻게 그
 /// 금액이 나왔는지(지급 → 공제) 순서대로 편다. 지난 달은 명세서 목록에서
 /// 골라 같은 형식으로 다시 본다.
-class SalaryScreen extends StatelessWidget {
+class SalaryScreen extends StatefulWidget {
   SalaryScreen({super.key});
 
+  @override
+  State<SalaryScreen> createState() => _SalaryScreenState();
+}
+
+class _SalaryScreenState extends State<SalaryScreen> {
   void _openHistory(BuildContext context) {
     showFullPage<void>(context, (_) => _HistoryScreen());
   }
+
+  /// 조건 변경 신청 — 올리면 대표 승인을 기다린다
+  Future<void> _request() async {
+    final request = await _showRequestComposer(context);
+    if (request == null || !mounted) return;
+    setState(() => _requests.insert(0, request));
+    AppToast.show(context, '급여 조건 변경을 신청했어요');
+  }
+
+  Future<void> _cancelRequest(_PayRequest request) async {
+    final ok = await showConfirmDialog(
+      context,
+      title: '신청을 취소할까요?',
+      message: '대표에게 올린 급여 조건 변경 신청이 사라져요.',
+      confirmLabel: '취소하기',
+      destructive: true,
+    );
+    if (!ok || !mounted) return;
+    setState(() => _requests.remove(request));
+    AppToast.show(context, '신청을 취소했어요');
+  }
+
+  /// 신청 내역에서 취소하고 돌아올 수 있어 다녀오면 다시 그린다
+  Future<void> _openRequests() async {
+    await showFullPage<void>(context, (_) => _RequestHistoryScreen());
+    if (mounted) setState(() {});
+  }
+
+  Widget _conditionCard() => _ConditionCard(
+    onRequest: _request,
+    onCancel: _cancelRequest,
+    onHistory: _openRequests,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -34,6 +79,8 @@ class SalaryScreen extends StatelessWidget {
       _PayCard(payslip: current),
       SizedBox(height: 12),
       _DeductCard(payslip: current),
+      SizedBox(height: 12),
+      _conditionCard(),
       SizedBox(height: 12),
       _HistoryCard(onOpenAll: () => _openHistory(context)),
     ];
@@ -73,7 +120,19 @@ class SalaryScreen extends StatelessWidget {
               ),
             ),
             SizedBox(height: 16),
-            _HistoryCard(onOpenAll: () => _openHistory(context)),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    flex: 4,
+                    child: _HistoryCard(onOpenAll: () => _openHistory(context)),
+                  ),
+                  SizedBox(width: 16),
+                  Expanded(flex: 3, child: _conditionCard()),
+                ],
+              ),
+            ),
           ],
         ),
       ),

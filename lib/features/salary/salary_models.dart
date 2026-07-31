@@ -28,6 +28,141 @@ enum _EmployType {
   final String label;
 }
 
+/// 본인이 가입 여부를 신고하는 보험
+///
+/// 산재보험은 전액 회사 부담이라 급여에서 떼지 않아 여기 없다.
+enum _Insurance {
+  pension('국민연금'),
+  health('건강보험'),
+  employment('고용보험');
+
+  const _Insurance(this.label);
+
+  final String label;
+}
+
+/// 급여 조건 변경 신청 상태
+enum _RequestStatus {
+  pending('승인 대기'),
+  approved('승인 완료'),
+  rejected('반려');
+
+  const _RequestStatus(this.label);
+
+  final String label;
+
+  Color get color => switch (this) {
+    _RequestStatus.pending => AppColors.warning,
+    _RequestStatus.approved => AppColors.success,
+    _RequestStatus.rejected => AppColors.error,
+  };
+}
+
+/// 급여 조건 신청 (목업)
+///
+/// 기본급·세션 단가처럼 회사가 정하는 값은 [_companyBase]에 있고,
+/// 고용 형태와 보험 가입 여부는 본인이 신고한다. 대표가 승인해야
+/// 그달 급여부터 적용된다.
+class _PayRequest {
+  _PayRequest({
+    required this.requestedAt,
+    required this.type,
+    required this.insurances,
+    required this.effectiveFrom,
+    this.reason,
+    this.status = _RequestStatus.pending,
+    this.decidedAt,
+    this.comment,
+  });
+
+  final DateTime requestedAt;
+  final _EmployType type;
+  final Set<_Insurance> insurances;
+
+  /// 적용을 시작할 달
+  final DateTime effectiveFrom;
+
+  /// 본인이 적은 사유
+  final String? reason;
+
+  _RequestStatus status;
+  DateTime? decidedAt;
+
+  /// 대표가 남긴 의견 (반려 사유 등)
+  String? comment;
+
+  String get insuranceLabel =>
+      insurances.isEmpty ? '보험 미가입' : insurances.map((i) => i.label).join(', ');
+}
+
+/// 회사가 정해 주는 값 — 본인이 못 바꾼다
+class _CompanyTerms {
+  const _CompanyTerms({
+    required this.base,
+    required this.sessionRate,
+    required this.newBonus,
+    required this.reBonus,
+    required this.meal,
+  });
+
+  final int base;
+  final int sessionRate;
+  final int newBonus;
+  final int reBonus;
+  final int meal;
+}
+
+const _companyBase = _CompanyTerms(
+  base: 2400000,
+  sessionRate: 15000,
+  newBonus: 50000,
+  reBonus: 20000,
+  meal: 100000,
+);
+
+/// 급여 조건 신청 내역 (최신순)
+final _requests = <_PayRequest>[
+  _PayRequest(
+    requestedAt: DateTime(2026, 2, 24),
+    type: _EmployType.regular,
+    insurances: {_Insurance.pension, _Insurance.health, _Insurance.employment},
+    effectiveFrom: DateTime(2026, 3),
+    reason: '4대보험 가입 신고',
+    status: _RequestStatus.approved,
+    decidedAt: DateTime(2026, 2, 26),
+  ),
+  _PayRequest(
+    requestedAt: DateTime(2025, 11, 12),
+    type: _EmployType.parttime,
+    insurances: {},
+    effectiveFrom: DateTime(2025, 12),
+    reason: '주 3일 근무로 전환 요청',
+    status: _RequestStatus.rejected,
+    decidedAt: DateTime(2025, 11, 14),
+    comment: '근무표상 주 20시간이라 아르바이트 조건에 맞지 않아요. 정규직으로 유지합니다.',
+  ),
+];
+
+/// 지금 적용 중인 조건 — 승인된 신청 중 가장 최근 것
+_PayRequest get _appliedRequest => _requests.firstWhere(
+  (r) => r.status == _RequestStatus.approved,
+  orElse: () => _PayRequest(
+    requestedAt: DateTime(2023, 3, 2),
+    type: _EmployType.regular,
+    insurances: {_Insurance.pension, _Insurance.health, _Insurance.employment},
+    effectiveFrom: DateTime(2023, 3),
+    status: _RequestStatus.approved,
+  ),
+);
+
+/// 대표 승인을 기다리는 신청 (없으면 null)
+_PayRequest? get _pendingRequest {
+  for (final request in _requests) {
+    if (request.status == _RequestStatus.pending) return request;
+  }
+  return null;
+}
+
 /// 명세서 한 줄 — 이름, 계산 근거, 금액
 class _PayItem {
   const _PayItem(this.label, this.amount, {this.note});
@@ -118,6 +253,9 @@ List<_Payslip> _seedPayslips() {
         reSignups: record[i].$3,
         // 이번 달은 아직 정산 전
         status: i == 0 ? _PayStatus.scheduled : _PayStatus.paid,
+        // 승인된 조건 그대로 — 회사가 정한 값 + 본인이 신고한 보험
+        type: _appliedRequest.type,
+        insurances: _appliedRequest.insurances,
       ),
   ];
 }
@@ -132,13 +270,14 @@ _Payslip _payslipOf({
   required int newSignups,
   required int reSignups,
   required _PayStatus status,
-  _EmployType type = _EmployType.regular,
+  required _EmployType type,
+  required Set<_Insurance> insurances,
 }) {
-  const base = 2400000;
-  const sessionRate = 15000;
-  const newBonus = 50000;
-  const reBonus = 20000;
-  const meal = 100000;
+  final base = _companyBase.base;
+  final sessionRate = _companyBase.sessionRate;
+  final newBonus = _companyBase.newBonus;
+  final reBonus = _companyBase.reBonus;
+  final meal = _companyBase.meal;
 
   final pays = [
     _PayItem('기본급', base),
@@ -166,31 +305,42 @@ _Payslip _payslipOf({
   final taxable = gross - meal;
   int cut(num value) => (value ~/ 10) * 10;
 
-  final deductions = switch (type) {
-    // 4대보험 + 근로소득세
-    _EmployType.regular => () {
-      final health = cut(taxable * 0.03545);
-      final incomeTax = cut(taxable * 0.031);
-      return [
-        _PayItem('국민연금', cut(taxable * 0.045), note: '4.5%'),
-        _PayItem('건강보험', health, note: '3.545%'),
-        _PayItem('장기요양', cut(health * 0.1295), note: '건강보험의 12.95%'),
-        _PayItem('고용보험', cut(taxable * 0.009), note: '0.9%'),
-        _PayItem('소득세', incomeTax),
-        _PayItem('지방소득세', cut(incomeTax * 0.1), note: '소득세의 10%'),
-      ];
-    }(),
-    // 주 15시간 미만이면 고용보험도 안 든다 — 소득세만
-    _EmployType.parttime => [
-      _PayItem('소득세', cut(taxable * 0.006)),
-      _PayItem('지방소득세', cut(taxable * 0.0006), note: '소득세의 10%'),
-    ],
-    // 사업소득 3.3% 원천징수
-    _EmployType.freelance => [
-      _PayItem('사업소득세', cut(taxable * 0.03), note: '3%'),
-      _PayItem('지방소득세', cut(taxable * 0.003), note: '0.3%'),
-    ],
-  };
+  // 프리랜서는 사업소득 3.3% 원천징수로 끝난다
+  if (type == _EmployType.freelance) {
+    return _Payslip(
+      month: month,
+      type: type,
+      pays: pays,
+      deductions: [
+        _PayItem('사업소득세', cut(taxable * 0.03), note: '3%'),
+        _PayItem('지방소득세', cut(taxable * 0.003), note: '0.3%'),
+      ],
+      sessions: sessions,
+      status: status,
+    );
+  }
+
+  // 나머지는 본인이 신고해 승인받은 보험만 뗀다
+  final deductions = <_PayItem>[];
+  if (insurances.contains(_Insurance.pension)) {
+    deductions.add(_PayItem('국민연금', cut(taxable * 0.045), note: '4.5%'));
+  }
+  if (insurances.contains(_Insurance.health)) {
+    final health = cut(taxable * 0.03545);
+    deductions
+      ..add(_PayItem('건강보험', health, note: '3.545%'))
+      ..add(_PayItem('장기요양', cut(health * 0.1295), note: '건강보험의 12.95%'));
+  }
+  if (insurances.contains(_Insurance.employment)) {
+    deductions.add(_PayItem('고용보험', cut(taxable * 0.009), note: '0.9%'));
+  }
+
+  final incomeTax = cut(
+    taxable * (type == _EmployType.regular ? 0.031 : 0.006),
+  );
+  deductions
+    ..add(_PayItem('소득세', incomeTax))
+    ..add(_PayItem('지방소득세', cut(incomeTax * 0.1), note: '소득세의 10%'));
 
   return _Payslip(
     month: month,
