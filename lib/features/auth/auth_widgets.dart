@@ -70,7 +70,7 @@ class _AuthScaffold extends StatelessWidget {
         backgroundColor: AppColors.background,
         body: Center(
           child: SingleChildScrollView(
-            padding: EdgeInsets.symmetric(vertical: 28),
+            padding: EdgeInsets.symmetric(vertical: 16),
             child: ConstrainedBox(
               constraints: BoxConstraints(maxWidth: width),
               child: Container(

@@ -153,27 +153,27 @@ class _SignupScreenState extends State<_SignupScreen> {
       // 짝지은 칸을 나란히 두려면 폭이 있어야 한다
       width: 560,
       children: [
-        _AuthField(
-          controller: _invite,
-          label: '초대키',
-          hint: 'HIFIS-4F2A-91K7',
-          autofocus: !isDesktop,
-          textInputAction: TextInputAction.next,
-          formatters: [_UpperCaseFormatter()],
-          error: _errors['invite'],
+        // 이름을 초대키와 짝지어 한 줄을 아낀다 — 카드가 창을 넘으면 스크롤이 생긴다
+        _FieldPair(
+          left: _AuthField(
+            controller: _invite,
+            label: '초대키',
+            hint: 'HIFIS-4F2A-91K7',
+            textInputAction: TextInputAction.next,
+            formatters: [_UpperCaseFormatter()],
+            error: _errors['invite'],
+          ),
+          right: _AuthField(
+            controller: _name,
+            label: '이름',
+            hint: '홍길동',
+            textInputAction: TextInputAction.next,
+            error: _errors['name'],
+          ),
         ),
         SizedBox(height: 7),
         Text('관리자에게 받은 초대키를 그대로 입력해 주세요.', style: AppTextStyles.caption),
         SizedBox(height: 16),
-        _AuthField(
-          controller: _name,
-          label: '이름',
-          hint: '홍길동',
-          textInputAction: TextInputAction.next,
-          error: _errors['name'],
-        ),
-        SizedBox(height: 16),
-        // 폰에서 위아래로 쌓여도 입력 순서가 그대로이도록 짝을 지었다
         _FieldPair(
           left: _AuthField(
             controller: _email,
