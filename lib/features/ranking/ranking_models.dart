@@ -5,17 +5,18 @@ part of 'ranking_screen.dart';
 /// 종합은 나머지 네 항목을 100점으로 환산해 평균 낸 값이라
 /// 항상 맨 뒤에 둔다.
 enum _Metric {
-  revenue('매출'),
-  kindness('친절 점수'),
-  project('프로젝트 달성'),
-  care('환경정비'),
-  overall('종합');
+  revenue('매출', '매출'),
+  kindness('친절 점수', '친절'),
+  project('프로젝트 달성', '프로젝트'),
+  care('환경정비', '환경정비'),
+  overall('종합', '종합');
 
-  const _Metric(this.label);
+  const _Metric(this.label, this.short);
 
   final String label;
 
-  bool get isOverall => this == _Metric.overall;
+  /// 폰 탭처럼 칸이 좁을 때 쓰는 짧은 이름
+  final String short;
 }
 
 /// 랭킹에 오르는 사람 한 명 (목업)

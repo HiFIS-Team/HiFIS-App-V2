@@ -71,7 +71,7 @@ class _RankingScreenState extends State<RankingScreen> {
   List<Widget> _body(List<_Entry> entries) {
     final top = entries.take(3).toList();
     final rest = entries.skip(3).toList();
-    final podium = _Podium(top: top, metric: _metric);
+    final podium = _Podium(top: top, metric: _metric, big: !isDesktop);
 
     // 다른 지점을 보고 있으면 내 순위가 없다 — 그때는 시상대만 넓게 쓴다
     final at = entries.indexWhere((e) => e.ranker.isMe);
@@ -87,7 +87,8 @@ class _RankingScreenState extends State<RankingScreen> {
           );
 
     return [
-      // 데스크톱은 폭이 남아 내 순위와 시상대를 나란히 놓는다
+      // 데스크톱은 폭이 남아 내 순위와 시상대를 나란히 놓는다.
+      // 폰은 시상대를 먼저 크게 세우고 내 순위를 그 아래에 둔다.
       if (myCard == null)
         podium
       else if (isDesktop)
@@ -102,9 +103,9 @@ class _RankingScreenState extends State<RankingScreen> {
           ),
         )
       else ...[
-        myCard,
-        SizedBox(height: 12),
         podium,
+        SizedBox(height: 16),
+        myCard,
       ],
       SizedBox(height: isDesktop ? 16 : 12),
       _RankList(entries: rest, metric: _metric, startsAt: top.length + 1),
@@ -169,7 +170,10 @@ class _RankingScreenState extends State<RankingScreen> {
 // 항목 · 지점 고르기
 // ---------------------------------------------------------------------------
 
-/// 폰 항목 탭 — 다섯 칸을 세그먼트에 욱여넣으면 글자가 뭉개져서 칩을 옆으로 민다
+/// 폰 항목 탭 — 다섯 칸을 균등하게 나눈 밑줄 탭 (업무 탭과 같은 결)
+///
+/// 알약 다섯 개를 늘어놓으면 화면 폭을 넘겨 옆으로 밀어야 하는데,
+/// 항목이 몇 개인지 한눈에 안 보인다. 한 화면에 다 세운다.
 class _PhoneTabs extends StatelessWidget {
   _PhoneTabs({required this.selected, required this.onSelect});
 
@@ -178,37 +182,48 @@ class _PhoneTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 38,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.zero,
-        children: [
-          for (var i = 0; i < _Metric.values.length; i++) ...[
-            if (i > 0) SizedBox(width: 8),
-            Pressable(
+    return Row(
+      children: [
+        for (var i = 0; i < _Metric.values.length; i++)
+          Expanded(
+            child: Pressable(
               onTap: () => onSelect(i),
-              scale: 0.96,
+              scale: 0.94,
               child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                alignment: Alignment.center,
+                padding: EdgeInsets.only(bottom: 10),
                 decoration: BoxDecoration(
-                  color: i == selected ? AppColors.primary : AppColors.gray100,
-                  borderRadius: BorderRadius.circular(12),
+                  border: Border(
+                    bottom: BorderSide(
+                      color: i == selected
+                          ? AppColors.primary
+                          : AppColors.gray100,
+                      width: 2,
+                    ),
+                  ),
                 ),
-                child: Text(
-                  _Metric.values[i].label,
-                  style: AppTextStyles.label.copyWith(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: i == selected ? Colors.white : AppColors.gray600,
+                child: Center(
+                  // 칸보다 이름이 길면 줄여서 맞춘다
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      _Metric.values[i].short,
+                      maxLines: 1,
+                      style: AppTextStyles.body2.copyWith(
+                        fontSize: 14,
+                        color: i == selected
+                            ? AppColors.primary
+                            : AppColors.gray500,
+                        fontWeight: i == selected
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
-          ],
-        ],
-      ),
+          ),
+      ],
     );
   }
 }
@@ -329,9 +344,91 @@ class _MyRankCard extends StatelessWidget {
   /// 이 지점에서 순위에 오른 사람 수 (상위 몇 %인지 계산에 쓴다)
   final int total;
 
+  Widget get _chase =>
+      _ChaseLine(entry: entry, above: above, below: below, metric: metric);
+
+  /// 폰 — 아바타·상위 %를 왼쪽에, 등수를 오른쪽에 크게 놓고
+  /// 그 아래 한 줄로 다음 순위까지 얼마 남았는지 붙인다
+  Widget _phone(int percent) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(18, 16, 18, 14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        // 내 순위만 브랜드 테두리로 목록과 구분한다
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.primary, width: 2.5),
+                ),
+                child: Avatar(name: entry.ranker.name, size: 46),
+              ),
+              SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          '내 순위',
+                          style: AppTextStyles.caption.copyWith(fontSize: 12),
+                        ),
+                        SizedBox(width: 6),
+                        _DeltaBadge(entry: entry, metric: metric),
+                      ],
+                    ),
+                    SizedBox(height: 2),
+                    Text('상위 $percent%', style: AppTextStyles.title2),
+                  ],
+                ),
+              ),
+              SizedBox(width: 10),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    '${entry.rank}',
+                    style: TextStyle(
+                      fontFamily: AppTextStyles.fontFamily,
+                      fontSize: 34,
+                      fontWeight: FontWeight.w800,
+                      height: 1.1,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  Text(
+                    '위',
+                    style: AppTextStyles.title3.copyWith(
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          SizedBox(height: 12),
+          Container(height: 1, color: AppColors.divider),
+          SizedBox(height: 12),
+          _chase,
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final percent = (entry.rank * 100 / total).round();
+
+    if (!isDesktop) return _phone(percent);
 
     return Container(
       padding: EdgeInsets.fromLTRB(22, 18, 22, 18),
@@ -423,12 +520,7 @@ class _MyRankCard extends StatelessWidget {
                 ],
               ),
               SizedBox(height: 12),
-              _ChaseLine(
-                entry: entry,
-                above: above,
-                below: below,
-                metric: metric,
-              ),
+              _chase,
             ],
           ),
         ],
@@ -475,6 +567,34 @@ class _ChaseLine extends StatelessWidget {
               '${_gapLabel(metric, gap, entry.ranker)} 남았어요'
         : '${target.rank}위와 ${_gapLabel(metric, gap, entry.ranker)} 차이로 앞서요';
 
+    final line = Row(
+      children: [
+        Icon(
+          chasing
+              ? CupertinoIcons.arrow_up_right
+              : CupertinoIcons.checkmark_seal_fill,
+          size: 13,
+          color: color,
+        ),
+        SizedBox(width: 7),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.caption.copyWith(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ),
+      ],
+    );
+
+    // 폰은 이미 카드 안 구분선 아래라서 면을 한 겹 더 깔면 답답하다
+    if (!isDesktop) return line;
+
     return Container(
       height: 40,
       padding: EdgeInsets.symmetric(horizontal: 12),
@@ -482,30 +602,7 @@ class _ChaseLine extends StatelessWidget {
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Row(
-        children: [
-          Icon(
-            chasing
-                ? CupertinoIcons.arrow_up_right
-                : CupertinoIcons.checkmark_seal_fill,
-            size: 13,
-            color: color,
-          ),
-          SizedBox(width: 7),
-          Expanded(
-            child: Text(
-              text,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppTextStyles.caption.copyWith(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: color,
-              ),
-            ),
-          ),
-        ],
-      ),
+      child: line,
     );
   }
 }
@@ -598,10 +695,13 @@ class _DeltaBadge extends StatelessWidget {
 
 /// TOP 3 시상대 — 가운데가 1위, 받침대 높이로 등수를 보여준다
 class _Podium extends StatelessWidget {
-  _Podium({required this.top, required this.metric});
+  _Podium({required this.top, required this.metric, this.big = false});
 
   final List<_Entry> top;
   final _Metric metric;
+
+  /// 폰은 이 화면의 주인공이라 카드 없이 크게 세운다
+  final bool big;
 
   /// 2위 · 1위 · 3위 순서로 세워야 1위가 가운데에 온다
   List<_Entry?> get _order => [
@@ -612,6 +712,21 @@ class _Podium extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final steps = Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        for (final entry in _order)
+          Expanded(
+            child: entry == null
+                ? SizedBox()
+                : _Step(entry: entry, metric: metric, big: big),
+          ),
+      ],
+    );
+
+    // 폰은 배경 위에 그대로 세운다 — 카드 테두리를 두르면 시상대가 작아 보인다
+    if (big) return steps;
+
     return Container(
       padding: EdgeInsets.fromLTRB(20, 18, 20, 0),
       decoration: AppDecorations.card(radius: 20),
@@ -620,51 +735,64 @@ class _Podium extends StatelessWidget {
         children: [
           Text('${metric.label} TOP 3', style: AppTextStyles.label),
           SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              for (final entry in _order)
-                Expanded(
-                  child: entry == null
-                      ? SizedBox()
-                      : _Step(entry: entry, metric: metric),
-                ),
-            ],
-          ),
+          steps,
         ],
       ),
     );
   }
 }
 
-/// 시상대 한 칸 — 아바타 · 이름 · 값 · 등수 받침대
+/// 시상대 한 칸 — 왕관 · 아바타 · 이름 · 값 · 등수 받침대
 class _Step extends StatelessWidget {
-  _Step({required this.entry, required this.metric});
+  _Step({required this.entry, required this.metric, this.big = false});
 
   final _Entry entry;
   final _Metric metric;
+  final bool big;
 
   @override
   Widget build(BuildContext context) {
     final first = entry.rank == 1;
     // 등수가 높을수록 받침대가 높다
-    final height = switch (entry.rank) {
-      1 => 74.0,
-      2 => 56.0,
+    final height = switch ((entry.rank, big)) {
+      (1, true) => 104.0,
+      (2, true) => 78.0,
+      (_, true) => 64.0,
+      (1, _) => 74.0,
+      (2, _) => 56.0,
       _ => 44.0,
     };
+    final avatar = big ? (first ? 72.0 : 56.0) : (first ? 52.0 : 42.0);
 
     return Column(
       children: [
-        Avatar(name: entry.ranker.name, size: first ? 52 : 42),
-        SizedBox(height: 8),
+        // 1위 머리 위 왕관 — 자리를 늘 잡아둬서 세 칸의 아래가 어긋나지 않는다
+        if (big)
+          SizedBox(
+            height: 24,
+            child: first
+                ? Text('👑', style: TextStyle(fontSize: 20, height: 1.1))
+                : null,
+          ),
+        // 1위만 브랜드 색 링을 두른다
+        Container(
+          padding: EdgeInsets.all(first ? 3 : 0),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: first
+                ? Border.all(color: AppColors.primary, width: 2.5)
+                : null,
+          ),
+          child: Avatar(name: entry.ranker.name, size: avatar),
+        ),
+        SizedBox(height: big ? 10 : 8),
         Text(
           entry.ranker.name,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: AppTextStyles.body2.copyWith(
             fontWeight: first ? FontWeight.w700 : FontWeight.w600,
-            fontSize: first ? 15 : 14,
+            fontSize: big ? (first ? 16 : 15) : (first ? 15 : 14),
           ),
         ),
         SizedBox(height: 2),
@@ -674,18 +802,18 @@ class _Step extends StatelessWidget {
             _format(metric, entry.value),
             maxLines: 1,
             style: AppTextStyles.caption.copyWith(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+              fontSize: big ? 13 : 12,
+              fontWeight: FontWeight.w700,
               color: first ? AppColors.primary : AppColors.textSecondary,
             ),
           ),
         ),
-        SizedBox(height: 10),
+        SizedBox(height: big ? 12 : 10),
         Container(
           height: height,
-          margin: EdgeInsets.symmetric(horizontal: 4),
+          margin: EdgeInsets.symmetric(horizontal: big ? 3 : 4),
           alignment: Alignment.topCenter,
-          padding: EdgeInsets.only(top: 10),
+          padding: EdgeInsets.only(top: big ? 14 : 10),
           decoration: BoxDecoration(
             // 1위만 브랜드 색으로, 나머지는 회색 면 (포인트 컬러 하나 원칙)
             gradient: first
@@ -695,14 +823,20 @@ class _Step extends StatelessWidget {
                     colors: [AppColors.gradientStart, AppColors.gradientEnd],
                   )
                 : null,
-            color: first ? null : AppColors.gray50,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+            color: first
+                ? null
+                : entry.rank == 2
+                ? AppColors.gray100
+                : AppColors.gray50,
+            borderRadius: BorderRadius.vertical(
+              top: Radius.circular(big ? 16 : 12),
+            ),
           ),
           child: Text(
             '${entry.rank}',
             style: TextStyle(
               fontFamily: AppTextStyles.fontFamily,
-              fontSize: first ? 22 : 18,
+              fontSize: big ? (first ? 34 : 28) : (first ? 22 : 18),
               fontWeight: FontWeight.w800,
               height: 1,
               color: first ? Colors.white : AppColors.gray400,
@@ -737,17 +871,27 @@ class _RankList extends StatelessWidget {
     if (entries.isEmpty) return SizedBox.shrink();
 
     return Container(
-      padding: EdgeInsets.fromLTRB(12, 16, 12, 12),
+      padding: EdgeInsets.fromLTRB(12, isDesktop ? 16 : 6, 12, 6),
       decoration: AppDecorations.card(radius: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 10),
-            child: Text('$startsAt위부터', style: AppTextStyles.label),
-          ),
-          SizedBox(height: 6),
-          for (final entry in entries) _RankRow(entry: entry, metric: metric),
+          // 폰은 시상대 바로 아래라 이어지는 흐름이 보여서 머리말을 뺀다
+          if (isDesktop) ...[
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 10),
+              child: Text('$startsAt위부터', style: AppTextStyles.label),
+            ),
+            SizedBox(height: 6),
+          ],
+          for (var i = 0; i < entries.length; i++) ...[
+            if (!isDesktop && i > 0)
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 10),
+                child: Container(height: 1, color: AppColors.divider),
+              ),
+            _RankRow(entry: entries[i], metric: metric),
+          ],
         ],
       ),
     );
@@ -783,8 +927,8 @@ class _RankRow extends StatelessWidget {
               ),
             ),
           ),
-          Avatar(name: entry.ranker.name, size: 32),
-          SizedBox(width: 10),
+          Avatar(name: entry.ranker.name, size: isDesktop ? 32 : 36),
+          SizedBox(width: 12),
           Expanded(
             child: Row(
               children: [
@@ -798,15 +942,18 @@ class _RankRow extends StatelessWidget {
                     ),
                   ),
                 ),
-                SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    entry.ranker.team,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.caption.copyWith(fontSize: 12),
+                // 폰은 폭이 좁아 이름과 점수만 남긴다
+                if (isDesktop) ...[
+                  SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      entry.ranker.team,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.caption.copyWith(fontSize: 12),
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -822,11 +969,13 @@ class _RankRow extends StatelessWidget {
                   color: mine ? AppColors.primary : AppColors.textPrimary,
                 ),
               ),
-              SizedBox(height: 1),
-              Text(
-                entry.note,
-                style: AppTextStyles.caption.copyWith(fontSize: 11),
-              ),
+              if (isDesktop) ...[
+                SizedBox(height: 1),
+                Text(
+                  entry.note,
+                  style: AppTextStyles.caption.copyWith(fontSize: 11),
+                ),
+              ],
             ],
           ),
           SizedBox(width: 8),
