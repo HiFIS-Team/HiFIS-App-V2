@@ -141,7 +141,7 @@ class _SummaryCard extends StatelessWidget {
     final paid = payslip.status == _PayStatus.paid;
 
     return Container(
-      padding: EdgeInsets.fromLTRB(22, 20, 22, 22),
+      padding: EdgeInsets.fromLTRB(22, 20, 22, 16),
       decoration: AppDecorations.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -191,7 +191,7 @@ class _SummaryCard extends StatelessWidget {
           ),
           SizedBox(height: 18),
           Container(height: 1, color: AppColors.divider),
-          SizedBox(height: 14),
+          SizedBox(height: 16),
           Row(
             children: [
               Icon(
