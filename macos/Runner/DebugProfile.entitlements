@@ -8,6 +8,10 @@
 	<true/>
 	<key>com.apple.security.network.server</key>
 	<true/>
+	<!-- 서버 API 호출에 필요하다. 없으면 샌드박스가 나가는 요청을 전부 막아
+	     macOS에서만 로그인이 안 된다 (실제 발생). -->
+	<key>com.apple.security.network.client</key>
+	<true/>
 	<key>com.apple.security.files.user-selected.read-only</key>
 	<true/>
 </dict>
