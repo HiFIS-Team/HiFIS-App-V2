@@ -62,6 +62,7 @@ class Employee {
     this.statusMessage,
     this.shiftStart,
     this.shiftEnd,
+    this.workDays = const [],
   });
 
   factory Employee.fromJson(Map<String, dynamic> json) => Employee(
@@ -77,6 +78,10 @@ class Employee {
     team: json['team'] as String?,
     avatarUrl: json['avatarUrl'] as String?,
     statusMessage: json['statusMessage'] as String?,
+    workDays: [
+      for (final day in (json['workDays'] as List<dynamic>? ?? const []))
+        day as int,
+    ],
     shiftStart: json['shiftStart'] as String?,
     shiftEnd: json['shiftEnd'] as String?,
   );
@@ -103,7 +108,13 @@ class Employee {
   final String? shiftStart;
   final String? shiftEnd;
 
-  bool get needsSchedule => shiftStart == null || shiftEnd == null;
+  /// 근무 요일 — ISO 기준 1(월) ~ 7(일)
+  ///
+  /// 결근 판정의 기준이라 이게 없으면 서버가 결근·휴무를 못 가른다.
+  final List<int> workDays;
+
+  bool get needsSchedule =>
+      shiftStart == null || shiftEnd == null || workDays.isEmpty;
 
   /// 아바타 색 — 서버가 `#RRGGBB` 로 준다
   ///

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'core/data/current_user.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'core/util/platform.dart';
@@ -9,6 +10,7 @@ import 'core/widgets/app_loading.dart';
 import 'features/auth/auth_screen.dart';
 import 'features/auth/auth_session.dart';
 import 'features/main/main_shell.dart';
+import 'features/onboarding/schedule_setup_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -84,8 +86,29 @@ class _HiFISAppState extends State<HiFISApp> with WidgetsBindingObserver {
 ///
 /// 로그인/로그아웃은 [AuthSession]의 값만 바꾸면 되고, 화면 교체는 여기서
 /// 한 번에 처리한다. 갈아 끼울 때는 짧게 겹쳐 넘겨 뚝 끊기지 않게 한다.
-class _AuthGate extends StatelessWidget {
+class _AuthGate extends StatefulWidget {
   _AuthGate();
+
+  @override
+  State<_AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<_AuthGate> {
+  /// 근무 설정을 방금 마쳤는지 — 저장 직후 메인으로 넘어가기 위한 표시
+  bool _scheduleDone = false;
+
+  Widget _signedInScreen() {
+    // 근무 시간·요일이 없으면 서버가 지각·결근을 판정하지 못한다.
+    // 첫 로그인에 한 번 받고 넘어간다.
+    final needsSchedule = currentUser?.needsSchedule ?? false;
+    if (needsSchedule && !_scheduleDone) {
+      return ScheduleSetupScreen(
+        key: ValueKey('schedule'),
+        onDone: () => setState(() => _scheduleDone = true),
+      );
+    }
+    return MainShell(key: ValueKey('main'));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -96,7 +119,7 @@ class _AuthGate extends StatelessWidget {
         switchInCurve: Curves.easeOut,
         switchOutCurve: Curves.easeIn,
         child: signedIn
-            ? MainShell(key: ValueKey('main'))
+            ? _signedInScreen()
             : LoginScreen(key: ValueKey('login')),
       ),
     );

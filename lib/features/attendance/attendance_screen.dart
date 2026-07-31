@@ -92,6 +92,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     try {
       final created = await AttendanceApi.createLeave(
         type: draft.kind.type,
+        halfPeriod: draft.kind.period,
         startDate: draft.date,
         endDate: draft.endDate,
         reason: draft.reason,

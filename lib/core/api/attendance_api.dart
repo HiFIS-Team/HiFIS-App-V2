@@ -1,3 +1,4 @@
+import '../data/employee.dart';
 import 'api_client.dart';
 
 /// 휴가 종류 — 서버 `LeaveType`
@@ -23,6 +24,108 @@ enum LeaveType {
 
   /// 차감되는 일수 — 반차만 0.5, 나머지는 날짜 수만큼
   double get dayValue => this == LeaveType.half ? 0.5 : 1.0;
+}
+
+/// 반차 시간대 — 서버 `HalfPeriod`. `LeaveType.half` 일 때만 의미가 있다.
+enum HalfPeriod {
+  am('AM', '오전 반차'),
+  pm('PM', '오후 반차');
+
+  const HalfPeriod(this.wire, this.label);
+
+  final String wire;
+  final String label;
+
+  static HalfPeriod? parse(String? value) => value == null
+      ? null
+      : HalfPeriod.values.firstWhere(
+          (p) => p.wire == value,
+          orElse: () => HalfPeriod.am,
+        );
+}
+
+/// 하루 근태 판정 — 서버 `AttendanceStatus`
+///
+/// 기록이 없는 날(결근·휴무)까지 서버가 판정해 준다. 급여·평가가 같은 기준을
+/// 쓰므로 앱이 따로 계산하지 않는다.
+enum AttendanceStatus {
+  normal('NORMAL'),
+  late('LATE'),
+  earlyLeave('EARLY_LEAVE'),
+  lateAndEarly('LATE_AND_EARLY'),
+  inProgress('IN_PROGRESS'),
+  noCheckout('NO_CHECKOUT'),
+  absent('ABSENT'),
+  onLeave('ON_LEAVE'),
+  dayOff('DAY_OFF'),
+  unknown('UNKNOWN');
+
+  const AttendanceStatus(this.wire);
+
+  final String wire;
+
+  static AttendanceStatus parse(String? value) =>
+      AttendanceStatus.values.firstWhere(
+        (s) => s.wire == value,
+        orElse: () => AttendanceStatus.unknown,
+      );
+}
+
+/// 캘린더 하루 (서버 `AttendanceDayOut`)
+class AttendanceDay {
+  AttendanceDay({
+    required this.date,
+    required this.status,
+    this.checkIn,
+    this.checkOut,
+    this.workMinutes,
+    this.leaveType,
+    this.halfPeriod,
+  });
+
+  factory AttendanceDay.fromJson(Map<String, dynamic> json) => AttendanceDay(
+    date: DateTime.parse(json['date'] as String),
+    status: AttendanceStatus.parse(json['status'] as String?),
+    checkIn: _localTime(json['checkIn'] as String?),
+    checkOut: _localTime(json['checkOut'] as String?),
+    workMinutes: json['workMinutes'] as int?,
+    leaveType: json['leaveType'] == null
+        ? null
+        : LeaveType.parse(json['leaveType'] as String?),
+    halfPeriod: HalfPeriod.parse(json['halfPeriod'] as String?),
+  );
+
+  final DateTime date;
+  final AttendanceStatus status;
+  final DateTime? checkIn;
+  final DateTime? checkOut;
+  final int? workMinutes;
+
+  /// 휴가인 날만 채워진다
+  final LeaveType? leaveType;
+  final HalfPeriod? halfPeriod;
+}
+
+/// 연차 부여·사용·잔여 (서버 `LeaveBalanceOut`)
+class LeaveBalance {
+  LeaveBalance({
+    required this.granted,
+    required this.used,
+    required this.remaining,
+  });
+
+  factory LeaveBalance.fromJson(Map<String, dynamic> json) => LeaveBalance(
+    granted: (json['granted'] as num).toDouble(),
+    used: (json['used'] as num).toDouble(),
+    remaining: (json['remaining'] as num).toDouble(),
+  );
+
+  /// 입사일 기준 근로기준법 산정 일수
+  final double granted;
+
+  /// 승인 + 대기 중인 신청까지 합친 확정 일수
+  final double used;
+  final double remaining;
 }
 
 /// 휴가 신청 상태 — 서버 `LeaveStatus`
@@ -90,6 +193,7 @@ class LeaveRequest {
     required this.endDate,
     required this.days,
     required this.status,
+    this.halfPeriod,
     this.reason,
     this.rejectReason,
   });
@@ -98,6 +202,7 @@ class LeaveRequest {
     id: json['id'] as String,
     employeeId: json['employeeId'] as String,
     type: LeaveType.parse(json['type'] as String?),
+    halfPeriod: HalfPeriod.parse(json['halfPeriod'] as String?),
     startDate: DateTime.parse(json['startDate'] as String),
     endDate: DateTime.parse(json['endDate'] as String),
     days: (json['days'] as num).toDouble(),
@@ -109,6 +214,10 @@ class LeaveRequest {
   final String id;
   final String employeeId;
   final LeaveType type;
+
+  /// 반차일 때만 채워진다 (오전/오후)
+  final HalfPeriod? halfPeriod;
+
   final DateTime startDate;
   final DateTime endDate;
 
@@ -173,22 +282,71 @@ class AttendanceApi {
     ];
   }
 
+  /// 월 캘린더 — 하루하루 판정된 상태를 그대로 받는다
+  ///
+  /// 결근처럼 기록이 없는 날도 서버가 채워 준다. 다만 근무 요일이 설정 안 된
+  /// 사람은 결근·휴무를 못 가려서 기록 있는 날만 온다.
+  static Future<List<AttendanceDay>> calendar({
+    required String month,
+    String? employeeId,
+  }) async {
+    final rows = await _client.getList(
+      '/attendance/calendar',
+      query: {'month': month, 'employeeId': ?employeeId},
+    );
+    return [
+      for (final row in rows)
+        AttendanceDay.fromJson((row as Map).cast<String, dynamic>()),
+    ];
+  }
+
+  /// 연차 부여·사용·잔여
+  static Future<LeaveBalance> balance({String? employeeId}) async {
+    final data = await _client.get(
+      '/leaves/balance',
+      query: {'employeeId': ?employeeId},
+    );
+    return LeaveBalance.fromJson(data);
+  }
+
   static Future<LeaveRequest> createLeave({
     required LeaveType type,
     required DateTime startDate,
     required DateTime endDate,
+    HalfPeriod? halfPeriod,
     String? reason,
   }) async {
     final data = await _client.post(
       '/leaves',
       body: {
         'type': type.wire,
+        'halfPeriod': ?halfPeriod?.wire,
         'startDate': _dateOnly(startDate),
         'endDate': _dateOnly(endDate),
         'reason': ?reason,
       },
     );
     return LeaveRequest.fromJson(data!);
+  }
+
+  /// 근무 시간·근무 요일 설정
+  ///
+  /// [workDays]는 ISO 요일 1(월)~7(일). 하나 이상 없으면 서버가 422 를 준다.
+  /// 근무 시간 중에는 바꿀 수 없다 (403 WITHIN_SHIFT).
+  static Future<Employee> setSchedule({
+    required String shiftStart,
+    required String shiftEnd,
+    required List<int> workDays,
+  }) async {
+    final data = await _client.post(
+      '/employees/me/schedule',
+      body: {
+        'shiftStart': shiftStart,
+        'shiftEnd': shiftEnd,
+        'workDays': workDays,
+      },
+    );
+    return Employee.fromJson(data!);
   }
 
   /// 신청자 본인이 대기중인 신청을 물린다 (이력은 남는다)
