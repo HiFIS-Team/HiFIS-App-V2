@@ -11,8 +11,11 @@ import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/util/platform.dart';
 import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/app_toast.dart';
+import '../../core/widgets/avatar.dart';
+import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/glass_bottom_button.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/pressable.dart';
@@ -144,6 +147,29 @@ class _PeerReviewSectionState extends State<PeerReviewSection> {
         if (_mine.containsKey(person.id)) person,
     ];
     final ordered = [...pending, ...done];
+
+    // 폰은 사람마다 카드 하나 (프로젝트 목록과 같은 결).
+    // 데스크톱은 2단 화면이라 카드가 과해서 기존 줄 목록을 그대로 쓴다.
+    if (!isDesktop) {
+      return Column(
+        children: [
+          _ReviewProgress(done: done.length, total: _targets.length),
+          if (ordered.isEmpty) ...[
+            SizedBox(height: 16),
+            EmptyCard(icon: Icons.group_rounded, text: '평가할 사람이 없어요'),
+          ] else
+            for (final person in ordered) ...[
+              SizedBox(height: 12),
+              _PersonCard(
+                person: person,
+                isSelf: person.id == currentUser?.id,
+                review: _mine[person.id],
+                onTap: () => _openForm(person),
+              ),
+            ],
+        ],
+      );
+    }
 
     return Column(
       children: [
@@ -576,6 +602,164 @@ class _ReviewProgress extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 폰 목록 카드 — 프로젝트 카드와 같은 결로 사람 하나에 카드 하나
+///
+/// 아바타·이름·상태 배지 / 직급 / 별점 요약. 아직 안 한 사람은 빈 별이라
+/// **무엇이 남았는지가 한눈에 보인다.**
+///
+/// 데스크톱은 아직 [_PersonRow] 를 쓴다 (2단 화면이라 카드가 과하다).
+class _PersonCard extends StatelessWidget {
+  _PersonCard({
+    required this.person,
+    required this.isSelf,
+    required this.review,
+    required this.onTap,
+  });
+
+  final Employee person;
+  final bool isSelf;
+
+  /// 이미 낸 평가 — 없으면 아직 안 한 사람이다
+  final PeerReview? review;
+
+  final VoidCallback onTap;
+
+  /// 준 별점의 평균 (5개 항목)
+  double get _average {
+    final stars = review!.stars.values;
+    return stars.isEmpty ? 0 : stars.reduce((a, b) => a + b) / stars.length;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final done = review != null;
+    final color = done ? AppColors.success : AppColors.primary;
+
+    return Pressable(
+      onTap: onTap,
+      scale: 0.98,
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        padding: EdgeInsets.fromLTRB(20, 18, 20, 18),
+        decoration: AppDecorations.card(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Avatar(name: person.name, size: 40),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              person.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.body1.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          if (isSelf) ...[
+                            SizedBox(width: 6),
+                            _Chip(text: '나', color: AppColors.primary),
+                          ],
+                        ],
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        isSelf ? '본인 평가' : person.rank.label,
+                        style: AppTextStyles.caption.copyWith(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(width: 8),
+                _StatusBadge(done: done),
+              ],
+            ),
+            SizedBox(height: 14),
+            Row(
+              children: [
+                for (var i = 1; i <= peerStarCount; i++) ...[
+                  if (i > 1) SizedBox(width: 3),
+                  Icon(
+                    done && i <= _average.round()
+                        ? CupertinoIcons.star_fill
+                        : CupertinoIcons.star,
+                    size: 15,
+                    color: done ? color : AppColors.gray300,
+                  ),
+                ],
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    done ? _average.toStringAsFixed(1) : '아직 평가하지 않았어요',
+                    style: AppTextStyles.caption.copyWith(
+                      fontSize: 12,
+                      fontWeight: done ? FontWeight.w700 : FontWeight.w400,
+                      color: done ? color : AppColors.textTertiary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 카드 오른쪽 위 상태 — 프로젝트 카드의 D-day 배지 자리
+class _StatusBadge extends StatelessWidget {
+  _StatusBadge({required this.done});
+
+  final bool done;
+
+  @override
+  Widget build(BuildContext context) => _Chip(
+    text: done ? '완료' : '평가하기',
+    color: done ? AppColors.success : AppColors.primary,
+    filled: false,
+  );
+}
+
+/// 작은 알약 배지
+class _Chip extends StatelessWidget {
+  _Chip({required this.text, required this.color, this.filled = true});
+
+  final String text;
+  final Color color;
+
+  /// true 면 색을 꽉 채우고 글자를 흰색으로 (이름 옆 '나' 배지)
+  final bool filled;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: filled ? 6 : 10, vertical: 3),
+      decoration: BoxDecoration(
+        color: filled ? color : color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(100),
+      ),
+      child: Text(
+        text,
+        style: AppTextStyles.caption.copyWith(
+          fontSize: filled ? 10 : 12,
+          color: filled ? Colors.white : color,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
