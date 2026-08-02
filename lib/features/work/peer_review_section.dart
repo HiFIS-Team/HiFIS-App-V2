@@ -18,6 +18,7 @@ import '../../core/widgets/avatar.dart';
 import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/glass_bottom_button.dart';
 import '../../core/widgets/glass_icon_button.dart';
+import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/pressable.dart';
 import '../../core/widgets/progress_bar.dart';
 import '../../core/widgets/see_all_button.dart';
@@ -41,6 +42,16 @@ class PeerReviewSection extends StatefulWidget {
   State<PeerReviewSection> createState() => _PeerReviewSectionState();
 }
 
+/// 폰 목록 필터 — 평가는 냈거나 안 냈거나 둘뿐이라 두 칸이다
+enum _Filter {
+  pending('평가 전'),
+  done('평가 완료');
+
+  const _Filter(this.label);
+
+  final String label;
+}
+
 class _PeerReviewSectionState extends State<PeerReviewSection> {
   bool _loading = true;
 
@@ -52,6 +63,9 @@ class _PeerReviewSectionState extends State<PeerReviewSection> {
 
   /// 이번 달 전체 평가 — 대표·관리자의 제출 현황에 쓴다
   List<PeerReview> _all = const [];
+
+  /// 폰 목록 필터 — 남은 게 용건이라 '평가 전'부터 연다
+  _Filter _filter = _Filter.pending;
 
   String get _period => periodKey(DateTime.now());
 
@@ -120,20 +134,6 @@ class _PeerReviewSectionState extends State<PeerReviewSection> {
     if (submitted == true && mounted) await _load();
   }
 
-  /// 폰: 머리말 하나와 그 아래 사람 카드들
-  List<Widget> _group(String title, List<Employee> people) => [
-    _SectionHeader(title: title, count: people.length),
-    for (final person in people) ...[
-      SizedBox(height: 12),
-      _PersonCard(
-        person: person,
-        isSelf: person.id == currentUser?.id,
-        review: _mine[person.id],
-        onTap: () => _openForm(person),
-      ),
-    ],
-  ];
-
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -162,21 +162,37 @@ class _PeerReviewSectionState extends State<PeerReviewSection> {
     ];
     final ordered = [...pending, ...done];
 
-    // 폰은 사람마다 카드 하나 (프로젝트 목록과 같은 결).
+    // 폰은 필터 탭 + 사람 카드 (프로젝트 목록과 같은 결).
     // 데스크톱은 2단 화면이라 카드가 과해서 기존 줄 목록을 그대로 쓴다.
     if (!isDesktop) {
-      if (ordered.isEmpty) {
-        return EmptyCard(icon: Icons.group_rounded, text: '평가할 사람이 없어요');
-      }
+      final shown = _filter == _Filter.pending ? pending : done;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 안 한 쪽이 위 — 이 화면의 용건은 '뭐가 남았나'다
-          if (pending.isNotEmpty) ..._group('평가 전', pending),
-          if (done.isNotEmpty) ...[
-            if (pending.isNotEmpty) SizedBox(height: 28),
-            ..._group('평가 완료', done),
-          ],
+          _FilterTabs(
+            selected: _filter,
+            onSelect: (filter) => setState(() => _filter = filter),
+          ),
+          SizedBox(height: 16),
+          if (shown.isEmpty)
+            EmptyCard(
+              icon: Icons.group_rounded,
+              text: _targets.isEmpty
+                  ? '평가할 사람이 없어요'
+                  : _filter == _Filter.pending
+                  ? '이번 달 평가를 모두 마쳤어요'
+                  : '아직 평가한 사람이 없어요',
+            )
+          else
+            for (var i = 0; i < shown.length; i++) ...[
+              if (i > 0) SizedBox(height: 12),
+              _PersonCard(
+                person: shown[i],
+                isSelf: shown[i].id == currentUser?.id,
+                review: _mine[shown[i].id],
+                onTap: () => _openForm(shown[i]),
+              ),
+            ],
         ],
       );
     }
@@ -617,29 +633,49 @@ class _ReviewProgress extends StatelessWidget {
   }
 }
 
-/// 폰 목록 머리말 — 제목·인원수와 옆으로 뻗는 실선 (직원 명단과 같은 모양)
-class _SectionHeader extends StatelessWidget {
-  _SectionHeader({required this.title, required this.count});
+/// 폰 목록 필터 — 프로젝트 목록의 단계 탭과 같은 모양
+class _FilterTabs extends StatelessWidget {
+  _FilterTabs({required this.selected, required this.onSelect});
 
-  final String title;
-  final int count;
+  final _Filter selected;
+  final ValueChanged<_Filter> onSelect;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Text(
-          title,
-          style: AppTextStyles.label.copyWith(
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        SizedBox(width: 8),
-        Text('$count명', style: AppTextStyles.caption),
-        SizedBox(width: 14),
-        Expanded(child: Container(height: 1, color: AppColors.gray200)),
-      ],
+    return Container(
+      height: 44,
+      padding: EdgeInsets.all(4),
+      decoration: segmentTrack(),
+      child: Row(
+        children: [
+          for (final filter in _Filter.values)
+            Expanded(
+              child: Pressable(
+                onTap: () => onSelect(filter),
+                scale: 0.97,
+                // 배경은 애니메이션 없이 즉시 바꾼다 (페이드가 있으면 두 칸이
+                // 같이 눌린 것처럼 보인다)
+                child: Container(
+                  decoration: segmentFill(selected: filter == selected),
+                  child: Center(
+                    child: Text(
+                      filter.label,
+                      style: AppTextStyles.body2.copyWith(
+                        fontSize: 13,
+                        color: filter == selected
+                            ? AppColors.textPrimary
+                            : AppColors.gray600,
+                        fontWeight: filter == selected
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
