@@ -51,9 +51,64 @@ class _PraiseSectionState extends State<PraiseSection> {
     );
   }
 
+  /// 폰 목록 머리말 — 제목·건수와 전체 보기
+  Widget _listHead({
+    required String title,
+    required int count,
+    required VoidCallback onOpenAll,
+    List<Widget> extra = const [],
+  }) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
+        children: [
+          Text(
+            title,
+            style: AppTextStyles.label.copyWith(fontWeight: FontWeight.w700),
+          ),
+          SizedBox(width: 8),
+          Text('$count', style: AppTextStyles.caption),
+          ...extra,
+          Spacer(),
+          SeeAllButton(onTap: onOpenAll),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_tab == 2) {
+      final sorted = [..._surveys]..sort((a, b) => b.time.compareTo(a.time));
+      // 카드에는 최근 5건만 — 나머지는 전체 보기 화면에서
+      final recent = sorted.take(5).toList();
+
+      if (!isDesktop) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _tabs(),
+            SizedBox(height: 20),
+            _listHead(
+              title: '설문 응답',
+              count: sorted.length,
+              onOpenAll: _openSurveys,
+            ),
+            SizedBox(height: 12),
+            if (recent.isEmpty)
+              EmptyCard(icon: Icons.assignment_rounded, text: '아직 들어온 설문이 없어요')
+            else
+              for (var i = 0; i < recent.length; i++) ...[
+                if (i > 0) SizedBox(height: 12),
+                _SurveyCardItem(
+                  survey: recent[i],
+                  onTap: () => _showSurveyDetail(context, recent[i]),
+                ),
+              ],
+          ],
+        );
+      }
+
       return Column(
         children: [
           _tabs(),
@@ -79,36 +134,24 @@ class _PraiseSectionState extends State<PraiseSection> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _tabs(),
-          SizedBox(height: 16),
-          _FeedbackSummary(),
           SizedBox(height: 20),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 4),
-            child: Row(
-              children: [
+          _listHead(
+            title: title,
+            count: items.length,
+            onOpenAll: _openHistory,
+            // 컴플레인은 아직 손대지 않은 건수를 같이 알려준다
+            extra: [
+              if (unresolved > 0) ...[
+                SizedBox(width: 8),
                 Text(
-                  title,
-                  style: AppTextStyles.label.copyWith(
+                  '미처리 $unresolved',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.warning,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                SizedBox(width: 8),
-                Text('${items.length}', style: AppTextStyles.caption),
-                // 컴플레인은 아직 손대지 않은 건수를 같이 알려준다
-                if (unresolved > 0) ...[
-                  SizedBox(width: 8),
-                  Text(
-                    '미처리 $unresolved',
-                    style: AppTextStyles.caption.copyWith(
-                      color: AppColors.warning,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-                Spacer(),
-                SeeAllButton(onTap: _openHistory),
               ],
-            ),
+            ],
           ),
           SizedBox(height: 12),
           if (recent.isEmpty)
@@ -1223,6 +1266,99 @@ class _SurveyCard extends StatelessWidget {
               ),
             ],
         ],
+      ),
+    );
+  }
+}
+
+/// 폰 설문 카드 — 피드백 카드와 같은 결
+///
+/// 데스크톱은 아직 [_SurveyRow] 를 쓴다 (2단 화면이라 카드가 과하다).
+class _SurveyCardItem extends StatelessWidget {
+  _SurveyCardItem({required this.survey, required this.onTap});
+
+  final _Survey survey;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      scale: 0.98,
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        padding: EdgeInsets.fromLTRB(20, 18, 20, 18),
+        decoration: AppDecorations.card(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: survey.color,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    survey.name.characters.first,
+                    style: TextStyle(
+                      fontFamily: AppTextStyles.fontFamily,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        survey.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.body1.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        _formatStamp(survey.time),
+                        style: AppTextStyles.caption.copyWith(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                // 누구를 칭찬했는지 / 개선 요청만 남겼는지 한눈에
+                if (survey.praised.isNotEmpty) ...[
+                  SizedBox(width: 8),
+                  _SurveyTag(
+                    label: '칭찬 ${survey.praised}',
+                    color: AppColors.primary,
+                  ),
+                ],
+                if (survey.improve.isNotEmpty) ...[
+                  SizedBox(width: 6),
+                  _SurveyTag(label: '개선 요청', color: AppColors.warning),
+                ],
+              ],
+            ),
+            SizedBox(height: 14),
+            Text(
+              survey.motive,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.body2.copyWith(
+                color: AppColors.textSecondary,
+                height: 1.45,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
