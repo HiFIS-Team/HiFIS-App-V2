@@ -15,6 +15,7 @@ import '../../core/util/platform.dart';
 import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/avatar.dart';
+import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/glass_bottom_button.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/pressable.dart';
@@ -142,6 +143,54 @@ class _ContributionSectionState extends State<ContributionSection> {
             valueColor: AlwaysStoppedAnimation(AppColors.primary),
           ),
         ),
+      );
+    }
+
+    // 폰은 기여마다 카드 하나 (다른 업무 목록과 같은 결).
+    // 데스크톱은 2단 화면이라 카드가 과해서 기존 줄 목록을 그대로 쓴다.
+    if (!isDesktop) {
+      // 목록에는 최근 5건만 — 나머지는 전체 보기 화면에서
+      final recent = _items.take(5).toList();
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 항목 넷 — 무엇으로 점수가 쌓였는지
+          _KindGrid(items: _items),
+          if (myRole.canGrant) ...[
+            SizedBox(height: 16),
+            _GrantBanner(onTap: _grant),
+          ],
+          SizedBox(height: 20),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4),
+            child: Row(
+              children: [
+                Text(
+                  '기여 내역',
+                  style: AppTextStyles.label.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                SizedBox(width: 8),
+                Text('${_items.length}', style: AppTextStyles.caption),
+                Spacer(),
+                SeeAllButton(onTap: _openHistory),
+              ],
+            ),
+          ),
+          SizedBox(height: 12),
+          if (recent.isEmpty)
+            EmptyCard(
+              icon: Icons.workspace_premium_rounded,
+              text: '이번 달 기여 기록이 없어요',
+            )
+          else
+            for (var i = 0; i < recent.length; i++) ...[
+              if (i > 0) SizedBox(height: 12),
+              _ContributionCard(item: recent[i]),
+            ],
+        ],
       );
     }
 
@@ -546,6 +595,90 @@ class _HistoryCard extends StatelessWidget {
               if (i > 0) Divider(height: 1, color: AppColors.divider),
               _ContributionRow(item: items[i]),
             ],
+        ],
+      ),
+    );
+  }
+}
+
+/// 폰 목록 카드 — 다른 업무 목록과 같은 결로 기여 하나에 카드 하나
+///
+/// 데스크톱은 아직 [_ContributionRow] 를 쓴다 (2단 화면이라 카드가 과하다).
+class _ContributionCard extends StatelessWidget {
+  _ContributionCard({required this.item});
+
+  final _Contribution item;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, 18, 20, 18),
+      decoration: AppDecorations.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: item.kind.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Icon(item.kind.icon, size: 18, color: item.kind.color),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.kind.label,
+                      style: AppTextStyles.body1.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      // 부여 항목은 누가 줬는지가 근거다
+                      item.by == null
+                          ? _dayLabel(item.date)
+                          : '${item.by}님 · ${_dayLabel(item.date)}',
+                      style: AppTextStyles.caption.copyWith(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(width: 8),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                  color: item.kind.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(100),
+                ),
+                child: Text(
+                  '+${item.points}',
+                  style: AppTextStyles.caption.copyWith(
+                    fontSize: 12,
+                    color: item.kind.color,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 14),
+          Text(
+            item.title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.body2.copyWith(
+              color: AppColors.textSecondary,
+              height: 1.45,
+            ),
+          ),
         ],
       ),
     );
