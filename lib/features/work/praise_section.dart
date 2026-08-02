@@ -6,6 +6,7 @@ import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
 import '../../core/widgets/app_dialog.dart';
+import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/glass_search_bar.dart';
 import '../../core/widgets/mode_switch.dart';
@@ -70,6 +71,68 @@ class _PraiseSectionState extends State<PraiseSection> {
     final unresolved = _complaint && _showStatus
         ? items.where((f) => f.status == _Status.pending).length
         : 0;
+
+    // 폰은 피드백마다 카드 하나 (프로젝트·동료 평가 목록과 같은 결).
+    // 데스크톱은 2단 화면이라 카드가 과해서 기존 줄 목록을 그대로 쓴다.
+    if (!isDesktop) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _tabs(),
+          SizedBox(height: 16),
+          _FeedbackSummary(),
+          SizedBox(height: 20),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4),
+            child: Row(
+              children: [
+                Text(
+                  title,
+                  style: AppTextStyles.label.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                SizedBox(width: 8),
+                Text('${items.length}', style: AppTextStyles.caption),
+                // 컴플레인은 아직 손대지 않은 건수를 같이 알려준다
+                if (unresolved > 0) ...[
+                  SizedBox(width: 8),
+                  Text(
+                    '미처리 $unresolved',
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.warning,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+                Spacer(),
+                SeeAllButton(onTap: _openHistory),
+              ],
+            ),
+          ),
+          SizedBox(height: 12),
+          if (recent.isEmpty)
+            EmptyCard(
+              icon: _complaint
+                  ? Icons.report_gmailerrorred_rounded
+                  : Icons.favorite_rounded,
+              text: _complaint ? '아직 컴플레인이 없어요' : '아직 받은 칭찬이 없어요',
+            )
+          else
+            for (var i = 0; i < recent.length; i++) ...[
+              if (i > 0) SizedBox(height: 12),
+              _FeedbackCard(
+                feedback: recent[i],
+                onTap: () => _showFeedbackDetail(
+                  context,
+                  recent[i],
+                  onChanged: () => setState(() {}),
+                ),
+              ),
+            ],
+        ],
+      );
+    }
 
     return Column(
       children: [
@@ -588,6 +651,94 @@ class _StatusButton extends StatelessWidget {
 }
 
 /// 피드백 한 줄 — 아바타, 이름, 내용, 시각과 끝의 화살표
+/// 폰 목록 카드 — 프로젝트·동료 평가 목록과 같은 결로 피드백 하나에 카드 하나
+///
+/// 데스크톱은 아직 [_FeedbackRow] 를 쓴다 (2단 화면이라 카드가 과하다).
+class _FeedbackCard extends StatelessWidget {
+  _FeedbackCard({required this.feedback, required this.onTap});
+
+  final _Feedback feedback;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final showStatus = feedback.complaint && _showStatus;
+
+    return Pressable(
+      onTap: onTap,
+      scale: 0.98,
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        padding: EdgeInsets.fromLTRB(20, 18, 20, 18),
+        decoration: AppDecorations.card(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: feedback.color,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    feedback.name.characters.first,
+                    style: TextStyle(
+                      fontFamily: AppTextStyles.fontFamily,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        feedback.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.body1.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        _formatStamp(feedback.time),
+                        style: AppTextStyles.caption.copyWith(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                // 컴플레인만 처리 단계가 있다 — 칭찬은 배지 자리가 빈다
+                if (showStatus) ...[
+                  SizedBox(width: 8),
+                  _StatusChip(status: feedback.status),
+                ],
+              ],
+            ),
+            SizedBox(height: 14),
+            Text(
+              feedback.text,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.body2.copyWith(
+                color: AppColors.textSecondary,
+                height: 1.45,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _FeedbackRow extends StatelessWidget {
   _FeedbackRow({required this.feedback, required this.onTap});
 
