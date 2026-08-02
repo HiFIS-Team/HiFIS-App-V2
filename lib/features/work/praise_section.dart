@@ -6,6 +6,7 @@ import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
 import '../../core/widgets/app_dialog.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/glass_search_bar.dart';
@@ -531,14 +532,25 @@ class _FeedbackDetailCard extends StatefulWidget {
 }
 
 class _FeedbackDetailCardState extends State<_FeedbackDetailCard> {
-  /// 같은 버튼을 다시 누르면 미처리로 되돌린다 (잘못 누른 걸 취소할 방법)
+  /// 처리 단계를 바꾸고 창을 닫는다
+  ///
+  /// 같은 버튼을 다시 누르면 미처리로 되돌린다 (잘못 누른 걸 취소할 방법).
+  ///
+  /// **고르면 바로 닫고 토스트로 알린다.** 창을 열어둔 채 색만 바꾸면
+  /// 처리가 됐는지 안 됐는지 알 수가 없다.
   void _pick(_Status status) {
-    setState(
-      () => widget.feedback.status = widget.feedback.status == status
-          ? _Status.pending
-          : status,
-    );
+    final feedback = widget.feedback;
+    final next = feedback.status == status ? _Status.pending : status;
+    feedback.status = next;
     widget.onChanged?.call();
+
+    AppToast.show(
+      context,
+      next == _Status.pending
+          ? '미처리로 되돌렸어요'
+          : '${next.label}${_particleRo(next.label)} 바꿨어요',
+    );
+    Navigator.of(context).pop();
   }
 
   @override
@@ -617,6 +629,18 @@ class _FeedbackDetailCardState extends State<_FeedbackDetailCard> {
       ),
     );
   }
+}
+
+/// 앞말 받침에 맞는 조사 — `해결중으로` / `해결 완료로`
+///
+/// 상태 이름이 늘어나도 문장이 어색해지지 않게 계산해서 붙인다.
+String _particleRo(String word) {
+  final code = word.runes.last;
+  // 한글 음절이 아니면(영문·숫자) 그냥 '로'
+  if (code < 0xAC00 || code > 0xD7A3) return '로';
+  final jongseong = (code - 0xAC00) % 28;
+  // 받침이 없거나 ㄹ 받침이면 '로', 그 외에는 '으로'
+  return jongseong == 0 || jongseong == 8 ? '로' : '으로';
 }
 
 /// 처리 단계 알약 — 목록·상세에 같이 쓴다
