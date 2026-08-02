@@ -1,5 +1,3 @@
-import 'dart:io' show Platform;
-
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
@@ -8,19 +6,24 @@ import 'token_store.dart';
 
 /// 서버 주소
 ///
-/// 기기마다 "localhost"가 가리키는 곳이 달라서 기본값을 나눠 둔다.
-/// 실기기는 맥의 LAN IP를 알아야 하므로 빌드할 때 넣는다:
+/// 기본값이 **운영 서버**다. 아무 설정 없이 빌드해도 배포본이 붙을 곳으로 간다 —
+/// 예전처럼 기본값이 localhost 면 빌드에 `--dart-define` 을 빠뜨렸을 때
+/// 배포본이 로그인 화면에서 멈춘다.
+///
+/// 로컬 서버를 볼 때만 빌드할 때 넣는다:
 ///
 /// ```
-/// flutter run --dart-define=API_BASE_URL=http://192.168.0.10:8001
+/// flutter run --dart-define=API_BASE_URL=http://localhost:8001
 /// ```
+///
+/// 기기마다 "localhost"가 가리키는 곳이 다르다.
+/// - 안드로이드 에뮬레이터: 호스트(맥)는 `http://10.0.2.2:8001` — localhost는 에뮬레이터 자신
+/// - 실기기: 맥의 LAN IP (`http://192.168.0.10:8001`)
+const _defaultBaseUrl = 'https://api.hifis.app';
+
 String get apiBaseUrl {
   const override = String.fromEnvironment('API_BASE_URL');
-  if (override.isNotEmpty) return override;
-
-  // 안드로이드 에뮬레이터에서 호스트(맥)는 10.0.2.2 다. localhost는 에뮬레이터 자신.
-  if (!kIsWeb && Platform.isAndroid) return 'http://10.0.2.2:8001';
-  return 'http://localhost:8001';
+  return override.isEmpty ? _defaultBaseUrl : override;
 }
 
 /// 서버가 준 파일 경로(`/files/...?exp=&sig=`)를 띄울 수 있는 주소로
