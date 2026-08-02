@@ -120,6 +120,20 @@ class _PeerReviewSectionState extends State<PeerReviewSection> {
     if (submitted == true && mounted) await _load();
   }
 
+  /// 폰: 머리말 하나와 그 아래 사람 카드들
+  List<Widget> _group(String title, List<Employee> people) => [
+    _SectionHeader(title: title, count: people.length),
+    for (final person in people) ...[
+      SizedBox(height: 12),
+      _PersonCard(
+        person: person,
+        isSelf: person.id == currentUser?.id,
+        review: _mine[person.id],
+        onTap: () => _openForm(person),
+      ),
+    ],
+  ];
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -151,22 +165,18 @@ class _PeerReviewSectionState extends State<PeerReviewSection> {
     // 폰은 사람마다 카드 하나 (프로젝트 목록과 같은 결).
     // 데스크톱은 2단 화면이라 카드가 과해서 기존 줄 목록을 그대로 쓴다.
     if (!isDesktop) {
+      if (ordered.isEmpty) {
+        return EmptyCard(icon: Icons.group_rounded, text: '평가할 사람이 없어요');
+      }
       return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _ReviewProgress(done: done.length, total: _targets.length),
-          if (ordered.isEmpty) ...[
-            SizedBox(height: 16),
-            EmptyCard(icon: Icons.group_rounded, text: '평가할 사람이 없어요'),
-          ] else
-            for (final person in ordered) ...[
-              SizedBox(height: 12),
-              _PersonCard(
-                person: person,
-                isSelf: person.id == currentUser?.id,
-                review: _mine[person.id],
-                onTap: () => _openForm(person),
-              ),
-            ],
+          // 안 한 쪽이 위 — 이 화면의 용건은 '뭐가 남았나'다
+          if (pending.isNotEmpty) ..._group('평가 전', pending),
+          if (done.isNotEmpty) ...[
+            if (pending.isNotEmpty) SizedBox(height: 28),
+            ..._group('평가 완료', done),
+          ],
         ],
       );
     }
@@ -603,6 +613,33 @@ class _ReviewProgress extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// 폰 목록 머리말 — 제목·인원수와 옆으로 뻗는 실선 (직원 명단과 같은 모양)
+class _SectionHeader extends StatelessWidget {
+  _SectionHeader({required this.title, required this.count});
+
+  final String title;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Text(
+          title,
+          style: AppTextStyles.label.copyWith(
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        SizedBox(width: 8),
+        Text('$count명', style: AppTextStyles.caption),
+        SizedBox(width: 14),
+        Expanded(child: Container(height: 1, color: AppColors.gray200)),
+      ],
     );
   }
 }
