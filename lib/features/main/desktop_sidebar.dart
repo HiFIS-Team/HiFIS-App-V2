@@ -144,15 +144,17 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
 
   Widget _logo() {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 26),
+      // 오른쪽을 좁게 둔다 — 마크가 가로로 길어서(1.92:1) 접힌 레일(72)에
+      // 양쪽 26을 다 주면 들어갈 자리가 20밖에 안 남아 넘친다.
+      padding: EdgeInsets.only(left: 26, right: 6),
       child: SizedBox(
         height: 26,
         child: Row(
           children: [
             Image.asset(
               'assets/images/hifis_mark.png',
-              height: 22,
-              cacheHeight: 66,
+              height: 18,
+              cacheHeight: 54,
             ),
             Expanded(
               child: ClipRect(

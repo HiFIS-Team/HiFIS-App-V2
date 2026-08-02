@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// 케틀벨 마크 로딩 애니메이션
+/// 마크 로딩 애니메이션
 ///
 /// 마크가 천천히 떠올라 잠깐 머물다가, 떨어지면서 통통 튀며
 /// 제자리에 안착하는 동작을 반복한다. 들려 있는 동안 살짝 기울고
@@ -8,12 +8,18 @@ import 'package:flutter/material.dart';
 class AppLoading extends StatefulWidget {
   AppLoading({super.key, this.size = 72});
 
-  /// 마크 높이 (논리 픽셀)
+  /// 마크 높이 (논리 픽셀). 폭은 마크 비율([_markRatio])을 따라간다.
   final double size;
 
   @override
   State<AppLoading> createState() => _AppLoadingState();
 }
+
+/// 마크 이미지의 가로:세로 (`assets/images/hifis_mark.png` 866×451)
+///
+/// 마크를 바꾸면 이 값도 같이 고쳐야 한다 — 안 고치면 박스를 넘치거나
+/// 그림자가 마크 폭과 어긋난다.
+const _markRatio = 1.92;
 
 class _AppLoadingState extends State<AppLoading>
     with SingleTickerProviderStateMixin {
@@ -60,7 +66,7 @@ class _AppLoadingState extends State<AppLoading>
     // 정지한 마크가 런치 스크린의 마크와 같은 자리에 온다.
     // 들어올리는 동작과 그림자는 박스 밖으로 그려진다.
     return SizedBox(
-      width: widget.size * 1.6,
+      width: widget.size * _markRatio,
       height: widget.size,
       child: AnimatedBuilder(
         animation: _controller,
@@ -74,7 +80,8 @@ class _AppLoadingState extends State<AppLoading>
               Positioned(
                 bottom: -8,
                 child: Container(
-                  width: widget.size * (0.66 - 0.22 * t),
+                  // 마크 폭보다 조금 좁게 깔리고, 떠오를수록 3분의 1까지 줄어든다
+                  width: widget.size * _markRatio * (0.87 - 0.29 * t),
                   height: widget.size * 0.09,
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.10 - 0.05 * t),
