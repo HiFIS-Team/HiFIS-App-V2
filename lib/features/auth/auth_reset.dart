@@ -182,7 +182,9 @@ class _PasswordResetScreenState extends State<_PasswordResetScreen> {
         1 => '${_contact.text.trim()} 으로 6자리 번호를 보냈어요.',
         _ => '앞으로 사용할 비밀번호를 입력해 주세요.',
       },
-      onBack: _back,
+      // 데스크톱은 회원가입과 같이 헤더에 뒤로 버튼을 두지 않는다 —
+      // 카드가 그만큼 길어져 창 안에 안 들어간다. 대신 아래에 링크를 둔다.
+      onBack: isDesktop ? null : _back,
       children: [
         _StepBar(step: _step),
         SizedBox(height: 24),
@@ -191,6 +193,31 @@ class _PasswordResetScreenState extends State<_PasswordResetScreen> {
           1 => _codeStep(),
           _ => _passwordStep(),
         },
+        if (isDesktop) ...[SizedBox(height: 14), _backLink()],
+      ],
+    );
+  }
+
+  /// 데스크톱에서 헤더의 뒤로 버튼을 대신하는 링크
+  ///
+  /// 누르면 [_back] 과 똑같이 움직인다 — 첫 단계면 로그인으로 나가고
+  /// 아니면 한 단계 물러난다. 자리만 아래로 옮긴 것이다.
+  Widget _backLink() {
+    final (prompt, action) = switch (_step) {
+      0 => ('비밀번호가 기억났나요?', '로그인'),
+      1 => ('주소를 잘못 입력했나요?', '다시 입력'),
+      _ => ('인증을 다시 할까요?', '이전 단계'),
+    };
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          prompt,
+          style: AppTextStyles.label.copyWith(color: AppColors.textTertiary),
+        ),
+        SizedBox(width: 6),
+        _AuthTextButton(label: action, onTap: _back, strong: true),
       ],
     );
   }
