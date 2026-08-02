@@ -110,9 +110,13 @@ class _PayslipFormState extends State<_PayslipForm> {
         SizedBox(height: 8),
         Container(
           padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          // 이 폼은 카드 안이 아니라 화면 배경 위에 바로 놓인다.
+          // 라이트에서 gray50 은 배경과 같은 색이라 입력칸이 통째로 묻힌다
+          // (`AppColors.track` 주석 참고). 흰 면에 테두리로 칸을 세운다.
           decoration: BoxDecoration(
-            color: AppColors.gray50,
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.gray100),
           ),
           child: TextField(
             controller: _note,
