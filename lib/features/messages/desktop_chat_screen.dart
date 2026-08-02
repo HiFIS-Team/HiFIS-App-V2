@@ -54,7 +54,13 @@ class _DesktopChatScreenState extends State<DesktopChatScreen> {
               // 왼쪽: 대화 목록 (대화를 누르면 오른쪽에 채팅방이 뜬다)
               SizedBox(
                 width: 360,
-                child: MessageScreen(embedded: true, onOpenChat: _openChat),
+                child: MessageScreen(
+                  embedded: true,
+                  onOpenChat: _openChat,
+                  // 연필도 가운데 '메시지 보내기' 와 같은 자리에 연다.
+                  // 안 넘기면 이 화면 자체를 덮는 최상위로 열린다
+                  onNewMessage: _newMessage,
+                ),
               ),
               Container(width: 1, color: AppColors.gray100),
               // 오른쪽: 선택한 채팅방 / 안내 상태

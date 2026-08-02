@@ -19,6 +19,7 @@ class MessageScreen extends StatefulWidget {
     this.embedded = false,
     this.onExpand,
     this.onOpenChat,
+    this.onNewMessage,
   });
 
   /// 데스크톱 플로팅 패널에 담길 때 true.
@@ -31,6 +32,13 @@ class MessageScreen extends StatefulWidget {
   /// 대화를 눌렀을 때 화면 전환 대신 호출할 콜백
   /// (데스크톱 전체보기에서 오른쪽 영역에 채팅방을 띄우는 용도)
   final void Function(String name, Color color, String? emoji)? onOpenChat;
+
+  /// 새 채팅(연필) 버튼을 눌렀을 때 화면 전환 대신 호출할 콜백
+  ///
+  /// 이 화면이 **다른 내비게이터 옆에 놓이는** 데스크톱 전체보기에서 필요하다.
+  /// 거기서는 `Navigator.of(context)` 가 오른쪽 pane 이 아니라 전체보기를 띄운
+  /// 바깥쪽을 가리켜서, 같은 화면의 '메시지 보내기' 버튼과 다른 데로 열렸다.
+  final VoidCallback? onNewMessage;
 
   @override
   State<MessageScreen> createState() => _MessageScreenState();
@@ -55,6 +63,20 @@ class _MessageScreenState extends State<MessageScreen> {
     _scrollController.dispose();
     _collapse.dispose();
     super.dispose();
+  }
+
+  /// 새 채팅 — 호스트가 자리를 정해 줬으면 거기에, 아니면 이 화면 위로 띄운다
+  void _newMessage() {
+    final open = widget.onNewMessage;
+    if (open != null) return open();
+
+    Navigator.push(
+      context,
+      CupertinoPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => NewMessageScreen(),
+      ),
+    );
   }
 
   /// 안 읽은 대화만 볼지 — 헤더 필터 메뉴에서 켠다
@@ -268,13 +290,7 @@ class _MessageScreenState extends State<MessageScreen> {
                     GlassIconButton(
                       symbol: 'square.and.pencil',
                       size: 52,
-                      onPressed: () => Navigator.push(
-                        context,
-                        CupertinoPageRoute(
-                          fullscreenDialog: true,
-                          builder: (_) => NewMessageScreen(),
-                        ),
-                      ),
+                      onPressed: _newMessage,
                     ),
                     SizedBox(width: 10),
                     Expanded(child: _FloatingSearchBar()),
