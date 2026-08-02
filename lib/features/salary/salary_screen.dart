@@ -558,31 +558,50 @@ class _PayslipRow extends StatelessWidget {
       scale: 0.99,
       child: Padding(
         padding: EdgeInsets.symmetric(vertical: 12),
+        // 월·세션·상태·금액을 한 줄에 세우면 폰 폭에 100pt 넘게 모자란다.
+        // 예전엔 `Spacer()` 로 밀어 뒀는데, 자리가 없으면 Spacer 가 0이 되어
+        // '지급 완료3,450,000원' 처럼 붙어 버렸다 (실제 발생).
+        // 달을 위, 세션·상태를 아래로 내려 가로 압박 자체를 없앤다.
         child: Row(
           children: [
-            SizedBox(
-              width: 92,
-              child: Text(
-                _monthLabel(payslip.month),
-                style: AppTextStyles.body2.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _monthLabel(payslip.month),
+                    style: AppTextStyles.body2.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  SizedBox(height: 3),
+                  Row(
+                    children: [
+                      Text(
+                        '세션 ${payslip.sessions}회',
+                        style: AppTextStyles.caption.copyWith(fontSize: 12),
+                      ),
+                      Text(
+                        ' · ',
+                        style: AppTextStyles.caption.copyWith(
+                          fontSize: 12,
+                          color: AppColors.gray300,
+                        ),
+                      ),
+                      Text(
+                        payslip.status.label,
+                        style: AppTextStyles.caption.copyWith(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: payslip.status.color,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
-            Text(
-              '세션 ${payslip.sessions}회',
-              style: AppTextStyles.caption.copyWith(fontSize: 12),
-            ),
-            SizedBox(width: 8),
-            Text(
-              payslip.status.label,
-              style: AppTextStyles.caption.copyWith(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: payslip.status.color,
-              ),
-            ),
-            Spacer(),
+            SizedBox(width: 12),
             Text(
               _won(payslip.total),
               style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w700),

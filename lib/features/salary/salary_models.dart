@@ -88,9 +88,19 @@ class _Payslip {
   bool get submitted => status != _PayStatus.draft;
 
   /// 지급 항목 — 서버가 계산한 값을 그대로 늘어놓는다
+  ///
+  /// 아직 산출 안 된 달도 **항목은 0원으로 늘어놓는다.** 빈 목록을 주면
+  /// 카드에 제목과 '총 지급액 0원' 만 남아서 화면이 고장 난 것처럼 보인다
+  /// (실제로 그렇게 보였다). 무엇을 받는 자리인지는 금액이 0이어도 알려 준다.
   List<_PayItem> get pays {
     final payslip = source;
-    if (payslip == null) return const [];
+    if (payslip == null) {
+      return const [
+        _PayItem('기본급', 0),
+        _PayItem('신규 등록 인센티브', 0),
+        _PayItem('재등록 인센티브', 0),
+      ];
+    }
     final basis = payslip.basis;
     return [
       _PayItem('기본급', payslip.baseSalary),
