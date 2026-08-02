@@ -537,7 +537,7 @@ class _WriteInCardState extends State<_WriteInCard> {
               SizedBox(width: 8),
               Expanded(
                 child: AppButton(
-                  label: '완료 · +${widget.item.points}점',
+                  label: '완료',
                   filled: _value.isNotEmpty,
                   onTap: _submit,
                 ),
