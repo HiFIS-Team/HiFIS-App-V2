@@ -415,6 +415,7 @@ class _PayCard extends StatelessWidget {
     items: payslip.pays,
     total: payslip.total,
     totalLabel: '총 지급액',
+    footnote: payslip.payNote,
   );
 }
 
@@ -425,12 +426,16 @@ class _AmountCard extends StatelessWidget {
     required this.items,
     required this.total,
     required this.totalLabel,
+    this.footnote,
   });
 
   final String title;
   final List<_PayItem> items;
   final int total;
   final String totalLabel;
+
+  /// 합계 아래 한 줄 설명 — 금액이 왜 이렇게 나왔는지
+  final String? footnote;
 
   @override
   Widget build(BuildContext context) {
@@ -503,6 +508,29 @@ class _AmountCard extends StatelessWidget {
               Text(_won(total), style: AppTextStyles.title3),
             ],
           ),
+          if (footnote != null) ...[
+            SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  CupertinoIcons.info_circle,
+                  size: 13,
+                  color: AppColors.gray400,
+                ),
+                SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    footnote!,
+                    style: AppTextStyles.caption.copyWith(
+                      fontSize: 12,
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

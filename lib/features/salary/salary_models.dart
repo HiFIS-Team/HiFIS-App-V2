@@ -89,6 +89,13 @@ class _Payslip {
 
   /// 지급 항목 — 서버가 계산한 값을 그대로 늘어놓는다
   ///
+  /// **세션 수당 줄은 없다.** 커미션 모델에서는 세션 급여가 곧 신규·재등록
+  /// 커미션이다 — 세션 싸인 한 건마다 회차 단가(`등록가 ÷ 총 회차`)에 요율이
+  /// 붙고, 그 합이 아래 두 줄이다. 따로 '세션 수당'을 두면 이중 계산이 된다.
+  ///
+  /// 같은 이유로 '몇 회 × 얼마' 로 못 묶는다. 회차 단가가 회원 등록가마다
+  /// 달라서 단일 정액이 아니다. 그래서 **금액 합계 + 횟수**로만 보여준다.
+  ///
   /// 아직 산출 안 된 달도 **항목은 0원으로 늘어놓는다.** 빈 목록을 주면
   /// 카드에 제목과 '총 지급액 0원' 만 남아서 화면이 고장 난 것처럼 보인다
   /// (실제로 그렇게 보였다). 무엇을 받는 자리인지는 금액이 0이어도 알려 준다.
@@ -97,29 +104,31 @@ class _Payslip {
     if (payslip == null) {
       return const [
         _PayItem('기본급', 0),
-        _PayItem('신규 등록 인센티브', 0),
-        _PayItem('재등록 인센티브', 0),
+        _PayItem('PT 커미션 · 신규', 0),
+        _PayItem('PT 커미션 · 재등록', 0),
       ];
     }
-    final basis = payslip.basis;
     return [
       _PayItem('기본급', payslip.baseSalary),
       _PayItem(
-        '신규 등록 인센티브',
+        'PT 커미션 · 신규',
         payslip.incentiveNew,
-        note: basis.newSales.isEmpty ? null : '${basis.newSales.length}건',
+        note: newSessions == 0 ? null : '워크인 $newSessions회',
       ),
       _PayItem(
-        '재등록 인센티브',
+        'PT 커미션 · 재등록',
         payslip.incentiveRenewal,
-        note: basis.renewalSales.isEmpty
-            ? null
-            : '${basis.renewalSales.length}건',
+        // 서버가 재등록과 지인소개를 같은 요율로 한 통에 담는다
+        note: renewalSessions == 0 ? null : '소개 포함 $renewalSessions회',
       ),
       if (payslip.otherAllowances != 0)
         _PayItem('기타 수당', payslip.otherAllowances),
     ];
   }
+
+  /// 커미션이 왜 이 금액인지 — 카드 맨 아래 한 줄
+  String? get payNote =>
+      source == null ? null : '이번 달 세션 $sessions회 · 회차마다 등록 단가가 달라 합계로 보여드려요';
 
   /// 공제 항목 (4대 보험·세금) — 서버가 직급·공제 방식에 따라 계산한다
   List<_PayItem> get deductions => [
@@ -135,11 +144,13 @@ class _Payslip {
 
   int get totalDeduction => source?.totalDeduction ?? 0;
 
-  /// 이번 달 세션 싸인 수
+  /// 이번 달 세션 싸인 수 — 금액이 아니라 참고용 숫자다
   int get sessions => source?.basis.sessionSigns ?? 0;
 
-  int get newSignups => source?.basis.newSales.length ?? 0;
-  int get reSignups => source?.basis.renewalSales.length ?? 0;
+  /// 커미션이 붙은 세션 수 — `newSales`·`renewalSales` 는 등록 건이 아니라
+  /// **세션 한 건씩**이다 (서버가 `{회차} · {워크인|재등록|지인소개}` 로 담는다).
+  int get newSessions => source?.basis.newSales.length ?? 0;
+  int get renewalSessions => source?.basis.renewalSales.length ?? 0;
 
   /// 지급일 — 서버가 알려 준다 (없으면 다음 달 10일로 가정)
   DateTime get payDay =>
