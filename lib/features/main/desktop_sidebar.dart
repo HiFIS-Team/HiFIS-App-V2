@@ -142,19 +142,34 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
     );
   }
 
+  /// 사이드바 마크 크기 — 폭은 마크 비율(1.92:1)을 따라간다
+  static const _logoHeight = 18.0;
+  static const _logoWidth = _logoHeight * 1.92;
+
+  /// 메뉴 아이콘의 왼쪽 선 — 바깥 여백 12 + 칸 안쪽 여백 13
+  static const _iconLeft = 25.0;
+
   Widget _logo() {
-    return Padding(
-      // 오른쪽을 좁게 둔다 — 마크가 가로로 길어서(1.92:1) 접힌 레일(72)에
-      // 양쪽 26을 다 주면 들어갈 자리가 20밖에 안 남아 넘친다.
-      padding: EdgeInsets.only(left: 26, right: 6),
+    // 마크가 가로로 길어서(1.92:1) 아이콘(20)보다 훨씬 넓다. 왼쪽을 맞추면
+    // 접혔을 때 중심이 오른쪽으로 밀리고, 중심을 맞추면 펼쳤을 때 왼쪽이
+    // 어긋난다. 그래서 상태에 따라 옮긴다 — 접힘은 아이콘과 같은 축(가운데),
+    // 펼침은 아이콘과 같은 왼쪽 선.
+    final railInner = DesktopSidebar.railWidth - 1; // 오른쪽 경계 헤어라인 1px
+    return AnimatedPadding(
+      duration: Duration(milliseconds: 200),
+      curve: Curves.easeOutCubic,
+      padding: EdgeInsets.only(
+        left: _hovered ? _iconLeft : (railInner - _logoWidth) / 2,
+        right: 6,
+      ),
       child: SizedBox(
         height: 26,
         child: Row(
           children: [
             Image.asset(
               'assets/images/hifis_mark.png',
-              height: 18,
-              cacheHeight: 54,
+              height: _logoHeight,
+              cacheHeight: (_logoHeight * 3).round(),
             ),
             Expanded(
               child: ClipRect(
