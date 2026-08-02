@@ -57,8 +57,108 @@ class _MessageScreenState extends State<MessageScreen> {
     super.dispose();
   }
 
+  /// 안 읽은 대화만 볼지 — 헤더 필터 메뉴에서 켠다
+  bool _unreadOnly = false;
+
+  /// 필터 버튼 위치를 알아야 메뉴를 그 아래에 띄울 수 있다
+  final _filterKey = GlobalKey();
+
+  /// 헤더 필터 메뉴 — 아이폰 메시지의 그 메뉴와 같은 구성
+  Future<void> _openFilterMenu() async {
+    final button = _filterKey.currentContext?.findRenderObject() as RenderBox?;
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (button == null || overlay == null) return;
+
+    final origin = button.localToGlobal(Offset.zero, ancestor: overlay);
+    final picked = await showMenu<String>(
+      context: context,
+      color: AppColors.surface,
+      elevation: 8,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: AppColors.gray100),
+      ),
+      position: RelativeRect.fromLTRB(
+        origin.dx,
+        origin.dy + button.size.height + 6,
+        overlay.size.width - origin.dx - button.size.width,
+        0,
+      ),
+      items: [
+        _menuItem('deleted', CupertinoIcons.trash, '최근 삭제된 항목'),
+        _menuItem('left', CupertinoIcons.arrow_turn_up_left, '최근 나간 항목'),
+        PopupMenuDivider(),
+        PopupMenuItem<String>(
+          enabled: false,
+          height: 30,
+          child: Text(
+            '필터 기준',
+            style: AppTextStyles.caption.copyWith(fontSize: 12),
+          ),
+        ),
+        _menuItem(
+          'unread',
+          CupertinoIcons.chat_bubble,
+          '읽지 않음',
+          checked: _unreadOnly,
+        ),
+      ],
+    );
+    if (!mounted) return;
+
+    switch (picked) {
+      case 'unread':
+        setState(() => _unreadOnly = !_unreadOnly);
+      case 'deleted':
+        _openArchive('최근 삭제된 항목', '최근 삭제한 대화가 없어요');
+      case 'left':
+        _openArchive('최근 나간 항목', '최근 나간 대화방이 없어요');
+    }
+  }
+
+  PopupMenuItem<String> _menuItem(
+    String value,
+    IconData icon,
+    String label, {
+    bool checked = false,
+  }) {
+    return PopupMenuItem<String>(
+      value: value,
+      height: 44,
+      child: Row(
+        children: [
+          Icon(icon, size: 17, color: AppColors.textSecondary),
+          SizedBox(width: 10),
+          Expanded(child: Text(label, style: AppTextStyles.body2)),
+          if (checked)
+            Icon(CupertinoIcons.checkmark, size: 15, color: AppColors.primary),
+        ],
+      ),
+    );
+  }
+
+  /// 삭제·나간 대화 보관함
+  ///
+  /// 서버에 붙기 전이라 담을 게 없다. 화면 틀만 두고 비어 있음을 알린다.
+  void _openArchive(String title, String emptyText) {
+    Navigator.push(
+      context,
+      CupertinoPageRoute(
+        builder: (_) => _ArchiveScreen(title: title, emptyText: emptyText),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final shown = _unreadOnly
+        ? [
+            for (final c in _conversations)
+              if (c.unread) c,
+          ]
+        : _conversations;
+
     return Scaffold(
       backgroundColor: AppColors.surface,
       body: Stack(
@@ -89,54 +189,30 @@ class _MessageScreenState extends State<MessageScreen> {
                   ),
                 ),
                 SizedBox(height: 8),
-                _ConversationTile(
-                  onOpen: widget.onOpenChat,
-                  name: '민중기',
-                  preview: '네 알겠습니다!',
-                  time: '방금 전',
-                  color: AppColors.primary,
-                  online: true,
-                  unread: true,
-                ),
-                _ConversationTile(
-                  onOpen: widget.onOpenChat,
-                  name: '이준경',
-                  preview: '휴가 신청서 올렸어요',
-                  time: '오전 10:12',
-                  color: AppColors.warning,
-                  unread: true,
-                ),
-                _ConversationTile(
-                  onOpen: widget.onOpenChat,
-                  name: '트레이너 단톡방',
-                  preview: '오늘 PT 일정 공유합니다',
-                  time: '오전 9:30',
-                  color: Color(0xFF7C5CFC),
-                  emoji: '💪',
-                ),
-                _ConversationTile(
-                  onOpen: widget.onOpenChat,
-                  name: '유찬빈',
-                  preview: '수고하셨습니다~',
-                  time: '어제',
-                  color: AppColors.success,
-                  online: true,
-                ),
-                _ConversationTile(
-                  onOpen: widget.onOpenChat,
-                  name: '박준현',
-                  preview: '사진을 보냈습니다',
-                  time: '어제',
-                  color: AppColors.gray500,
-                ),
-                _ConversationTile(
-                  onOpen: widget.onOpenChat,
-                  name: '전체 공지방',
-                  preview: '8월 근무표가 확정되었습니다',
-                  time: '월요일',
-                  color: AppColors.error,
-                  emoji: '📢',
-                ),
+                if (shown.isEmpty)
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(20, 40, 20, 40),
+                    child: Center(
+                      child: Text(
+                        '안 읽은 대화가 없어요',
+                        style: AppTextStyles.body2.copyWith(
+                          color: AppColors.textTertiary,
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  for (final conversation in shown)
+                    _ConversationTile(
+                      onOpen: widget.onOpenChat,
+                      name: conversation.name,
+                      preview: conversation.preview,
+                      time: conversation.time,
+                      color: conversation.color,
+                      emoji: conversation.emoji,
+                      online: conversation.online,
+                      unread: conversation.unread,
+                    ),
               ],
             ),
           ),
@@ -171,7 +247,11 @@ class _MessageScreenState extends State<MessageScreen> {
                       onPressed: () => Navigator.pop(context),
                     ),
                   Spacer(),
-                  GlassIconButton(symbol: 'line.3.horizontal.decrease'),
+                  GlassIconButton(
+                    key: _filterKey,
+                    symbol: 'line.3.horizontal.decrease',
+                    onPressed: _openFilterMenu,
+                  ),
                 ],
               ),
             ),
@@ -264,6 +344,127 @@ class _FloatingSearchBar extends StatelessWidget {
     );
   }
 }
+
+/// 삭제·나간 대화 보관함 — 지금은 담기는 게 없어 안내만 띄운다
+class _ArchiveScreen extends StatelessWidget {
+  _ArchiveScreen({required this.title, required this.emptyText});
+
+  final String title;
+  final String emptyText;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      body: Stack(
+        children: [
+          Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 40),
+              child: Text(
+                emptyText,
+                textAlign: TextAlign.center,
+                style: AppTextStyles.body2.copyWith(
+                  color: AppColors.textTertiary,
+                ),
+              ),
+            ),
+          ),
+          IgnorePointer(
+            child: SafeArea(
+              bottom: false,
+              child: SizedBox(
+                height: 56,
+                child: Center(child: Text(title, style: AppTextStyles.title3)),
+              ),
+            ),
+          ),
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: EdgeInsets.only(top: 8, left: 16),
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: GlassIconButton(
+                  symbol: 'chevron.backward',
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 대화 한 줄 (목업)
+///
+/// 필터를 걸려면 데이터가 있어야 해서 하드코딩된 타일을 모델로 옮겼다.
+class _Conversation {
+  const _Conversation({
+    required this.name,
+    required this.preview,
+    required this.time,
+    required this.color,
+    this.emoji,
+    this.online = false,
+    this.unread = false,
+  });
+
+  final String name;
+  final String preview;
+  final String time;
+  final Color color;
+  final String? emoji;
+  final bool online;
+  final bool unread;
+}
+
+final _conversations = <_Conversation>[
+  _Conversation(
+    name: '민중기',
+    preview: '네 알겠습니다!',
+    time: '방금 전',
+    color: AppColors.primary,
+    online: true,
+    unread: true,
+  ),
+  _Conversation(
+    name: '이준경',
+    preview: '휴가 신청서 올렸어요',
+    time: '오전 10:12',
+    color: AppColors.warning,
+    unread: true,
+  ),
+  _Conversation(
+    name: '트레이너 단톡방',
+    preview: '오늘 PT 일정 공유합니다',
+    time: '오전 9:30',
+    color: Color(0xFF7C5CFC),
+    emoji: '💪',
+  ),
+  _Conversation(
+    name: '유찬빈',
+    preview: '수고하셨습니다~',
+    time: '어제',
+    color: AppColors.success,
+    online: true,
+  ),
+  _Conversation(
+    name: '박준현',
+    preview: '사진을 보냈습니다',
+    time: '어제',
+    color: AppColors.gray500,
+  ),
+  _Conversation(
+    name: '전체 공지방',
+    preview: '8월 근무표가 확정되었습니다',
+    time: '월요일',
+    color: AppColors.error,
+    emoji: '📢',
+  ),
+];
 
 class _ConversationTile extends StatelessWidget {
   _ConversationTile({
