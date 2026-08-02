@@ -11,8 +11,10 @@ import '../../core/data/staff.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/util/platform.dart';
 import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/app_toast.dart';
+import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/glass_bottom_button.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/glass_search_bar.dart';
@@ -342,31 +344,77 @@ class _LessonSectionState extends State<LessonSection> {
       );
     }
 
+    // 상단 액션 버튼 두 개 — 폰·PC 공통
+    final actions = Row(
+      children: [
+        Expanded(
+          child: _ActionButton(
+            icon: CupertinoIcons.person_add,
+            label: '회원 등록',
+            onTap: _register,
+          ),
+        ),
+        SizedBox(width: 10),
+        Expanded(
+          child: _ActionButton(
+            icon: CupertinoIcons.signature,
+            label: '세션 싸인 받기',
+            highlighted: true,
+            onTap: _pickAndSign,
+          ),
+        ),
+      ],
+    );
+
+    // 폰은 싸인마다 카드 하나 (회원 친절도 목록과 같은 결).
+    // 데스크톱은 2단 화면이라 카드가 과해서 기존 줄 목록을 그대로 쓴다.
+    if (!isDesktop) {
+      final sorted = _LessonStore.instance.mySigns;
+      // 목록에는 최근 5건만 — 나머지는 전체 보기 화면에서
+      final recent = sorted.take(5).toList();
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          actions,
+          SizedBox(height: 20),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4),
+            child: Row(
+              children: [
+                Text(
+                  '세션 기록',
+                  style: AppTextStyles.label.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                SizedBox(width: 8),
+                Text('${sorted.length}', style: AppTextStyles.caption),
+                Spacer(),
+                SeeAllButton(onTap: _openHistory),
+              ],
+            ),
+          ),
+          SizedBox(height: 12),
+          if (recent.isEmpty)
+            EmptyCard(icon: Icons.draw_rounded, text: '아직 받은 싸인이 없어요')
+          else
+            for (var i = 0; i < recent.length; i++) ...[
+              if (i > 0) SizedBox(height: 12),
+              _SignCard(
+                sign: recent[i],
+                onTap: () => _showSignDetail(context, recent[i]),
+              ),
+            ],
+        ],
+      );
+    }
+
     return Column(
       children: [
         _SessionGoalCard(),
         SizedBox(height: 16),
-        // 상단 액션 버튼 두 개
-        Row(
-          children: [
-            Expanded(
-              child: _ActionButton(
-                icon: CupertinoIcons.person_add,
-                label: '회원 등록',
-                onTap: _register,
-              ),
-            ),
-            SizedBox(width: 10),
-            Expanded(
-              child: _ActionButton(
-                icon: CupertinoIcons.signature,
-                label: '세션 싸인 받기',
-                highlighted: true,
-                onTap: _pickAndSign,
-              ),
-            ),
-          ],
-        ),
+        actions,
         SizedBox(height: 16),
         _buildRecordCard(),
       ],
@@ -592,6 +640,94 @@ class _MemberBadge extends StatelessWidget {
 }
 
 /// 세션 기록 한 줄 — 서명 미리보기, 이름·배지, 회차·시각, +1
+/// 폰 목록 카드 — 회원 친절도·동료 평가 목록과 같은 결로 싸인 하나에 카드 하나
+///
+/// 데스크톱은 아직 [_SignRow] 를 쓴다 (2단 화면이라 카드가 과하다).
+class _SignCard extends StatelessWidget {
+  _SignCard({required this.sign, required this.onTap});
+
+  final SessionSign sign;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      scale: 0.98,
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        padding: EdgeInsets.fromLTRB(20, 18, 20, 18),
+        decoration: AppDecorations.card(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        sign.displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.body1.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        _formatStamp(sign.signedAt),
+                        style: AppTextStyles.caption.copyWith(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(width: 8),
+                _MemberBadge(isNew: sign.isNewRegistration),
+              ],
+            ),
+            SizedBox(height: 14),
+            Row(
+              children: [
+                // 서명 미리보기 — 이 기록의 증거라 카드에서도 크게 둔다
+                Container(
+                  width: 92,
+                  height: 52,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    color: AppColors.gray50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.gray100),
+                  ),
+                  child: _SignImage(url: sign.signatureFullUrl),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    sign.roundLabel,
+                    style: AppTextStyles.body2.copyWith(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Text(
+                  '+1',
+                  style: AppTextStyles.body1.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _SignRow extends StatelessWidget {
   _SignRow({required this.sign, required this.onTap});
 
