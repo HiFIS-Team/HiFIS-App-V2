@@ -378,6 +378,39 @@ final _members = <_Member>[
   ),
 ];
 
+/// 목업 명단에서 나를 찾는다 — 없으면 로그인 정보로 만든다
+///
+/// 이 명단은 아직 목업이라 **로그인한 사람이 여기 없는 게 정상**이다.
+/// 서버 계정(`관리자`·`테스트 트레이너`…)과 목업 이름(`이준승`…)이 겹치지 않는다.
+/// 예전에는 `firstWhere` 로 찾다가 그대로 터졌다 (`Bad state: No element` —
+/// 화면 전체가 빨간 에러로 덮였다).
+///
+/// 명단에 끼워 넣지는 않는다. 옆의 동료·팀·근무중 수는 목업 13명을 센 값이고,
+/// 거기에 실제 계정을 한 명 섞으면 어느 쪽 숫자도 아니게 된다.
+_Member get _meOrSelf {
+  for (final member in _members) {
+    if (member.isMe) return member;
+  }
+
+  final user = currentUser;
+  return _Member(
+    name: me,
+    role: user?.rank.label ?? '',
+    team: '',
+    // 서버는 지점을 uuid(`branchId`)로 주고 목업은 이름('강남점')으로 쓴다.
+    // 짝지을 방법이 없어 비워 두고, 카드에서 빈 값은 빼고 그린다.
+    branch: '',
+    permission: myRole,
+    code: user?.empNo ?? '-',
+    phone: user?.phone ?? '-',
+    email: user?.email ?? '-',
+    joined: DateTime.now(),
+    status: _Status.working,
+    workedDays: 0,
+    workedHours: 0,
+  );
+}
+
 /// 지점 필터 목록 — 맨 앞은 모든 지점을 함께 보는 '전체'
 const _allBranches = '전체';
 final _branches = [

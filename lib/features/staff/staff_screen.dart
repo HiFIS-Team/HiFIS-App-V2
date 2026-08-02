@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
 import '../../core/data/staff.dart';
 import '../../core/theme/app_colors.dart';
@@ -270,7 +271,7 @@ class _MyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mine = _members.firstWhere((m) => m.isMe);
+    final mine = _meOrSelf;
     final here = _members.where((m) => m.branch == branch && m.active).toList();
     final teams = {for (final m in here) m.team}.length;
     final working = here.where((m) => m.status.present).length;
@@ -315,13 +316,17 @@ class _MyCard extends StatelessWidget {
                         ),
                         SizedBox(height: 4),
                         Text(mine.name, style: AppTextStyles.title2),
-                        SizedBox(height: 2),
-                        Text(
-                          '${mine.branch} · ${mine.role}',
-                          style: AppTextStyles.body2.copyWith(
-                            color: AppColors.textSecondary,
+                        // 목업에 없는 계정으로 로그인하면 지점을 모른다.
+                        // 빈 값을 그대로 이으면 ' · 대표' 처럼 앞이 비어 보인다
+                        if (_subtitle(mine).isNotEmpty) ...[
+                          SizedBox(height: 2),
+                          Text(
+                            _subtitle(mine),
+                            style: AppTextStyles.body2.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
                           ),
-                        ),
+                        ],
                         SizedBox(height: 2),
                         Text(mine.email, style: AppTextStyles.caption),
                       ],
@@ -340,6 +345,10 @@ class _MyCard extends StatelessWidget {
       ),
     );
   }
+
+  /// '강남점 · 대표' — 모르는 값은 빼고 잇는다
+  String _subtitle(_Member member) =>
+      [member.branch, member.role].where((s) => s.isNotEmpty).join(' · ');
 
   Widget _count(String label, int value, {Color? color}) => SizedBox(
     width: 74,
