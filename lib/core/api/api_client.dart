@@ -1,29 +1,43 @@
+import 'dart:io' show Platform;
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import 'api_exception.dart';
 import 'token_store.dart';
 
-/// 서버 주소
-///
-/// 기본값이 **운영 서버**다. 아무 설정 없이 빌드해도 배포본이 붙을 곳으로 간다 —
-/// 예전처럼 기본값이 localhost 면 빌드에 `--dart-define` 을 빠뜨렸을 때
-/// 배포본이 로그인 화면에서 멈춘다.
-///
-/// 로컬 서버를 볼 때만 빌드할 때 넣는다:
-///
-/// ```
-/// flutter run --dart-define=API_BASE_URL=http://localhost:8001
-/// ```
-///
-/// 기기마다 "localhost"가 가리키는 곳이 다르다.
-/// - 안드로이드 에뮬레이터: 호스트(맥)는 `http://10.0.2.2:8001` — localhost는 에뮬레이터 자신
-/// - 실기기: 맥의 LAN IP (`http://192.168.0.10:8001`)
-const _defaultBaseUrl = 'https://api.hifis.app';
+/// 운영 서버 — 릴리즈 빌드가 보는 곳
+const _prodBaseUrl = 'https://api.hifis.app';
 
+/// 서버 주소 — **빌드 모드가 정한다**
+///
+/// | 빌드 | 보는 곳 |
+/// |---|---|
+/// | `flutter run` (디버그·프로파일) | 로컬 `:8001` |
+/// | `flutter run --release` · `flutter build` | `https://api.hifis.app` |
+///
+/// 평소 개발은 아무것도 안 붙여도 로컬을 보고, 배포 빌드는 아무것도 안 붙여도
+/// 운영을 본다. **양쪽 다 플래그를 외울 필요가 없다** — 어느 쪽이든
+/// 한 번 빠뜨리면 사고(개발 중 운영 DB 수정 / 배포본이 로그인에서 멈춤)라
+/// 사람이 기억하는 것에 맡기지 않는다.
+///
+/// 섞어 봐야 할 때만 넣는다 (이게 제일 우선한다):
+///
+/// ```
+/// # 디버그로 운영 서버 확인
+/// flutter run --dart-define=API_BASE_URL=https://api.hifis.app
+///
+/// # 실기기(릴리즈)로 맥의 로컬 서버 확인 — 맥의 LAN IP 를 쓴다
+/// flutter run --release --dart-define=API_BASE_URL=http://192.168.0.10:8001
+/// ```
 String get apiBaseUrl {
   const override = String.fromEnvironment('API_BASE_URL');
-  return override.isEmpty ? _defaultBaseUrl : override;
+  if (override.isNotEmpty) return override;
+  if (kReleaseMode) return _prodBaseUrl;
+
+  // 안드로이드 에뮬레이터에서 호스트(맥)는 10.0.2.2 다. localhost는 에뮬레이터 자신.
+  if (!kIsWeb && Platform.isAndroid) return 'http://10.0.2.2:8001';
+  return 'http://localhost:8001';
 }
 
 /// 서버가 준 파일 경로(`/files/...?exp=&sig=`)를 띄울 수 있는 주소로
