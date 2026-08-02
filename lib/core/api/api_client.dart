@@ -9,35 +9,44 @@ import 'token_store.dart';
 /// 운영 서버 — 릴리즈 빌드가 보는 곳
 const _prodBaseUrl = 'https://api.hifis.app';
 
-/// 서버 주소 — **빌드 모드가 정한다**
+/// 서버 주소
 ///
-/// | 빌드 | 보는 곳 |
-/// |---|---|
-/// | `flutter run` (디버그·프로파일) | 로컬 `:8001` |
-/// | `flutter run --release` · `flutter build` | `https://api.hifis.app` |
+/// 로컬 서버(`:8001`)는 **개발용 맥 한 대에서만** 돈다. 그래서 기준은
+/// "디버그냐"가 아니라 **"그 맥에 닿을 수 있느냐"** 다.
 ///
-/// 평소 개발은 아무것도 안 붙여도 로컬을 보고, 배포 빌드는 아무것도 안 붙여도
-/// 운영을 본다. **양쪽 다 플래그를 외울 필요가 없다** — 어느 쪽이든
-/// 한 번 빠뜨리면 사고(개발 중 운영 DB 수정 / 배포본이 로그인에서 멈춤)라
-/// 사람이 기억하는 것에 맡기지 않는다.
+/// | 대상 | 디버그 | 릴리즈 |
+/// |---|---|---|
+/// | macOS · iOS 시뮬 | `localhost:8001` (맥 안에서 돎) | 운영 |
+/// | 안드로이드 에뮬 | `10.0.2.2:8001` (호스트 별칭) | 운영 |
+/// | **윈도우** | **운영** — 다른 PC 라 localhost 에 서버가 없다 | 운영 |
 ///
-/// 섞어 봐야 할 때만 넣는다 (이게 제일 우선한다):
+/// 디버그를 전부 로컬로 묶었더니 **윈도우가 자기 PC 의 없는 서버를 찾았다**
+/// (실제 발생). 윈도우 빌드는 맥이 아닌 컴퓨터에서 돌아가는 유일한 대상이다.
+///
+/// 그 외에는 플래그를 외울 필요가 없다 — 평소 개발은 그냥 `flutter run`,
+/// 배포는 그냥 `flutter build` 다. 어느 쪽이든 한 번 빠뜨리면 사고
+/// (개발 중 운영 DB 수정 / 배포본이 로그인에서 멈춤)라 사람 기억에 맡기지 않는다.
+///
+/// 섞어야 할 때만 넣는다 (이게 제일 우선한다):
 ///
 /// ```
 /// # 디버그로 운영 서버 확인
 /// flutter run --dart-define=API_BASE_URL=https://api.hifis.app
 ///
-/// # 실기기(릴리즈)로 맥의 로컬 서버 확인 — 맥의 LAN IP 를 쓴다
-/// flutter run --release --dart-define=API_BASE_URL=http://192.168.0.10:8001
+/// # 실기기·윈도우로 맥의 로컬 서버 확인 — 같은 공유기에 물리고 맥의 LAN IP 를 쓴다
+/// flutter run -d windows --dart-define=API_BASE_URL=http://192.168.0.10:8001
 /// ```
 String get apiBaseUrl {
   const override = String.fromEnvironment('API_BASE_URL');
   if (override.isNotEmpty) return override;
-  if (kReleaseMode) return _prodBaseUrl;
+  if (kReleaseMode || kIsWeb) return _prodBaseUrl;
 
   // 안드로이드 에뮬레이터에서 호스트(맥)는 10.0.2.2 다. localhost는 에뮬레이터 자신.
-  if (!kIsWeb && Platform.isAndroid) return 'http://10.0.2.2:8001';
-  return 'http://localhost:8001';
+  if (Platform.isAndroid) return 'http://10.0.2.2:8001';
+  if (Platform.isMacOS || Platform.isIOS) return 'http://localhost:8001';
+
+  // 윈도우 — 개발 서버가 도는 맥이 아니다
+  return _prodBaseUrl;
 }
 
 /// 서버가 준 파일 경로(`/files/...?exp=&sig=`)를 띄울 수 있는 주소로
