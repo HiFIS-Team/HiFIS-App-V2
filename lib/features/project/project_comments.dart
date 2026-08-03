@@ -10,7 +10,7 @@ part of 'project_screen.dart';
 void _showComments(
   BuildContext context,
   _Project project, {
-  required ValueChanged<String> onComment,
+  required Future<void> Function(String) onComment,
 }) {
   showModalBottomSheet<void>(
     context: context,
@@ -25,7 +25,9 @@ class _CommentSheet extends StatefulWidget {
   _CommentSheet({required this.project, required this.onComment});
 
   final _Project project;
-  final ValueChanged<String> onComment;
+
+  /// 서버에 올리고 오는 동안 기다려야 해서 `ValueChanged` 가 아니다
+  final Future<void> Function(String) onComment;
 
   @override
   State<_CommentSheet> createState() => _CommentSheetState();
@@ -40,10 +42,10 @@ class _CommentSheetState extends State<_CommentSheet> {
     super.dispose();
   }
 
-  void _send(String text) {
-    widget.onComment(text);
-    // 시트 안 목록도 바로 갱신한다
-    setState(() {});
+  Future<void> _send(String text) async {
+    await widget.onComment(text);
+    // 시트 안 목록도 바로 갱신한다 (올라간 뒤라야 새 줄이 보인다)
+    if (mounted) setState(() {});
   }
 
   @override

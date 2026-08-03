@@ -189,6 +189,23 @@ class _ProjectDetailScreen extends StatefulWidget {
 
 class _ProjectDetailScreenState extends State<_ProjectDetailScreen> {
   @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  /// 홈 카드에서 열면 목록을 안 거치므로 여기서도 받아 둔다.
+  /// 목록에서 들어온 거라면 이미 받아 놔서 둘 다 바로 빠져나온다.
+  Future<void> _load() async {
+    try {
+      await _loadDetail(widget.project);
+      if (mounted) setState(() {});
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return PhoneDetailScaffold(
       title: '프로젝트',

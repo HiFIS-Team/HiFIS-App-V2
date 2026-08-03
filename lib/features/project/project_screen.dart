@@ -65,11 +65,11 @@ class _ProjectScreenState extends State<ProjectScreen> {
     if (mounted) setState(() => _loading = false);
   }
 
-  /// 상세를 열 때 체크리스트를 받아 온다
-  Future<void> _openTodos(_Project project) async {
-    if (project.todosLoaded) return;
+  /// 상세를 열 때 체크리스트와 타임라인을 받아 온다 (둘을 같이 띄운다)
+  Future<void> _openDetail(_Project project) async {
+    if (project.detailLoaded) return;
     try {
-      await _loadTodos(project);
+      await _loadDetail(project);
       if (mounted) setState(() {});
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
@@ -152,14 +152,16 @@ class _ProjectScreenState extends State<ProjectScreen> {
         onFilter: (v) => setState(() => _phase = v),
         onCreate: _create,
         onChanged: () => setState(() {}),
-        onOpen: _openTodos,
+        onOpen: _openDetail,
       );
     }
 
     final selected = _syncSelection(list);
-    // 데스크톱은 고른 프로젝트가 바로 상세로 열린다 — 그때 체크리스트를 받는다
-    if (selected != null && !selected.todosLoaded) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _openTodos(selected));
+    // 데스크톱은 고른 프로젝트가 바로 상세로 열린다 — 그때 상세 내용을 받는다
+    if (selected != null && !selected.detailLoaded) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _openDetail(selected),
+      );
     }
 
     // 배경은 다른 화면과 같은 회색 — 카드가 떠 보이게 한다.
@@ -548,12 +550,15 @@ class _ProjectDetail extends StatelessWidget {
   /// 폰은 폭이 좁아 머리말을 여러 줄로 쌓는다
   final bool phone;
 
-  /// 할 일을 건드릴 때마다 활동 기록을 남긴다
-  void _log(String text) {
-    project.events.insert(
-      0,
-      _Event(author: me, text: text, time: DateTime.now()),
-    );
+  /// 타임라인에 한 줄 미리 끼워 넣는다.
+  ///
+  /// 서버가 자동으로 쌓는 건 **완료·기한 변경·담당 변경**뿐이라, 나머지는
+  /// 다시 받아오면 사라진다 (backend-gap.md 3번). 그래도 누른 자리에서
+  /// 바로 보이는 게 있어야 해서 남긴다.
+  _Event _log(String text) {
+    final event = _Event(author: me, text: text, time: DateTime.now());
+    project.events.insert(0, event);
+    return event;
   }
 
   /// 화면을 먼저 바꾸고 서버에 보낸다 — 실패하면 되돌린다.
@@ -561,7 +566,8 @@ class _ProjectDetail extends StatelessWidget {
   Future<void> _toggle(BuildContext context, _Todo todo) async {
     final before = todo.done;
     todo.done = !before;
-    _log(todo.done ? "'${todo.text}' 완료" : "'${todo.text}' 완료 취소");
+    // 완료 문구는 서버가 쌓는 것과 같은 모양으로 맞춰 둔다 — 다시 받아와도 안 바뀐다
+    final event = _log(todo.done ? '완료: ${todo.text}' : "'${todo.text}' 완료 취소");
     onChanged();
 
     final projectId = project.id;
@@ -571,6 +577,7 @@ class _ProjectDetail extends StatelessWidget {
       await ProjectApi.updateTodo(projectId, todoId, done: todo.done);
     } catch (error) {
       todo.done = before;
+      project.events.remove(event);
       onChanged();
       if (context.mounted) AppToast.show(context, messageOf(error));
     }
@@ -621,12 +628,18 @@ class _ProjectDetail extends StatelessWidget {
     }
   }
 
-  void _comment(String text) {
-    project.events.insert(
-      0,
-      _Event(author: me, text: text, time: DateTime.now(), comment: true),
-    );
-    onChanged();
+  /// 댓글 — 서버에 올린 뒤 돌아온 줄을 그대로 얹는다.
+  /// 실패하면 아무것도 안 남는다 (빈 줄이 남아 있다가 사라지는 것보다 낫다)
+  Future<void> _comment(BuildContext context, String text) async {
+    final projectId = project.id;
+    if (projectId == null) return;
+    try {
+      final saved = await ProjectApi.addComment(projectId, body: text);
+      project.events.insert(0, _eventFrom(saved));
+      onChanged();
+    } catch (error) {
+      if (context.mounted) AppToast.show(context, messageOf(error));
+    }
   }
 
   /// 기한 연장 신청 — 승인 전까지 마감일은 그대로다
@@ -857,11 +870,18 @@ class _ProjectDetail extends StatelessWidget {
         if (!isDesktop) ...[
           _CommentTeaser(
             project: project,
-            onTap: () => _showComments(context, project, onComment: _comment),
+            onTap: () => _showComments(
+              context,
+              project,
+              onComment: (text) => _comment(context, text),
+            ),
           ),
           SizedBox(height: 16),
         ],
-        _ActivityCard(project: project, onComment: _comment),
+        _ActivityCard(
+          project: project,
+          onComment: (text) => _comment(context, text),
+        ),
       ],
     );
   }
@@ -1336,7 +1356,9 @@ class _ActivityCard extends StatefulWidget {
   _ActivityCard({required this.project, required this.onComment});
 
   final _Project project;
-  final ValueChanged<String> onComment;
+
+  /// 서버에 올리고 오는 동안 기다려야 해서 `ValueChanged` 가 아니다
+  final Future<void> Function(String) onComment;
 
   @override
   State<_ActivityCard> createState() => _ActivityCardState();
@@ -1357,13 +1379,14 @@ class _ActivityCardState extends State<_ActivityCard> {
     super.dispose();
   }
 
-  void _send() {
+  Future<void> _send() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
-    widget.onComment(text);
+    // 입력칸은 먼저 비운다 — 서버를 기다리는 동안 두 번 눌리지 않게
     _controller.clear();
     // 보낸 뒤에도 계속 쓸 수 있게 포커스를 되돌린다
     _focus.requestFocus();
+    await widget.onComment(text);
   }
 
   @override
@@ -2223,7 +2246,7 @@ class _ProjectComposerState extends State<_ProjectComposer> {
       _Project(
         name: name,
         desc: _desc.text.trim(),
-        color: _color,
+        colorHex: _hexOf(_color),
         owner: _owner,
         start: now,
         due: _due,
@@ -2233,7 +2256,8 @@ class _ProjectComposerState extends State<_ProjectComposer> {
             if (_members.contains(staff.name)) staff.name,
         ],
         todos: _todos,
-        events: [_Event(author: me, text: '프로젝트 생성', time: now)],
+        // 타임라인은 서버가 만들면서 '프로젝트를 만들었어요' 를 쌓아 준다
+        events: [],
       ),
     );
   }
@@ -2735,14 +2759,18 @@ class _Todo {
   bool done;
 }
 
-/// 활동 기록 한 줄 (댓글이면 comment = true)
+/// 타임라인 한 줄 (서버 `ProjectActivity`) — 댓글이면 comment = true
 class _Event {
   _Event({
     required this.author,
     required this.text,
     required this.time,
+    this.id,
     this.comment = false,
   });
+
+  /// 서버 uuid — **댓글만 갖는다**. 시스템 기록은 고치거나 지울 수 없다
+  final String? id;
 
   final String author;
   final String text;
@@ -2787,7 +2815,6 @@ class _Project {
   _Project({
     required this.name,
     required this.desc,
-    required this.color,
     required this.owner,
     required this.start,
     required this.due,
@@ -2795,6 +2822,7 @@ class _Project {
     required this.todos,
     required this.events,
     this.id,
+    this.colorHex,
     this.createdById,
     this.memberIds = const [],
     this.serverProgress = 0,
@@ -2808,7 +2836,11 @@ class _Project {
 
   String name;
   String desc;
-  final Color color;
+
+  /// 만들 때 고른 색 (`#RRGGBB`) — 서버가 들고 있다.
+  /// 색 필드가 생기기 전에 올린 프로젝트는 null 이라 [color] 가 대신 만들어 낸다
+  String? colorHex;
+
   String owner;
   final String? createdById;
   DateTime start;
@@ -2823,13 +2855,26 @@ class _Project {
 
   final List<_Todo> todos;
 
-  /// 활동 기록·댓글 — **서버에 없다** (backend-gap.md 3번).
-  /// 앱이 화면 안에서만 쌓다가 껐다 켜면 지워진다.
+  /// 활동 기록·댓글 — 서버 타임라인(`GET /projects/{id}/activities`).
+  /// 댓글과 시스템 활동이 한 줄기로 섞여 최신순으로 온다
   final List<_Event> events;
 
   /// 체크리스트를 받아왔는지 — 상세를 열 때 한 번만 받는다.
   /// 새로 만든 프로젝트는 만들면서 바로 채우므로 [_saveNewProject] 가 켠다.
   bool todosLoaded = false;
+
+  /// 타임라인을 받아왔는지 — 체크리스트와 같이 상세를 열 때 받는다
+  bool eventsLoaded = false;
+
+  /// 상세를 받는 중인 요청 — [_loadDetail] 이 붙잡아 둔다
+  Future<void>? loading;
+
+  /// 상세에 필요한 걸 다 받았는지
+  bool get detailLoaded => todosLoaded && eventsLoaded;
+
+  /// 목록 띠·진행률 막대에 쓰는 색.
+  /// 서버 값이 없거나 못 읽으면 id 에서 만들어 쓴다 — 어느 기기에서나 같은 색이 나온다
+  Color get color => _hexColor(colorHex) ?? _projectColor(id ?? name);
 
   /// 목록에서 쓰는 서버 값. 체크리스트를 받기 전에는 이걸로 그린다
   int serverProgress;
@@ -2883,14 +2928,15 @@ Future<void> _loadProjects() async {
 
 /// 서버 프로젝트 → 화면 모델
 ///
-/// 체크리스트는 여기서 안 받는다. 목록에는 개수(`todoCount`·`doneCount`)만
-/// 있으면 되고, 항목 자체는 상세를 열 때 [_loadTodos] 로 받는다.
+/// 체크리스트와 타임라인은 여기서 안 받는다. 목록에는 개수(`todoCount`·
+/// `doneCount`)만 있으면 되고, 나머지는 상세를 열 때 [_loadTodos]·
+/// [_loadActivities] 로 받는다.
 _Project _fromServer(Project row, ProjectRequest? request) {
   return _Project(
     id: row.id,
     name: row.title,
     desc: row.purpose,
-    color: _projectColor(row.id),
+    colorHex: row.color,
     owner: _nameOf(row.createdById),
     createdById: row.createdById,
     start: row.startAt,
@@ -2918,11 +2964,10 @@ _Project _fromServer(Project row, ProjectRequest? request) {
 /// uuid → 이름. 명단에 없으면(퇴사자 등) 빈 문자열
 String _nameOf(String id) => StaffDirectory.instance.byId(id)?.name ?? '';
 
-/// 프로젝트 색
+/// 색 필드가 생기기 전에 올린 프로젝트에 쓰는 대체 색
 ///
-/// **서버에 색 필드가 없다**(backend-gap.md 38번). 카드·아바타·차트가 색으로
-/// 프로젝트를 구분하므로 id 에서 만들어 쓴다 — 같은 프로젝트는 어느 기기에서나
-/// 같은 색이 나온다. 만들 때 고른 색은 이번 실행에서만 살아 있다.
+/// 카드 띠·진행률 막대가 색으로 프로젝트를 가르므로 비워 둘 수 없다.
+/// id 에서 만들어서 어느 기기에서나 같은 색이 나오게 한다.
 const _projectColors = [
   AppColors.primary,
   AppColors.error,
@@ -2933,8 +2978,21 @@ const _projectColors = [
   Color(0xFFE0447C),
 ];
 
-Color _projectColor(String id) =>
-    _projectColors[id.hashCode.abs() % _projectColors.length];
+Color _projectColor(String key) =>
+    _projectColors[key.hashCode.abs() % _projectColors.length];
+
+/// `#RRGGBB` → 색. 못 읽으면 null (아바타 색과 같은 규칙이다)
+Color? _hexColor(String? value) {
+  if (value == null) return null;
+  final hex = value.replaceFirst('#', '');
+  if (hex.length != 6) return null;
+  final rgb = int.tryParse(hex, radix: 16);
+  return rgb == null ? null : Color(0xFF000000 | rgb);
+}
+
+/// 색 → `#RRGGBB`. 서버는 이 형식으로만 받는다
+String _hexOf(Color color) =>
+    '#${(color.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
 
 /// 상세를 열 때 체크리스트를 받는다 — 한 번 받으면 다시 받지 않는다
 Future<void> _loadTodos(_Project project) async {
@@ -2955,6 +3013,51 @@ Future<void> _loadTodos(_Project project) async {
   project.todosLoaded = true;
 }
 
+/// 상세를 열 때 타임라인을 받는다 — 한 번 받으면 다시 받지 않는다.
+///
+/// 화면에서 미리 끼워 넣은 줄(체크 완료·연장 신청 등)은 여기서 **서버 것으로
+/// 통째로 갈린다.** 서버가 안 남기는 활동은 그때 사라진다 (backend-gap.md 3번).
+Future<void> _loadActivities(_Project project) async {
+  final id = project.id;
+  if (id == null || project.eventsLoaded) return;
+  final rows = await ProjectApi.activities(id);
+  project.events
+    ..clear()
+    ..addAll([for (final row in rows) _eventFrom(row)]);
+  project.eventsLoaded = true;
+}
+
+/// 상세에 필요한 것(체크리스트·타임라인)을 한 번에 받는다.
+///
+/// 이미 받았으면 바로 끝나고, **받는 중이면 그 요청에 얹힌다.**
+/// 데스크톱은 빌드마다 여는 콜백이 걸려서 플래그만으로는 첫 응답이 오기 전에
+/// 한 번 더 나간다 (실제 발생 — `activities` 가 두 번 찍혔다).
+Future<void> _loadDetail(_Project project) {
+  if (project.detailLoaded) return Future.value();
+  return project.loading ??= Future.wait([
+    _loadTodos(project),
+    _loadActivities(project),
+    // 실패한 요청은 남기지 않는다 — 붙잡아 두면 다시 열어도 영영 못 받는다
+  ]).whenComplete(() => project.loading = null);
+}
+
+/// 서버 타임라인 한 줄 → 화면 모델
+_Event _eventFrom(ProjectActivity row) => _Event(
+  // 시스템 기록은 고치거나 지울 수 없어서 id 를 들고 있을 필요가 없다
+  id: row.isComment ? row.id : null,
+  author: _actorName(row.actorId),
+  text: row.body ?? '',
+  time: row.createdAt,
+  comment: row.isComment,
+);
+
+/// 활동을 남긴 사람 — null 이면 서버가 남긴 것이다
+String _actorName(String? id) {
+  if (id == null) return '시스템';
+  final name = _nameOf(id);
+  return name.isEmpty ? '알 수 없음' : name;
+}
+
 /// 새 프로젝트를 서버에 올린다
 ///
 /// 폼에서 미리 적어 둔 체크리스트도 같이 올린다 — 프로젝트를 먼저 만들어야
@@ -2971,6 +3074,7 @@ Future<_Project> _saveNewProject(_Project draft) async {
       for (final name in draft.members)
         ?StaffDirectory.instance.byName(name)?.id,
     ],
+    color: draft.colorHex,
   );
 
   for (var i = 0; i < draft.todos.length; i++) {
@@ -2988,6 +3092,8 @@ Future<_Project> _saveNewProject(_Project draft) async {
   final project = _fromServer(fresh, null);
   // 방금 적은 것이라 다시 받을 필요가 없다
   await _loadTodos(project);
+  // 타임라인은 서버가 '프로젝트를 만들었어요' 한 줄을 이미 쌓아 뒀다
+  await _loadActivities(project);
   return project;
 }
 

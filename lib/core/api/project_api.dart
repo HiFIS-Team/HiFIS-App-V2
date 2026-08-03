@@ -60,6 +60,31 @@ enum ProjectRequestStatus {
       );
 }
 
+/// 상세 타임라인 한 줄의 종류 (서버 `ProjectActivityKind`)
+///
+/// [comment] 만 사람이 쓴 글이고 나머지는 서버가 자동으로 쌓는 활동 기록이다.
+/// 서버가 VARCHAR 로 들고 있어 종류가 늘 수 있으므로 모르는 값은 [other] 로
+/// 떨어뜨린다 — 댓글이 아니라 시스템 기록으로 그려진다.
+enum ProjectActivityKind {
+  comment('COMMENT'),
+  created('CREATED'),
+  progress('PROGRESS'),
+  todo('TODO'),
+  due('DUE'),
+  assignee('ASSIGNEE'),
+  other('');
+
+  const ProjectActivityKind(this.wire);
+
+  final String wire;
+
+  static ProjectActivityKind parse(String? value) =>
+      ProjectActivityKind.values.firstWhere(
+        (k) => k.wire == value,
+        orElse: () => ProjectActivityKind.other,
+      );
+}
+
 /// 프로젝트 (서버 `ProjectOut`)
 class Project {
   Project({
@@ -76,6 +101,7 @@ class Project {
     required this.status,
     required this.createdById,
     required this.createdAt,
+    this.color,
     this.extensionReason,
   });
 
@@ -93,6 +119,7 @@ class Project {
       for (final id in (json['assigneeIds'] as List<dynamic>? ?? const []))
         id as String,
     ],
+    color: json['color'] as String?,
     extensionReason: json['extensionReason'] as String?,
     status: ProjectStatus.parse(json['status'] as String?),
     createdById: json['createdById'] as String,
@@ -120,6 +147,10 @@ class Project {
   final int doneCount;
 
   final List<String> assigneeIds;
+
+  /// 만들 때 고른 색 (`#RRGGBB`).
+  /// **null 이면 앱이 id 에서 만들어 쓴다** — 색 필드가 생기기 전에 올린 것들이다
+  final String? color;
 
   /// 마지막으로 승인된 연장 사유
   final String? extensionReason;
@@ -160,6 +191,49 @@ class ProjectTodo {
 
   /// 표시 순서 — 같으면 만든 순서로 온다
   final int sort;
+}
+
+/// 상세 타임라인 한 줄 (서버 `ProjectActivityOut`)
+///
+/// 댓글과 시스템 활동이 **한 테이블에 같이 쌓여** 최신순으로 온다.
+/// 가르는 건 [kind] 하나다.
+class ProjectActivity {
+  ProjectActivity({
+    required this.id,
+    required this.projectId,
+    required this.kind,
+    required this.createdAt,
+    required this.updatedAt,
+    this.actorId,
+    this.body,
+  });
+
+  factory ProjectActivity.fromJson(Map<String, dynamic> json) =>
+      ProjectActivity(
+        id: json['id'] as String,
+        projectId: json['projectId'] as String,
+        actorId: json['actorId'] as String?,
+        kind: ProjectActivityKind.parse(json['kind'] as String?),
+        body: json['body'] as String?,
+        createdAt: _time(json['createdAt'])!,
+        updatedAt: _time(json['updatedAt']) ?? _time(json['createdAt'])!,
+      );
+
+  final String id;
+  final String projectId;
+
+  /// 한 사람 — **null 이면 서버가 남긴 것**이다
+  final String? actorId;
+
+  final ProjectActivityKind kind;
+
+  /// 댓글 본문 또는 활동 메시지 (`완료: 포스터 시안` 처럼 서버가 문장을 만들어 준다)
+  final String? body;
+
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  bool get isComment => kind == ProjectActivityKind.comment;
 }
 
 /// 기한 변경 요청 (서버 `ProjectRequestOut`)
@@ -244,6 +318,7 @@ class ProjectApi {
     String steps = '',
     DateTime? startAt,
     List<String> assigneeIds = const [],
+    String? color,
   }) async {
     final data = await _client.post(
       '/projects',
@@ -254,6 +329,7 @@ class ProjectApi {
         'startAt': ?startAt?.toUtc().toIso8601String(),
         'due': due.toUtc().toIso8601String(),
         'assigneeIds': assigneeIds,
+        'color': ?color,
       },
     );
     return Project.fromJson(data!);
@@ -269,6 +345,7 @@ class ProjectApi {
     DateTime? startAt,
     DateTime? due,
     List<String>? assigneeIds,
+    String? color,
   }) async {
     final data = await _client.patch(
       '/projects/$id',
@@ -279,6 +356,7 @@ class ProjectApi {
         'startAt': ?startAt?.toUtc().toIso8601String(),
         'due': ?due?.toUtc().toIso8601String(),
         'assigneeIds': ?assigneeIds,
+        'color': ?color,
       },
     );
     return Project.fromJson(data!);
@@ -333,6 +411,46 @@ class ProjectApi {
 
   static Future<void> deleteTodo(String projectId, String todoId) =>
       _client.delete('/projects/$projectId/todos/$todoId');
+
+  // ── 상세 타임라인 (활동 기록 + 댓글) ──
+
+  /// 최신순. 댓글과 시스템 활동이 섞여서 온다
+  static Future<List<ProjectActivity>> activities(String projectId) async {
+    final rows = await _client.getList('/projects/$projectId/activities');
+    return [
+      for (final row in rows)
+        ProjectActivity.fromJson((row as Map).cast<String, dynamic>()),
+    ];
+  }
+
+  /// 댓글 달기 — 만들어진 한 줄이 그대로 돌아온다
+  static Future<ProjectActivity> addComment(
+    String projectId, {
+    required String body,
+  }) async {
+    final data = await _client.post(
+      '/projects/$projectId/comments',
+      body: {'body': body},
+    );
+    return ProjectActivity.fromJson(data!);
+  }
+
+  /// 고치기 — **본인 댓글만** 된다 (그 외 403)
+  static Future<ProjectActivity> updateComment(
+    String projectId,
+    String commentId, {
+    required String body,
+  }) async {
+    final data = await _client.patch(
+      '/projects/$projectId/comments/$commentId',
+      body: {'body': body},
+    );
+    return ProjectActivity.fromJson(data!);
+  }
+
+  /// 지우기 — 본인 댓글 또는 관리자·점장
+  static Future<void> deleteComment(String projectId, String commentId) =>
+      _client.delete('/projects/$projectId/comments/$commentId');
 
   // ── 기한 변경 요청 ──
 
