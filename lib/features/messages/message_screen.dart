@@ -8,7 +8,6 @@ import '../../core/api/chat_api.dart';
 import '../../core/data/staff.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/top_frost.dart';
@@ -92,16 +91,19 @@ class _MessageScreenState extends State<MessageScreen> {
 
   /// 새 채팅 — 호스트가 자리를 정해 줬으면 거기에, 아니면 이 화면 위로 띄운다
   ///
-  /// **데스크톱 사내톡 패널에서는 [showFullPage] 로 연다.** 패널은 380×560 짜리
-  /// 상자 안에 자기 내비게이터를 두고 있어서, 거기로 밀어 넣으면 화면이 그 상자에
-  /// 갇힌다 (실제로 눌러도 아무것도 안 나오는 것처럼 보였다).
-  /// `showFullPage` 는 앱이 상세 화면을 열 때 쓰는 그 길이다 —
-  /// 폰은 밀려 들어오고 데스크톱은 가운데 모달로 뜬다.
+  /// 사내톡 패널에서는 **패널 안에서 폰처럼 밀려 들어온다** (패널 전용
+  /// 내비게이터). 패널 밖을 덮지 않는 게 이 화면의 설계다.
   void _newMessage() {
     final open = widget.onNewMessage;
     if (open != null) return open();
 
-    showFullPage<void>(context, (_) => NewMessageScreen());
+    Navigator.push(
+      context,
+      CupertinoPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => NewMessageScreen(),
+      ),
+    );
   }
 
   /// 안 읽은 대화만 볼지 — 헤더 필터 메뉴에서 켠다
@@ -192,18 +194,18 @@ class _MessageScreenState extends State<MessageScreen> {
     );
   }
 
-  /// 나간 대화 보관함
-  ///
-  /// 새 채팅과 같은 이유로 [showFullPage] 를 쓴다 — 사내톡 패널 안으로 밀어
-  /// 넣으면 380×560 상자에 갇힌다.
+  /// 나간 대화 보관함 — 새 채팅과 같은 자리에서 열린다
   void _openArchive(
     String title,
     String emptyText, {
     Future<List<ChatRoom>> Function()? load,
   }) {
-    showFullPage<void>(
+    Navigator.push(
       context,
-      (_) => _ArchiveScreen(title: title, emptyText: emptyText, load: load),
+      CupertinoPageRoute(
+        builder: (_) =>
+            _ArchiveScreen(title: title, emptyText: emptyText, load: load),
+      ),
     );
   }
 
@@ -306,6 +308,12 @@ class _MessageScreenState extends State<MessageScreen> {
             ),
           ),
           // 하단 고정: 새 채팅 글래스 버튼 + 글래스 검색바 (키보드와 함께 상승)
+          //
+          // **연필과 검색바를 한 Row 에 두면 안 된다.** 검색바가 `BackdropFilter`
+          // 라서 애플에서는 네이티브 버튼(CNButton)이 그 블러 레이어에 묻히고
+          // **탭이 `onPressed` 까지 오지 않는다** (실제 발생 — 눌러도 아무 일도
+          // 안 일어나고 에러도 안 났다). 그래서 자리는 그대로 두고 레이어만
+          // 나눈다 — 검색바가 먼저 그려지고 연필이 그 위에 올라간다.
           Align(
             alignment: Alignment.bottomCenter,
             child: SafeArea(
@@ -314,14 +322,24 @@ class _MessageScreenState extends State<MessageScreen> {
                 padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
                 child: Row(
                   children: [
-                    GlassIconButton(
-                      symbol: 'square.and.pencil',
-                      size: 52,
-                      onPressed: _newMessage,
-                    ),
-                    SizedBox(width: 10),
+                    // 연필이 앉을 자리만 비워 둔다 (52 + 간격 10)
+                    SizedBox(width: 62),
                     Expanded(child: _FloatingSearchBar()),
                   ],
+                ),
+              ),
+            ),
+          ),
+          Align(
+            alignment: Alignment.bottomLeft,
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: EdgeInsets.only(left: 20, bottom: 10),
+                child: GlassIconButton(
+                  symbol: 'square.and.pencil',
+                  size: 52,
+                  onPressed: _newMessage,
                 ),
               ),
             ),
