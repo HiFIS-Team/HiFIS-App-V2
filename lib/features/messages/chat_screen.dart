@@ -84,8 +84,6 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _typingSent = false;
   Timer? _typingStop;
 
-  bool _loading = true;
-
   String get _roomId => widget.roomId;
 
   ChatRoom? get _room => _store.roomOf(_roomId);
@@ -119,7 +117,6 @@ class _ChatScreenState extends State<ChatScreen> {
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
     }
-    if (mounted) setState(() => _loading = false);
     _scrollToBottom();
   }
 
@@ -375,47 +372,13 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Future<void> _loadOlder() async {
-    try {
-      await _store.loadOlder(_roomId);
-    } catch (error) {
-      if (mounted) AppToast.show(context, messageOf(error));
-    }
-  }
-
-  static bool _sameDay(DateTime a, DateTime b) =>
-      a.year == b.year && a.month == b.month && a.day == b.day;
-
-  static String _dayLabel(DateTime at) {
-    final now = DateTime.now();
-    if (_sameDay(at, now)) return '오늘';
-    if (_sameDay(at, now.subtract(Duration(days: 1)))) return '어제';
-    return '${at.year}년 ${at.month}월 ${at.day}일';
-  }
-
-  /// 마지막 내 메시지 아래에 붙는 '읽음' — 아무도 안 읽었으면 안 붙인다
-  ///
-  /// 그룹방은 몇 명이 읽었는지를 같이 적는다. DM 은 한 명뿐이라 숫자가 군더더기다.
+  /// 마지막 내 메시지 아래에 붙는 '읽음' — 목업의 그 자리 그대로다
   String? get _readLabel {
     final messages = _messages;
     if (messages.isEmpty) return null;
     final last = messages.last;
     if (!_isMine(last) || last.pending || last.readCount == 0) return null;
-    final room = _room;
-    if (room != null && room.isGroup) return '${last.readCount}명 읽음';
     return '읽음';
-  }
-
-  /// 입력 중인 사람 안내 — 이름을 찾을 수 있으면 이름으로 적는다
-  String? get _typingLabel {
-    final who = _store.typingIn(_roomId);
-    if (who.isEmpty) return null;
-    final names = [
-      for (final id in who) ?StaffDirectory.instance.byId(id)?.name,
-    ];
-    if (names.isEmpty) return '입력 중…';
-    if (names.length == 1) return '${names.first}님이 입력 중…';
-    return '${names.first}님 외 ${names.length - 1}명이 입력 중…';
   }
 
   /// 말풍선 한 줄 — 시스템 안내는 가운데 회색 글로 그린다
@@ -506,52 +469,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 MediaQuery.paddingOf(context).bottom + 72,
               ),
               children: [
-                if (_loading)
-                  Padding(
-                    padding: EdgeInsets.only(top: 40),
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.4,
-                        valueColor: AlwaysStoppedAnimation(AppColors.primary),
-                      ),
-                    ),
-                  ),
-                if (_store.hasMore(_roomId))
-                  Center(
-                    child: Pressable(
-                      onTap: _loadOlder,
-                      scale: 0.96,
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 6,
-                      ),
-                      child: Text(
-                        '이전 대화 더 보기',
-                        style: AppTextStyles.caption.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                for (var i = 0; i < _messages.length; i++) ...[
-                  // 날짜가 바뀌면 가운데 구분선을 넣는다
-                  if (i == 0 ||
-                      !_sameDay(
-                        _messages[i - 1].createdAt,
-                        _messages[i].createdAt,
-                      )) ...[
-                    SizedBox(height: i == 0 ? 0 : 8),
-                    Center(
-                      child: Text(
-                        _dayLabel(_messages[i].createdAt),
-                        style: AppTextStyles.caption,
-                      ),
-                    ),
-                    SizedBox(height: 16),
-                  ],
-                  _messageRow(_messages[i], desktop),
-                ],
+                Center(child: Text('오늘', style: AppTextStyles.caption)),
+                SizedBox(height: 16),
+                for (final message in _messages) _messageRow(message, desktop),
                 if (_readLabel case final label?)
                   Align(
                     alignment: Alignment.centerRight,
@@ -560,16 +480,6 @@ class _ChatScreenState extends State<ChatScreen> {
                       child: Text(
                         label,
                         style: AppTextStyles.caption.copyWith(fontSize: 12),
-                      ),
-                    ),
-                  ),
-                if (_typingLabel case final label?)
-                  Padding(
-                    padding: EdgeInsets.only(top: 10, left: 4),
-                    child: Text(
-                      label,
-                      style: AppTextStyles.caption.copyWith(
-                        color: AppColors.textTertiary,
                       ),
                     ),
                   ),

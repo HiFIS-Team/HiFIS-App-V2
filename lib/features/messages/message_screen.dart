@@ -236,22 +236,12 @@ class _MessageScreenState extends State<MessageScreen> {
                   ),
                 ),
                 SizedBox(height: 8),
-                if (!_store.loaded && _store.loadingRooms)
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(20, 60, 20, 40),
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.4,
-                        valueColor: AlwaysStoppedAnimation(AppColors.primary),
-                      ),
-                    ),
-                  )
-                else if (shown.isEmpty)
+                if (shown.isEmpty)
                   Padding(
                     padding: EdgeInsets.fromLTRB(20, 40, 20, 40),
                     child: Center(
                       child: Text(
-                        _unreadOnly ? '안 읽은 대화가 없어요' : '아직 대화가 없어요',
+                        '안 읽은 대화가 없어요',
                         style: AppTextStyles.body2.copyWith(
                           color: AppColors.textTertiary,
                         ),
@@ -508,7 +498,7 @@ class _ConversationTile extends StatelessWidget {
               color: color,
               size: 54,
               online: chatRoomOnline(room),
-              emoji: room.isGroup ? '💬' : null,
+              emoji: null,
             ),
             SizedBox(width: 12),
             Expanded(

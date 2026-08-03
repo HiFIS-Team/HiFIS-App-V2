@@ -87,9 +87,11 @@ class ChatSocket {
 
     final base = apiBaseUrl.replaceFirst(RegExp(r'^http'), 'ws');
     try {
+      // 서버가 안 받으면 OS 타임아웃(수십 초)까지 매달린다 — 짧게 끊고
+      // 백오프로 다시 시도한다
       final socket = await WebSocket.connect(
         '$base/ws/chat?token=${Uri.encodeQueryComponent(token)}',
-      );
+      ).timeout(const Duration(seconds: 6));
       if (_closed) {
         await socket.close();
         return;

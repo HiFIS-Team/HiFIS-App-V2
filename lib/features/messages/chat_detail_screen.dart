@@ -3,13 +3,10 @@ import 'package:flutter/material.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../core/api/chat_api.dart';
-import '../../core/data/employee.dart';
 import '../../core/data/staff.dart';
-import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_toast.dart';
-import '../../core/widgets/avatar.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/pressable.dart';
 import '../../core/widgets/top_frost.dart';
@@ -56,12 +53,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     if (room == null) return AppColors.primary;
     return chatRoomPeer(room)?.color ?? staffOf(_name).color;
   }
-
-  /// 방에 있는 사람들 — 명단에서 못 찾은 id 는 뺀다
-  List<Employee> get _members => [
-    for (final id in _room?.memberIds ?? const <String>[])
-      ?StaffDirectory.instance.byId(id),
-  ];
 
   /// 이름 칸 인라인 수정용 — 변경 버튼을 눌러야 적용된다
   late final _nameController = TextEditingController(text: _name);
@@ -200,84 +191,58 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 SizedBox(height: 14),
                 Center(child: Text(_name, style: AppTextStyles.title2)),
                 SizedBox(height: 32),
-                if (_isGroup) ...[
-                  _SectionLabel('이름 변경'),
-                  SizedBox(height: 8),
-                  _SettingBox(
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _nameController,
-                            style: AppTextStyles.body1.copyWith(
+                _SectionLabel('이름 변경'),
+                SizedBox(height: 8),
+                _SettingBox(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _nameController,
+                          style: AppTextStyles.body1.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                          cursorColor: AppColors.primary,
+                          textInputAction: TextInputAction.done,
+                          onSubmitted: (_) => _applyRename(),
+                          decoration: InputDecoration(
+                            hintText: '채팅방 이름',
+                            hintStyle: AppTextStyles.body1.copyWith(
+                              color: AppColors.gray400,
+                            ),
+                            border: InputBorder.none,
+                            isCollapsed: true,
+                          ),
+                        ),
+                      ),
+                      Pressable(
+                        onTap: _applyRename,
+                        scale: 0.9,
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.gray100),
+                          ),
+                          child: Text(
+                            '변경',
+                            style: AppTextStyles.label.copyWith(
+                              color: AppColors.textPrimary,
                               fontWeight: FontWeight.w600,
                             ),
-                            cursorColor: AppColors.primary,
-                            textInputAction: TextInputAction.done,
-                            onSubmitted: (_) => _applyRename(),
-                            decoration: InputDecoration(
-                              hintText: '채팅방 이름',
-                              hintStyle: AppTextStyles.body1.copyWith(
-                                color: AppColors.gray400,
-                              ),
-                              border: InputBorder.none,
-                              isCollapsed: true,
-                            ),
                           ),
                         ),
-                        Pressable(
-                          onTap: _applyRename,
-                          scale: 0.9,
-                          child: Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.surface,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppColors.gray100),
-                            ),
-                            child: Text(
-                              '변경',
-                              style: AppTextStyles.label.copyWith(
-                                color: AppColors.textPrimary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  SizedBox(height: 24),
-                ],
-                _SectionLabel('멤버 ${_members.length}'),
+                ),
+                SizedBox(height: 24),
+                _SectionLabel('멤버'),
                 SizedBox(height: 8),
-                for (final member in _members)
-                  Padding(
-                    padding: EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      children: [
-                        Avatar(
-                          name: member.name,
-                          imageUrl: member.avatarImageUrl,
-                          size: 34,
-                        ),
-                        SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            member.name,
-                            style: AppTextStyles.body2.copyWith(
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                        Text(member.rank.label, style: AppTextStyles.caption),
-                      ],
-                    ),
-                  ),
-                SizedBox(height: 4),
                 _SettingBox(
                   onTap: _invite,
                   child: Row(

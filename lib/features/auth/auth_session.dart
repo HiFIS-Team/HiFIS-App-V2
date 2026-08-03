@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -57,8 +59,10 @@ class AuthSession extends ValueNotifier<bool> {
       email = me!.email;
       await StaffDirectory.instance.load();
       // 사내톡은 화면을 열 때가 아니라 로그인해 있는 동안 늘 붙어 있다 —
-      // 목록 화면에서 안 연 방의 새 메시지도 받아야 한다
-      await ChatSocket.instance.connect();
+      // 목록 화면에서 안 연 방의 새 메시지도 받아야 한다.
+      // **기다리지 않는다** — WebSocket 연결은 서버가 안 받으면 OS 타임아웃까지
+      // 수십 초를 끌 수 있어서, await 하면 그동안 앱이 로그인 화면에서 멈춘다.
+      unawaited(ChatSocket.instance.connect());
       value = true;
     } catch (_) {
       // 서버가 꺼져 있거나 토큰이 죽었다 — 조용히 로그인 화면부터 시작한다
@@ -93,7 +97,9 @@ class AuthSession extends ValueNotifier<bool> {
     await prefs.setString(_keyEmail, email);
     await prefs.setBool(_keyAutoLogin, autoLogin);
 
-    await ChatSocket.instance.connect();
+    // 소켓은 기다리지 않는다 (restore 와 같은 이유) — 붙는 동안에도 메시지
+    // 전송은 REST 로 나가므로 대화가 막히지 않는다
+    unawaited(ChatSocket.instance.connect());
 
     value = true;
   }
