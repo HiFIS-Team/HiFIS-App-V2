@@ -81,7 +81,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // 실패해도 찍어 둔다 — 서버가 죽어 있을 때 포커스마다 재시도하지 않게
     _loadedAt = DateTime.now();
     try {
-      final summary = await HomeApi.summary();
+      // 공지 카드가 목록을 그대로 읽는다 — 요약과 같이 받아 둔다
+      final summary =
+          (await Future.wait([HomeApi.summary(), loadNoticesIfNeeded()])).first
+              as HomeSummary;
       if (!mounted) return;
       setState(() => _summary = summary);
     } catch (error) {

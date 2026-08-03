@@ -1160,7 +1160,7 @@ class _ReaderChip extends StatelessWidget {
   }
 }
 
-// ── 데이터 (목업) ──
+// ── 데이터 ──
 
 /// 공지 한 건 — 본문은 마크다운 원문 그대로 담는다
 class _Notice {
@@ -1381,3 +1381,17 @@ List<NoticeBrief> noticeBriefs(int count) {
 
 /// 올라온 공지 수 (홈 카드 머리말)
 int get noticeCount => _notices.length;
+
+/// 홈에서 공지 목록을 채운다
+///
+/// 홈 카드가 [noticeBriefs]·[noticeCount] 로 같은 목록을 읽는데, 그건
+/// 공지 탭을 한 번 열어야 채워진다. **홈부터 보면 카드가 비어 보인다.**
+/// 실패해도 홈은 떠야 하므로 조용히 넘긴다 (공지 탭에서 다시 시도한다).
+Future<void> loadNoticesIfNeeded() async {
+  if (_noticesLoaded) return;
+  try {
+    await _loadNotices();
+  } catch (_) {
+    // 서버가 꺼져 있다 — 카드는 '올라온 공지가 없어요' 로 남는다
+  }
+}
