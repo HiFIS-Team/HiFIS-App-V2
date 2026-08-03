@@ -15,6 +15,7 @@ import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/pressable.dart';
 import '../../core/widgets/see_all_button.dart';
 import '../notice/notice_screen.dart';
+import '../notifications/notification_screen.dart';
 import '../project/project_screen.dart';
 
 /// 홈 화면 — 모든 직원이 처음 보는 화면
@@ -82,12 +83,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // 실패해도 찍어 둔다 — 서버가 죽어 있을 때 포커스마다 재시도하지 않게
     _loadedAt = DateTime.now();
     try {
-      // 공지·프로젝트 카드가 목록을 그대로 읽는다 — 요약과 같이 받아 둔다
+      // 공지·프로젝트 카드가 목록을 그대로 읽는다 — 요약과 같이 받아 둔다.
+      // 알림은 카드에 안 쓰지만 헤더 종 배지가 여기서 받은 수를 본다
       final summary =
           (await Future.wait([
                 HomeApi.summary(),
                 loadNoticesIfNeeded(),
                 loadProjectsIfNeeded(),
+                loadNotificationsIfNeeded(),
               ])).first
               as HomeSummary;
       if (!mounted) return;

@@ -45,6 +45,29 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> {
+  @override
+  void initState() {
+    super.initState();
+    requestedScreen.addListener(_onRequestedScreen);
+  }
+
+  @override
+  void dispose() {
+    requestedScreen.removeListener(_onRequestedScreen);
+    super.dispose();
+  }
+
+  /// 알림을 눌러 화면을 열어달라고 걸어 둔 요청을 처리한다.
+  /// 비우면서 리스너가 한 번 더 돌지만 값이 null이라 바로 빠져나온다
+  void _onRequestedScreen() {
+    final target = requestedScreen.value;
+    if (target == null) return;
+    requestedScreen.value = null;
+    // 데스크톱은 알림이 패널이라 목적지를 가린 채로 남는다
+    _notiOpen.value = false;
+    _go(target);
+  }
+
   // 아이콘은 장식이 적은 심플한 심볼로 통일한다
   static const _mainSymbols = [
     'house.fill',
@@ -74,31 +97,63 @@ class _MainShellState extends State<MainShell> {
   ];
 
   /// 홈 카드에서 프로젝트로 — 플랫폼마다 탭을 세는 방식이 달라 여기서 나눈다
-  void _goProjects() {
-    if (isDesktop) {
-      _paneIndex.value = 2;
-    } else if (!isApple) {
-      setState(() => _androidTab = 2);
-    } else {
-      setState(() {
-        _subMenu = false;
-        _mainIndex = 2;
-      });
-    }
-  }
+  void _goProjects() => _go(NotificationTarget.project);
 
   /// 홈 카드에서 공지로 (폰은 서브 바 안에 있다)
-  void _goNotices() {
+  void _goNotices() => _go(NotificationTarget.notice);
+
+  /// 화면 하나로 옮긴다 — 홈 카드와 알림이 같이 쓴다
+  ///
+  /// 같은 화면이라도 자리가 셋 다 다르다.
+  /// - 데스크톱은 사이드바 순서(`_desktopPages`)
+  /// - 안드로이드는 메인 4개 뒤에 서브 4개가 이어진 한 줄
+  /// - 아이폰은 메인 바와 서브 바가 갈려서 둘 중 어디인지까지 정해야 한다
+  void _go(NotificationTarget target) {
     if (isDesktop) {
-      _paneIndex.value = 10;
-    } else if (!isApple) {
-      setState(() => _androidTab = 6);
-    } else {
-      setState(() {
-        _subMenu = true;
-        _subIndex = 3;
-      });
+      // 슬라이드인 화면이 열려 있으면 덮고 있어서 먼저 닫는다
+      _paneNavKey.currentState?.popUntil((r) => r.isFirst);
+      _paneIndex.value = switch (target) {
+        NotificationTarget.project => 2,
+        NotificationTarget.attendance => 8,
+        NotificationTarget.salary => 9,
+        NotificationTarget.notice => 10,
+        NotificationTarget.ranking => 11,
+      };
+      return;
     }
+
+    if (!isApple) {
+      setState(
+        () => _androidTab = switch (target) {
+          NotificationTarget.project => 2,
+          NotificationTarget.attendance => 4,
+          NotificationTarget.salary => 5,
+          NotificationTarget.notice => 6,
+          NotificationTarget.ranking => 7,
+        },
+      );
+      return;
+    }
+
+    setState(() {
+      switch (target) {
+        case NotificationTarget.project:
+          _subMenu = false;
+          _mainIndex = 2;
+        case NotificationTarget.attendance:
+          _subMenu = true;
+          _subIndex = 1;
+        case NotificationTarget.salary:
+          _subMenu = true;
+          _subIndex = 2;
+        case NotificationTarget.notice:
+          _subMenu = true;
+          _subIndex = 3;
+        case NotificationTarget.ranking:
+          _subMenu = true;
+          _subIndex = 4;
+      }
+    });
   }
 
   List<Widget> get _subPages => [
@@ -212,8 +267,11 @@ class _MainShellState extends State<MainShell> {
                                         open: open,
                                         alignment: Alignment.topRight,
                                         reserve: 24,
+                                        // 패널은 닫혀도 트리에 남아서, 열림 상태를
+                                        // 넘겨야 다시 열 때 새로 받는다
                                         child: NotificationScreen(
                                           embedded: true,
+                                          active: open,
                                         ),
                                       ),
                                 ),
@@ -630,28 +688,37 @@ class _HeaderButtonsState extends State<_HeaderButtons> {
   }
 
   /// 알림 버튼 — 데스크톱은 화면 전환 대신 패널을 열고 종이 X로 바뀐다
+  ///
+  /// 빨간 점은 **안 읽은 알림이 있을 때만** 뜬다. 한동안 늘 켜둔 채였는데,
+  /// 그러면 눌러서 다 읽어도 그대로라 배지가 아무 뜻이 없었다.
   Widget _bell() {
     final noti = widget.notiOpen;
     if (noti == null) {
-      return GlassIconButton(
-        symbol: 'bell',
-        showBadge: true,
-        enabled: !_overlayOpen,
-        onPressed: () => Navigator.push(
-          context,
-          CupertinoPageRoute(builder: (_) => NotificationScreen()),
+      return ValueListenableBuilder<int>(
+        valueListenable: unreadNotifications,
+        builder: (context, unread, child) => GlassIconButton(
+          symbol: 'bell',
+          showBadge: unread > 0,
+          enabled: !_overlayOpen,
+          onPressed: () => Navigator.push(
+            context,
+            CupertinoPageRoute(builder: (_) => NotificationScreen()),
+          ),
         ),
       );
     }
     return ValueListenableBuilder<bool>(
       valueListenable: noti,
-      builder: (context, open, child) => GlassIconButton(
-        // 심볼이 바뀌어도 네이티브 버튼을 새로 만들지 않게 고정 식별자를 준다
-        stableId: 'noti',
-        symbol: open ? 'xmark' : 'bell',
-        showBadge: !open,
-        enabled: !_overlayOpen,
-        onPressed: () => noti.value = !noti.value,
+      builder: (context, open, child) => ValueListenableBuilder<int>(
+        valueListenable: unreadNotifications,
+        builder: (context, unread, child) => GlassIconButton(
+          // 심볼이 바뀌어도 네이티브 버튼을 새로 만들지 않게 고정 식별자를 준다
+          stableId: 'noti',
+          symbol: open ? 'xmark' : 'bell',
+          showBadge: !open && unread > 0,
+          enabled: !_overlayOpen,
+          onPressed: () => noti.value = !noti.value,
+        ),
       ),
     );
   }
