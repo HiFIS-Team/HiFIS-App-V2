@@ -1108,7 +1108,12 @@ Future<NoticeReaders> _readersOf(_Notice notice) {
       NoticeReaders(total: 0, readCount: 0, people: const []),
     );
   }
-  return _readersCache[id] ??= NoticeApi.readers(id);
+  // 실패한 요청은 남기지 않는다 — 캐시에 박히면 다시 열어도 영영 못 받는다
+  return _readersCache[id] ??= NoticeApi.readers(id)
+    ..catchError((Object error) {
+      _readersCache.remove(id);
+      throw error;
+    });
 }
 
 /// 확인 여부 알약 — 안 본 사람은 흐리게
@@ -1221,6 +1226,9 @@ bool _noticesLoaded = false;
 
 Future<void> _loadNotices() async {
   final rows = await NoticeApi.list();
+  // 목록을 새로 받는 김에 확인 현황도 버린다 —
+  // 그 사이 남들이 읽었을 수 있어서 들고 있던 값은 이미 옛것이다
+  _readersCache.clear();
   _notices
     ..clear()
     ..addAll([for (final row in rows) _fromServer(row)]);
