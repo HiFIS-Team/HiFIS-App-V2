@@ -532,14 +532,10 @@ class _ChatScreenState extends State<ChatScreen> {
                           ),
                         ),
                         SizedBox(width: 10),
-                        Flexible(
-                          child: Text(
-                            _title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTextStyles.title3,
-                          ),
-                        ),
+                        // **Flexible 로 감싸지 않는다** — 이 Row 는 폭이 무한대라
+                        // flex 를 주면 레이아웃이 실패하고 화면 전체가 안 그려진다
+                        // (실제 발생: 입력칸이 안 보이고 멈춘 것처럼 됐다)
+                        Text(_title, style: AppTextStyles.title3),
                         SizedBox(width: 2),
                         Icon(
                           CupertinoIcons.chevron_forward,
