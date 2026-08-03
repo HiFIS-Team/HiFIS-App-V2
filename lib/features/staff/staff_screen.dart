@@ -32,7 +32,7 @@ part 'staff_models.dart';
 /// (근무중·회의중·외출…)가 보이고, 카드를 누르면 연락처와 이번 달 근태
 /// 요약이 뜬다. 폰은 아직 진입점이 없어 PC를 먼저 만든다.
 ///
-/// 사람은 팀으로 나눈다 — 일이 팀 단위로 움직이기 때문이다.
+/// 사람은 직급으로 나눈다 — 누구를 찾을 때 먼저 떠올리는 기준이다.
 /// 시스템 권한(MASTER·ADMIN·MEMBER)은 찾는 기준이 아니라서 배지로만 붙인다.
 ///
 /// 명단은 `/employees`, 지점 이름은 `/branches`, 지금 나와 있는 사람은
@@ -46,7 +46,7 @@ class StaffScreen extends StatefulWidget {
 
 class _StaffScreenState extends State<StaffScreen> {
   String _query = '';
-  String _team = '전체';
+  String _rank = _allRanks;
 
   /// 지점은 전체로 시작한다 (내 지점만 보려면 직접 고른다)
   String _branch = _allBranches;
@@ -76,7 +76,7 @@ class _StaffScreenState extends State<StaffScreen> {
 
   _Employment get _employment => _Employment.values[_tab];
 
-  /// 지점 + 재직 상태까지만 걸러낸 명단 (팀 칩 인원 수의 기준)
+  /// 지점 + 재직 상태까지만 걸러낸 명단 (직급 칩 인원 수의 기준)
   bool _inBranch(_Member member) =>
       _branch == _allBranches || member.branch == _branch;
 
@@ -87,12 +87,11 @@ class _StaffScreenState extends State<StaffScreen> {
   List<_Member> get _visible {
     final query = _query.trim();
     return _scoped.where((m) {
-      if (_team != '전체' && m.team != _team) return false;
+      if (_rank != _allRanks && m.role != _rank) return false;
       if (query.isEmpty) return true;
-      // 이름·직무·팀·이메일 아무 데나 걸리면 보여준다
+      // 이름·직급·이메일 아무 데나 걸리면 보여준다
       return m.name.contains(query) ||
           m.role.contains(query) ||
-          m.team.contains(query) ||
           m.email.toLowerCase().contains(query.toLowerCase());
     }).toList();
   }
@@ -175,10 +174,10 @@ class _StaffScreenState extends State<StaffScreen> {
     AppToast.show(context, '$label을 복사했어요');
   }
 
-  /// 팀을 나누지 않고 한 판에 쭉 나열한다.
+  /// 직급으로 나누지 않고 한 판에 쭉 나열한다.
   /// 머리말은 지금 무엇을 보고 있는지 알려주므로 전체일 때도 붙인다.
   List<Widget> _body(List<_Member> list) => [
-    _SectionHeader(title: _team, count: list.length),
+    _SectionHeader(title: _rank, count: list.length),
     SizedBox(height: 12),
     if (_grid) _cards(list) else _rows(list),
   ];
@@ -264,7 +263,7 @@ class _StaffScreenState extends State<StaffScreen> {
                 selected: _branch,
                 onSelect: (branch) => setState(() {
                   _branch = branch;
-                  _team = '전체';
+                  _rank = _allRanks;
                 }),
               ),
             ),
@@ -286,21 +285,21 @@ class _StaffScreenState extends State<StaffScreen> {
                     selected: _tab,
                     onSelect: (i) => setState(() {
                       _tab = i;
-                      _team = '전체';
+                      _rank = _allRanks;
                     }),
                   ),
                 ),
               ],
             ),
             SizedBox(height: 10),
-            // 팀 필터와 검색·보기 전환을 한 줄에 — 고르는 일이 한자리에 모인다
+            // 직급 필터와 검색·보기 전환을 한 줄에 — 고르는 일이 한자리에 모인다
             Row(
               children: [
                 Expanded(
-                  child: _TeamChips(
+                  child: _RankChips(
                     scope: _scoped,
-                    selected: _team,
-                    onSelect: (team) => setState(() => _team = team),
+                    selected: _rank,
+                    onSelect: (rank) => setState(() => _rank = rank),
                   ),
                 ),
                 SizedBox(width: 12),
@@ -339,7 +338,7 @@ class _StaffScreenState extends State<StaffScreen> {
 class _MyCard extends StatelessWidget {
   _MyCard({required this.branch});
 
-  /// 보고 있는 지점 — 동료·팀 수를 이 지점 기준으로 센다
+  /// 보고 있는 지점 — 동료·직급 수를 이 지점 기준으로 센다
   final String branch;
 
   @override
@@ -351,7 +350,7 @@ class _MyCard extends StatelessWidget {
           (m) => m.active && (branch == _allBranches || m.branch == branch),
         )
         .toList();
-    final teams = {for (final m in here) m.team}.length;
+    final ranks = {for (final m in here) m.rank}.length;
     final working = here.where((m) => m.status.present).length;
 
     return Container(
@@ -412,7 +411,7 @@ class _MyCard extends StatelessWidget {
                   ),
                   _count('동료', here.where((m) => !m.isMe).length),
                   _divider(),
-                  _count('팀', teams),
+                  _count('직급', ranks),
                   _divider(),
                   _count('근무중', working, color: AppColors.success),
                 ],
@@ -596,8 +595,8 @@ class _SearchBarState extends State<_SearchBar> {
 }
 
 /// 팀 필터 — 팀 이름 옆에 인원 수를 같이 보여준다
-class _TeamChips extends StatelessWidget {
-  _TeamChips({
+class _RankChips extends StatelessWidget {
+  _RankChips({
     required this.scope,
     required this.selected,
     required this.onSelect,
@@ -608,27 +607,28 @@ class _TeamChips extends StatelessWidget {
   final String selected;
   final ValueChanged<String> onSelect;
 
-  int _countOf(String team) =>
-      team == '전체' ? scope.length : scope.where((m) => m.team == team).length;
+  int _countOf(String rank) => rank == _allRanks
+      ? scope.length
+      : scope.where((m) => m.role == rank).length;
 
   @override
   Widget build(BuildContext context) {
     // 탭을 옮길 때마다 칩이 늘었다 줄었다 하면 자리를 못 외운다.
-    // 팀은 항상 같은 자리에 두고, 아무도 없으면 0으로 알린다.
+    // 직급은 항상 같은 자리에 두고, 아무도 없으면 0으로 알린다.
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: [
-        for (final team in _teams)
+        for (final rank in _ranks)
           Builder(
             builder: (context) {
-              final count = _countOf(team);
-              final on = team == selected;
-              // 비어 있는 팀은 눌러도 볼 게 없어 한 톤 흐리게 둔다
+              final count = _countOf(rank);
+              final on = rank == selected;
+              // 비어 있는 직급은 눌러도 볼 게 없어 한 톤 흐리게 둔다
               final empty = count == 0 && !on;
 
               return Pressable(
-                onTap: () => onSelect(team),
+                onTap: () => onSelect(rank),
                 scale: 0.96,
                 child: AnimatedContainer(
                   duration: Duration(milliseconds: 140),
@@ -643,7 +643,7 @@ class _TeamChips extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        team,
+                        rank,
                         style: AppTextStyles.label.copyWith(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -917,7 +917,7 @@ class _MemberCardState extends State<_MemberCard> {
                     ),
                   ),
                   SizedBox(width: 6),
-                  // 팀은 머리말에 이미 있으니 여기는 권한을 보여준다
+                  // 직급은 머리말에 이미 있으니 여기는 권한을 보여준다
                   _PermissionTag(permission: member.permission),
                 ],
               ),
@@ -1421,7 +1421,7 @@ class _MemberDetailState extends State<_MemberDetail> {
             rows: [
               ('사번', member.code),
               ('지점', member.branch),
-              ('소속', '${member.team} · ${member.role}'),
+              ('직급', member.role),
               ('권한', member.permission.label),
               ('상태', member.employment.label),
               if (member.joined case final at?) ('입사일', _date(at)),
@@ -1472,7 +1472,7 @@ class _ProfileCard extends StatelessWidget {
                 ),
                 SizedBox(height: 4),
                 Text(
-                  '${member.role} · ${member.team}',
+                  member.role,
                   style: AppTextStyles.body2.copyWith(
                     color: AppColors.textSecondary,
                   ),

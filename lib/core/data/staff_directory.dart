@@ -42,12 +42,28 @@ class StaffDirectory {
     branches = const [];
   }
 
-  /// 지점 이름 — 못 찾으면 빈 문자열 (화면이 빈 값은 빼고 그린다)
-  String branchName(String? id) {
+  Branch? branchOf(String? id) {
     for (final branch in branches) {
-      if (branch.id == id) return branch.name;
+      if (branch.id == id) return branch;
     }
-    return '';
+    return null;
+  }
+
+  /// 지점 이름 — 못 찾으면 빈 문자열 (화면이 빈 값은 빼고 그린다)
+  String branchName(String? id) => branchOf(id)?.name ?? '';
+
+  /// 지점 표시 순서 — 작을수록 앞
+  ///
+  /// 본사(HQ)는 지점이 아니라 전사라서 맨 앞이다. 그다음은 정해진 차례
+  /// (화순 → 첨단 → 동광주). 목록에 없는 지점은 뒤로 밀고 이름순으로 둔다.
+  static const _order = ['화순', '동광주첨단', '첨단', '동광주'];
+
+  int branchRank(String? id) {
+    final branch = branchOf(id);
+    if (branch == null) return _order.length + 1;
+    if (branch.isHq) return -1;
+    final at = _order.indexOf(branch.name);
+    return at < 0 ? _order.length : at;
   }
 
   /// uuid 로 찾기 — 서버 데이터를 다루는 화면이 쓴다

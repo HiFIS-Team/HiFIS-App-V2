@@ -3,11 +3,17 @@ import 'dart:ui' show Color;
 import '../api/api_client.dart' show apiBaseUrl;
 
 /// 권한 — 서버 `Role` 과 같은 값. MASTER > ADMIN > MANAGER > MEMBER
+///
+/// **화면에도 영어 그대로 쓴다.** 예전에는 '대표·관리자·점장·직원'으로 옮겼는데,
+/// 권한과 직급([Rank])이 따로 있어서 한국어로 쓰면 둘이 헷갈린다 —
+/// 권한 `MANAGER` 인 사람의 직급이 '점장'이 아닐 수도 있다.
+///
+/// **선언 순서가 곧 정렬 순서다** (높은 권한부터).
 enum Role {
-  master('MASTER', '대표'),
-  admin('ADMIN', '관리자'),
-  manager('MANAGER', '점장'),
-  member('MEMBER', '직원');
+  master('MASTER', 'MASTER'),
+  admin('ADMIN', 'ADMIN'),
+  manager('MANAGER', 'MANAGER'),
+  member('MEMBER', 'MEMBER');
 
   const Role(this.wire, this.label);
 
@@ -34,13 +40,22 @@ enum Role {
 }
 
 /// 직급 — 서버 `Rank` 와 같은 값
+///
+/// **순서가 곧 조직 순서다** (위에서 아래로). 조직도 직급 칩이 이 차례로 선다.
+/// 서버 `app/enums.py` 는 반대로(트레이너부터) 적혀 있지만 그건 저장 값일 뿐이라
+/// 화면 순서는 여기서 정한다.
+///
+/// **`marketer` 는 아직 서버에 없다** (backend-gap.md 8번). 서버가 안 주므로
+/// 지금은 아무도 이 직급이 아니고, 조직도 칩에 `마케터 0` 으로 뜬다.
+/// **읽기 전용이라 문제는 없지만, 서버에 추가되기 전까지 아무도 배정할 수 없다.**
 enum Rank {
-  trainer('TRAINER', '트레이너'),
-  fc('FC', 'FC'),
-  teamLead('TEAM_LEAD', '팀장'),
+  ceo('CEO', '대표'),
+  developer('DEVELOPER', '개발자'),
+  marketer('MARKETER', '마케터'),
   storeManager('STORE_MANAGER', '점장'),
-  developer('DEVELOPER', '개발'),
-  ceo('CEO', '대표');
+  teamLead('TEAM_LEAD', '팀장'),
+  trainer('TRAINER', '트레이너'),
+  fc('FC', 'FC');
 
   const Rank(this.wire, this.label);
 

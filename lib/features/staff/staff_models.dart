@@ -62,12 +62,10 @@ class _Member {
   String get id => source.id;
   String get name => source.name;
 
-  /// 직급 (트레이너·FC·점장…)
-  String get role => source.rank.label;
+  Rank get rank => source.rank;
 
-  /// 소속 팀 — 서버가 비워 둘 수 있다
-  String get team =>
-      (source.team == null || source.team!.isEmpty) ? _noTeam : source.team!;
+  /// 직급 이름 (트레이너·FC·팀장·점장·개발·대표)
+  String get role => source.rank.label;
 
   /// 소속 지점 이름 — 서버는 uuid 로만 준다
   String get branch => StaffDirectory.instance.branchName(source.branchId);
@@ -125,9 +123,6 @@ class _Member {
   }
 }
 
-/// 팀이 비어 있는 사람을 모으는 칸 — 서버 `team` 이 nullable 이다
-const _noTeam = '팀 미지정';
-
 /// 화면이 쓰는 명단
 final _members = <_Member>[];
 
@@ -151,7 +146,8 @@ Future<void> _loadStaff() async {
 
   _members
     ..clear()
-    ..addAll([for (final employee in directory.employees) _Member(employee)]);
+    ..addAll([for (final employee in directory.employees) _Member(employee)])
+    ..sort(_byRoleThenBranch);
 
   _todayWorking.clear();
   try {
@@ -169,19 +165,44 @@ Future<void> _loadStaff() async {
   _staffLoaded = true;
 }
 
+/// 명단 정렬 — **권한이 먼저, 그다음 지점**
+///
+/// MASTER·ADMIN 은 한 지점 소속이 아니라 전사를 본다. 권한을 먼저 보므로
+/// 그 둘은 지점과 상관없이 늘 맨 앞에 선다.
+/// 같은 권한 안에서는 지점 차례(본사 → 화순 → 첨단 → 동광주), 그다음 이름순.
+int _byRoleThenBranch(_Member a, _Member b) {
+  final role = a.permission.index.compareTo(b.permission.index);
+  if (role != 0) return role;
+
+  final directory = StaffDirectory.instance;
+  final branch = directory
+      .branchRank(a.source.branchId)
+      .compareTo(directory.branchRank(b.source.branchId));
+  if (branch != 0) return branch;
+
+  return a.name.compareTo(b.name);
+}
+
 /// 지점 필터 목록 — 맨 앞은 모든 지점을 함께 보는 '전체'
 const _allBranches = '전체';
 
-List<String> get _branches => [
-  _allBranches,
-  for (final branch in StaffDirectory.instance.branches) branch.name,
-];
+List<String> get _branches {
+  final directory = StaffDirectory.instance;
+  final sorted = [...directory.branches]
+    ..sort(
+      (a, b) =>
+          directory.branchRank(a.id).compareTo(directory.branchRank(b.id)),
+    );
+  return [_allBranches, for (final branch in sorted) branch.name];
+}
 
-/// 필터에 쓸 팀 목록 — 명단에 실제로 있는 팀만 명단 순서대로
-List<String> get _teams => [
-  '전체',
-  ...{for (final m in _members) m.team},
-];
+/// 필터에 쓸 직급 목록 — 서버 `Rank` 를 그대로 쓴다
+///
+/// 명단에 있는 것만 세우지 않고 **여섯 개를 늘 다 세운다.** 지점·재직 상태 탭을
+/// 옮길 때마다 칩이 늘었다 줄었다 하면 자리를 못 외운다.
+const _allRanks = '전체';
+
+List<String> get _ranks => [_allRanks, for (final r in Rank.values) r.label];
 
 /// 명단에서 나를 찾는다 — 못 찾으면 로그인 정보로 만든다
 ///
