@@ -1,4 +1,7 @@
 import 'api_client.dart';
+import 'reaction_api.dart';
+
+export 'reaction_api.dart' show ReactionAgg, ReactionApi, ReactionTarget;
 
 /// 공지 (서버 `NoticeOut`)
 class Notice {
@@ -11,6 +14,7 @@ class Notice {
     required this.createdAt,
     required this.readByMe,
     required this.readCount,
+    required this.reactions,
   });
 
   factory Notice.fromJson(Map<String, dynamic> json) => Notice(
@@ -22,6 +26,7 @@ class Notice {
     createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
     readByMe: json['readByMe'] as bool? ?? false,
     readCount: json['readCount'] as int? ?? 0,
+    reactions: reactionsFromJson(json['reactions']),
   );
 
   final String id;
@@ -41,6 +46,9 @@ class Notice {
 
   /// 확인한 사람 수. 전체 인원은 `/notices/{id}/readers` 가 준다
   final int readCount;
+
+  /// 이모지별 누른 사람 — 목록 응답에 같이 실려 온다
+  final List<ReactionAgg> reactions;
 }
 
 /// 확인 현황 한 사람 (서버 `NoticeReaderOut`)
