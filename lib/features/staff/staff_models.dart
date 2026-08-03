@@ -161,6 +161,23 @@ Future<void> _loadStaff() async {
   _staffLoaded = true;
 }
 
+/// 1:1 사내톡 열기 — 방을 만들고(있으면 그 방을) 연다
+///
+/// 명단 카드와 상세 화면 둘 다 쓴다. **서버가 기존 DM 을 찾아 주므로**
+/// 같은 사람에게 여러 번 눌러도 방이 새로 생기지 않는다.
+Future<void> _openChat(BuildContext context, _Member member) async {
+  try {
+    final room = await ChatStore.instance.createRoom([member.id]);
+    if (!context.mounted) return;
+    Navigator.push(
+      context,
+      CupertinoPageRoute(builder: (_) => ChatScreen(roomId: room.id)),
+    );
+  } catch (error) {
+    if (context.mounted) AppToast.show(context, messageOf(error));
+  }
+}
+
 /// 서버가 돌려준 사람으로 명단의 그 자리를 갈아끼운다
 ///
 /// 명단(`_members`)과 디렉터리(`StaffDirectory`) 둘 다 고친다 — 디렉터리는

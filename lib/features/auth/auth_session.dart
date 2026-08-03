@@ -3,10 +3,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/api/auth_api.dart';
+import '../../core/api/chat_socket.dart';
 import '../../core/api/token_store.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
 import '../../core/data/staff_directory.dart';
+import '../messages/chat_store.dart';
 
 /// 로그인 세션
 ///
@@ -54,6 +56,9 @@ class AuthSession extends ValueNotifier<bool> {
       currentUser = me;
       email = me!.email;
       await StaffDirectory.instance.load();
+      // 사내톡은 화면을 열 때가 아니라 로그인해 있는 동안 늘 붙어 있다 —
+      // 목록 화면에서 안 연 방의 새 메시지도 받아야 한다
+      await ChatSocket.instance.connect();
       value = true;
     } catch (_) {
       // 서버가 꺼져 있거나 토큰이 죽었다 — 조용히 로그인 화면부터 시작한다
@@ -88,6 +93,8 @@ class AuthSession extends ValueNotifier<bool> {
     await prefs.setString(_keyEmail, email);
     await prefs.setBool(_keyAutoLogin, autoLogin);
 
+    await ChatSocket.instance.connect();
+
     value = true;
   }
 
@@ -101,10 +108,13 @@ class AuthSession extends ValueNotifier<bool> {
     } catch (_) {
       // 네트워크가 없어도 로그아웃은 진행한다
     }
+    await ChatSocket.instance.disconnect();
     await TokenStore.instance.clear();
     me = null;
     currentUser = null;
     StaffDirectory.instance.clear();
+    // 다음 사람에게 앞사람 대화가 보이면 안 된다
+    ChatStore.instance.clear();
     value = false;
   }
 }

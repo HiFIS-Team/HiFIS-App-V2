@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/api/chat_api.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/glass_icon_button.dart';
@@ -24,12 +25,10 @@ class _DesktopChatScreenState extends State<DesktopChatScreen> {
   /// 오른쪽 채팅 영역 전용 내비게이터
   final _rightNavKey = GlobalKey<NavigatorState>();
 
-  void _openChat(String name, Color color, String? emoji) {
+  void _openChat(ChatRoom room) {
     // 이전에 보던 채팅방은 스택에 쌓지 않고 갈아끼운다
     _rightNavKey.currentState?.pushAndRemoveUntil(
-      CupertinoPageRoute(
-        builder: (_) => ChatScreen(name: name, color: color, emoji: emoji),
-      ),
+      CupertinoPageRoute(builder: (_) => ChatScreen(roomId: room.id)),
       (route) => route.isFirst,
     );
   }

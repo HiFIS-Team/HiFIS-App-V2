@@ -3,16 +3,22 @@ import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/api/api_exception.dart';
+import '../../core/api/chat_api.dart';
+import '../../core/data/staff.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/top_frost.dart';
 import 'chat_screen.dart';
+import 'chat_store.dart';
 import 'new_message_screen.dart';
 
-/// 사내톡 화면 (인스타그램 DM 스타일 목업)
+/// 사내톡 화면 (인스타그램 DM 스타일)
 ///
-/// 데이터는 하드코딩된 샘플이며, 기능 개발 시 실제 대화 데이터로 교체한다.
+/// 방 목록은 [ChatStore] 가 들고 있다 — 이 화면과 채팅방·데스크톱 2단 화면이
+/// 같은 목록을 본다. 새 메시지는 WebSocket 으로 들어와 화면을 다시 그린다.
 class MessageScreen extends StatefulWidget {
   MessageScreen({
     super.key,
@@ -31,7 +37,7 @@ class MessageScreen extends StatefulWidget {
 
   /// 대화를 눌렀을 때 화면 전환 대신 호출할 콜백
   /// (데스크톱 전체보기에서 오른쪽 영역에 채팅방을 띄우는 용도)
-  final void Function(String name, Color color, String? emoji)? onOpenChat;
+  final void Function(ChatRoom room)? onOpenChat;
 
   /// 새 채팅(연필) 버튼을 눌렀을 때 화면 전환 대신 호출할 콜백
   ///
@@ -50,16 +56,34 @@ class _MessageScreenState extends State<MessageScreen> {
   /// 0(펼침) ~ 1(접힘). 큰 타이틀이 스크롤로 사라지는 정도.
   final _collapse = ScrollCollapse();
 
+  final _store = ChatStore.instance;
+
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    _store.addListener(_onStore);
+    _load();
+  }
+
+  void _onStore() {
+    if (mounted) setState(() {});
+  }
+
+  /// 방 목록 받아오기 — 한 번 받아 뒀으면 조용히 갱신만 한다
+  Future<void> _load() async {
+    try {
+      await _store.loadRooms();
+    } catch (error) {
+      if (mounted && !_store.loaded) AppToast.show(context, messageOf(error));
+    }
   }
 
   void _onScroll() => _collapse.update(_scrollController.offset);
 
   @override
   void dispose() {
+    _store.removeListener(_onStore);
     _scrollController.dispose();
     _collapse.dispose();
     super.dispose();
@@ -174,12 +198,13 @@ class _MessageScreenState extends State<MessageScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final rooms = _store.rooms;
     final shown = _unreadOnly
         ? [
-            for (final c in _conversations)
-              if (c.unread) c,
+            for (final room in rooms)
+              if (room.unreadCount > 0) room,
           ]
-        : _conversations;
+        : rooms;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -211,12 +236,22 @@ class _MessageScreenState extends State<MessageScreen> {
                   ),
                 ),
                 SizedBox(height: 8),
-                if (shown.isEmpty)
+                if (!_store.loaded && _store.loadingRooms)
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(20, 60, 20, 40),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.4,
+                        valueColor: AlwaysStoppedAnimation(AppColors.primary),
+                      ),
+                    ),
+                  )
+                else if (shown.isEmpty)
                   Padding(
                     padding: EdgeInsets.fromLTRB(20, 40, 20, 40),
                     child: Center(
                       child: Text(
-                        '안 읽은 대화가 없어요',
+                        _unreadOnly ? '안 읽은 대화가 없어요' : '아직 대화가 없어요',
                         style: AppTextStyles.body2.copyWith(
                           color: AppColors.textTertiary,
                         ),
@@ -224,17 +259,8 @@ class _MessageScreenState extends State<MessageScreen> {
                     ),
                   )
                 else
-                  for (final conversation in shown)
-                    _ConversationTile(
-                      onOpen: widget.onOpenChat,
-                      name: conversation.name,
-                      preview: conversation.preview,
-                      time: conversation.time,
-                      color: conversation.color,
-                      emoji: conversation.emoji,
-                      online: conversation.online,
-                      unread: conversation.unread,
-                    ),
+                  for (final room in shown)
+                    _ConversationTile(room: room, onOpen: widget.onOpenChat),
               ],
             ),
           ),
@@ -414,110 +440,63 @@ class _ArchiveScreen extends StatelessWidget {
   }
 }
 
-/// 대화 한 줄 (목업)
-///
-/// 필터를 걸려면 데이터가 있어야 해서 하드코딩된 타일을 모델로 옮겼다.
-class _Conversation {
-  const _Conversation({
-    required this.name,
-    required this.preview,
-    required this.time,
-    required this.color,
-    this.emoji,
-    this.online = false,
-    this.unread = false,
-  });
+/// 목록의 시각 — 오늘이면 시:분, 어제면 '어제', 그 전이면 날짜
+String chatListTime(DateTime at) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final day = DateTime(at.year, at.month, at.day);
+  final gap = today.difference(day).inDays;
 
-  final String name;
-  final String preview;
-  final String time;
-  final Color color;
-  final String? emoji;
-  final bool online;
-  final bool unread;
+  if (gap == 0) {
+    final hour = at.hour % 12 == 0 ? 12 : at.hour % 12;
+    final minute = at.minute.toString().padLeft(2, '0');
+    return '${at.hour < 12 ? '오전' : '오후'} $hour:$minute';
+  }
+  if (gap == 1) return '어제';
+  if (gap < 7) return const ['월', '화', '수', '목', '금', '토', '일'][at.weekday - 1];
+  return '${at.month}월 ${at.day}일';
 }
 
-final _conversations = <_Conversation>[
-  _Conversation(
-    name: '민중기',
-    preview: '네 알겠습니다!',
-    time: '방금 전',
-    color: AppColors.primary,
-    online: true,
-    unread: true,
-  ),
-  _Conversation(
-    name: '이준경',
-    preview: '휴가 신청서 올렸어요',
-    time: '오전 10:12',
-    color: AppColors.warning,
-    unread: true,
-  ),
-  _Conversation(
-    name: '트레이너 단톡방',
-    preview: '오늘 PT 일정 공유합니다',
-    time: '오전 9:30',
-    color: Color(0xFF7C5CFC),
-    emoji: '💪',
-  ),
-  _Conversation(
-    name: '유찬빈',
-    preview: '수고하셨습니다~',
-    time: '어제',
-    color: AppColors.success,
-    online: true,
-  ),
-  _Conversation(
-    name: '박준현',
-    preview: '사진을 보냈습니다',
-    time: '어제',
-    color: AppColors.gray500,
-  ),
-  _Conversation(
-    name: '전체 공지방',
-    preview: '8월 근무표가 확정되었습니다',
-    time: '월요일',
-    color: AppColors.error,
-    emoji: '📢',
-  ),
-];
+/// 목록에 적을 마지막 메시지 한 줄
+String chatPreview(ChatMessage? last) {
+  if (last == null) return '아직 대화가 없어요';
+  if (last.body.isNotEmpty) return last.body;
+  return last.attachments.isEmpty ? '' : '파일을 보냈어요';
+}
+
+/// 지금 나와 있는 사람인가 — 조직도와 같은 기준을 쓴다
+///
+/// 사내톡에만 따로 접속 상태를 두지 않는다. 출근해서 아직 퇴근을 안 찍었으면
+/// 초록 점이 붙는다 (`todayAttendanceStatus`).
+bool chatRoomOnline(ChatRoom room) {
+  final peer = chatRoomPeer(room);
+  return peer?.todayStatus?.working ?? false;
+}
 
 class _ConversationTile extends StatelessWidget {
-  _ConversationTile({
-    required this.name,
-    required this.preview,
-    required this.time,
-    required this.color,
-    this.emoji,
-    this.online = false,
-    this.unread = false,
-    this.onOpen,
-  });
+  _ConversationTile({required this.room, this.onOpen});
 
-  final String name;
-  final String preview;
-  final String time;
-  final Color color;
-  final String? emoji;
-  final bool online;
-  final bool unread;
+  final ChatRoom room;
 
   /// 있으면 화면 전환 대신 이 콜백을 부른다 (데스크톱 전체보기)
-  final void Function(String name, Color color, String? emoji)? onOpen;
+  final void Function(ChatRoom room)? onOpen;
 
   @override
   Widget build(BuildContext context) {
+    final name = chatRoomTitle(room);
+    final unread = room.unreadCount > 0;
+    // 그룹방은 사람 하나로 표현할 수 없어서 브랜드 색으로 둔다
+    final color = chatRoomPeer(room)?.color ?? staffOf(name).color;
+
     return InkWell(
       onTap: () {
         if (onOpen != null) {
-          onOpen!(name, color, emoji);
+          onOpen!(room);
           return;
         }
         Navigator.push(
           context,
-          CupertinoPageRoute(
-            builder: (_) => ChatScreen(name: name, color: color, emoji: emoji),
-          ),
+          CupertinoPageRoute(builder: (_) => ChatScreen(roomId: room.id)),
         );
       },
       child: Padding(
@@ -528,8 +507,8 @@ class _ConversationTile extends StatelessWidget {
               name: name,
               color: color,
               size: 54,
-              online: online,
-              emoji: emoji,
+              online: chatRoomOnline(room),
+              emoji: room.isGroup ? '💬' : null,
             ),
             SizedBox(width: 12),
             Expanded(
@@ -538,13 +517,16 @@ class _ConversationTile extends StatelessWidget {
                 children: [
                   Text(
                     name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: AppTextStyles.body1.copyWith(
                       fontWeight: unread ? FontWeight.w600 : FontWeight.w500,
                     ),
                   ),
                   SizedBox(height: 2),
                   Text(
-                    '$preview · $time',
+                    '${chatPreview(room.lastMessage)} · '
+                    '${chatListTime(room.sortAt)}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: AppTextStyles.caption.copyWith(

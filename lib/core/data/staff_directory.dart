@@ -22,19 +22,19 @@ class StaffDirectory {
   bool get isEmpty => employees.isEmpty;
 
   /// 명단 받아오기 — 실패해도 앱은 떠야 하므로 조용히 넘긴다
+  ///
+  /// 둘을 같이 띄우되 **각자에게 바로 에러 처리를 붙인다.** `await` 한 뒤에
+  /// try 로 감싸면, 먼저 실패한 쪽이 아직 아무도 안 기다리는 동안 터져서
+  /// 콘솔에 `Unhandled Exception` 이 찍힌다 (실제로 찍혔다 — 잡히기는 하는데
+  /// 빨간 로그가 남아 진짜 문제를 가린다).
   Future<void> load() async {
-    final people = StaffApi.list();
-    final places = BranchApi.list();
-    try {
-      employees = await people;
-    } catch (_) {
-      // 서버가 꺼져 있거나 권한이 없다 — 목업 명단으로 계속 간다
-    }
-    try {
-      branches = await places;
-    } catch (_) {
-      // 지점 이름을 못 받으면 화면이 uuid 대신 빈 값으로 떨어진다
-    }
+    // 서버가 꺼져 있거나 권한이 없다 — 목업 명단으로 계속 간다
+    final people = StaffApi.list().catchError((_) => employees);
+    // 지점 이름을 못 받으면 화면이 uuid 대신 빈 값으로 떨어진다
+    final places = BranchApi.list().catchError((_) => branches);
+
+    employees = await people;
+    branches = await places;
   }
 
   void clear() {

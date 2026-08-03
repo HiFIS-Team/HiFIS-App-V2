@@ -19,6 +19,7 @@ class GlassInputBar extends StatefulWidget {
     this.autofocus = false,
     this.replyLabel,
     this.onCancelReply,
+    this.onChanged,
   });
 
   final ValueChanged<String> onSend;
@@ -29,6 +30,9 @@ class GlassInputBar extends StatefulWidget {
   /// 답글 대상 원문. 있으면 입력바 위에 인용 줄이 표시된다.
   final String? replyLabel;
   final VoidCallback? onCancelReply;
+
+  /// 글자가 바뀔 때마다 — 사내톡의 '입력 중' 신호에 쓴다
+  final ValueChanged<String>? onChanged;
 
   @override
   State<GlassInputBar> createState() => _GlassInputBarState();
@@ -44,6 +48,7 @@ class _GlassInputBarState extends State<GlassInputBar> {
     _controller.addListener(() {
       final hasText = _controller.text.trim().isNotEmpty;
       if (hasText != _hasText) setState(() => _hasText = hasText);
+      widget.onChanged?.call(_controller.text);
     });
   }
 

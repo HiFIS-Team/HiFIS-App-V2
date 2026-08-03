@@ -1,35 +1,31 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/api/api_exception.dart';
+import '../../core/api/chat_api.dart';
+import '../../core/data/employee.dart';
+import '../../core/data/staff.dart';
+import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/app_toast.dart';
+import '../../core/widgets/avatar.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/pressable.dart';
 import '../../core/widgets/top_frost.dart';
+import 'chat_store.dart';
 import 'new_message_screen.dart';
 
-/// 채팅방 상세 화면 (이름/알림/멤버 초대/공유된 콘텐츠)
+/// 채팅방 상세 화면 (이름/멤버 초대/공유된 콘텐츠)
 ///
-/// 설정 값은 목업이며, 기능 개발 시 실제 채팅방 데이터로 교체한다.
+/// 이름 변경·초대·나가기는 전부 서버로 간다. 서버가 그 사실을 대화에
+/// 회색 안내 한 줄로 남기므로 방에 있는 사람 모두가 바로 본다.
+///
+/// **나가면 `true` 로 닫힌다** — 채팅방 화면이 그걸 보고 같이 닫는다.
 class ChatDetailScreen extends StatefulWidget {
-  ChatDetailScreen({
-    super.key,
-    required this.name,
-    required this.color,
-    this.emoji,
-    this.onInvite,
-    this.onRename,
-  });
+  ChatDetailScreen({super.key, required this.roomId});
 
-  final String name;
-  final Color color;
-  final String? emoji;
-
-  /// 멤버 초대가 확정되면 초대된 이름 목록과 함께 호출된다.
-  final ValueChanged<List<String>>? onInvite;
-
-  /// 채팅방 이름이 변경되면 새 이름과 함께 호출된다.
-  final ValueChanged<String>? onRename;
+  final String roomId;
 
   @override
   State<ChatDetailScreen> createState() => _ChatDetailScreenState();
@@ -43,11 +39,34 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   int _shareTab = 0;
 
-  /// 채팅방 이름 (변경 시 갱신)
-  late String _name = widget.name;
+  final _store = ChatStore.instance;
+
+  ChatRoom? get _room => _store.roomOf(widget.roomId);
+
+  /// 채팅방 이름 — DM 은 상대 이름이라 바꿀 수 없다
+  String get _name {
+    final room = _room;
+    return room == null ? '대화' : chatRoomTitle(room);
+  }
+
+  bool get _isGroup => _room?.isGroup ?? false;
+
+  Color get _headColor {
+    final room = _room;
+    if (room == null) return AppColors.primary;
+    return chatRoomPeer(room)?.color ?? staffOf(_name).color;
+  }
+
+  /// 방에 있는 사람들 — 명단에서 못 찾은 id 는 뺀다
+  List<Employee> get _members => [
+    for (final id in _room?.memberIds ?? const <String>[])
+      ?StaffDirectory.instance.byId(id),
+  ];
 
   /// 이름 칸 인라인 수정용 — 변경 버튼을 눌러야 적용된다
-  late final _nameController = TextEditingController(text: widget.name);
+  late final _nameController = TextEditingController(text: _name);
+
+  bool _saving = false;
 
   static const _shareTabs = ['사진', '영상', '파일'];
 
@@ -55,12 +74,18 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    _store.addListener(_onStore);
+  }
+
+  void _onStore() {
+    if (mounted) setState(() {});
   }
 
   void _onScroll() => _collapse.update(_scrollController.offset);
 
   @override
   void dispose() {
+    _store.removeListener(_onStore);
     _scrollController.dispose();
     _collapse.dispose();
     _nameController.dispose();
@@ -68,28 +93,43 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   }
 
   /// 이름 칸에 입력된 값을 적용한다. 빈 값이면 원래 이름으로 되돌린다.
-  void _applyRename() {
+  Future<void> _applyRename() async {
     FocusScope.of(context).unfocus();
     final value = _nameController.text.trim();
     if (value.isEmpty) {
       _nameController.text = _name;
       return;
     }
-    if (value == _name) return;
-    setState(() => _name = value);
-    widget.onRename?.call(value);
+    if (value == _name || _saving) return;
+    setState(() => _saving = true);
+    try {
+      await _store.rename(widget.roomId, value);
+      if (mounted) AppToast.show(context, '방 이름을 바꿨어요');
+    } catch (error) {
+      if (mounted) {
+        _nameController.text = _name;
+        AppToast.show(context, messageOf(error));
+      }
+    }
+    if (mounted) setState(() => _saving = false);
   }
 
   Future<void> _invite() async {
-    final names = await Navigator.push<List<String>>(
+    final picked = await Navigator.push<List<String>>(
       context,
       CupertinoPageRoute(
         fullscreenDialog: true,
         builder: (_) => NewMessageScreen(inviteMode: true),
       ),
     );
-    if (names == null || names.isEmpty) return;
-    widget.onInvite?.call(names);
+    if (picked == null || picked.isEmpty || !mounted) return;
+    try {
+      await _store.addMembers(widget.roomId, picked);
+      // 초대 안내는 서버가 대화에 남긴다 — 여기서 따로 만들지 않는다
+      if (mounted) AppToast.show(context, '초대했어요');
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
   }
 
   Future<void> _leave() async {
@@ -112,10 +152,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       ),
     );
     if (ok != true || !mounted) return;
-    // 상세 → 채팅방 순서로 닫아 사내톡 목록으로 돌아간다
-    final navigator = Navigator.of(context);
-    navigator.pop();
-    navigator.pop();
+    try {
+      await _store.leave(widget.roomId);
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+      return;
+    }
+    // `true` 로 닫으면 채팅방 화면이 자기도 닫는다 → 사내톡 목록으로 돌아간다
+    if (mounted) Navigator.pop(context, true);
   }
 
   @override
@@ -137,14 +181,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     height: 84,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: widget.color.withValues(
-                        alpha: widget.emoji != null ? 0.12 : 1,
-                      ),
+                      color: _headColor.withValues(alpha: _isGroup ? 0.12 : 1),
                       shape: BoxShape.circle,
                     ),
                     child: Text(
-                      widget.emoji ?? _name.characters.first,
-                      style: widget.emoji != null
+                      _isGroup ? '💬' : _name.characters.first,
+                      style: _isGroup
                           ? TextStyle(fontSize: 36)
                           : TextStyle(
                               fontFamily: AppTextStyles.fontFamily,
@@ -158,58 +200,84 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 SizedBox(height: 14),
                 Center(child: Text(_name, style: AppTextStyles.title2)),
                 SizedBox(height: 32),
-                _SectionLabel('이름 변경'),
-                SizedBox(height: 8),
-                _SettingBox(
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _nameController,
-                          style: AppTextStyles.body1.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                          cursorColor: AppColors.primary,
-                          textInputAction: TextInputAction.done,
-                          onSubmitted: (_) => _applyRename(),
-                          decoration: InputDecoration(
-                            hintText: '채팅방 이름',
-                            hintStyle: AppTextStyles.body1.copyWith(
-                              color: AppColors.gray400,
-                            ),
-                            border: InputBorder.none,
-                            isCollapsed: true,
-                          ),
-                        ),
-                      ),
-                      Pressable(
-                        onTap: _applyRename,
-                        scale: 0.9,
-                        child: Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.surface,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.gray100),
-                          ),
-                          child: Text(
-                            '변경',
-                            style: AppTextStyles.label.copyWith(
-                              color: AppColors.textPrimary,
+                if (_isGroup) ...[
+                  _SectionLabel('이름 변경'),
+                  SizedBox(height: 8),
+                  _SettingBox(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _nameController,
+                            style: AppTextStyles.body1.copyWith(
                               fontWeight: FontWeight.w600,
                             ),
+                            cursorColor: AppColors.primary,
+                            textInputAction: TextInputAction.done,
+                            onSubmitted: (_) => _applyRename(),
+                            decoration: InputDecoration(
+                              hintText: '채팅방 이름',
+                              hintStyle: AppTextStyles.body1.copyWith(
+                                color: AppColors.gray400,
+                              ),
+                              border: InputBorder.none,
+                              isCollapsed: true,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                        Pressable(
+                          onTap: _applyRename,
+                          scale: 0.9,
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.gray100),
+                            ),
+                            child: Text(
+                              '변경',
+                              style: AppTextStyles.label.copyWith(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                SizedBox(height: 24),
-                _SectionLabel('멤버'),
+                  SizedBox(height: 24),
+                ],
+                _SectionLabel('멤버 ${_members.length}'),
                 SizedBox(height: 8),
+                for (final member in _members)
+                  Padding(
+                    padding: EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Avatar(
+                          name: member.name,
+                          imageUrl: member.avatarImageUrl,
+                          size: 34,
+                        ),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            member.name,
+                            style: AppTextStyles.body2.copyWith(
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        Text(member.rank.label, style: AppTextStyles.caption),
+                      ],
+                    ),
+                  ),
+                SizedBox(height: 4),
                 _SettingBox(
                   onTap: _invite,
                   child: Row(

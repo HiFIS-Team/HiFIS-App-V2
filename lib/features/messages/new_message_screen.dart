@@ -1,12 +1,19 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/api/api_exception.dart';
+import '../../core/data/current_user.dart';
+import '../../core/data/employee.dart';
+import '../../core/data/staff.dart';
+import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/glass_bottom_button.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/top_frost.dart';
 import 'chat_screen.dart';
+import 'chat_store.dart';
 
 /// 새 사내톡 만들기 화면 (아래에서 올라오는 모달)
 ///
@@ -31,15 +38,25 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
   final _collapse = ScrollCollapse(start: 10);
 
   String _query = '';
+
+  /// 고른 사람의 **uuid** — 이름으로 담으면 동명이인이 섞인다
   final Set<String> _selected = {};
 
-  static final List<_Member> _members = [
-    _Member('이준승', '센터', '대표', Color(0xFF7C5CFC)),
-    _Member('이준경', '센터', '개발', Color(0xFF00A8B5)),
-    _Member('민중기', '센터', '점장', AppColors.success),
-    _Member('박준현', '센터', '트레이너', AppColors.warning),
-    _Member('유찬빈', '센터', '트레이너', AppColors.primary),
-    _Member('전상현', '센터', 'FC', Color(0xFFE0447C)),
+  /// 방을 만드는 중 — 두 번 눌러 방이 두 개 생기지 않게 잠근다
+  bool _creating = false;
+
+  /// 고를 수 있는 사람 — **나는 뺀다** (나에게 말을 걸 수는 없다)
+  List<_Member> get _members => [
+    for (final e in StaffDirectory.instance.employees)
+      if (e.id != currentUser?.id && e.status == EmployeeStatus.active)
+        _Member(
+          e.id,
+          e.name,
+          StaffDirectory.instance.branchName(e.branchId),
+          e.rank.label,
+          e.color ?? staffOf(e.name).color,
+          e.avatarImageUrl,
+        ),
   ];
 
   @override
@@ -60,7 +77,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
 
   void _toggle(_Member member) {
     setState(() {
-      if (!_selected.remove(member.name)) _selected.add(member.name);
+      if (!_selected.remove(member.id)) _selected.add(member.id);
     });
   }
 
@@ -77,36 +94,38 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
     };
   }
 
-  /// 선택된 멤버로 대화를 시작한다. TODO: 실제 대화방 생성 API 연동
-  void _confirm() {
-    final picked = _members.where((m) => _selected.contains(m.name)).toList();
-    if (picked.isEmpty) return;
+  /// 선택된 멤버로 대화를 시작한다
+  ///
+  /// **1:1 은 서버가 기존 방을 찾아 준다** — 같은 사람에게 두 번 말을 걸어도
+  /// 방이 새로 생기지 않는다.
+  Future<void> _confirm() async {
+    final picked = _members.where((m) => _selected.contains(m.id)).toList();
+    if (picked.isEmpty || _creating) return;
 
-    // 초대 모드: 선택한 이름 목록만 돌려주고 닫는다
+    // 초대 모드: 고른 사람의 id 만 돌려주고 닫는다 (방은 상세 화면이 만든다)
     if (widget.inviteMode) {
-      Navigator.pop(context, picked.map((m) => m.name).toList());
+      Navigator.pop(context, [for (final m in picked) m.id]);
       return;
     }
 
     final groupName = _groupNameController.text.trim();
-    final isGroup = picked.length > 1;
-    final title = groupName.isNotEmpty
-        ? groupName
-        : isGroup
-        ? '${picked.first.name} 외 ${picked.length - 1}명'
-        : picked.first.name;
-
-    final navigator = Navigator.of(context);
-    navigator.pop();
-    navigator.push(
-      CupertinoPageRoute(
-        builder: (_) => ChatScreen(
-          name: title,
-          color: picked.first.color,
-          emoji: isGroup ? '👥' : null,
-        ),
-      ),
-    );
+    setState(() => _creating = true);
+    try {
+      final room = await ChatStore.instance.createRoom([
+        for (final m in picked) m.id,
+      ], name: groupName.isEmpty ? null : groupName);
+      if (!mounted) return;
+      final navigator = Navigator.of(context);
+      navigator.pop();
+      navigator.push(
+        CupertinoPageRoute(builder: (_) => ChatScreen(roomId: room.id)),
+      );
+    } catch (error) {
+      if (mounted) {
+        setState(() => _creating = false);
+        AppToast.show(context, messageOf(error));
+      }
+    }
   }
 
   @override
@@ -196,7 +215,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
                   for (final member in filtered)
                     _MemberTile(
                       member: member,
-                      selected: _selected.contains(member.name),
+                      selected: _selected.contains(member.id),
                       onTap: () => _toggle(member),
                     ),
               ],
@@ -264,12 +283,16 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
 }
 
 class _Member {
-  _Member(this.name, this.team, this.role, this.color);
+  _Member(this.id, this.name, this.team, this.role, this.color, this.avatarUrl);
 
+  final String id;
   final String name;
+
+  /// 소속 지점 — 검색에 걸리라고 들고 있다
   final String team;
   final String role;
   final Color color;
+  final String? avatarUrl;
 }
 
 class _FieldLabel extends StatelessWidget {

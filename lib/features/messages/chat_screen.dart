@@ -4,14 +4,21 @@ import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/api/api_exception.dart';
+import '../../core/api/chat_api.dart';
+import '../../core/data/current_user.dart';
+import '../../core/data/staff.dart';
+import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/glass_input_bar.dart';
 import '../../core/widgets/pressable.dart';
 import '../../core/widgets/top_frost.dart';
 import 'chat_detail_screen.dart';
+import 'chat_store.dart';
 
 /// 리액션으로 고를 수 있는 이모지 목록
 const _reactionEmojis = ['❤️', '😂', '👍', '😮', '😢', '🔥'];
@@ -37,16 +44,17 @@ class _EmojiText extends StatelessWidget {
   }
 }
 
-/// 채팅방 화면 (인스타그램 DM 스타일 목업)
+/// 채팅방 화면 (인스타그램 DM 스타일)
 ///
-/// 메시지는 하드코딩된 샘플이며, 기능 개발 시 실제 채팅 데이터로 교체한다.
+/// 메시지는 [ChatStore] 가 들고 있다 — 목록 화면과 같은 것을 본다.
 /// 말풍선 더블탭 → ❤️ 토글, 길게 누르기 → 이모지 피커.
+///
+/// **방 id 로 연다.** 이름·색은 서버 명단에서 찾아 쓰므로 넘길 필요가 없고,
+/// 이름이 바뀌어도(그룹방 이름 변경) 한 곳만 고치면 다 따라온다.
 class ChatScreen extends StatefulWidget {
-  ChatScreen({super.key, required this.name, required this.color, this.emoji});
+  ChatScreen({super.key, required this.roomId});
 
-  final String name;
-  final Color color;
-  final String? emoji;
+  final String roomId;
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -56,47 +64,118 @@ class _ChatScreenState extends State<ChatScreen> {
   final _scrollController = ScrollController();
   final _inputFocus = FocusNode();
 
-  /// PC에서 커서가 올라가 있는 말풍선 (호버 액션 아이콘 표시용)
-  _ChatMessage? _hovered;
+  final _store = ChatStore.instance;
 
-  /// 채팅방 이름 (상세 화면에서 변경 가능)
-  late String _title = widget.name;
+  /// PC에서 커서가 올라가 있는 말풍선 (호버 액션 아이콘 표시용)
+  ///
+  /// **setState 로 두면 안 된다** — `MouseRegion.onEnter` 안에서 트리를 다시
+  /// 만들면 마우스 추적 중에 트리가 바뀌어 `_debugDuringDeviceUpdate` 단언에
+  /// 걸린다 (실제 발생). 아이콘만 다시 그리도록 값 알림으로 둔다.
+  final _hovered = ValueNotifier<String?>(null);
 
   /// 답글 작성 대상 메시지 (없으면 일반 전송)
-  _ChatMessage? _replyTarget;
+  ChatMessage? _replyTarget;
 
-  final List<_ChatMessage> _messages = [
-    _ChatMessage(text: '피스님 혹시 내일 오전 근무 가능하실까요?', mine: false),
-    _ChatMessage(text: '네 가능합니다! 몇 시부터인가요?', mine: true),
-    _ChatMessage(text: '9시부터 부탁드려요 🙏', mine: false, reaction: '❤️'),
-    _ChatMessage(text: '네 알겠습니다!', mine: true, read: true),
-  ];
+  /// 사라지는 중인 말풍선 — 줄어드는 애니메이션을 그리는 동안만 들어 있다.
+  /// 서버가 지우면 스토어에서 빠지면서 실제로 사라진다.
+  final _removingIds = <String>{};
+
+  /// 마지막으로 보낸 '입력 중' 신호 — 글자마다 보내지 않으려고 기억해 둔다
+  bool _typingSent = false;
+  Timer? _typingStop;
+
+  bool _loading = true;
+
+  String get _roomId => widget.roomId;
+
+  ChatRoom? get _room => _store.roomOf(_roomId);
+
+  List<ChatMessage> get _messages => _store.messagesOf(_roomId);
+
+  /// 헤더에 적을 방 이름 — DM 은 상대 이름, 그룹은 방 이름(없으면 멤버 이름)
+  String get _title {
+    final room = _room;
+    return room == null ? '대화' : chatRoomTitle(room);
+  }
+
+  bool get _isGroup => _room?.isGroup ?? false;
+
+  Color get _headColor {
+    final room = _room;
+    if (room == null) return AppColors.primary;
+    return chatRoomPeer(room)?.color ?? staffOf(chatRoomTitle(room)).color;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _store.addListener(_onStore);
+    _open();
+  }
+
+  Future<void> _open() async {
+    try {
+      await _store.openRoom(_roomId);
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+    if (mounted) setState(() => _loading = false);
+    _scrollToBottom();
+  }
+
+  /// 새 메시지가 들어오면 아래에 붙어 있던 화면은 따라 내려간다
+  void _onStore() {
+    if (!mounted) return;
+    final atBottom =
+        !_scrollController.hasClients ||
+        _scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 80;
+    setState(() {});
+    if (atBottom) _scrollToBottom();
+    // 열어 둔 방에 새 글이 오면 바로 읽은 것으로 친다
+    if (_room?.unreadCount case final unread? when unread > 0) {
+      _store.markRead(_roomId);
+    }
+  }
 
   @override
   void dispose() {
+    _hovered.dispose();
+    _typingStop?.cancel();
+    if (_typingSent) _store.typing(_roomId, isTyping: false);
+    _store.removeListener(_onStore);
     _scrollController.dispose();
     _inputFocus.dispose();
     super.dispose();
   }
 
-  void _send(String text) {
-    final sent = _ChatMessage(
-      text: text,
-      mine: true,
-      replyTo: _replyTarget?.text,
-    );
-    setState(() {
-      _messages.add(sent);
-      _replyTarget = null;
+  /// 입력 중 신호 — 켤 때 한 번만 보내고 2초 쉬면 끈다
+  void _onTyping() {
+    if (!_typingSent) {
+      _typingSent = true;
+      _store.typing(_roomId, isTyping: true);
+    }
+    _typingStop?.cancel();
+    _typingStop = Timer(Duration(seconds: 2), () {
+      _typingSent = false;
+      _store.typing(_roomId, isTyping: false);
     });
-    // 목업: 잠시 후 상대가 읽은 것으로 처리해 읽음 표시를 보여준다.
-    // TODO: 실제 채팅 연동 시 읽음 이벤트로 교체
-    Timer(Duration(milliseconds: 1500), () {
-      if (!mounted) return;
-      setState(() => sent.read = true);
-      // 읽음 줄이 생기며 늘어난 높이만큼 더 내려서 입력바에 가려지지 않게 한다
-      _scrollToBottom();
-    });
+  }
+
+  Future<void> _send(String text) async {
+    final reply = _replyTarget;
+    setState(() => _replyTarget = null);
+    _typingStop?.cancel();
+    if (_typingSent) {
+      _typingSent = false;
+      _store.typing(_roomId, isTyping: false);
+    }
+    _scrollToBottom();
+    try {
+      await _store.send(_roomId, body: text, replyTo: reply);
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
     _scrollToBottom();
   }
 
@@ -111,38 +190,40 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  void _openDetail() {
-    Navigator.push(
+  Future<void> _openDetail() async {
+    final left = await Navigator.push<bool>(
       context,
-      CupertinoPageRoute(
-        builder: (_) => ChatDetailScreen(
-          name: _title,
-          color: widget.color,
-          emoji: widget.emoji,
-          onInvite: _onMembersInvited,
-          onRename: (value) => setState(() => _title = value),
-        ),
-      ),
+      CupertinoPageRoute(builder: (_) => ChatDetailScreen(roomId: _roomId)),
     );
+    // 방을 나갔으면 이 화면도 닫는다 — 없는 방에 남아 있을 수 없다
+    if (left == true && mounted) Navigator.pop(context);
   }
 
-  /// 상세 화면에서 멤버 초대가 확정되면 회색 시스템 메시지를 남긴다
-  void _onMembersInvited(List<String> names) {
-    final label = names.length == 1
-        ? '${names.first}님이 초대되었습니다'
-        : '${names.first}님 외 ${names.length - 1}명이 초대되었습니다';
-    setState(
-      () => _messages.add(_ChatMessage(text: label, mine: false, system: true)),
-    );
-    _scrollToBottom();
+  /// 더블탭 ❤️ — 이미 내가 눌렀으면 뺀다 (서버가 토글로 처리)
+  void _toggleHeart(ChatMessage message) => _react(message, '❤️');
+
+  Future<void> _react(ChatMessage message, String emoji) async {
+    if (message.pending) return; // 아직 서버 id 가 없다
+    try {
+      await _store.toggleReaction(_roomId, message.id, emoji);
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
   }
 
-  void _toggleHeart(_ChatMessage message) {
-    setState(() => message.reaction = message.reaction == '❤️' ? null : '❤️');
+  /// 내가 이 말풍선에 단 이모지 (없으면 null) — 피커의 선택 표시에 쓴다
+  String? _myReaction(ChatMessage message) {
+    final myId = currentUser?.id;
+    for (final agg in message.reactions) {
+      if (agg.minePressed(myId)) return agg.emoji;
+    }
+    return null;
   }
+
+  bool _isMine(ChatMessage message) => message.senderId == currentUser?.id;
 
   /// 말풍선 길게 누르기 메뉴: 위 이모지 피커 + 아래 답글/전송 취소
-  Future<void> _openMessageMenu(_ChatMessage message) async {
+  Future<void> _openMessageMenu(ChatMessage message) async {
     final result = await showGeneralDialog<String>(
       context: context,
       barrierDismissible: true,
@@ -150,7 +231,7 @@ class _ChatScreenState extends State<ChatScreen> {
       barrierColor: Colors.black.withValues(alpha: 0.2),
       transitionDuration: Duration(milliseconds: 200),
       pageBuilder: (context, animation, secondaryAnimation) =>
-          _MessageMenu(selected: message.reaction, mine: message.mine),
+          _MessageMenu(selected: _myReaction(message), mine: _isMine(message)),
       transitionBuilder: (context, animation, secondaryAnimation, child) =>
           FadeTransition(
             opacity: animation,
@@ -170,29 +251,33 @@ class _ChatScreenState extends State<ChatScreen> {
       case _MessageMenu.unsend:
         _unsend(message);
       default:
-        // 이미 달린 이모지를 다시 고르면 리액션을 제거한다
-        setState(
-          () => message.reaction = result == message.reaction ? null : result,
-        );
+        // 같은 이모지를 다시 고르면 서버가 알아서 뺀다 (토글)
+        _react(message, result);
     }
   }
 
-  void _replyTo(_ChatMessage message) {
+  void _replyTo(ChatMessage message) {
     setState(() => _replyTarget = message);
     _inputFocus.requestFocus();
   }
 
-  void _unsend(_ChatMessage message) {
-    // 줄어드는 애니메이션이 끝난 뒤 실제로 제거한다
-    setState(() => message.removing = true);
-    Timer(Duration(milliseconds: 260), () {
-      if (mounted) setState(() => _messages.remove(message));
-    });
+  /// 전송 취소 — 줄어드는 애니메이션을 먼저 보여주고 서버에 알린다
+  Future<void> _unsend(ChatMessage message) async {
+    setState(() => _removingIds.add(message.id));
+    try {
+      await _store.deleteMessage(_roomId, message.id);
+    } catch (error) {
+      // 못 지웠으면 되돌린다 — 지워진 것처럼 보이면 안 된다
+      if (mounted) {
+        setState(() => _removingIds.remove(message.id));
+        AppToast.show(context, messageOf(error));
+      }
+    }
   }
 
   /// 호버 아이콘의 이모지 버튼 — 누른 아이콘 위에 이모지 캡슐만 띄운다
   /// (화면 가운데가 아니라 말풍선 곁에 뜨는 인스타그램 방식)
-  Future<void> _openEmojiPicker(_ChatMessage message, Offset anchor) async {
+  Future<void> _openEmojiPicker(ChatMessage message, Offset anchor) async {
     final result = await showGeneralDialog<String>(
       context: context,
       barrierDismissible: true,
@@ -219,7 +304,7 @@ class _ChatScreenState extends State<ChatScreen> {
               top: top,
               child: Material(
                 type: MaterialType.transparency,
-                child: _EmojiCapsule(selected: message.reaction),
+                child: _EmojiCapsule(selected: _myReaction(message)),
               ),
             ),
           ],
@@ -229,44 +314,47 @@ class _ChatScreenState extends State<ChatScreen> {
           FadeTransition(opacity: animation, child: child),
     );
     if (result == null || !mounted) return;
-    setState(
-      () => message.reaction = result == message.reaction ? null : result,
-    );
+    _react(message, result);
   }
 
   /// PC: 말풍선에 커서를 올리면 옆에 뜨는 작은 액션 아이콘들 (삭제·답글·이모지)
-  Widget _hoverActions(_ChatMessage message) {
-    final visible = _hovered == message;
-    return AnimatedOpacity(
-      duration: Duration(milliseconds: 120),
-      opacity: visible ? 1 : 0,
-      child: IgnorePointer(
-        ignoring: !visible,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: message.mine
-              // 말풍선 왼쪽에 붙으므로 바깥부터 삭제 → 답글 → 이모지 순
-              ? [
-                  _hoverIcon(
-                    Icons.delete_outline_rounded,
-                    (_) => _unsend(message),
-                  ),
-                  _hoverIcon(Icons.reply_rounded, (_) => _replyTo(message)),
-                  _hoverIcon(
-                    Icons.mood_rounded,
-                    (anchor) => _openEmojiPicker(message, anchor),
-                  ),
-                ]
-              // 상대 말풍선은 오른쪽에 붙는다 (전송 취소는 내 메시지 전용)
-              : [
-                  _hoverIcon(
-                    Icons.mood_rounded,
-                    (anchor) => _openEmojiPicker(message, anchor),
-                  ),
-                  _hoverIcon(Icons.reply_rounded, (_) => _replyTo(message)),
-                ],
-        ),
-      ),
+  Widget _hoverActions(ChatMessage message) {
+    return ValueListenableBuilder<String?>(
+      valueListenable: _hovered,
+      builder: (context, hovered, _) {
+        final visible = hovered == message.id;
+        return AnimatedOpacity(
+          duration: Duration(milliseconds: 120),
+          opacity: visible ? 1 : 0,
+          child: IgnorePointer(
+            ignoring: !visible,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: _isMine(message)
+                  // 말풍선 왼쪽에 붙으므로 바깥부터 삭제 → 답글 → 이모지 순
+                  ? [
+                      _hoverIcon(
+                        Icons.delete_outline_rounded,
+                        (_) => _unsend(message),
+                      ),
+                      _hoverIcon(Icons.reply_rounded, (_) => _replyTo(message)),
+                      _hoverIcon(
+                        Icons.mood_rounded,
+                        (anchor) => _openEmojiPicker(message, anchor),
+                      ),
+                    ]
+                  // 상대 말풍선은 오른쪽에 붙는다 (전송 취소는 내 메시지 전용)
+                  : [
+                      _hoverIcon(
+                        Icons.mood_rounded,
+                        (anchor) => _openEmojiPicker(message, anchor),
+                      ),
+                      _hoverIcon(Icons.reply_rounded, (_) => _replyTo(message)),
+                    ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -282,6 +370,116 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Padding(
           padding: EdgeInsets.all(4),
           child: Icon(icon, size: 16, color: AppColors.gray500),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _loadOlder() async {
+    try {
+      await _store.loadOlder(_roomId);
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+  }
+
+  static bool _sameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  static String _dayLabel(DateTime at) {
+    final now = DateTime.now();
+    if (_sameDay(at, now)) return '오늘';
+    if (_sameDay(at, now.subtract(Duration(days: 1)))) return '어제';
+    return '${at.year}년 ${at.month}월 ${at.day}일';
+  }
+
+  /// 마지막 내 메시지 아래에 붙는 '읽음' — 아무도 안 읽었으면 안 붙인다
+  ///
+  /// 그룹방은 몇 명이 읽었는지를 같이 적는다. DM 은 한 명뿐이라 숫자가 군더더기다.
+  String? get _readLabel {
+    final messages = _messages;
+    if (messages.isEmpty) return null;
+    final last = messages.last;
+    if (!_isMine(last) || last.pending || last.readCount == 0) return null;
+    final room = _room;
+    if (room != null && room.isGroup) return '${last.readCount}명 읽음';
+    return '읽음';
+  }
+
+  /// 입력 중인 사람 안내 — 이름을 찾을 수 있으면 이름으로 적는다
+  String? get _typingLabel {
+    final who = _store.typingIn(_roomId);
+    if (who.isEmpty) return null;
+    final names = [
+      for (final id in who) ?StaffDirectory.instance.byId(id)?.name,
+    ];
+    if (names.isEmpty) return '입력 중…';
+    if (names.length == 1) return '${names.first}님이 입력 중…';
+    return '${names.first}님 외 ${names.length - 1}명이 입력 중…';
+  }
+
+  /// 말풍선 한 줄 — 시스템 안내는 가운데 회색 글로 그린다
+  Widget _messageRow(ChatMessage message, bool desktop) {
+    if (message.isSystem) {
+      return Padding(
+        padding: EdgeInsets.symmetric(vertical: 10),
+        child: Center(
+          child: Text(
+            message.body,
+            textAlign: TextAlign.center,
+            style: AppTextStyles.caption,
+          ),
+        ),
+      );
+    }
+
+    final mine = _isMine(message);
+    final sender = StaffDirectory.instance.byId(message.senderId);
+    final name = sender?.name ?? '알 수 없음';
+    final reaction = message.reactions.isEmpty
+        ? null
+        : message.reactions.first.emoji;
+
+    return _RemovableMessage(
+      key: ValueKey(message.id),
+      removing: _removingIds.contains(message.id),
+      mine: mine,
+      child: MouseRegion(
+        onEnter: (_) => _hovered.value = message.id,
+        onExit: (_) {
+          if (_hovered.value == message.id) _hovered.value = null;
+        },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            mine
+                ? _MyBubble(
+                    text: message.body,
+                    replyTo: message.replyTo?.preview,
+                    reaction: reaction,
+                    pending: message.pending,
+                    onDoubleTap: () => _toggleHeart(message),
+                    onLongPress: () => _openMessageMenu(message),
+                    actions: desktop ? _hoverActions(message) : null,
+                  )
+                : _TheirBubble(
+                    name: name,
+                    color: sender?.color ?? staffOf(name).color,
+                    emoji: null,
+                    text: message.body,
+                    replyTo: message.replyTo?.preview,
+                    reaction: reaction,
+                    onDoubleTap: () => _toggleHeart(message),
+                    onLongPress: () => _openMessageMenu(message),
+                    actions: desktop ? _hoverActions(message) : null,
+                  ),
+            // 리액션 알약이 말풍선 아래로 삐져나오는 만큼 간격을 더 준다
+            AnimatedContainer(
+              duration: Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+              height: reaction != null ? 22 : 8,
+            ),
+          ],
         ),
       ),
     );
@@ -308,75 +506,70 @@ class _ChatScreenState extends State<ChatScreen> {
                 MediaQuery.paddingOf(context).bottom + 72,
               ),
               children: [
-                Center(child: Text('오늘', style: AppTextStyles.caption)),
-                SizedBox(height: 16),
-                for (final message in _messages)
-                  if (message.system)
-                    Padding(
-                      padding: EdgeInsets.symmetric(vertical: 10),
-                      child: Center(
-                        child: Text(message.text, style: AppTextStyles.caption),
+                if (_loading)
+                  Padding(
+                    padding: EdgeInsets.only(top: 40),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.4,
+                        valueColor: AlwaysStoppedAnimation(AppColors.primary),
                       ),
-                    )
-                  else
-                    _RemovableMessage(
-                      key: ObjectKey(message),
-                      removing: message.removing,
-                      mine: message.mine,
-                      child: MouseRegion(
-                        onEnter: (_) => setState(() => _hovered = message),
-                        onExit: (_) => setState(() {
-                          if (_hovered == message) _hovered = null;
-                        }),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            message.mine
-                                ? _MyBubble(
-                                    text: message.text,
-                                    replyTo: message.replyTo,
-                                    reaction: message.reaction,
-                                    onDoubleTap: () => _toggleHeart(message),
-                                    onLongPress: () =>
-                                        _openMessageMenu(message),
-                                    actions: desktop
-                                        ? _hoverActions(message)
-                                        : null,
-                                  )
-                                : _TheirBubble(
-                                    name: _title,
-                                    color: widget.color,
-                                    emoji: widget.emoji,
-                                    text: message.text,
-                                    replyTo: message.replyTo,
-                                    reaction: message.reaction,
-                                    onDoubleTap: () => _toggleHeart(message),
-                                    onLongPress: () =>
-                                        _openMessageMenu(message),
-                                    actions: desktop
-                                        ? _hoverActions(message)
-                                        : null,
-                                  ),
-                            // 리액션 알약이 말풍선 아래로 삐져나오는 만큼 간격을 더 준다
-                            AnimatedContainer(
-                              duration: Duration(milliseconds: 200),
-                              curve: Curves.easeOut,
-                              height: message.reaction != null ? 22 : 8,
-                            ),
-                          ],
+                    ),
+                  ),
+                if (_store.hasMore(_roomId))
+                  Center(
+                    child: Pressable(
+                      onTap: _loadOlder,
+                      scale: 0.96,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 6,
+                      ),
+                      child: Text(
+                        '이전 대화 더 보기',
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
-                if (_messages.isNotEmpty &&
-                    _messages.last.mine &&
-                    _messages.last.read)
+                  ),
+                for (var i = 0; i < _messages.length; i++) ...[
+                  // 날짜가 바뀌면 가운데 구분선을 넣는다
+                  if (i == 0 ||
+                      !_sameDay(
+                        _messages[i - 1].createdAt,
+                        _messages[i].createdAt,
+                      )) ...[
+                    SizedBox(height: i == 0 ? 0 : 8),
+                    Center(
+                      child: Text(
+                        _dayLabel(_messages[i].createdAt),
+                        style: AppTextStyles.caption,
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                  ],
+                  _messageRow(_messages[i], desktop),
+                ],
+                if (_readLabel case final label?)
                   Align(
                     alignment: Alignment.centerRight,
                     child: Padding(
                       padding: EdgeInsets.only(right: 4),
                       child: Text(
-                        '읽음',
+                        label,
                         style: AppTextStyles.caption.copyWith(fontSize: 12),
+                      ),
+                    ),
+                  ),
+                if (_typingLabel case final label?)
+                  Padding(
+                    padding: EdgeInsets.only(top: 10, left: 4),
+                    child: Text(
+                      label,
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.textTertiary,
                       ),
                     ),
                   ),
@@ -411,14 +604,14 @@ class _ChatScreenState extends State<ChatScreen> {
                           height: 36,
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
-                            color: widget.color.withValues(
-                              alpha: widget.emoji != null ? 0.12 : 1,
+                            color: _headColor.withValues(
+                              alpha: _isGroup ? 0.12 : 1,
                             ),
                             shape: BoxShape.circle,
                           ),
                           child: Text(
-                            widget.emoji ?? _title.characters.first,
-                            style: widget.emoji != null
+                            _isGroup ? '💬' : _title.characters.first,
+                            style: _isGroup
                                 ? TextStyle(fontSize: 15)
                                 : TextStyle(
                                     fontFamily: AppTextStyles.fontFamily,
@@ -429,7 +622,14 @@ class _ChatScreenState extends State<ChatScreen> {
                           ),
                         ),
                         SizedBox(width: 10),
-                        Text(_title, style: AppTextStyles.title3),
+                        Flexible(
+                          child: Text(
+                            _title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.title3,
+                          ),
+                        ),
                         SizedBox(width: 2),
                         Icon(
                           CupertinoIcons.chevron_forward,
@@ -453,7 +653,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: GlassInputBar(
                   onSend: _send,
                   focusNode: _inputFocus,
-                  replyLabel: _replyTarget?.text,
+                  replyLabel: _replyTarget?.body,
+                  onChanged: (_) => _onTyping(),
                   onCancelReply: () => setState(() => _replyTarget = null),
                 ),
               ),
@@ -465,36 +666,6 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
-class _ChatMessage {
-  _ChatMessage({
-    required this.text,
-    required this.mine,
-    this.reaction,
-    this.read = false,
-    this.replyTo,
-    this.system = false,
-  });
-
-  final String text;
-  final bool mine;
-
-  /// 초대 안내처럼 가운데 회색으로 표시되는 시스템 메시지 여부
-  final bool system;
-
-  /// 답글 대상 메시지의 원문 (답글이 아니면 null)
-  final String? replyTo;
-
-  /// 말풍선에 달린 리액션 이모지 (없으면 null)
-  String? reaction;
-
-  /// 상대가 읽었는지 여부 (내 메시지에만 의미 있음)
-  bool read;
-
-  /// 전송 취소로 사라지는 중인지 여부 (애니메이션 후 리스트에서 제거)
-  bool removing = false;
-}
-
-/// 전송 취소 시 말풍선이 줄어들고 흐려지며 사라지는 애니메이션 래퍼
 class _RemovableMessage extends StatelessWidget {
   _RemovableMessage({
     super.key,
@@ -537,6 +708,7 @@ class _MyBubble extends StatelessWidget {
     required this.text,
     this.replyTo,
     this.reaction,
+    this.pending = false,
     this.onDoubleTap,
     this.onLongPress,
     this.actions,
@@ -545,6 +717,9 @@ class _MyBubble extends StatelessWidget {
   final String text;
   final String? replyTo;
   final String? reaction;
+
+  /// 아직 서버 응답을 못 받았다 — 살짝 흐리게 그려 보내는 중임을 알린다
+  final bool pending;
   final VoidCallback? onDoubleTap;
   final VoidCallback? onLongPress;
 
@@ -566,64 +741,71 @@ class _MyBubble extends StatelessWidget {
   }
 
   Widget _bubble() {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        GestureDetector(
-          onDoubleTap: onDoubleTap,
-          onLongPress: onLongPress,
-          child: Container(
-            constraints: BoxConstraints(maxWidth: 280),
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(20),
-                topRight: Radius.circular(20),
-                bottomLeft: Radius.circular(20),
-                bottomRight: Radius.circular(6),
+    return Opacity(
+      // 보내는 중에는 살짝 흐리다 — 서버가 받으면 또렷해진다
+      opacity: pending ? 0.55 : 1,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          GestureDetector(
+            onDoubleTap: onDoubleTap,
+            onLongPress: onLongPress,
+            child: Container(
+              constraints: BoxConstraints(maxWidth: 280),
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                  bottomLeft: Radius.circular(20),
+                  bottomRight: Radius.circular(6),
+                ),
               ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (replyTo != null)
-                  Container(
-                    margin: EdgeInsets.only(bottom: 6),
-                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      replyTo!,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.caption.copyWith(
-                        color: Colors.white.withValues(alpha: 0.85),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (replyTo != null)
+                    Container(
+                      margin: EdgeInsets.only(bottom: 6),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        replyTo!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.caption.copyWith(
+                          color: Colors.white.withValues(alpha: 0.85),
+                        ),
                       ),
                     ),
+                  Text(
+                    text,
+                    style: AppTextStyles.body2.copyWith(color: Colors.white),
                   ),
-                Text(
-                  text,
-                  style: AppTextStyles.body2.copyWith(color: Colors.white),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-        if (reaction != null)
-          Positioned(
-            bottom: -14,
-            right: 10,
-            child: _ReactionPill(
-              key: ValueKey(reaction!),
-              emoji: reaction!,
-              onTap: onLongPress,
+          if (reaction != null)
+            Positioned(
+              bottom: -14,
+              right: 10,
+              child: _ReactionPill(
+                key: ValueKey(reaction!),
+                emoji: reaction!,
+                onTap: onLongPress,
+              ),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 }

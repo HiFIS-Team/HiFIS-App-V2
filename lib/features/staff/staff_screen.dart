@@ -25,6 +25,7 @@ import '../../core/widgets/phone_scaffold.dart';
 import '../../core/widgets/placeholder_screen.dart';
 import '../../core/widgets/pressable.dart';
 import '../messages/chat_screen.dart';
+import '../messages/chat_store.dart';
 
 part 'staff_manage.dart';
 part 'staff_models.dart';
@@ -160,16 +161,6 @@ class _StaffScreenState extends State<StaffScreen> {
     }
   }
 
-  /// 1:1 사내톡 — 상대 이름으로 대화방을 연다
-  void _chat(_Member member) {
-    Navigator.push(
-      context,
-      CupertinoPageRoute(
-        builder: (_) => ChatScreen(name: member.name, color: member.color),
-      ),
-    );
-  }
-
   void _copy(String label, String value) {
     Clipboard.setData(ClipboardData(text: value));
     AppToast.show(context, '$label을 복사했어요');
@@ -204,7 +195,7 @@ class _StaffScreenState extends State<StaffScreen> {
                 showBranch: _branch == _allBranches,
                 member: member,
                 onTap: () => _open(member),
-                onChat: () => _chat(member),
+                onChat: () => _openChat(context, member),
                 onCopy: () => _copy('이메일', member.email),
                 onApprove: () => _activate(member),
                 onReject: () => _resign(member),
@@ -224,7 +215,7 @@ class _StaffScreenState extends State<StaffScreen> {
             showBranch: _branch == _allBranches,
             member: member,
             onTap: () => _open(member),
-            onChat: () => _chat(member),
+            onChat: () => _openChat(context, member),
             onCopy: () => _copy('이메일', member.email),
             onApprove: () => _activate(member),
             onReject: () => _resign(member),
@@ -1416,13 +1407,7 @@ class _MemberDetailState extends State<_MemberDetail> {
                     icon: CupertinoIcons.chat_bubble_fill,
                     label: '사내톡',
                     primary: true,
-                    onTap: () => Navigator.push(
-                      context,
-                      CupertinoPageRoute(
-                        builder: (_) =>
-                            ChatScreen(name: member.name, color: member.color),
-                      ),
-                    ),
+                    onTap: () => _openChat(context, member),
                   ),
                 ),
                 SizedBox(width: 8),
