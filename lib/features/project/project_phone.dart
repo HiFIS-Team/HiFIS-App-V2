@@ -11,6 +11,7 @@ class _ProjectPhone extends StatelessWidget {
     required this.onFilter,
     required this.onCreate,
     required this.onChanged,
+    required this.onOpen,
   });
 
   final List<_Project> projects;
@@ -21,7 +22,12 @@ class _ProjectPhone extends StatelessWidget {
   /// 상세에서 바꾼 내용이 목록에도 반영되도록 돌아올 때 알린다
   final VoidCallback onChanged;
 
+  /// 상세를 열기 전에 체크리스트를 받아 온다
+  final Future<void> Function(_Project) onOpen;
+
   Future<void> _open(BuildContext context, _Project project) async {
+    await onOpen(project);
+    if (!context.mounted) return;
     await Navigator.push(
       context,
       CupertinoPageRoute(

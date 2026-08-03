@@ -22,10 +22,11 @@ import '../project/project_screen.dart';
 /// 오늘 근무는 `/me/home` 에서 온다. 지점 집계인 `/dashboard` 와 달리
 /// 권한 없이 본인 것만 주는 요약이라 직급에 상관없이 열린다.
 ///
-/// 프로젝트·공지 **목록**은 아직 목업이다. 서버가 홈 요약으로 주는 것은
-/// 개수뿐이고 목록은 각 탭 화면과 같은 데이터를 써야 해서,
-/// 그 화면들을 연동할 때 홈 카드도 같이 붙인다.
-/// 요약의 `monthScore` 도 지금은 놓을 자리가 없어 안 쓴다 — 화면을 늘리지 않는다.
+/// 프로젝트·공지 카드는 각 탭 화면과 **같은 목록**을 읽는다. 그 목록은 탭을
+/// 열어야 채워지므로, 홈에서도 요약과 나란히 받아 둔다
+/// (`loadNoticesIfNeeded`·`loadProjectsIfNeeded`). 안 그러면 홈부터 본 사람은
+/// 카드가 비어 보인다.
+/// 요약의 `monthScore` 는 지금 놓을 자리가 없어 안 쓴다 — 화면을 늘리지 않는다.
 class HomeScreen extends StatefulWidget {
   HomeScreen({super.key, this.onOpenProjects, this.onOpenNotices});
 
@@ -81,9 +82,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // 실패해도 찍어 둔다 — 서버가 죽어 있을 때 포커스마다 재시도하지 않게
     _loadedAt = DateTime.now();
     try {
-      // 공지 카드가 목록을 그대로 읽는다 — 요약과 같이 받아 둔다
+      // 공지·프로젝트 카드가 목록을 그대로 읽는다 — 요약과 같이 받아 둔다
       final summary =
-          (await Future.wait([HomeApi.summary(), loadNoticesIfNeeded()])).first
+          (await Future.wait([
+                HomeApi.summary(),
+                loadNoticesIfNeeded(),
+                loadProjectsIfNeeded(),
+              ])).first
               as HomeSummary;
       if (!mounted) return;
       setState(() => _summary = summary);

@@ -2,7 +2,10 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/api/api_exception.dart';
+import '../../core/api/project_api.dart';
 import '../../core/data/staff.dart';
+import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -41,12 +44,36 @@ class _ProjectScreenState extends State<ProjectScreen> {
   /// 선택한 프로젝트 (목록이 바뀌면 첫 항목으로 되돌린다)
   _Project? _selected;
 
+  /// 첫 진입에만 스피너를 돌린다 — 탭을 다시 열 때는 받아둔 목록을 바로 그린다
+  bool _loading = !_projectsLoaded;
+
   @override
   void initState() {
     super.initState();
     // 홈에서 넘어오며 걸어둔 요청은 첫 빌드 전에 반영한다 (setState 필요 없음)
     _consumeRequest();
     requestedProject.addListener(_onRequest);
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      await _loadProjects();
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  /// 상세를 열 때 체크리스트를 받아 온다
+  Future<void> _openTodos(_Project project) async {
+    if (project.todosLoaded) return;
+    try {
+      await _loadTodos(project);
+      if (mounted) setState(() {});
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
   }
 
   @override
@@ -84,19 +111,38 @@ class _ProjectScreenState extends State<ProjectScreen> {
   }
 
   Future<void> _create() async {
-    final created = await _showProjectComposer(context);
-    if (created == null || !mounted) return;
-    setState(() {
-      _projects.add(created);
-      // 만든 건 바로 열어준다 (마감이 남아 있으니 진행 중)
-      _phase = _Phase.running;
-      _selected = created;
-    });
-    AppToast.show(context, '프로젝트를 만들었어요');
+    final draft = await _showProjectComposer(context);
+    if (draft == null || !mounted) return;
+
+    try {
+      final created = await _saveNewProject(draft);
+      if (!mounted) return;
+      setState(() {
+        _projects.insert(0, created);
+        // 만든 건 바로 열어준다 (마감이 남아 있으니 진행 중)
+        _phase = _Phase.running;
+        _selected = created;
+      });
+      AppToast.show(context, '프로젝트를 만들었어요');
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return Scaffold(
+        backgroundColor: isDesktop ? null : AppColors.background,
+        body: Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2.4,
+            valueColor: AlwaysStoppedAnimation(AppColors.primary),
+          ),
+        ),
+      );
+    }
+
     final list = _visible;
 
     if (!isDesktop) {
@@ -106,10 +152,15 @@ class _ProjectScreenState extends State<ProjectScreen> {
         onFilter: (v) => setState(() => _phase = v),
         onCreate: _create,
         onChanged: () => setState(() {}),
+        onOpen: _openTodos,
       );
     }
 
     final selected = _syncSelection(list);
+    // 데스크톱은 고른 프로젝트가 바로 상세로 열린다 — 그때 체크리스트를 받는다
+    if (selected != null && !selected.todosLoaded) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _openTodos(selected));
+    }
 
     // 배경은 다른 화면과 같은 회색 — 카드가 떠 보이게 한다.
     // 목록 쪽만 흰 패널로 둬서 좌우 영역이 구분된다.
@@ -435,15 +486,42 @@ Future<void> _extendProject(
   _Project project,
   VoidCallback onChanged,
 ) async {
-  final request = await _showExtensionDialog(context, project);
-  if (request == null) return;
+  final draft = await _showExtensionDialog(context, project);
+  if (draft == null) return;
   final before = _date(project.due);
-  project.request = request;
+
+  final projectId = project.id;
+  if (projectId != null) {
+    try {
+      final saved = await ProjectApi.requestChange(
+        projectId,
+        // 마감이 지난 뒤 올리는 건 '연장'이 아니라 '누락 사유'다
+        type: _dday(project.due) < 0
+            ? ProjectRequestType.overdue
+            : ProjectRequestType.extension,
+        newDue: draft.due,
+        reason: draft.reason,
+      );
+      project.request = _Extension(
+        id: saved.id,
+        requester: me,
+        due: saved.newDue,
+        reason: saved.reason,
+        time: saved.createdAt,
+      );
+    } catch (error) {
+      if (context.mounted) AppToast.show(context, messageOf(error));
+      return;
+    }
+  } else {
+    project.request = draft;
+  }
+
   project.events.insert(
     0,
     _Event(
       author: me,
-      text: '기한 연장 신청 ($before → ${_date(request.due)})',
+      text: '기한 연장 신청 ($before → ${_date(draft.due)})',
       time: DateTime.now(),
     ),
   );
@@ -478,13 +556,37 @@ class _ProjectDetail extends StatelessWidget {
     );
   }
 
-  void _toggle(_Todo todo) {
-    todo.done = !todo.done;
+  /// 화면을 먼저 바꾸고 서버에 보낸다 — 실패하면 되돌린다.
+  /// 체크 하나 누를 때마다 기다리게 하면 목록이 뻑뻑해진다.
+  Future<void> _toggle(BuildContext context, _Todo todo) async {
+    final before = todo.done;
+    todo.done = !before;
     _log(todo.done ? "'${todo.text}' 완료" : "'${todo.text}' 완료 취소");
     onChanged();
+
+    final projectId = project.id;
+    final todoId = todo.id;
+    if (projectId == null || todoId == null) return;
+    try {
+      await ProjectApi.updateTodo(projectId, todoId, done: todo.done);
+    } catch (error) {
+      todo.done = before;
+      onChanged();
+      if (context.mounted) AppToast.show(context, messageOf(error));
+    }
   }
 
-  void _remove(_Todo todo) {
+  Future<void> _remove(BuildContext context, _Todo todo) async {
+    final projectId = project.id;
+    final todoId = todo.id;
+    if (projectId != null && todoId != null) {
+      try {
+        await ProjectApi.deleteTodo(projectId, todoId);
+      } catch (error) {
+        if (context.mounted) AppToast.show(context, messageOf(error));
+        return;
+      }
+    }
     project.todos.remove(todo);
     _log("'${todo.text}' 할 일 삭제");
     onChanged();
@@ -497,8 +599,26 @@ class _ProjectDetail extends StatelessWidget {
       current: todo.assignee,
     );
     if (picked == null) return;
+
+    final before = todo.assignee;
     todo.assignee = picked.isEmpty ? null : picked;
     onChanged();
+
+    final projectId = project.id;
+    final todoId = todo.id;
+    if (projectId == null || todoId == null) return;
+    try {
+      await ProjectApi.updateTodo(
+        projectId,
+        todoId,
+        // 담당자를 비우는 건 서버가 null 로 받는다
+        assigneeId: _idOfMember(project, todo.assignee),
+      );
+    } catch (error) {
+      todo.assignee = before;
+      onChanged();
+      if (context.mounted) AppToast.show(context, messageOf(error));
+    }
   }
 
   void _comment(String text) {
@@ -523,10 +643,25 @@ class _ProjectDetail extends StatelessWidget {
     );
     if (reason == null) return;
 
+    final requestId = request.id;
+    if (requestId != null) {
+      try {
+        if (approve) {
+          await ProjectApi.approve(requestId);
+        } else {
+          await ProjectApi.reject(requestId, reason: reason);
+        }
+      } catch (error) {
+        if (context.mounted) AppToast.show(context, messageOf(error));
+        return;
+      }
+    }
+
     if (approve) {
       _log(
         '기한 연장 승인 (${_date(project.due)} → ${_date(request.due)}) · $reason',
       );
+      // 승인하면 서버가 프로젝트 마감일을 새 날짜로 바꿔 준다
       project.due = request.due;
     } else {
       _log('기한 연장 반려 (마감일 ${_date(project.due)} 유지) · $reason');
@@ -713,8 +848,8 @@ class _ProjectDetail extends StatelessWidget {
         // 칸 안에 스크롤을 넣지 않고 페이지가 늘어나는 쪽을 택했다.
         _TodoCard(
           project: project,
-          onToggle: _toggle,
-          onRemove: _remove,
+          onToggle: (todo) => _toggle(context, todo),
+          onRemove: (todo) => _remove(context, todo),
           onAssign: (todo) => _assign(context, todo),
         ),
         SizedBox(height: 16),
@@ -2586,11 +2721,14 @@ class _MemberToggleRow extends StatelessWidget {
   }
 }
 
-// ── 데이터 (목업) ──
+// ── 데이터 ──
 
-/// 할 일 한 건
+/// 할 일 한 건 (서버 `ProjectTodo`)
 class _Todo {
-  _Todo({required this.text, this.assignee, this.done = false});
+  _Todo({required this.text, this.id, this.assignee, this.done = false});
+
+  /// 서버 uuid — null 이면 아직 안 올린 것 (새 프로젝트 만들 때 미리 적은 항목)
+  String? id;
 
   String text;
   String? assignee;
@@ -2630,7 +2768,11 @@ class _Extension {
     required this.due,
     required this.reason,
     required this.time,
+    this.id,
   });
+
+  /// 서버 요청 uuid — 승인·반려할 때 쓴다
+  final String? id;
 
   final String requester;
 
@@ -2652,191 +2794,210 @@ class _Project {
     required this.members,
     required this.todos,
     required this.events,
+    this.id,
+    this.createdById,
+    this.memberIds = const [],
+    this.serverProgress = 0,
+    this.serverTodoCount = 0,
+    this.serverDoneCount = 0,
     this.request,
   });
 
-  final String name;
-  final String desc;
+  /// 서버 uuid — null 이면 아직 안 올린 것
+  String? id;
+
+  String name;
+  String desc;
   final Color color;
-  final String owner;
-  final DateTime start;
+  String owner;
+  final String? createdById;
+  DateTime start;
 
   /// 마감일 — 기한 연장이 승인되면 늘어난다
   DateTime due;
 
   final List<String> members;
+
+  /// 참여자 uuid — 서버에 보낼 때 쓴다. [members] 와 같은 사람들이다
+  List<String> memberIds;
+
   final List<_Todo> todos;
+
+  /// 활동 기록·댓글 — **서버에 없다** (backend-gap.md 3번).
+  /// 앱이 화면 안에서만 쌓다가 껐다 켜면 지워진다.
   final List<_Event> events;
+
+  /// 체크리스트를 받아왔는지 — 상세를 열 때 한 번만 받는다.
+  /// 새로 만든 프로젝트는 만들면서 바로 채우므로 [_saveNewProject] 가 켠다.
+  bool todosLoaded = false;
+
+  /// 목록에서 쓰는 서버 값. 체크리스트를 받기 전에는 이걸로 그린다
+  int serverProgress;
+  int serverTodoCount;
+  int serverDoneCount;
 
   /// 결재를 기다리는 기한 연장 신청 (없으면 null)
   _Extension? request;
 
-  int get doneCount => todos.where((t) => t.done).length;
+  int get todoCount => todosLoaded ? todos.length : serverTodoCount;
 
-  double get progress => todos.isEmpty ? 0 : doneCount / todos.length;
+  int get doneCount =>
+      todosLoaded ? todos.where((t) => t.done).length : serverDoneCount;
 
-  /// 단계는 따로 관리하지 않고 할 일과 마감일에서 끌어낸다.
-  /// 할 일을 다 끝내면 완료, 못 끝낸 채 마감이 지나면 누락.
+  /// 0~1. 체크리스트가 있으면 완료 비율, 없으면 서버가 들고 있는 수동값.
+  /// **서버 `_recompute_progress` 와 같은 규칙이다.**
+  double get progress =>
+      todoCount == 0 ? serverProgress / 100 : doneCount / todoCount;
+
+  /// 단계는 따로 관리하지 않고 진행률과 마감일에서 끌어낸다.
+  /// 서버 `_status` 와 같은 순서로 판정하되, **서버의 `WAITING`(진행률 0)은
+  /// 진행 중에 합친다** — 앱 탭이 진행 중·완료·누락 셋뿐이다.
   _Phase get phase {
-    if (todos.isNotEmpty && doneCount == todos.length) return _Phase.done;
+    if (progress >= 1) return _Phase.done;
     if (_dday(due) < 0) return _Phase.missed;
     return _Phase.running;
   }
 }
 
-/// 목업 프로젝트. 탭을 오가도 유지되도록 모듈 전역으로 둔다.
-final _projects = <_Project>[..._seedProjects()];
+/// 올라온 프로젝트 — 서버에서 받아 온다.
+/// 탭을 오가도 다시 받지 않도록 모듈 전역으로 둔다.
+final _projects = <_Project>[];
 
-List<_Project> _seedProjects() {
-  final now = DateTime.now();
-  DateTime day(int offset) =>
-      DateTime(now.year, now.month, now.day + offset, 18);
-  DateTime ago(int hours) => now.subtract(Duration(hours: hours));
+/// 한 번이라도 받아왔는지 — 탭을 다시 열 때 빈 목록을 깜빡이지 않게 한다
+bool _projectsLoaded = false;
 
-  return [
-    _Project(
-      name: '여름 회원 이벤트 프로모션',
-      desc: '7~8월 신규 회원 유치를 위한 여름 프로모션. 포스터·SNS·경품까지 한 번에 진행합니다.',
-      color: AppColors.error,
-      owner: '민중기',
-      start: day(-12),
-      due: day(2),
-      members: [me, '민중기', '이준승', '전상현', '박준현'],
-      todos: [
-        _Todo(text: '포스터 시안 확정', assignee: '이준승', done: true),
-        _Todo(text: '경품 업체 선정', assignee: '박준현', done: true),
-        _Todo(text: '인스타 예약 발행', assignee: '전상현'),
-        _Todo(text: '현수막 설치', assignee: me),
-        _Todo(text: '이벤트 안내 문자 발송', assignee: '민중기'),
-      ],
-      events: [
-        _Event(
-          author: '민중기',
-          text: '현수막은 정문 쪽으로 걸어주세요',
-          time: ago(3),
-          comment: true,
+Future<void> _loadProjects() async {
+  // 결재 대기 중인 기한 변경 요청을 같이 받아 프로젝트에 붙인다
+  final listing = ProjectApi.list();
+  final pending = ProjectApi.requests(status: ProjectRequestStatus.pending);
+  final rows = await listing;
+  final requests = <String, ProjectRequest>{
+    for (final request in await pending) request.projectId: request,
+  };
+
+  _projects
+    ..clear()
+    ..addAll([for (final row in rows) _fromServer(row, requests[row.id])]);
+  _projectsLoaded = true;
+}
+
+/// 서버 프로젝트 → 화면 모델
+///
+/// 체크리스트는 여기서 안 받는다. 목록에는 개수(`todoCount`·`doneCount`)만
+/// 있으면 되고, 항목 자체는 상세를 열 때 [_loadTodos] 로 받는다.
+_Project _fromServer(Project row, ProjectRequest? request) {
+  return _Project(
+    id: row.id,
+    name: row.title,
+    desc: row.purpose,
+    color: _projectColor(row.id),
+    owner: _nameOf(row.createdById),
+    createdById: row.createdById,
+    start: row.startAt,
+    due: row.due,
+    members: [for (final id in row.assigneeIds) _nameOf(id)]
+      ..removeWhere((name) => name.isEmpty),
+    memberIds: row.assigneeIds,
+    todos: [],
+    events: [],
+    serverProgress: row.progress,
+    serverTodoCount: row.todoCount,
+    serverDoneCount: row.doneCount,
+    request: request == null
+        ? null
+        : _Extension(
+            id: request.id,
+            requester: _nameOf(request.requestedById),
+            due: request.newDue,
+            reason: request.reason,
+            time: request.createdAt,
+          ),
+  );
+}
+
+/// uuid → 이름. 명단에 없으면(퇴사자 등) 빈 문자열
+String _nameOf(String id) => StaffDirectory.instance.byId(id)?.name ?? '';
+
+/// 프로젝트 색
+///
+/// **서버에 색 필드가 없다**(backend-gap.md 38번). 카드·아바타·차트가 색으로
+/// 프로젝트를 구분하므로 id 에서 만들어 쓴다 — 같은 프로젝트는 어느 기기에서나
+/// 같은 색이 나온다. 만들 때 고른 색은 이번 실행에서만 살아 있다.
+const _projectColors = [
+  AppColors.primary,
+  AppColors.error,
+  AppColors.warning,
+  AppColors.success,
+  Color(0xFF7C5CFC),
+  Color(0xFF00A8B5),
+  Color(0xFFE0447C),
+];
+
+Color _projectColor(String id) =>
+    _projectColors[id.hashCode.abs() % _projectColors.length];
+
+/// 상세를 열 때 체크리스트를 받는다 — 한 번 받으면 다시 받지 않는다
+Future<void> _loadTodos(_Project project) async {
+  final id = project.id;
+  if (id == null || project.todosLoaded) return;
+  final rows = await ProjectApi.todos(id);
+  project.todos
+    ..clear()
+    ..addAll([
+      for (final row in rows)
+        _Todo(
+          id: row.id,
+          text: row.content,
+          assignee: row.assigneeId == null ? null : _nameOf(row.assigneeId!),
+          done: row.done,
         ),
-        _Event(author: '박준현', text: "'경품 업체 선정' 완료", time: ago(20)),
-        _Event(author: '이준승', text: "'포스터 시안 확정' 완료", time: ago(46)),
-      ],
-    ),
-    _Project(
-      name: 'PT룸 장비 교체',
-      desc: '노후된 PT룸 소도구와 벤치를 교체합니다. 예산 승인 후 순차 반입.',
-      color: AppColors.warning,
-      owner: '박준현',
-      start: day(-6),
-      due: day(5),
-      members: [me, '박준현', '유찬빈'],
-      todos: [
-        _Todo(text: '교체 대상 목록 정리', assignee: '박준현', done: true),
-        _Todo(text: '견적 3곳 비교', assignee: '유찬빈', done: true),
-        _Todo(text: '예산 결재 올리기', assignee: '박준현'),
-        _Todo(text: '기존 장비 처분', assignee: me),
-        _Todo(text: '반입 일정 공지', assignee: '유찬빈'),
-      ],
-      events: [
-        _Event(author: '유찬빈', text: "'견적 3곳 비교' 완료", time: ago(30)),
-        _Event(
-          author: '박준현',
-          text: '벤치는 두 대만 먼저 들이는 게 좋겠어요',
-          time: ago(52),
-          comment: true,
-        ),
-      ],
-    ),
-    _Project(
-      name: '신규 트레이너 온보딩',
-      desc: '신규 입사 트레이너 2명의 교육 과정과 첫 달 스케줄을 준비합니다.',
-      color: AppColors.primary,
-      owner: '민중기',
-      start: day(-3),
-      due: day(12),
-      members: [me, '민중기', '유찬빈', '전상현'],
-      todos: [
-        _Todo(text: '교육 자료 최신화', assignee: '민중기', done: true),
-        _Todo(text: '멘토 배정', assignee: me),
-        _Todo(text: '첫 주 스케줄 편성', assignee: '유찬빈'),
-        _Todo(text: '사내 계정 발급 요청', assignee: '전상현'),
-      ],
-      events: [_Event(author: '민중기', text: "'교육 자료 최신화' 완료", time: ago(8))],
-    ),
-    _Project(
-      name: '가을 시즌 클래스 개편',
-      desc: '가을 시즌 GX 클래스 시간표를 개편하고 신규 프로그램을 도입합니다.',
-      color: AppColors.primary,
-      owner: '유찬빈',
-      start: day(-1),
-      due: day(16),
-      members: [me, '유찬빈'],
-      todos: [
-        _Todo(text: '회원 선호 시간대 조사', assignee: '유찬빈'),
-        _Todo(text: '신규 프로그램 후보 정리', assignee: me),
-        _Todo(text: '강사 일정 조율'),
-      ],
-      events: [],
-    ),
-    _Project(
-      name: '락커룸 리모델링',
-      desc: '락커룸 샤워부스와 락커 교체 공사. 공사 기간 중 이용 안내가 필요합니다.',
-      color: AppColors.gray500,
-      owner: '이준승',
-      start: day(2),
-      due: day(23),
-      members: [me, '이준승', '민중기', '이준경', '박준현', '전상현'],
-      todos: [
-        _Todo(text: '공사 업체 선정', assignee: '이준승'),
-        _Todo(text: '공사 기간 회원 안내문', assignee: '민중기'),
-        _Todo(text: '임시 락커 배치도', assignee: me),
-      ],
-      events: [
-        _Event(
-          author: '이준승',
-          text: '공사는 휴관일 끼고 진행하려 합니다',
-          time: ago(70),
-          comment: true,
-        ),
-      ],
-    ),
-    // 누락 탭 확인용 — 마감이 지났는데 할 일이 남은 프로젝트 (연장 신청이 올라와 있다)
-    _Project(
-      name: '상반기 시설 안전 점검',
-      desc: '소방·전기 설비 정기 점검과 보수. 업체 일정이 밀려 마감을 넘겼습니다.',
-      color: AppColors.warning,
-      owner: '민중기',
-      start: day(-25),
-      due: day(-4),
-      members: [me, '민중기', '이준경'],
-      todos: [
-        _Todo(text: '소방 설비 점검', assignee: '민중기', done: true),
-        _Todo(text: '전기 안전 진단', assignee: '이준경'),
-        _Todo(text: '점검 결과 보고서 제출', assignee: me),
-      ],
-      events: [_Event(author: '민중기', text: "'소방 설비 점검' 완료", time: ago(120))],
-      request: _Extension(
-        requester: '민중기',
-        due: day(7),
-        reason: '전기 진단 업체 일정이 밀려서 다음 주까지 연장이 필요합니다',
-        time: ago(5),
-      ),
-    ),
-    // 완료 탭 확인용 — 할 일이 모두 체크된 프로젝트
-    _Project(
-      name: '상반기 회원권 정책 개편',
-      desc: '상반기 회원권 가격과 환불 규정을 정비했습니다.',
-      color: AppColors.success,
-      owner: '이준승',
-      start: day(-40),
-      due: day(-6),
-      members: [me, '이준승', '민중기'],
-      todos: [
-        _Todo(text: '경쟁사 가격 조사', assignee: '민중기', done: true),
-        _Todo(text: '신규 가격표 확정', assignee: '이준승', done: true),
-        _Todo(text: '환불 규정 문구 수정', assignee: me, done: true),
-      ],
-      events: [_Event(author: '이준승', text: "'신규 가격표 확정' 완료", time: ago(150))],
-    ),
-  ];
+    ]);
+  project.todosLoaded = true;
+}
+
+/// 새 프로젝트를 서버에 올린다
+///
+/// 폼에서 미리 적어 둔 체크리스트도 같이 올린다 — 프로젝트를 먼저 만들어야
+/// 붙일 자리(uuid)가 생기므로 순서가 갈린다.
+/// 체크리스트가 하나라도 붙으면 서버가 진행률을 다시 계산해 주므로,
+/// 만들어진 프로젝트를 마지막에 한 번 더 받아 온다.
+Future<_Project> _saveNewProject(_Project draft) async {
+  final created = await ProjectApi.create(
+    title: draft.name,
+    purpose: draft.desc,
+    startAt: draft.start,
+    due: draft.due,
+    assigneeIds: [
+      for (final name in draft.members)
+        ?StaffDirectory.instance.byName(name)?.id,
+    ],
+  );
+
+  for (var i = 0; i < draft.todos.length; i++) {
+    final todo = draft.todos[i];
+    await ProjectApi.addTodo(
+      created.id,
+      content: todo.text,
+      assigneeId: StaffDirectory.instance.byName(todo.assignee ?? '')?.id,
+      sort: i,
+    );
+  }
+
+  final rows = await ProjectApi.list();
+  final fresh = rows.where((p) => p.id == created.id).firstOrNull ?? created;
+  final project = _fromServer(fresh, null);
+  // 방금 적은 것이라 다시 받을 필요가 없다
+  await _loadTodos(project);
+  return project;
+}
+
+/// 담당자 이름 → uuid. 서버는 사람을 uuid 로만 받는다
+String? _idOfMember(_Project project, String? name) {
+  if (name == null || name.isEmpty) return null;
+  for (final id in project.memberIds) {
+    if (_nameOf(id) == name) return id;
+  }
+  return StaffDirectory.instance.byName(name)?.id;
 }
 
 // ── 표시용 계산 ──
@@ -2918,6 +3079,20 @@ class ProjectBrief {
     context,
     CupertinoPageRoute(builder: (_) => _ProjectDetailScreen(project: _project)),
   );
+}
+
+/// 홈에서 프로젝트 목록을 채운다
+///
+/// 홈 카드가 [projectBriefs]·[projectCount] 로 같은 목록을 읽는데, 그건
+/// 프로젝트 탭을 한 번 열어야 채워진다. 홈부터 보면 카드가 비어 보인다.
+/// 실패해도 홈은 떠야 하므로 조용히 넘긴다 (프로젝트 탭에서 다시 시도한다).
+Future<void> loadProjectsIfNeeded() async {
+  if (_projectsLoaded) return;
+  try {
+    await _loadProjects();
+  } catch (_) {
+    // 서버가 꺼져 있다 — 카드는 비어 있는 채로 남는다
+  }
 }
 
 /// 홈 카드용 — 진행 중인 프로젝트를 마감 임박순으로 [count]개까지
