@@ -13,6 +13,7 @@ class EnvItem {
     required this.name,
     required this.points,
     required this.editable,
+    required this.sortOrder,
   });
 
   factory EnvItem.fromJson(Map<String, dynamic> json) => EnvItem(
@@ -21,6 +22,7 @@ class EnvItem {
     name: json['name'] as String,
     points: json['points'] as int,
     editable: json['editable'] as bool? ?? true,
+    sortOrder: json['sortOrder'] as int? ?? 0,
   );
 
   final String id;
@@ -32,6 +34,13 @@ class EnvItem {
 
   /// 점장이 이름·배점을 고칠 수 있는 항목인지 (기본 항목은 잠겨 있다)
   final bool editable;
+
+  /// 화면에 세우는 순서 — **서버가 정한다**
+  ///
+  /// 배점 순으로 오면 매일 여러 번 누르는 세탁(1점)이 맨 아래로 가고
+  /// 어쩌다 하는 현수막(10점)이 맨 위에 온다. 그래서 서버가 하루 일하는
+  /// 흐름대로 번호를 매겨 준다 (빨래·청소 → 관리 → 홍보 → 기타).
+  final int sortOrder;
 }
 
 /// 환경정비 수행 기록 (서버 `EnvTaskLogOut`)

@@ -78,7 +78,8 @@ class _WorkScreenState extends State<WorkScreen> {
       final logs = await logRequest;
       if (!mounted) return;
       setState(() {
-        _envItems = _sortForDisplay(items);
+        // 서버가 sortOrder 순으로 준다 — 앱이 다시 세우지 않는다
+        _envItems = items;
         _logs = logs;
         _envLoading = false;
       });
@@ -89,53 +90,11 @@ class _WorkScreenState extends State<WorkScreen> {
     }
   }
 
-  /// 화면에 세우는 순서 — 하루 일하는 흐름대로
-  ///
-  /// 서버는 배점이 높은 순으로 준다. 그러면 매일 여러 번 누르는 세탁(1점)이
-  /// 맨 아래로 가고 어쩌다 하는 현수막(10점)이 맨 위에 온다.
-  /// 빨래·청소 → 관리 → 홍보 → 기타 순으로 다시 세운다.
-  static const _envOrder = [
-    '세탁',
-    '건조기',
-    '빨래정리',
-    '구역청소',
-    '복도청소',
-    '락커정리',
-    '남탈부스',
-    '남탈청소',
-    '여탈부스',
-    '여탈청소',
-    '화장실청소',
-    '기구관리',
-    '회원지도',
-    'TM회원관리',
-    '게시물',
-    '스토리',
-    '전단지',
-    '현수막',
-    '족자',
-    '블로그',
-    '클레임해결',
-    '기타',
-  ];
-
   /// 이름 비교용 열쇠 — 공백·대소문자를 지우고 맞춘다
   ///
-  /// 지금은 서버 이름과 위 목록이 딱 맞지만, '기타'는 지점이 이름을 고칠 수
-  /// 있어서 띄어쓰기 하나로 순서에서 빠지지 않게 해 둔다.
+  /// '기타'는 지점이 이름을 고칠 수 있어서 띄어쓰기 하나로 못 알아보는 일이
+  /// 없게 해 둔다.
   static String _envKey(String name) => name.replaceAll(' ', '').toLowerCase();
-
-  static List<EnvItem> _sortForDisplay(List<EnvItem> items) {
-    final rank = {
-      for (var i = 0; i < _envOrder.length; i++) _envKey(_envOrder[i]): i,
-    };
-    return [...items]..sort((a, b) {
-      // 목록에 없는 항목(지점이 새로 만든 것)은 맨 뒤에 이름순으로 붙인다
-      final ra = rank[_envKey(a.name)] ?? _envOrder.length;
-      final rb = rank[_envKey(b.name)] ?? _envOrder.length;
-      return ra != rb ? ra.compareTo(rb) : a.name.compareTo(b.name);
-    });
-  }
 
   List<EnvTaskLog> get _myLogs => [
     for (final log in _logs)
