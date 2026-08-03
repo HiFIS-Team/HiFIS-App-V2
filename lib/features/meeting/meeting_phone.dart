@@ -24,10 +24,14 @@ class _MeetingPhone extends StatelessWidget {
     );
     if (!context.mounted) return;
     if (result == 'delete') {
-      _notes.remove(note);
-      AppToast.show(context, '회의록을 삭제했어요');
-    } else if (note.title.isEmpty && note.body.trim().isEmpty) {
-      // 아무것도 안 적고 나온 새 회의록은 목록에 남기지 않는다
+      try {
+        await _deleteNote(note);
+        if (context.mounted) AppToast.show(context, '회의록을 삭제했어요');
+      } catch (error) {
+        if (context.mounted) AppToast.show(context, messageOf(error));
+      }
+    } else if (note.id == null) {
+      // 아무것도 안 적어서 안 올라간 새 회의록은 목록에 남기지 않는다
       _notes.remove(note);
     }
     onChanged();
@@ -130,8 +134,29 @@ class _NoteScreen extends StatefulWidget {
 class _NoteScreenState extends State<_NoteScreen> {
   late bool _editing = widget.editing;
 
+  /// 편집을 마쳤다 — 여기서 서버에 올리거나 고친다
+  Future<void> _toggleEdit() async {
+    if (!_editing) {
+      setState(() => _editing = true);
+      return;
+    }
+    setState(() => _editing = false);
+    try {
+      await _saveNote(widget.note);
+      if (mounted) setState(() {});
+    } catch (error) {
+      if (!mounted) return;
+      // 실패하면 적던 내용을 지키기 위해 편집 상태로 되돌린다
+      setState(() => _editing = true);
+      AppToast.show(context, messageOf(error));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    // 남이 쓴 회의록은 읽기만 한다 (서버가 작성자·관리자만 통과시킨다)
+    final canEdit = widget.note.canEdit;
+
     return PhoneDetailScaffold(
       title: '회의록',
       // 편집·삭제는 헤더 글래스 버튼으로 올린다
@@ -142,20 +167,21 @@ class _NoteScreenState extends State<_NoteScreen> {
             symbolColor: AppColors.error,
             onPressed: () => Navigator.pop(context, 'delete'),
           ),
-        GlassIconButton(
-          // 심볼이 바뀌어도 네이티브 버튼을 새로 만들지 않게 고정 식별자를 준다
-          stableId: 'edit',
-          symbol: _editing ? 'checkmark' : 'square.and.pencil',
-          symbolColor: _editing ? AppColors.primary : null,
-          onPressed: () => setState(() => _editing = !_editing),
-        ),
+        if (canEdit)
+          GlassIconButton(
+            // 심볼이 바뀌어도 네이티브 버튼을 새로 만들지 않게 고정 식별자를 준다
+            stableId: 'edit',
+            symbol: _editing ? 'checkmark' : 'square.and.pencil',
+            symbolColor: _editing ? AppColors.primary : null,
+            onPressed: _toggleEdit,
+          ),
       ],
       child: _NoteView(
         note: widget.note,
         editing: _editing,
         onChanged: () => setState(() {}),
         onDelete: () => Navigator.pop(context, 'delete'),
-        onToggleEdit: () => setState(() => _editing = !_editing),
+        onToggleEdit: _toggleEdit,
         phone: true,
       ),
     );

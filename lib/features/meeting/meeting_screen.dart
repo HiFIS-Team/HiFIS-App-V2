@@ -1,12 +1,17 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/api/api_exception.dart';
+import '../../core/api/meeting_api.dart';
+import '../../core/data/current_user.dart';
 import '../../core/data/staff.dart';
+import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
+import '../../core/util/rich_blocks.dart';
 import '../../core/widgets/phone_scaffold.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/avatar.dart';
@@ -15,14 +20,18 @@ import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/markdown_view.dart';
 import '../../core/widgets/pressable.dart';
+import '../../core/widgets/reaction_row.dart';
 
 part 'meeting_phone.dart';
 
-/// 회의록 화면 (목업)
+/// 회의록 화면
 ///
 /// 데스크톱은 좌측 목록 + 우측 본문 2단 구조.
 /// 폰은 같은 내용을 목록 화면 + 본문 화면 두 장으로 나눠 보여준다.
 /// 본문은 마크다운으로 적고, 평소에는 렌더링된 모습으로 읽는다.
+///
+/// 서버는 본문을 블록 트리로 들고 있어서 오갈 때 옮겨 담는다
+/// ([blocksFromMarkdown] · [markdownFromBlocks]).
 class MeetingScreen extends StatefulWidget {
   MeetingScreen({super.key});
 
@@ -35,6 +44,23 @@ class _MeetingScreenState extends State<MeetingScreen> {
 
   /// 새로 만든 회의록은 바로 편집 모드로 연다
   bool _startEditing = false;
+
+  bool _loading = !_notesLoaded;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      await _loadNotes();
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+    if (mounted) setState(() => _loading = false);
+  }
 
   List<_Note> get _sorted =>
       [..._notes]..sort((a, b) => b.date.compareTo(a.date));
@@ -61,16 +87,56 @@ class _MeetingScreenState extends State<MeetingScreen> {
     });
   }
 
-  void _delete(_Note note) {
-    setState(() {
-      _notes.remove(note);
-      _selected = null;
-    });
-    AppToast.show(context, '회의록을 삭제했어요');
+  /// 편집을 마쳤다 — 여기서 서버에 올리거나 고친다
+  Future<void> _finishEditing(_Note note) async {
+    setState(() => _startEditing = false);
+    final isNew = note.id == null;
+    try {
+      await _saveNote(note);
+      if (!mounted) return;
+      // 아무것도 안 적고 끝낸 새 글은 목록에 남기지 않는다
+      if (note.id == null) {
+        setState(() {
+          _notes.remove(note);
+          _selected = null;
+        });
+        return;
+      }
+      setState(() {});
+      if (isNew) AppToast.show(context, '회의록을 올렸어요');
+    } catch (error) {
+      if (!mounted) return;
+      // 실패하면 적던 내용을 지키기 위해 편집 상태로 되돌린다
+      setState(() => _startEditing = true);
+      AppToast.show(context, messageOf(error));
+    }
+  }
+
+  Future<void> _delete(_Note note) async {
+    try {
+      await _deleteNote(note);
+      if (!mounted) return;
+      setState(() => _selected = null);
+      AppToast.show(context, '회의록을 삭제했어요');
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return Scaffold(
+        backgroundColor: isDesktop ? null : AppColors.background,
+        body: Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2.4,
+            valueColor: AlwaysStoppedAnimation(AppColors.primary),
+          ),
+        ),
+      );
+    }
+
     final list = _sorted;
 
     if (!isDesktop) {
@@ -108,8 +174,9 @@ class _MeetingScreenState extends State<MeetingScreen> {
                     editing: _startEditing,
                     onChanged: () => setState(() {}),
                     onDelete: () => _delete(selected),
-                    onToggleEdit: () =>
-                        setState(() => _startEditing = !_startEditing),
+                    onToggleEdit: () => _startEditing
+                        ? _finishEditing(selected)
+                        : setState(() => _startEditing = true),
                   ),
           ),
         ],
@@ -402,6 +469,7 @@ class _NoteViewState extends State<_NoteView> {
   }
 
   void _toggleEdit() {
+    // 마치기 전에 제목을 모델에 옮겨 담아야 그 값이 서버로 간다
     if (_editing) _sync();
     widget.onToggleEdit();
   }
@@ -488,36 +556,38 @@ class _NoteViewState extends State<_NoteView> {
           ),
           SizedBox(width: 6),
         ],
-        Pressable(
-          onTap: _toggleEdit,
-          scale: 0.95,
-          child: Container(
-            padding: EdgeInsets.fromLTRB(12, 8, 14, 8),
-            decoration: BoxDecoration(
-              color: _editing ? AppColors.primary : AppColors.gray50,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  _editing ? Icons.check_rounded : Icons.edit_rounded,
-                  size: 15,
-                  color: _editing ? Colors.white : AppColors.textSecondary,
-                ),
-                SizedBox(width: 4),
-                Text(
-                  _editing ? '완료' : '편집',
-                  style: AppTextStyles.body2.copyWith(
-                    fontSize: 14,
+        // 남이 쓴 회의록은 읽기만 한다 (서버가 작성자·관리자만 통과시킨다)
+        if (note.canEdit)
+          Pressable(
+            onTap: _toggleEdit,
+            scale: 0.95,
+            child: Container(
+              padding: EdgeInsets.fromLTRB(12, 8, 14, 8),
+              decoration: BoxDecoration(
+                color: _editing ? AppColors.primary : AppColors.gray50,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _editing ? Icons.check_rounded : Icons.edit_rounded,
+                    size: 15,
                     color: _editing ? Colors.white : AppColors.textSecondary,
-                    fontWeight: FontWeight.w700,
                   ),
-                ),
-              ],
+                  SizedBox(width: 4),
+                  Text(
+                    _editing ? '완료' : '편집',
+                    style: AppTextStyles.body2.copyWith(
+                      fontSize: 14,
+                      color: _editing ? Colors.white : AppColors.textSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
       ],
     );
 
@@ -665,6 +735,19 @@ class _NoteViewState extends State<_NoteView> {
           )
         else
           MarkdownView(source: note.body, onCheckbox: _toggleCheckbox),
+        // 반응은 읽을 때만 — 적는 중에 이모지 줄이 끼면 어수선하다
+        if (!_editing && note.id != null) ...[
+          SizedBox(height: 20),
+          ReactionRow(
+            target: ReactionTarget.meeting,
+            targetId: note.id,
+            reactions: note.reactions,
+            onToggled: (reactions) {
+              note.reactions = reactions;
+              widget.onChanged();
+            },
+          ),
+        ],
       ],
     );
   }
@@ -709,9 +792,12 @@ class _PersonChip extends StatelessWidget {
   }
 }
 
-// ── 데이터 (목업) ──
+// ── 데이터 ──
 
 /// 회의록 한 건 — 본문은 마크다운 원문 그대로 담는다
+///
+/// 서버는 본문을 **블록 트리**로 들고 있어서 오갈 때 `rich_blocks.dart` 가
+/// 옮겨 담는다 (backend-gap.md 42번).
 class _Note {
   _Note({
     required this.title,
@@ -719,15 +805,46 @@ class _Note {
     required this.members,
     required this.body,
     required this.updated,
+    this.id,
+    this.authorId,
+    this.memberIds = const [],
+    this.scope = MeetingScope.company,
+    this.projectId,
+    this.reactions = const [],
   });
+
+  /// 서버 uuid — null 이면 아직 안 올린 것
+  String? id;
+
+  /// 작성자 — 본인이나 관리자만 고칠 수 있다 ([canEdit])
+  String? authorId;
 
   String title;
   DateTime date;
+
+  /// 참석자 이름 — 화면에 쓴다. 서버에는 [memberIds] 로 보낸다
   List<String> members;
+
+  /// 참석자 uuid
+  List<String> memberIds;
+
   String body;
   DateTime updated;
 
+  final MeetingScope scope;
+  final String? projectId;
+
+  List<ReactionAgg> reactions;
+
   String get displayTitle => title.isEmpty ? '제목 없는 회의록' : title;
+
+  /// 고치거나 지울 수 있는지 — 서버 `_get_owned` 와 같은 기준이다.
+  /// 아직 안 올린 새 글은 열어 둔다 (안 그러면 쓰다 말고 저장도 못 한다)
+  bool get canEdit =>
+      id == null ||
+      authorId == null ||
+      authorId == currentUser?.id ||
+      myRole.strong;
 
   /// 목록에 보여줄 첫 줄 (마크다운 기호는 떼고)
   String get preview {
@@ -742,84 +859,82 @@ class _Note {
   }
 }
 
-/// 작성된 회의록 (목업). 탭을 오가도 유지되도록 모듈 전역으로 둔다.
-final _notes = <_Note>[..._seed()];
+/// 받아 둔 회의록. 탭을 오가도 유지되도록 모듈 전역으로 둔다.
+final _notes = <_Note>[];
 
-List<_Note> _seed() {
-  final now = DateTime.now();
-  DateTime day(int offset) => DateTime(now.year, now.month, now.day + offset);
+/// 한 번이라도 받아왔는지 — 탭을 다시 열 때 빈 목록을 깜빡이지 않게 한다
+bool _notesLoaded = false;
 
-  return [
-    _Note(
-      title: '주간 운영 회의',
-      date: day(0),
-      members: [me, '민중기', '이준승', '전상현'],
-      updated: now,
-      body: '''
-## 안건
-1. 지난주 매출 리뷰
-2. 여름 이벤트 진행 상황
-3. 기구 교체 일정
+Future<void> _loadNotes() async {
+  final rows = await MeetingApi.list();
+  _notes
+    ..clear()
+    ..addAll([for (final row in rows) _fromServer(row)]);
+  _notesLoaded = true;
+}
 
-## 논의 내용
-- 지난주 신규 등록 **18건**, 전주 대비 3건 증가
-- 재등록률은 62%로 목표(65%)에 조금 못 미침
-- 여름 이벤트 포스터 시안 확정, 인스타 예약 발행만 남음
-> 경품은 단가를 낮추더라도 수량을 늘리는 쪽이 반응이 좋다는 의견
+/// 서버 회의록 → 화면 모델
+_Note _fromServer(Meeting row) => _Note(
+  id: row.id,
+  authorId: row.authorId,
+  title: row.title,
+  date: row.meetingAt,
+  members: [
+    for (final id in row.attendeeIds) ?StaffDirectory.instance.byId(id)?.name,
+  ],
+  memberIds: row.attendeeIds,
+  body: markdownFromBlocks(row.blocks),
+  // 서버가 고친 시각을 안 줘서 만든 시각을 쓴다 (backend-gap.md 43번)
+  updated: row.createdAt,
+  scope: row.scope,
+  projectId: row.projectId,
+  reactions: row.reactions,
+);
 
-## 결정 사항
-- 이벤트 경품은 **소형 3종 + 대형 1종**으로 확정
-- 재등록 상담은 만료 2주 전부터 시작
+/// 편집을 마쳤을 때 — 새 글이면 올리고, 있던 글이면 고친다
+///
+/// 제목·본문이 모두 비었으면 아무것도 안 한다. 빈 글로 시작하는 구조라
+/// 작성을 눌렀다가 그냥 나가는 일이 흔한데, 그때마다 서버에 빈 회의록이 쌓인다.
+Future<void> _saveNote(_Note note) async {
+  if (note.title.trim().isEmpty && note.body.trim().isEmpty) return;
 
-## 할 일
-- [x] 포스터 시안 확정
-- [ ] 인스타 예약 발행
-- [ ] 만료 예정 회원 명단 정리
-- [ ] 기구 교체 견적 재확인
-''',
-    ),
-    _Note(
-      title: '여름 이벤트 킥오프',
-      date: day(-3),
-      members: [me, '민중기', '박준현'],
-      updated: day(-3),
-      body: '''
-## 목표
-7~8월 신규 회원 **50명** 유치
-
-## 역할 분담
-- 포스터·SNS: 전상현
-- 경품 발주: 박준현
-- 현장 안내: 김피스
-
-## 일정
-| 준비 기간은 2주로 잡고, 마감은 이벤트 시작 3일 전까지
-
-- [x] 컨셉 확정
-- [x] 예산 승인
-- [ ] 현수막 설치
-''',
-    ),
-    _Note(
-      title: '신규 트레이너 교육 정리',
-      date: day(-8),
-      members: [me, '유찬빈'],
-      updated: day(-8),
-      body: '''
-## 교육 과정
-1. 센터 규정과 근무 수칙
-2. 회원 응대 기본
-3. 기구 사용법과 안전 수칙
-
-## 참고
-- 교육 자료는 문서함 `트레이너 온보딩` 폴더에 정리
-- 첫 주는 선임 트레이너가 동행
-
-## 피드백
-- 실습 시간이 부족하다는 의견 → 다음 기수부터 실습 비중 확대
-''',
-    ),
+  final blocks = blocksFromMarkdown(note.body);
+  final attendeeIds = [
+    for (final name in note.members) ?StaffDirectory.instance.byName(name)?.id,
   ];
+
+  final id = note.id;
+  if (id == null) {
+    final created = await MeetingApi.create(
+      title: note.title,
+      blocks: blocks,
+      meetingAt: note.date,
+      scope: note.scope,
+      attendeeIds: attendeeIds,
+      projectId: note.projectId,
+    );
+    note.id = created.id;
+    note.authorId = created.authorId;
+    note.memberIds = created.attendeeIds;
+    note.reactions = created.reactions;
+    return;
+  }
+
+  final saved = await MeetingApi.update(
+    id,
+    title: note.title,
+    blocks: blocks,
+    meetingAt: note.date,
+    attendeeIds: attendeeIds,
+  );
+  note.memberIds = saved.attendeeIds;
+}
+
+/// 지우기 — 아직 안 올린 새 글은 서버를 부르지 않는다
+Future<void> _deleteNote(_Note note) async {
+  final id = note.id;
+  if (id != null) await MeetingApi.delete(id);
+  _notes.remove(note);
 }
 
 // ── 표시용 계산 ──
