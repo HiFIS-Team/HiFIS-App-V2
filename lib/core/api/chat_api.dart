@@ -1,3 +1,5 @@
+import 'package:dio/dio.dart';
+
 import 'api_client.dart';
 import 'reaction_api.dart';
 
@@ -144,6 +146,41 @@ class ChatMessage {
 
 ChatMessage? _last(dynamic value) =>
     value is Map ? ChatMessage.fromJson(value.cast<String, dynamic>()) : null;
+
+/// 사내톡에 올린 파일 하나 (서버 `AttachmentOut`)
+class ChatAttachment {
+  ChatAttachment({
+    required this.url,
+    required this.name,
+    required this.ext,
+    required this.size,
+  });
+
+  factory ChatAttachment.fromJson(Map<String, dynamic> json) => ChatAttachment(
+    url: json['url'] as String,
+    name: json['name'] as String? ?? '',
+    ext: json['ext'] as String? ?? '',
+    size: json['size'] as int? ?? 0,
+  );
+
+  /// 서명이 붙은 상대 경로 — 그대로 메시지 `attachments` 에 넣는다
+  final String url;
+
+  final String name;
+  final String ext;
+  final int size;
+}
+
+/// 첨부 주소가 사진인지 — 말풍선에 미리보기를 띄울지 가른다
+const _imageExts = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'heic'};
+
+bool isImageAttachment(String url) {
+  // `/files/2026/08/xxx.png?exp=..&sig=..` 에서 확장자만 본다
+  final path = url.split('?').first;
+  final dot = path.lastIndexOf('.');
+  if (dot < 0) return false;
+  return _imageExts.contains(path.substring(dot + 1).toLowerCase());
+}
 
 /// 대화방 (서버 `ChatRoomOut`)
 class ChatRoom {
@@ -292,4 +329,32 @@ class ChatApi {
   /// 여기까지 읽었다고 서버에 알린다
   static Future<void> markRead(String roomId) =>
       _client.post('/chat/rooms/$roomId/read');
+
+  /// 파일 올리기 — 돌려받은 [ChatAttachment.url] 을 [send] 의 `attachments` 에 넣는다
+  ///
+  /// 문서함 업로드와 나눠 쓴다. 대화에 붙는 사진 한 장은 문서 트리에
+  /// 들어갈 것이 아니라서 서버도 다른 엔드포인트를 준다.
+  static Future<ChatAttachment> uploadAttachment(
+    String roomId,
+    String path, {
+    String? filename,
+  }) async {
+    final form = FormData.fromMap({
+      'file': await MultipartFile.fromFile(path, filename: filename),
+    });
+    final data = await _client.post(
+      '/chat/rooms/$roomId/attachments',
+      body: form,
+    );
+    return ChatAttachment.fromJson(data!);
+  }
+
+  /// 나간 방 목록 — '최근 나간 항목'
+  static Future<List<ChatRoom>> leftRooms() async {
+    final rows = await _client.getList('/chat/rooms', query: {'left': true});
+    return [
+      for (final row in rows)
+        ChatRoom.fromJson((row as Map).cast<String, dynamic>()),
+    ];
+  }
 }

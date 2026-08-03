@@ -8,6 +8,7 @@ import '../../core/api/chat_api.dart';
 import '../../core/data/staff.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/top_frost.dart';
@@ -90,17 +91,17 @@ class _MessageScreenState extends State<MessageScreen> {
   }
 
   /// 새 채팅 — 호스트가 자리를 정해 줬으면 거기에, 아니면 이 화면 위로 띄운다
+  ///
+  /// **데스크톱 사내톡 패널에서는 [showFullPage] 로 연다.** 패널은 380×560 짜리
+  /// 상자 안에 자기 내비게이터를 두고 있어서, 거기로 밀어 넣으면 화면이 그 상자에
+  /// 갇힌다 (실제로 눌러도 아무것도 안 나오는 것처럼 보였다).
+  /// `showFullPage` 는 앱이 상세 화면을 열 때 쓰는 그 길이다 —
+  /// 폰은 밀려 들어오고 데스크톱은 가운데 모달로 뜬다.
   void _newMessage() {
     final open = widget.onNewMessage;
     if (open != null) return open();
 
-    Navigator.push(
-      context,
-      CupertinoPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => NewMessageScreen(),
-      ),
-    );
+    showFullPage<void>(context, (_) => NewMessageScreen());
   }
 
   /// 안 읽은 대화만 볼지 — 헤더 필터 메뉴에서 켠다
@@ -109,12 +110,20 @@ class _MessageScreenState extends State<MessageScreen> {
   /// 필터 버튼 위치를 알아야 메뉴를 그 아래에 띄울 수 있다
   final _filterKey = GlobalKey();
 
+  /// 메뉴가 이미 떠 있는지 — 없으면 누를 때마다 하나씩 더 쌓인다 (실제 발생)
+  bool _filterOpen = false;
+
   /// 헤더 필터 메뉴 — 아이폰 메시지의 그 메뉴와 같은 구성
   Future<void> _openFilterMenu() async {
+    if (_filterOpen) return;
     final button = _filterKey.currentContext?.findRenderObject() as RenderBox?;
+    // **최상위 오버레이 기준으로 띄운다.** 사내톡 패널 안의 오버레이를 쓰면
+    // 메뉴가 그 상자에 갇히고, 바깥을 눌러도 안 닫혀서 누를 때마다 쌓인다.
     final overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox?;
+        Overlay.of(context, rootOverlay: true).context.findRenderObject()
+            as RenderBox?;
     if (button == null || overlay == null) return;
+    _filterOpen = true;
 
     final origin = button.localToGlobal(Offset.zero, ancestor: overlay);
     final picked = await showMenu<String>(
@@ -132,7 +141,6 @@ class _MessageScreenState extends State<MessageScreen> {
         0,
       ),
       items: [
-        _menuItem('deleted', CupertinoIcons.trash, '최근 삭제된 항목'),
         _menuItem('left', CupertinoIcons.arrow_turn_up_left, '최근 나간 항목'),
         PopupMenuDivider(),
         PopupMenuItem<String>(
@@ -150,16 +158,16 @@ class _MessageScreenState extends State<MessageScreen> {
           checked: _unreadOnly,
         ),
       ],
+      useRootNavigator: true,
     );
+    _filterOpen = false;
     if (!mounted) return;
 
     switch (picked) {
       case 'unread':
         setState(() => _unreadOnly = !_unreadOnly);
-      case 'deleted':
-        _openArchive('최근 삭제된 항목', '최근 삭제한 대화가 없어요');
       case 'left':
-        _openArchive('최근 나간 항목', '최근 나간 대화방이 없어요');
+        _openArchive('최근 나간 항목', '최근 나간 대화방이 없어요', load: _store.leftRooms);
     }
   }
 
@@ -184,15 +192,18 @@ class _MessageScreenState extends State<MessageScreen> {
     );
   }
 
-  /// 삭제·나간 대화 보관함
+  /// 나간 대화 보관함
   ///
-  /// 서버에 붙기 전이라 담을 게 없다. 화면 틀만 두고 비어 있음을 알린다.
-  void _openArchive(String title, String emptyText) {
-    Navigator.push(
+  /// 새 채팅과 같은 이유로 [showFullPage] 를 쓴다 — 사내톡 패널 안으로 밀어
+  /// 넣으면 380×560 상자에 갇힌다.
+  void _openArchive(
+    String title,
+    String emptyText, {
+    Future<List<ChatRoom>> Function()? load,
+  }) {
+    showFullPage<void>(
       context,
-      CupertinoPageRoute(
-        builder: (_) => _ArchiveScreen(title: title, emptyText: emptyText),
-      ),
+      (_) => _ArchiveScreen(title: title, emptyText: emptyText, load: load),
     );
   }
 
@@ -377,12 +388,39 @@ class _FloatingSearchBar extends StatelessWidget {
   }
 }
 
-/// 삭제·나간 대화 보관함 — 지금은 담기는 게 없어 안내만 띄운다
-class _ArchiveScreen extends StatelessWidget {
-  _ArchiveScreen({required this.title, required this.emptyText});
+/// 나간 대화 보관함 — [load] 가 있으면 그 목록을, 없으면 안내만 띄운다
+class _ArchiveScreen extends StatefulWidget {
+  _ArchiveScreen({required this.title, required this.emptyText, this.load});
 
   final String title;
   final String emptyText;
+
+  /// 담긴 방을 받아오는 함수 — null 이면 늘 비어 있는 보관함이다
+  final Future<List<ChatRoom>> Function()? load;
+
+  @override
+  State<_ArchiveScreen> createState() => _ArchiveScreenState();
+}
+
+class _ArchiveScreenState extends State<_ArchiveScreen> {
+  List<ChatRoom> _rooms = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final load = widget.load;
+    if (load == null) return;
+    try {
+      final rooms = await load();
+      if (mounted) setState(() => _rooms = rooms);
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -390,24 +428,35 @@ class _ArchiveScreen extends StatelessWidget {
       backgroundColor: AppColors.surface,
       body: Stack(
         children: [
-          Center(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 40),
-              child: Text(
-                emptyText,
-                textAlign: TextAlign.center,
-                style: AppTextStyles.body2.copyWith(
-                  color: AppColors.textTertiary,
+          if (_rooms.isEmpty)
+            Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 40),
+                child: Text(
+                  widget.emptyText,
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.textTertiary,
+                  ),
                 ),
               ),
+            )
+          else
+            // 목록 화면과 같은 타일을 그대로 쓴다 — 새로 만든 모양이 아니다
+            ListView(
+              padding: EdgeInsets.fromLTRB(0, 68, 0, 40),
+              children: [
+                for (final room in _rooms) _ConversationTile(room: room),
+              ],
             ),
-          ),
           IgnorePointer(
             child: SafeArea(
               bottom: false,
               child: SizedBox(
                 height: 56,
-                child: Center(child: Text(title, style: AppTextStyles.title3)),
+                child: Center(
+                  child: Text(widget.title, style: AppTextStyles.title3),
+                ),
               ),
             ),
           ),

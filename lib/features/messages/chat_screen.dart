@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:ui';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/api/api_client.dart' show fileUrl;
 import '../../core/api/api_exception.dart';
 import '../../core/api/chat_api.dart';
 import '../../core/data/current_user.dart';
@@ -104,11 +106,51 @@ class _ChatScreenState extends State<ChatScreen> {
     return chatRoomPeer(room)?.color ?? staffOf(chatRoomTitle(room)).color;
   }
 
+  /// 이전 대화를 받아오는 중 — 스크롤 한 번에 여러 번 부르지 않게 잠근다
+  bool _loadingOlder = false;
+
+  /// 파일을 올리는 중 — 두 번 눌러 두 번 보내지 않게 잠근다
+  bool _uploading = false;
+
   @override
   void initState() {
     super.initState();
     _store.addListener(_onStore);
+    _scrollController.addListener(_onScroll);
     _open();
+  }
+
+  /// 위로 끝까지 올리면 이전 대화를 더 받아온다
+  ///
+  /// **버튼을 두지 않는다** — 화면에 없던 요소를 새로 만들지 않고, 카톡·인스타처럼
+  /// 위로 당기면 알아서 이어 붙는다.
+  void _onScroll() {
+    if (_loadingOlder || !_store.hasMore(_roomId)) return;
+    if (!_scrollController.hasClients) return;
+    if (_scrollController.position.pixels > 80) return;
+    _loadOlder();
+  }
+
+  Future<void> _loadOlder() async {
+    if (_loadingOlder) return;
+    _loadingOlder = true;
+    // 이어 붙기 전 위치를 기억해 뒀다가, 늘어난 만큼 내려서 화면이 안 튀게 한다
+    final before = _scrollController.hasClients
+        ? _scrollController.position.maxScrollExtent
+        : 0.0;
+    try {
+      await _store.loadOlder(_roomId);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_scrollController.hasClients) return;
+        final grew = _scrollController.position.maxScrollExtent - before;
+        if (grew > 0) {
+          _scrollController.jumpTo(_scrollController.position.pixels + grew);
+        }
+      });
+    } catch (_) {
+      // 못 받아오면 다음 스크롤에서 다시 시도한다
+    }
+    _loadingOlder = false;
   }
 
   Future<void> _open() async {
@@ -141,6 +183,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _typingStop?.cancel();
     if (_typingSent) _store.typing(_roomId, isTyping: false);
     _store.removeListener(_onStore);
+    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     _inputFocus.dispose();
     super.dispose();
@@ -157,6 +200,24 @@ class _ChatScreenState extends State<ChatScreen> {
       _typingSent = false;
       _store.typing(_roomId, isTyping: false);
     });
+  }
+
+  /// 파일 붙이기 — 입력바의 링크 아이콘이 부른다 (원래 비어 있던 버튼이다)
+  Future<void> _attach() async {
+    final picked = await FilePicker.pickFiles(allowMultiple: true);
+    final files = [
+      for (final f in picked?.files ?? const <PlatformFile>[])
+        if (f.path case final path?) (path, f.name),
+    ];
+    if (files.isEmpty || !mounted) return;
+    setState(() => _uploading = true);
+    try {
+      await _store.sendFiles(_roomId, files);
+      _scrollToBottom();
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+    if (mounted) setState(() => _uploading = false);
   }
 
   Future<void> _send(String text) async {
@@ -418,6 +479,7 @@ class _ChatScreenState extends State<ChatScreen> {
             mine
                 ? _MyBubble(
                     text: message.body,
+                    attachments: message.attachments,
                     replyTo: message.replyTo?.preview,
                     reaction: reaction,
                     pending: message.pending,
@@ -430,6 +492,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     color: sender?.color ?? staffOf(name).color,
                     emoji: null,
                     text: message.body,
+                    attachments: message.attachments,
                     replyTo: message.replyTo?.preview,
                     reaction: reaction,
                     onDoubleTap: () => _toggleHeart(message),
@@ -561,6 +624,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   focusNode: _inputFocus,
                   replyLabel: _replyTarget?.body,
                   onChanged: (_) => _onTyping(),
+                  onAttach: _uploading ? null : _attach,
                   onCancelReply: () => setState(() => _replyTarget = null),
                 ),
               ),
@@ -609,9 +673,71 @@ class _RemovableMessage extends StatelessWidget {
   }
 }
 
+/// 말풍선 안의 첨부 — 사진이면 미리보기, 아니면 파일 이름 한 줄
+///
+/// **말풍선 밖에 새로 그리는 것이 없다.** 본문 글자가 들어가던 자리에
+/// 같은 폭으로 들어간다.
+class _Attachments extends StatelessWidget {
+  _Attachments({required this.urls, required this.mine});
+
+  final List<String> urls;
+  final bool mine;
+
+  @override
+  Widget build(BuildContext context) {
+    final tint = mine ? Colors.white : AppColors.textPrimary;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final url in urls)
+          Padding(
+            padding: EdgeInsets.only(bottom: url == urls.last ? 0 : 6),
+            child: isImageAttachment(url)
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.network(
+                      fileUrl(url),
+                      width: 200,
+                      fit: BoxFit.cover,
+                      // 못 받아오면(서명 만료 등) 파일 줄로 떨어진다
+                      errorBuilder: (_, _, _) => _file(url, tint),
+                    ),
+                  )
+                : _file(url, tint),
+          ),
+      ],
+    );
+  }
+
+  Widget _file(String url, Color tint) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(CupertinoIcons.doc, size: 15, color: tint),
+      SizedBox(width: 6),
+      ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: 200),
+        child: Text(
+          _nameOf(url),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTextStyles.body2.copyWith(color: tint),
+        ),
+      ),
+    ],
+  );
+
+  /// `/files/2026/08/abc.png?exp=..` 에서 보여줄 이름만 뽑는다
+  static String _nameOf(String url) {
+    final path = url.split('?').first;
+    return path.substring(path.lastIndexOf('/') + 1);
+  }
+}
+
 class _MyBubble extends StatelessWidget {
   _MyBubble({
     required this.text,
+    this.attachments = const [],
     this.replyTo,
     this.reaction,
     this.pending = false,
@@ -621,6 +747,7 @@ class _MyBubble extends StatelessWidget {
   });
 
   final String text;
+  final List<String> attachments;
   final String? replyTo;
   final String? reaction;
 
@@ -721,6 +848,7 @@ class _TheirBubble extends StatelessWidget {
     required this.name,
     required this.color,
     required this.text,
+    this.attachments = const [],
     this.emoji,
     this.replyTo,
     this.reaction,
@@ -733,6 +861,7 @@ class _TheirBubble extends StatelessWidget {
   final Color color;
   final String? emoji;
   final String text;
+  final List<String> attachments;
   final String? replyTo;
   final String? reaction;
   final VoidCallback? onDoubleTap;
@@ -809,7 +938,12 @@ class _TheirBubble extends StatelessWidget {
                             style: AppTextStyles.caption,
                           ),
                         ),
-                      Text(text, style: AppTextStyles.body2),
+                      if (attachments.isNotEmpty)
+                        _Attachments(urls: attachments, mine: false),
+                      if (text.isNotEmpty) ...[
+                        if (attachments.isNotEmpty) SizedBox(height: 6),
+                        Text(text, style: AppTextStyles.body2),
+                      ],
                     ],
                   ),
                 ),

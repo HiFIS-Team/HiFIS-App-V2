@@ -20,6 +20,7 @@ class GlassInputBar extends StatefulWidget {
     this.replyLabel,
     this.onCancelReply,
     this.onChanged,
+    this.onAttach,
   });
 
   final ValueChanged<String> onSend;
@@ -33,6 +34,9 @@ class GlassInputBar extends StatefulWidget {
 
   /// 글자가 바뀔 때마다 — 사내톡의 '입력 중' 신호에 쓴다
   final ValueChanged<String>? onChanged;
+
+  /// 링크(클립) 아이콘을 눌렀을 때 — 없으면 눌러도 아무 일도 안 한다
+  final VoidCallback? onAttach;
 
   @override
   State<GlassInputBar> createState() => _GlassInputBarState();
@@ -183,7 +187,7 @@ class _GlassInputBarState extends State<GlassInputBar> {
                               )
                             : GestureDetector(
                                 key: ValueKey('link'),
-                                onTap: () {},
+                                onTap: widget.onAttach ?? () {},
                                 child: Container(
                                   width: 38,
                                   height: 38,

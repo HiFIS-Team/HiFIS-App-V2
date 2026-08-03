@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/api/api_client.dart' show fileUrl;
 import '../../core/api/api_exception.dart';
 import '../../core/api/chat_api.dart';
 import '../../core/data/staff.dart';
@@ -60,6 +61,28 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   bool _saving = false;
 
   static const _shareTabs = ['사진', '영상', '파일'];
+
+  /// 이 방에서 오간 첨부를 종류별로 모은다 — 대화에서 뽑으므로 따로 안 받아온다
+  List<List<String>> get _shared {
+    const image = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'heic'};
+    const video = {'mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v'};
+    final photos = <String>[], videos = <String>[], files = <String>[];
+    for (final message in _store.messagesOf(widget.roomId)) {
+      for (final url in message.attachments) {
+        final path = url.split('?').first;
+        final dot = path.lastIndexOf('.');
+        final ext = dot < 0 ? '' : path.substring(dot + 1).toLowerCase();
+        if (image.contains(ext)) {
+          photos.add(url);
+        } else if (video.contains(ext)) {
+          videos.add(url);
+        } else {
+          files.add(url);
+        }
+      }
+    }
+    return [photos, videos, files];
+  }
 
   @override
   void initState() {
@@ -278,7 +301,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       Expanded(
                         child: _ShareTab(
                           label: _shareTabs[i],
-                          count: 0,
+                          count: _shared[i].length,
                           selected: _shareTab == i,
                           onTap: () => setState(() => _shareTab = i),
                         ),
@@ -286,15 +309,28 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   ],
                 ),
                 Container(height: 1, color: AppColors.gray100),
-                SizedBox(height: 56),
-                Center(
-                  child: Text(
-                    '공유된 ${_shareTabs[_shareTab]}이 없어요',
-                    style: AppTextStyles.body2.copyWith(
-                      color: AppColors.gray400,
+                if (_shared[_shareTab].isEmpty) ...[
+                  SizedBox(height: 56),
+                  Center(
+                    child: Text(
+                      '공유된 ${_shareTabs[_shareTab]}이 없어요',
+                      style: AppTextStyles.body2.copyWith(
+                        color: AppColors.gray400,
+                      ),
                     ),
                   ),
-                ),
+                ] else ...[
+                  SizedBox(height: 16),
+                  // 있을 때만 그린다 — 빈 상태 문구는 원래 자리 그대로다
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final url in _shared[_shareTab])
+                        _SharedThumb(url: url, photo: _shareTab == 0),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -326,6 +362,61 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         ],
       ),
     );
+  }
+}
+
+/// 공유된 콘텐츠 한 칸 — 사진은 미리보기, 그 외는 파일 이름
+class _SharedThumb extends StatelessWidget {
+  _SharedThumb({required this.url, required this.photo});
+
+  final String url;
+  final bool photo;
+
+  @override
+  Widget build(BuildContext context) {
+    if (photo) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.network(
+          fileUrl(url),
+          width: 88,
+          height: 88,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => _box(),
+        ),
+      );
+    }
+    return _box();
+  }
+
+  Widget _box() => Container(
+    width: 88,
+    height: 88,
+    padding: EdgeInsets.all(8),
+    alignment: Alignment.center,
+    decoration: BoxDecoration(
+      color: AppColors.gray50,
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(CupertinoIcons.doc, size: 20, color: AppColors.gray500),
+        SizedBox(height: 6),
+        Text(
+          _nameOf(url),
+          maxLines: 2,
+          textAlign: TextAlign.center,
+          overflow: TextOverflow.ellipsis,
+          style: AppTextStyles.caption.copyWith(fontSize: 11),
+        ),
+      ],
+    ),
+  );
+
+  static String _nameOf(String url) {
+    final path = url.split('?').first;
+    return path.substring(path.lastIndexOf('/') + 1);
   }
 }
 

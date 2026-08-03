@@ -163,6 +163,31 @@ class ChatStore extends ChangeNotifier {
     }
   }
 
+  /// 파일 보내기 — 올린 뒤 그 주소를 붙여 메시지 한 건으로 보낸다
+  ///
+  /// 본문은 비워 둔다. 서버가 빈 본문을 받아 주고, 목록 미리보기는
+  /// '파일을 보냈어요' 로 떨어진다.
+  Future<void> sendFiles(
+    String roomId,
+    List<(String path, String name)> files,
+  ) async {
+    if (files.isEmpty) return;
+    final urls = <String>[];
+    for (final (path, name) in files) {
+      final uploaded = await ChatApi.uploadAttachment(
+        roomId,
+        path,
+        filename: name,
+      );
+      urls.add(uploaded.url);
+    }
+    final sent = await ChatApi.send(roomId, body: '', attachments: urls);
+    _replaceDraft(roomId, '', sent);
+  }
+
+  /// 내가 나간 방들 — '최근 나간 항목'
+  Future<List<ChatRoom>> leftRooms() => ChatApi.leftRooms();
+
   /// 전송 취소 — 서버가 지우면 소켓으로 모두에게 사라진다
   Future<void> deleteMessage(String roomId, String messageId) async {
     await ChatApi.deleteMessage(roomId, messageId);
