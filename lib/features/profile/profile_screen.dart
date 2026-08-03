@@ -1,22 +1,32 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/api/api_exception.dart';
+import '../../core/api/staff_api.dart';
 import '../../core/data/current_user.dart';
+import '../../core/data/employee.dart';
 import '../../core/data/staff.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/theme/theme_controller.dart';
 import '../../core/util/platform.dart';
+import '../../core/widgets/app_dialog.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/pressable.dart';
 import '../../core/widgets/top_frost.dart';
+import '../auth/auth_session.dart';
 import '../auth/logout.dart';
 
-/// 내 프로필 화면 (목업)
+/// 내 프로필 화면
 ///
-/// 데이터는 하드코딩된 샘플이며, 계정 기능 연동 시 실제 데이터로 교체한다.
-/// 저장/업로드/탈퇴 등 버튼 동작은 아직 비어 있다.
+/// 내가 바꿀 수 있는 것만 모은 자리다 — 이름·프로필 사진·아바타 색·업무 상태·
+/// 비밀번호. 직급·권한·지점·이메일은 관리자가 정하는 값이라 읽기만 한다.
+///
+/// 바꾼 값은 [currentUser] 에 바로 반영한다. 사이드바·아바타가 그 값을 읽어서,
+/// 안 갈아끼우면 옛 이름·색이 남는다.
 class ProfileScreen extends StatefulWidget {
   ProfileScreen({super.key});
 
@@ -34,6 +44,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    _reload();
+  }
+
+  /// 열 때 한 번 다시 받는다 — 다른 기기에서 바꿨을 수 있다.
+  /// 실패해도 화면은 로그인 때 받아 둔 값으로 뜬다
+  Future<void> _reload() async {
+    try {
+      applyCurrentUser(await StaffApi.me());
+      if (mounted) setState(() {});
+    } catch (_) {}
   }
 
   void _onScroll() => _collapse.update(_scrollController.offset);
@@ -46,10 +66,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   /// 프로필 요약 아래로 이어지는 설정 카드들 (폰·PC 공통)
+  ///
+  /// 바뀐 게 있으면 화면 전체를 다시 그린다 — 요약 카드가 같은 값을 읽는다
   List<Widget> get _settingCards => [
-    _BasicInfoCard(),
+    _BasicInfoCard(onChanged: () => setState(() {})),
     SizedBox(height: 16),
-    _WorkStatusCard(),
+    _WorkStatusCard(onChanged: () => setState(() {})),
     SizedBox(height: 16),
     _ThemeCard(),
     SizedBox(height: 16),
@@ -187,18 +209,28 @@ class _ProfileSummaryCard extends StatelessWidget {
             children: [
               _Avatar(size: 56),
               SizedBox(width: 16),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(me, style: AppTextStyles.title2),
-                  SizedBox(height: 2),
-                  Text(
-                    currentUser?.email ?? '',
-                    style: AppTextStyles.caption.copyWith(
-                      color: AppColors.gray500,
+              // 이름이 길면 이메일과 함께 카드 밖으로 넘친다
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      me,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.title2,
                     ),
-                  ),
-                ],
+                    SizedBox(height: 2),
+                    Text(
+                      currentUser?.email ?? '',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.gray500,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -226,10 +258,17 @@ class _ProfileSummaryCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: _SummaryField(label: '팀', value: 'PT팀'),
+                // 팀은 관리자가 넣어 주는 값이라 비어 있을 수 있다
+                child: _SummaryField(
+                  label: '팀',
+                  value: currentUser?.team ?? '-',
+                ),
               ),
               Expanded(
-                child: _SummaryField(label: '권한', value: 'MEMBER'),
+                child: _SummaryField(
+                  label: '권한',
+                  value: currentUser?.role.label ?? '-',
+                ),
               ),
             ],
           ),
@@ -261,28 +300,54 @@ class _SummaryField extends StatelessWidget {
   }
 }
 
+/// 내 아바타 — 사진이 있으면 사진, 없으면 아바타 색 + 이름 첫 글자
 class _Avatar extends StatelessWidget {
-  _Avatar({required this.size, this.color = AppColors.primary});
+  _Avatar({required this.size, this.color});
 
   final double size;
-  final Color color;
+
+  /// 색 고르는 자리에서 미리보기로 쓸 때만 넘긴다. 없으면 지금 내 색
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
+    final user = currentUser;
+    final url = user?.avatarImageUrl;
+    final fill = color ?? user?.color ?? AppColors.primary;
+    final initial = me.isEmpty ? '·' : me.characters.first;
+
     return Container(
       width: size,
       height: size,
       alignment: Alignment.center,
-      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-      child: Text(
-        '김',
-        style: TextStyle(
-          fontFamily: AppTextStyles.fontFamily,
-          fontSize: size * 0.36,
-          fontWeight: FontWeight.w700,
-          color: Colors.white,
-        ),
-      ),
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(color: fill, shape: BoxShape.circle),
+      child: url == null
+          ? Text(
+              initial,
+              style: TextStyle(
+                fontFamily: AppTextStyles.fontFamily,
+                fontSize: size * 0.36,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            )
+          : Image.network(
+              url,
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+              // 서명이 만료됐거나 못 받으면 색 아바타로 떨어진다
+              errorBuilder: (_, _, _) => Text(
+                initial,
+                style: TextStyle(
+                  fontFamily: AppTextStyles.fontFamily,
+                  fontSize: size * 0.36,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ),
     );
   }
 }
@@ -292,7 +357,10 @@ class _Avatar extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _BasicInfoCard extends StatefulWidget {
-  _BasicInfoCard();
+  _BasicInfoCard({required this.onChanged});
+
+  /// 이름·색이 바뀌면 요약 카드도 같이 다시 그린다
+  final VoidCallback onChanged;
 
   @override
   State<_BasicInfoCard> createState() => _BasicInfoCardState();
@@ -320,7 +388,74 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
     Color(0xFF64748B),
   ];
 
-  int _selectedColor = 0;
+  late final _name = TextEditingController(text: me);
+
+  /// 고른 아바타 색 — 서버 값과 같은 게 없으면 첫 번째로 둔다
+  late int _selectedColor = _indexOfMyColor();
+
+  bool _saving = false;
+  bool _uploading = false;
+
+  int _indexOfMyColor() {
+    final mine = currentUser?.color;
+    if (mine == null) return 0;
+    final index = _avatarColors.indexWhere(
+      (c) => c.toARGB32() == mine.toARGB32(),
+    );
+    return index < 0 ? 0 : index;
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final name = _name.text.trim();
+    if (name.isEmpty) {
+      AppToast.show(context, '이름을 입력해주세요');
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      applyCurrentUser(
+        await StaffApi.updateMe(
+          name: name,
+          avatarColor: _hexOf(_avatarColors[_selectedColor]),
+        ),
+      );
+      if (!mounted) return;
+      widget.onChanged();
+      AppToast.show(context, '기본 정보를 저장했어요');
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+    if (mounted) setState(() => _saving = false);
+  }
+
+  /// 프로필 사진 고르기 — 서버가 png·jpg·gif·webp 만 받는다
+  Future<void> _pickImage() async {
+    final picked = await FilePicker.pickFiles(
+      dialogTitle: '프로필 사진 선택',
+      type: FileType.custom,
+      allowedExtensions: const ['png', 'jpg', 'jpeg', 'gif', 'webp'],
+    );
+    final file = picked?.files.singleOrNull;
+    final path = file?.path;
+    if (file == null || path == null || !mounted) return;
+
+    setState(() => _uploading = true);
+    try {
+      applyCurrentUser(await StaffApi.uploadAvatar(path, filename: file.name));
+      if (!mounted) return;
+      widget.onChanged();
+      AppToast.show(context, '프로필 사진을 올렸어요');
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+    if (mounted) setState(() => _uploading = false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -334,16 +469,17 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
           SizedBox(height: 20),
           _FieldLabel('이름'),
           SizedBox(height: 8),
-          _InputBox(initial: me),
+          _InputBox(controller: _name),
           SizedBox(height: 20),
           _FieldLabel('프로필 이미지'),
           SizedBox(height: 10),
           Row(
             children: [
+              // 색을 고르는 중에는 사진을 감춘다 — 안 그러면 색이 안 보인다
               _Avatar(size: 56, color: _avatarColors[_selectedColor]),
               SizedBox(width: 14),
               Pressable(
-                onTap: () {},
+                onTap: _uploading ? () {} : _pickImage,
                 scale: 0.94,
                 child: Container(
                   height: 48,
@@ -356,9 +492,11 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
                   child: Center(
                     widthFactor: 1,
                     child: Text(
-                      '이미지 업로드',
+                      _uploading ? '올리는 중…' : '이미지 업로드',
                       style: AppTextStyles.label.copyWith(
-                        color: AppColors.textPrimary,
+                        color: _uploading
+                            ? AppColors.gray400
+                            : AppColors.textPrimary,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -369,7 +507,8 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
           ),
           SizedBox(height: 8),
           Text(
-            '이미지가 없을 땐 아래 아바타 색과 이름 첫 글자로 표시됩니다. (10MB 이하)',
+            // 서버가 5MB 까지만 받는다 (`save_avatar`) — 한동안 10MB 라고 적혀 있었다
+            '이미지가 없을 땐 아래 아바타 색과 이름 첫 글자로 표시됩니다. (5MB 이하)',
             style: AppTextStyles.caption,
           ),
           SizedBox(height: 20),
@@ -405,7 +544,7 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
           _FieldLabel('이메일'),
           SizedBox(height: 8),
           _InputBox(
-            initial: currentUser?.email ?? '',
+            value: currentUser?.email ?? '',
             enabled: false,
             helper: '이메일은 관리자만 변경할 수 있습니다.',
           ),
@@ -413,14 +552,18 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
           _FieldLabel('사번'),
           SizedBox(height: 8),
           _InputBox(
-            initial: currentUser?.empNo ?? '-',
+            value: currentUser?.empNo ?? '-',
             enabled: false,
             helper: '가입 시 자동으로 부여됩니다.',
           ),
           SizedBox(height: 24),
           Align(
             alignment: Alignment.centerRight,
-            child: _SmallPrimaryButton(label: '저장'),
+            child: _SmallPrimaryButton(
+              label: '저장',
+              busy: _saving,
+              onTap: _save,
+            ),
           ),
         ],
       ),
@@ -433,22 +576,49 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
 // ---------------------------------------------------------------------------
 
 class _WorkStatusCard extends StatefulWidget {
-  _WorkStatusCard();
+  _WorkStatusCard({required this.onChanged});
+
+  final VoidCallback onChanged;
 
   @override
   State<_WorkStatusCard> createState() => _WorkStatusCardState();
 }
 
 class _WorkStatusCardState extends State<_WorkStatusCard> {
-  static const _statuses = [
-    (emoji: '🔄', label: '자동 (출근 기준)'),
-    (emoji: '💼', label: '회의중'),
-    (emoji: '🍽️', label: '식사'),
-    (emoji: '🚶', label: '외출'),
-    (emoji: '💤', label: '자리비움'),
-  ];
+  static const _statuses = WorkStatus.values;
 
-  int _selected = 0;
+  late WorkStatus _selected = currentUser?.workStatus ?? WorkStatus.auto;
+  late final _message = TextEditingController(
+    text: currentUser?.statusMessage ?? '',
+  );
+
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _message.dispose();
+    super.dispose();
+  }
+
+  /// 상태와 메시지를 같이 올린다 — 칩만 누르고 저장을 안 하면 안 바뀐다
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    try {
+      applyCurrentUser(
+        await StaffApi.updateMe(
+          workStatus: _selected,
+          // 비운 것도 넘겨야 지워진다
+          statusMessage: _message.text.trim(),
+        ),
+      );
+      if (!mounted) return;
+      widget.onChanged();
+      AppToast.show(context, '업무 상태를 저장했어요');
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+    if (mounted) setState(() => _saving = false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -476,9 +646,10 @@ class _WorkStatusCardState extends State<_WorkStatusCard> {
                         ? _StatusChip(
                             emoji: _statuses[row * 2 + col].emoji,
                             label: _statuses[row * 2 + col].label,
-                            selected: _selected == row * 2 + col,
-                            onTap: () =>
-                                setState(() => _selected = row * 2 + col),
+                            selected: _selected == _statuses[row * 2 + col],
+                            onTap: () => setState(
+                              () => _selected = _statuses[row * 2 + col],
+                            ),
                           )
                         : SizedBox(),
                   ),
@@ -491,9 +662,11 @@ class _WorkStatusCardState extends State<_WorkStatusCard> {
           SizedBox(height: 8),
           Row(
             children: [
-              Expanded(child: _InputBox(hint: '예) 14시까지 외근')),
+              Expanded(
+                child: _InputBox(controller: _message, hint: '예) 14시까지 외근'),
+              ),
               SizedBox(width: 10),
-              _SmallPrimaryButton(label: '저장'),
+              _SmallPrimaryButton(label: '저장', busy: _saving, onTap: _save),
             ],
           ),
           SizedBox(height: 12),
@@ -799,8 +972,73 @@ class _ThemePreview extends StatelessWidget {
 // 비밀번호 변경 / 회원 탈퇴
 // ---------------------------------------------------------------------------
 
-class _PasswordCard extends StatelessWidget {
+class _PasswordCard extends StatefulWidget {
   _PasswordCard();
+
+  @override
+  State<_PasswordCard> createState() => _PasswordCardState();
+}
+
+class _PasswordCardState extends State<_PasswordCard> {
+  final _current = TextEditingController();
+  final _next = TextEditingController();
+  final _confirm = TextEditingController();
+
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _current.dispose();
+    _next.dispose();
+    _confirm.dispose();
+    super.dispose();
+  }
+
+  Future<void> _change() async {
+    final current = _current.text;
+    final next = _next.text;
+    if (current.isEmpty || next.isEmpty) {
+      AppToast.show(context, '비밀번호를 모두 입력해주세요');
+      return;
+    }
+    // 서버도 8자 미만이면 422 를 주지만, 안내가 여기서 나는 게 낫다
+    if (next.length < 8) {
+      AppToast.show(context, '새 비밀번호는 8자 이상이어야 해요');
+      return;
+    }
+    if (next != _confirm.text) {
+      AppToast.show(context, '새 비밀번호가 서로 달라요');
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      await StaffApi.changePassword(
+        currentPassword: current,
+        newPassword: next,
+      );
+
+      // 서버가 토큰 버전을 올려서 **지금 쓰던 토큰도 같이 죽는다** —
+      // access 만이 아니라 refresh 까지 401 이 된다 (직접 확인).
+      // 그냥 두면 다음 요청에서 '세션이 만료됐어요' 로 튕긴다.
+      // 새 비밀번호로 다시 들어가 이 기기만 이어 준다.
+      final session = AuthSession.instance;
+      await session.signIn(
+        email: currentUser?.email ?? session.email ?? '',
+        password: next,
+        autoLogin: session.autoLogin,
+      );
+
+      if (!mounted) return;
+      _current.clear();
+      _next.clear();
+      _confirm.clear();
+      AppToast.show(context, '비밀번호를 바꿨어요. 다른 기기는 다시 로그인해야 해요');
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+    if (mounted) setState(() => _saving = false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -814,19 +1052,27 @@ class _PasswordCard extends StatelessWidget {
           SizedBox(height: 20),
           _FieldLabel('현재 비밀번호'),
           SizedBox(height: 8),
-          _InputBox(obscure: true),
+          _InputBox(controller: _current, obscure: true),
           SizedBox(height: 20),
           _FieldLabel('새 비밀번호 (8자 이상)'),
           SizedBox(height: 8),
-          _InputBox(obscure: true),
+          _InputBox(controller: _next, obscure: true),
           SizedBox(height: 20),
           _FieldLabel('새 비밀번호 확인'),
           SizedBox(height: 8),
-          _InputBox(obscure: true),
+          _InputBox(
+            controller: _confirm,
+            obscure: true,
+            helper: '바꾸면 이 기기만 남고 다른 기기는 로그아웃돼요.',
+          ),
           SizedBox(height: 24),
           Align(
             alignment: Alignment.centerRight,
-            child: _SmallPrimaryButton(label: '비밀번호 변경'),
+            child: _SmallPrimaryButton(
+              label: '비밀번호 변경',
+              busy: _saving,
+              onTap: _change,
+            ),
           ),
         ],
       ),
@@ -889,6 +1135,30 @@ class _LogoutCard extends StatelessWidget {
 class _WithdrawCard extends StatelessWidget {
   _WithdrawCard();
 
+  /// 탈퇴 — 되돌릴 수 없어서 두 번 묻는다
+  Future<void> _withdraw(BuildContext context) async {
+    final ok = await showConfirmDialog(
+      context,
+      title: '정말 탈퇴할까요?',
+      message: '되돌릴 수 없어요. 계정이 비활성화되고 이름·연락처가 지워져요.',
+      confirmLabel: '탈퇴하기',
+      destructive: true,
+    );
+    if (!ok || !context.mounted) return;
+
+    try {
+      await StaffApi.withdraw();
+    } catch (error) {
+      // 대표가 혼자면 서버가 막는다 (승인권이 비어 버린다)
+      if (context.mounted) AppToast.show(context, messageOf(error));
+      return;
+    }
+    if (!context.mounted) return;
+    // 로그아웃과 같은 순서 — 얹혀 있는 화면부터 걷어내고 세션을 끊는다
+    Navigator.of(context, rootNavigator: true).popUntil((r) => r.isFirst);
+    await AuthSession.instance.signOut();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -916,7 +1186,7 @@ class _WithdrawCard extends StatelessWidget {
           Align(
             alignment: Alignment.centerLeft,
             child: Pressable(
-              onTap: () {},
+              onTap: () => _withdraw(context),
               scale: 0.94,
               child: Container(
                 height: 48,
@@ -970,14 +1240,21 @@ class _FieldLabel extends StatelessWidget {
 
 class _InputBox extends StatelessWidget {
   _InputBox({
-    this.initial,
+    this.controller,
+    this.value,
     this.hint,
     this.enabled = true,
     this.obscure = false,
     this.helper,
   });
 
-  final String? initial;
+  /// 고칠 수 있는 칸은 컨트롤러를 받는다.
+  /// 예전에는 `initialValue` 만 넘겼는데 그러면 **적은 값을 꺼낼 수가 없다**
+  final TextEditingController? controller;
+
+  /// 읽기 전용 칸에 보여줄 값
+  final String? value;
+
   final String? hint;
   final bool enabled;
   final bool obscure;
@@ -997,8 +1274,8 @@ class _InputBox extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
           ),
           child: enabled
-              ? TextFormField(
-                  initialValue: initial,
+              ? TextField(
+                  controller: controller,
                   obscureText: obscure,
                   style: AppTextStyles.body2,
                   cursorColor: AppColors.primary,
@@ -1012,7 +1289,7 @@ class _InputBox extends StatelessWidget {
                   ),
                 )
               : Text(
-                  initial ?? '',
+                  value ?? '',
                   style: AppTextStyles.body2.copyWith(color: AppColors.gray400),
                 ),
         ),
@@ -1026,33 +1303,54 @@ class _InputBox extends StatelessWidget {
 }
 
 class _SmallPrimaryButton extends StatelessWidget {
-  _SmallPrimaryButton({required this.label});
+  _SmallPrimaryButton({
+    required this.label,
+    required this.onTap,
+    this.busy = false,
+  });
 
   final String label;
+  final VoidCallback onTap;
+
+  /// 서버에 보내는 중 — 연타로 두 번 저장되지 않게 막는다
+  final bool busy;
 
   @override
   Widget build(BuildContext context) {
     return Pressable(
-      onTap: () {},
+      onTap: busy ? () {} : onTap,
       scale: 0.94,
       child: Container(
         height: 48,
         padding: EdgeInsets.symmetric(horizontal: 22),
         decoration: BoxDecoration(
-          color: AppColors.primary,
+          color: busy ? AppColors.gray300 : AppColors.primary,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Center(
           widthFactor: 1,
-          child: Text(
-            label,
-            style: AppTextStyles.label.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          child: busy
+              ? SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation(Colors.white),
+                  ),
+                )
+              : Text(
+                  label,
+                  style: AppTextStyles.label.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
         ),
       ),
     );
   }
 }
+
+/// 서버는 아바타 색을 `#RRGGBB` 로 받는다
+String _hexOf(Color color) =>
+    '#${(color.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';

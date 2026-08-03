@@ -1,5 +1,7 @@
 import 'dart:ui' show Color;
 
+import '../api/api_client.dart' show apiBaseUrl;
+
 /// 권한 — 서버 `Role` 과 같은 값. MASTER > ADMIN > MANAGER > MEMBER
 enum Role {
   master('MASTER', '대표'),
@@ -51,6 +53,29 @@ enum Rank {
   );
 }
 
+/// 스스로 바꾸는 업무 상태 — 서버 `WorkStatus` 와 같은 값
+///
+/// '근무중'·'오프라인'은 출퇴근 기록에서 서버가 정하는 값이라 여기 없다.
+/// [auto] 를 고르면 그 자동 판정을 따른다.
+enum WorkStatus {
+  auto('AUTO', '자동 (출근 기준)', '🔄'),
+  meeting('MEETING', '회의중', '💼'),
+  meal('MEAL', '식사', '🍽️'),
+  out('OUT', '외출', '🚶'),
+  away('AWAY', '자리비움', '💤');
+
+  const WorkStatus(this.wire, this.label, this.emoji);
+
+  final String wire;
+  final String label;
+  final String emoji;
+
+  static WorkStatus parse(String? value) => WorkStatus.values.firstWhere(
+    (s) => s.wire == value,
+    orElse: () => WorkStatus.auto,
+  );
+}
+
 /// 로그인한 직원 (서버 `EmployeeOut`)
 class Employee {
   Employee({
@@ -66,6 +91,7 @@ class Employee {
     this.team,
     this.avatarUrl,
     this.statusMessage,
+    this.workStatus = WorkStatus.auto,
     this.shiftStart,
     this.shiftEnd,
     this.workDays = const [],
@@ -84,6 +110,7 @@ class Employee {
     team: json['team'] as String?,
     avatarUrl: json['avatarUrl'] as String?,
     statusMessage: json['statusMessage'] as String?,
+    workStatus: WorkStatus.parse(json['workStatus'] as String?),
     workDays: [
       for (final day in (json['workDays'] as List<dynamic>? ?? const []))
         day as int,
@@ -107,8 +134,22 @@ class Employee {
   /// 사번 {입사연도}-{순번} — 출퇴근 바코드가 이 값을 쓴다
   final String? empNo;
   final String? team;
+
+  /// 프로필 사진 — 서버가 **서명이 붙은 상대 경로**(`/files/...?exp&sig`)로 준다.
+  /// 그대로는 못 부르고 서버 주소를 앞에 붙여야 한다 ([avatarImageUrl])
   final String? avatarUrl;
+
   final String? statusMessage;
+
+  /// 스스로 고른 업무 상태 (조직도·사내톡에 보인다)
+  final WorkStatus workStatus;
+
+  /// 바로 불러 쓸 수 있는 프로필 사진 주소 — 없으면 null
+  String? get avatarImageUrl {
+    final path = avatarUrl;
+    if (path == null || path.isEmpty) return null;
+    return path.startsWith('http') ? path : '$apiBaseUrl$path';
+  }
 
   /// 기본 근무 시간 "HH:MM" — 미설정이면 첫 로그인 때 설정을 받아야 한다
   final String? shiftStart;
