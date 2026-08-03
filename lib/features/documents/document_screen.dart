@@ -5,6 +5,11 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/api/api_exception.dart';
+import '../../core/api/document_api.dart';
+import '../../core/data/current_user.dart';
+import '../../core/data/staff.dart';
+import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -14,11 +19,13 @@ import '../../core/widgets/pressable.dart';
 
 part 'document_models.dart';
 
-/// 문서함 화면 (목업)
+/// 문서함 화면
 ///
 /// 컴퓨터의 파일 탐색기처럼 폴더를 만들어 문서를 담아둔다.
 /// 맥 파인더의 구조를 따라 좌측에 위치·폴더 목록, 우측에 현재 폴더의
 /// 내용을 보여주고, 아이콘 보기와 목록 보기를 오갈 수 있다.
+///
+/// 서버는 폴더와 문서를 평평하게 주고, 트리는 앱이 세운다 ([_buildTree]).
 class DocumentScreen extends StatefulWidget {
   DocumentScreen({super.key});
 
@@ -42,7 +49,27 @@ class _DocumentScreenState extends State<DocumentScreen> {
   /// 파일을 끌어와 창 위에 올려둔 상태
   bool _dragging = false;
 
+  /// 서버에 올리는 중 — 여러 개면 한 개씩 올라간다
+  bool _uploading = false;
+
+  bool _loading = !_treeLoaded;
+
   String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      await _loadTree();
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+    if (mounted) setState(() => _loading = false);
+  }
 
   _Item get _current => _path.last;
 
@@ -105,21 +132,31 @@ class _DocumentScreenState extends State<DocumentScreen> {
     final name = await _askName(context, title: '새 폴더', confirm: '만들기');
     if (name == null || !mounted) return;
 
-    final folder = _Item.folder(name: name);
-    setState(() {
-      // 위치 보기 중에 만들면 최상위에 생긴다
-      final target = _place == _Place.all ? _current : _root;
-      target.children!.add(folder);
-      target.updated = DateTime.now();
-      _selected = folder;
-    });
-    AppToast.show(context, '폴더를 만들었어요');
+    // 위치 보기 중에 만들면 최상위에 생긴다
+    final target = _place == _Place.all ? _current : _root;
+    try {
+      final created = await DocumentApi.createFolder(
+        name: name,
+        // 최상위는 서버에서 부모가 없다
+        parentId: target.id.isEmpty ? null : target.id,
+      );
+      if (!mounted) return;
+      final folder = _Item.folder(
+        name: created.name,
+        id: created.id,
+        ownerId: created.createdById,
+      );
+      setState(() {
+        target.children!.add(folder);
+        _selected = folder;
+      });
+      AppToast.show(context, '폴더를 만들었어요');
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
   }
 
   /// 컴퓨터에서 파일을 골라 지금 폴더에 담는다
-  ///
-  /// 서버가 없으니 실제로 올리지는 않고, 고른 파일의 이름·크기·경로를
-  /// 그대로 목록에 넣어둔다. 이미지는 그 경로로 미리보기까지 된다.
   Future<void> _upload() async {
     final result = await FilePicker.pickFiles(
       dialogTitle: '문서함에 올릴 파일 선택',
@@ -129,79 +166,87 @@ class _DocumentScreenState extends State<DocumentScreen> {
 
     // 위치 보기 중에 올리면 최상위에 담긴다
     final target = _place == _Place.all ? _current : _root;
-    final now = DateTime.now();
-
-    setState(() {
-      for (final picked in result.files) {
-        target.children!.add(
-          _Item.file(
-            name: picked.name,
-            kind: _Kind.of(picked.name),
-            bytes: picked.size,
-            updated: now,
-            path: picked.path,
-          ),
-        );
-      }
-      target.updated = now;
-      _place = _Place.all;
-    });
-    AppToast.show(context, '${result.files.length}개 파일을 올렸어요');
+    await _uploadPaths([
+      for (final picked in result.files)
+        if (picked.path case final path?) (path, picked.name),
+    ], target);
   }
 
   /// 창에 끌어다 놓은 것들을 담는다 (데스크톱 전용)
   ///
-  /// 폴더를 통째로 놓으면 안쪽 구조까지 그대로 가져온다.
-  void _drop(List<String> paths) {
+  /// **폴더는 못 받는다** — 서버에 한 번에 올리는 길이 없어서 파일만 걸러 낸다
+  /// (backend-gap.md 54번).
+  Future<void> _drop(List<String> paths) async {
     final target = _place == _Place.all ? _current : _root;
-    var added = 0;
+    final files = <(String, String)>[];
+    var folders = 0;
 
-    setState(() {
-      for (final path in paths) {
-        final item = _itemAt(path);
-        if (item == null) continue;
-        target.children!.add(item);
-        added++;
-      }
-      target.updated = DateTime.now();
-      _place = _Place.all;
-    });
-
-    if (added > 0) AppToast.show(context, '$added개를 문서함에 담았어요');
-  }
-
-  /// 경로 하나를 문서함 항목으로 바꾼다 (폴더면 안쪽까지 훑는다)
-  _Item? _itemAt(String path) {
-    final name = path.split(Platform.pathSeparator).last;
-    try {
+    for (final path in paths) {
+      final name = path.split(Platform.pathSeparator).last;
+      // 맥의 .DS_Store 같은 숨김 파일은 건너뛴다
+      if (name.startsWith('.')) continue;
       if (Directory(path).existsSync()) {
-        final children = <_Item>[];
-        for (final entity in Directory(path).listSync()) {
-          // 맥의 .DS_Store 같은 숨김 파일은 건너뛴다
-          if (entity.path.split(Platform.pathSeparator).last.startsWith('.')) {
-            continue;
-          }
-          final child = _itemAt(entity.path);
-          if (child != null) children.add(child);
-        }
-        return _Item.folder(name: name, children: children);
+        folders++;
+        continue;
       }
+      files.add((path, name));
+    }
 
-      final stat = File(path).statSync();
-      return _Item.file(
-        name: name,
-        kind: _Kind.of(name),
-        bytes: stat.size,
-        updated: stat.modified,
-        path: path,
-      );
-    } catch (_) {
-      // 권한이 없거나 읽는 중에 사라진 것은 조용히 넘긴다
-      return null;
+    await _uploadPaths(files, target);
+    if (folders > 0 && mounted) {
+      AppToast.show(context, '폴더는 아직 통째로 못 올려요 · 파일만 담았어요');
     }
   }
 
+  /// 고른 파일들을 하나씩 올린다 — 하나가 실패해도 나머지는 계속 간다
+  Future<void> _uploadPaths(List<(String, String)> files, _Item target) async {
+    if (files.isEmpty) return;
+    setState(() => _uploading = true);
+
+    var added = 0;
+    Object? failure;
+    for (final (path, name) in files) {
+      try {
+        final uploaded = await DocumentApi.upload(
+          path,
+          filename: name,
+          folderId: target.id.isEmpty ? null : target.id,
+        );
+        if (!mounted) return;
+        setState(() {
+          target.children!.add(
+            _Item.file(
+              name: uploaded.name,
+              kind: _Kind.of('x.${uploaded.ext}'),
+              bytes: uploaded.sizeBytes,
+              id: uploaded.id,
+              ownerId: uploaded.uploaderId,
+              url: uploaded.fileUrl,
+              // 방금 고른 파일이라 서버를 안 거치고도 미리보기가 된다
+              path: path,
+            ),
+          );
+        });
+        added++;
+      } catch (error) {
+        failure = error;
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _uploading = false;
+      _place = _Place.all;
+    });
+    if (added > 0) AppToast.show(context, '$added개 파일을 올렸어요');
+    if (failure != null) AppToast.show(context, messageOf(failure));
+  }
+
   Future<void> _rename(_Item item) async {
+    if (!item.canEdit) {
+      AppToast.show(context, '올린 사람만 이름을 바꿀 수 있어요');
+      return;
+    }
     final name = await _askName(
       context,
       title: '이름 바꾸기',
@@ -209,13 +254,57 @@ class _DocumentScreenState extends State<DocumentScreen> {
       initial: item.name,
     );
     if (name == null || !mounted) return;
-    setState(() {
-      item.name = name;
-      item.updated = DateTime.now();
-    });
+
+    final before = item.name;
+    setState(() => item.name = name);
+    try {
+      if (item.isFolder) {
+        await DocumentApi.renameFolder(item.id, name: name);
+      } else {
+        await DocumentApi.updateDocument(item.id, name: name);
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => item.name = before);
+      AppToast.show(context, messageOf(error));
+    }
   }
 
-  void _delete(_Item item) {
+  Future<void> _delete(_Item item) async {
+    if (!item.canEdit) {
+      AppToast.show(context, '올린 사람만 지울 수 있어요');
+      return;
+    }
+    // 폴더를 지우면 안에 든 문서도 서버에서 같이 지워진다
+    if (item.isFolder) {
+      // **하위 폴더가 있으면 서버가 500 을 낸다** (backend-gap.md 55번).
+      // 부르기 전에 막는다 — 안 그러면 원인 모를 오류만 뜬다
+      if (item.children!.any((child) => child.isFolder)) {
+        AppToast.show(context, '안에 폴더가 있어요 · 하위 폴더부터 지워주세요');
+        return;
+      }
+      final ok = await showConfirmDialog(
+        context,
+        title: "'${item.name}' 폴더를 지울까요?",
+        message: '폴더 안에 든 문서도 같이 지워져요.',
+        confirmLabel: '삭제',
+        destructive: true,
+      );
+      if (!ok || !mounted) return;
+    }
+
+    try {
+      if (item.isFolder) {
+        await DocumentApi.deleteFolder(item.id);
+      } else {
+        await DocumentApi.deleteDocument(item.id);
+      }
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+      return;
+    }
+    if (!mounted) return;
+
     final parent = _parentOf(_root, item) ?? _current;
     setState(() {
       parent.children?.remove(item);
@@ -228,8 +317,17 @@ class _DocumentScreenState extends State<DocumentScreen> {
     AppToast.show(context, '${item.name}을(를) 삭제했어요');
   }
 
+  /// 즐겨찾기 — **서버에 담을 자리가 없어서** 앱이 기억한다.
+  /// 껐다 켜면 풀린다 (backend-gap.md 51번)
   void _toggleStar(_Item item) {
-    setState(() => item.starred = !item.starred);
+    setState(() {
+      item.starred = !item.starred;
+      if (item.starred) {
+        _starred.add(item.id);
+      } else {
+        _starred.remove(item.id);
+      }
+    });
   }
 
   // ── 우클릭 메뉴 ──
@@ -289,10 +387,10 @@ class _DocumentScreenState extends State<DocumentScreen> {
   List<_Item> get _visible {
     final list = switch (_place) {
       _Place.all => [..._current.children!],
-      // 위치 보기는 폴더 구조와 상관없이 조건에 맞는 파일을 그러모은다
-      _Place.recent =>
-        _collect(_root).where((i) => !i.isFolder).toList()
-          ..sort((a, b) => b.updated.compareTo(a.updated)),
+      // 위치 보기는 폴더 구조와 상관없이 조건에 맞는 파일을 그러모은다.
+      // **서버가 올린 시각을 안 줘서** 정렬을 못 한다 (backend-gap.md 51번) —
+      // 대신 서버가 최신순으로 준 목록 순서를 그대로 따른다
+      _Place.recent => _collect(_root).where((i) => !i.isFolder).toList(),
       _Place.starred => _collect(_root).where((i) => i.starred).toList(),
     };
 
@@ -313,6 +411,17 @@ class _DocumentScreenState extends State<DocumentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2.4,
+            valueColor: AlwaysStoppedAnimation(AppColors.primary),
+          ),
+        ),
+      );
+    }
+
     final items = _visible;
 
     return Scaffold(
@@ -348,6 +457,9 @@ class _DocumentScreenState extends State<DocumentScreen> {
                 children: [
                   _pane(items),
                   if (_dragging) _DropOverlay(folder: _current.name),
+                  // 여러 개면 한 개씩 올라가서 시간이 걸린다 — 진행 중임을 알린다
+                  if (_uploading)
+                    Positioned(right: 24, bottom: 24, child: _UploadingChip()),
                 ],
               ),
             ),
@@ -1337,8 +1449,10 @@ class _ListRowState extends State<_ListRow> {
               ),
               SizedBox(
                 width: 130,
+                // 서버가 올린 시각을 안 준다 (backend-gap.md 51번) —
+                // 자리는 남겨 두고 값만 비운다
                 child: Text(
-                  _stamp(item.updated),
+                  '--',
                   style: AppTextStyles.caption.copyWith(fontSize: 12),
                 ),
               ),
@@ -1881,27 +1995,34 @@ class _FilePreviewCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(14),
               child: ConstrainedBox(
                 constraints: BoxConstraints(maxHeight: size.height * 0.5),
-                child: Image.file(
-                  File(item.path!),
-                  fit: BoxFit.contain,
-                  width: double.infinity,
-                  // 파일이 지워졌거나 못 읽으면 자리만 채운다
-                  errorBuilder: (context, error, stack) =>
-                      _placeholder('이미지를 불러올 수 없어요'),
-                ),
+                // 방금 올린 것은 로컬 파일이 있어 서버를 안 거쳐도 된다.
+                // 그 외에는 서명 주소로 받아 온다
+                child: item.path != null
+                    ? Image.file(
+                        File(item.path!),
+                        fit: BoxFit.contain,
+                        width: double.infinity,
+                        // 파일이 지워졌거나 못 읽으면 자리만 채운다
+                        errorBuilder: (context, error, stack) =>
+                            _placeholder('이미지를 불러올 수 없어요'),
+                      )
+                    : Image.network(
+                        item.url!,
+                        fit: BoxFit.contain,
+                        width: double.infinity,
+                        errorBuilder: (context, error, stack) =>
+                            _placeholder('이미지를 불러올 수 없어요'),
+                      ),
               ),
             )
           else
-            _placeholder(
-              item.path == null
-                  ? '샘플 문서라 미리보기가 없어요'
-                  : '${item.kind.label}은 아직 미리보기를 지원하지 않아요',
-            ),
+            _placeholder('${item.kind.label}은 아직 미리보기를 지원하지 않아요'),
           SizedBox(height: 16),
           _info('종류', item.kind.label),
           _info('크기', item.sizeLabel),
-          _info('수정한 날짜', _stamp(item.updated)),
-          if (item.path != null) _info('위치', item.path!),
+          // 올린 시각은 서버가 안 준다 (backend-gap.md 51번)
+          if (item.ownerId case final owner?)
+            _info('올린 사람', _uploaderName(owner)),
           SizedBox(height: 14),
           Pressable(
             onTap: () => Navigator.pop(context),

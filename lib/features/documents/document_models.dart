@@ -70,23 +70,32 @@ enum _Kind {
 
 /// 문서함 항목 — 폴더이거나 파일이다
 ///
-/// 폴더는 [children]을 가지고, 파일은 null이다.
+/// 서버는 폴더(`/folders`)와 문서(`/documents`)를 **평평하게** 준다.
+/// 트리는 `parentId`·`folderId` 를 보고 [_buildTree] 가 세운다.
 class _Item {
-  _Item.folder({required this.name, List<_Item>? children, DateTime? updated})
-    : kind = _Kind.folder,
-      bytes = 0,
-      path = null,
-      children = children ?? [],
-      updated = updated ?? DateTime.now();
+  _Item.folder({
+    required this.name,
+    required this.id,
+    this.ownerId,
+    List<_Item>? children,
+  }) : kind = _Kind.folder,
+       bytes = 0,
+       path = null,
+       url = null,
+       children = children ?? [];
 
   _Item.file({
     required this.name,
     required this.kind,
     required this.bytes,
-    required this.updated,
-    this.starred = false,
+    required this.id,
+    this.ownerId,
+    this.url,
     this.path,
   }) : children = null;
+
+  /// 서버 uuid
+  final String id;
 
   String name;
   final _Kind kind;
@@ -94,10 +103,17 @@ class _Item {
   /// 파일 크기 (폴더는 0)
   final int bytes;
 
-  DateTime updated;
+  /// 만든 사람·올린 사람 — 본인이나 관리자만 고치고 지울 수 있다
+  final String? ownerId;
+
+  /// 즐겨찾기 — **서버에 담을 자리가 없다** (backend-gap.md 51번).
+  /// 앱이 화면 안에서만 기억하다가 껐다 켜면 풀린다
   bool starred = false;
 
-  /// 올린 파일의 실제 경로 — 목업 데이터는 null이라 미리보기가 없다
+  /// 서버에 올라간 파일 주소 (서명 포함). 폴더는 null
+  final String? url;
+
+  /// 방금 고른 파일의 로컬 경로 — 올린 직후 미리보기에 쓴다
   final String? path;
 
   /// null이면 파일
@@ -105,8 +121,12 @@ class _Item {
 
   bool get isFolder => children != null;
 
-  /// 실제로 올린 이미지라 화면에 띄울 수 있는지
-  bool get canPreview => path != null && kind == _Kind.image;
+  /// 고치거나 지울 수 있는지 — 서버와 같은 기준이다
+  bool get canEdit =>
+      ownerId == null || ownerId == currentUser?.id || myRole.strong;
+
+  /// 화면에 띄울 수 있는 이미지인지
+  bool get canPreview => kind == _Kind.image && (path != null || url != null);
 
   /// 'KB · MB' 표기 — 파인더처럼 1000 단위로 끊는다
   String get sizeLabel {
@@ -117,7 +137,58 @@ class _Item {
 }
 
 /// 최상위 폴더 — 탭을 오가도 유지되도록 모듈 전역으로 둔다
-final _root = _Item.folder(name: '문서함', children: _seedTree());
+final _root = _Item.folder(name: '문서함', id: '', children: []);
+
+bool _treeLoaded = false;
+
+/// 즐겨찾기 — 서버에 없어서 앱이 들고 있는다 (backend-gap.md 51번)
+final _starred = <String>{};
+
+/// 서버에서 받아 트리를 다시 세운다
+///
+/// 폴더·문서를 한 번에 받아서 `parentId`·`folderId` 로 이어 붙인다.
+/// 폴더마다 문서를 따로 받으면 폴더 수만큼 요청이 나간다.
+Future<void> _loadTree() async {
+  final folders = DocumentApi.folders();
+  final documents = DocumentApi.documents();
+  _buildTree(await folders, await documents);
+  _treeLoaded = true;
+}
+
+void _buildTree(List<Folder> folders, List<Document> documents) {
+  final nodes = <String, _Item>{
+    for (final folder in folders)
+      folder.id: _Item.folder(
+        name: folder.name,
+        id: folder.id,
+        ownerId: folder.createdById,
+      ),
+  };
+
+  _root.children!.clear();
+
+  // 폴더를 부모 밑에 건다 — 부모가 사라진 폴더는 최상위로 올린다
+  for (final folder in folders) {
+    final node = nodes[folder.id]!;
+    (nodes[folder.parentId]?.children ?? _root.children!).add(node);
+  }
+
+  for (final document in documents) {
+    final node = _Item.file(
+      name: document.name,
+      kind: _Kind.of('x.${document.ext}'),
+      bytes: document.sizeBytes,
+      id: document.id,
+      ownerId: document.uploaderId,
+      url: document.fileUrl,
+    )..starred = _starred.contains(document.id);
+    (nodes[document.folderId]?.children ?? _root.children!).add(node);
+  }
+}
+
+/// uuid → 올린 사람 이름
+String _uploaderName(String id) =>
+    StaffDirectory.instance.byId(id)?.name ?? '알 수 없음';
 
 /// 트리 전체를 한 줄로 펴서 돌려준다 (최근 항목·즐겨찾기에 쓴다)
 List<_Item> _collect(_Item folder) {
@@ -139,185 +210,47 @@ _Item? _parentOf(_Item folder, _Item target) {
   return null;
 }
 
-/// '7.28 오후 3:20' 형태
-String _stamp(DateTime time) {
-  final period = time.hour < 12 ? '오전' : '오후';
-  final hour = time.hour % 12 == 0 ? 12 : time.hour % 12;
-  final minute = time.minute.toString().padLeft(2, '0');
-  return '${time.month}.${time.day} $period $hour:$minute';
-}
+/// 올리는 중임을 알리는 작은 알약 (우하단)
+class _UploadingChip extends StatelessWidget {
+  _UploadingChip();
 
-List<_Item> _seedTree() {
-  final now = DateTime.now();
-  DateTime at(int daysAgo, int hour, int minute) =>
-      DateTime(now.year, now.month, now.day - daysAgo, hour, minute);
-
-  return [
-    _Item.folder(
-      name: '계약서',
-      updated: at(2, 14, 10),
-      children: [
-        _Item.file(
-          name: '회원 이용 계약서 양식.pdf',
-          kind: _Kind.pdf,
-          bytes: 284000,
-          updated: at(2, 14, 10),
-          starred: true,
-        ),
-        _Item.file(
-          name: '트레이너 근로계약서.pdf',
-          kind: _Kind.pdf,
-          bytes: 196000,
-          updated: at(9, 11, 32),
-        ),
-        _Item.file(
-          name: '센터 임대차 계약서.pdf',
-          kind: _Kind.pdf,
-          bytes: 1420000,
-          updated: at(41, 16, 5),
-        ),
-        _Item.folder(
-          name: '만료 예정',
-          updated: at(6, 9, 15),
-          children: [
-            _Item.file(
-              name: '정수기 렌탈 계약.pdf',
-              kind: _Kind.pdf,
-              bytes: 132000,
-              updated: at(6, 9, 15),
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(100),
+        border: Border.all(color: AppColors.gray100),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 24,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation(AppColors.primary),
             ),
-          ],
-        ),
-      ],
-    ),
-    _Item.folder(
-      name: '인사',
-      updated: at(1, 10, 40),
-      children: [
-        _Item.file(
-          name: '취업규칙.pdf',
-          kind: _Kind.pdf,
-          bytes: 512000,
-          updated: at(24, 13, 20),
-        ),
-        _Item.file(
-          name: '급여 규정.docx',
-          kind: _Kind.doc,
-          bytes: 88000,
-          updated: at(12, 15, 48),
-        ),
-        _Item.file(
-          name: '신입 온보딩 체크리스트.xlsx',
-          kind: _Kind.sheet,
-          bytes: 46000,
-          updated: at(1, 10, 40),
-          starred: true,
-        ),
-      ],
-    ),
-    _Item.folder(
-      name: '매출',
-      updated: at(0, 17, 22),
-      children: [
-        _Item.file(
-          name: '2026 상반기 매출.xlsx',
-          kind: _Kind.sheet,
-          bytes: 342000,
-          updated: at(3, 18, 2),
-        ),
-        _Item.file(
-          name: '7월 정산.xlsx',
-          kind: _Kind.sheet,
-          bytes: 128000,
-          updated: at(0, 17, 22),
-        ),
-        _Item.file(
-          name: '회원권 단가표.xlsx',
-          kind: _Kind.sheet,
-          bytes: 64000,
-          updated: at(18, 9, 55),
-        ),
-      ],
-    ),
-    _Item.folder(
-      name: '마케팅',
-      updated: at(0, 11, 5),
-      children: [
-        _Item.file(
-          name: '여름 프로모션 포스터.png',
-          kind: _Kind.image,
-          bytes: 4820000,
-          updated: at(0, 11, 5),
-          starred: true,
-        ),
-        _Item.file(
-          name: 'SNS 콘텐츠 캘린더.xlsx',
-          kind: _Kind.sheet,
-          bytes: 72000,
-          updated: at(4, 14, 30),
-        ),
-        _Item.file(
-          name: '전단지 시안.zip',
-          kind: _Kind.archive,
-          bytes: 12400000,
-          updated: at(7, 16, 44),
-        ),
-      ],
-    ),
-    _Item.folder(
-      name: '센터 운영',
-      updated: at(0, 8, 50),
-      children: [
-        _Item.file(
-          name: '기구 점검표.xlsx',
-          kind: _Kind.sheet,
-          bytes: 38000,
-          updated: at(0, 8, 50),
-        ),
-        _Item.file(
-          name: '청소 체크리스트.pdf',
-          kind: _Kind.pdf,
-          bytes: 96000,
-          updated: at(5, 19, 12),
-        ),
-        _Item.file(
-          name: '비상 연락망.docx',
-          kind: _Kind.doc,
-          bytes: 42000,
-          updated: at(15, 10, 8),
-        ),
-      ],
-    ),
-    _Item.folder(
-      name: '회의 자료',
-      updated: at(1, 15, 0),
-      children: [
-        _Item.file(
-          name: '2026 사업계획.pptx',
-          kind: _Kind.slide,
-          bytes: 8600000,
-          updated: at(28, 17, 40),
-        ),
-        _Item.file(
-          name: '월간 회의 자료.pptx',
-          kind: _Kind.slide,
-          bytes: 3200000,
-          updated: at(1, 15, 0),
-        ),
-      ],
-    ),
-    _Item.file(
-      name: '사업자등록증.pdf',
-      kind: _Kind.pdf,
-      bytes: 220000,
-      updated: at(60, 9, 0),
-      starred: true,
-    ),
-    _Item.file(
-      name: '로고 원본.zip',
-      kind: _Kind.archive,
-      bytes: 24800000,
-      updated: at(33, 13, 25),
-    ),
-  ];
+          ),
+          SizedBox(width: 10),
+          Text(
+            '올리는 중…',
+            style: AppTextStyles.body2.copyWith(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
