@@ -42,6 +42,7 @@ class StaffApi {
   /// 여부로 가르지 않고 `null` 이면 안 건드리는 것으로 둔다.
   static Future<Employee> updateMe({
     String? name,
+    String? phone,
     String? avatarColor,
     String? statusMessage,
     WorkStatus? workStatus,
@@ -50,6 +51,7 @@ class StaffApi {
       '/employees/me',
       body: {
         'name': ?name,
+        'phone': ?phone,
         'avatarColor': ?avatarColor,
         'statusMessage': ?statusMessage,
         'workStatus': ?workStatus?.wire,

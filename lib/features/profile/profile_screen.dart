@@ -389,6 +389,7 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
   ];
 
   late final _name = TextEditingController(text: me);
+  late final _phone = TextEditingController(text: currentUser?.phone ?? '');
 
   /// 고른 아바타 색. **null 이면 아직 안 골랐다는 뜻**이다.
   ///
@@ -418,6 +419,7 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
   @override
   void dispose() {
     _name.dispose();
+    _phone.dispose();
     super.dispose();
   }
 
@@ -427,12 +429,19 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
       AppToast.show(context, '이름을 입력해주세요');
       return;
     }
+    // 비워 두는 건 괜찮다 — 적었으면 제대로 적어야 한다
+    final phone = _phone.text.replaceAll(RegExp(r'\D'), '');
+    if (phone.isNotEmpty && (phone.length != 11 || !phone.startsWith('01'))) {
+      AppToast.show(context, '휴대폰 번호 11자리를 입력해주세요');
+      return;
+    }
     setState(() => _saving = true);
     try {
       final picked = _previewColor;
       applyCurrentUser(
         await StaffApi.updateMe(
           name: name,
+          phone: phone,
           // 안 골랐으면 안 보낸다 — 서버가 쓰던 색을 그대로 둔다
           avatarColor: picked == null ? null : _hexOf(picked),
         ),
@@ -482,6 +491,15 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
           _FieldLabel('이름'),
           SizedBox(height: 8),
           _InputBox(controller: _name),
+          SizedBox(height: 20),
+          _FieldLabel('전화번호'),
+          SizedBox(height: 8),
+          _InputBox(
+            controller: _phone,
+            hint: '01012345678',
+            keyboardType: TextInputType.phone,
+            helper: '조직도에서 서로 연락할 때 쓰여요.',
+          ),
           SizedBox(height: 20),
           _FieldLabel('프로필 이미지'),
           SizedBox(height: 10),
@@ -1266,6 +1284,7 @@ class _InputBox extends StatelessWidget {
     this.enabled = true,
     this.obscure = false,
     this.helper,
+    this.keyboardType,
   });
 
   /// 고칠 수 있는 칸은 컨트롤러를 받는다.
@@ -1279,6 +1298,7 @@ class _InputBox extends StatelessWidget {
   final bool enabled;
   final bool obscure;
   final String? helper;
+  final TextInputType? keyboardType;
 
   @override
   Widget build(BuildContext context) {
@@ -1297,6 +1317,7 @@ class _InputBox extends StatelessWidget {
               ? TextField(
                   controller: controller,
                   obscureText: obscure,
+                  keyboardType: keyboardType,
                   style: AppTextStyles.body2,
                   cursorColor: AppColors.primary,
                   decoration: InputDecoration(
