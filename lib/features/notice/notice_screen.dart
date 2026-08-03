@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../core/api/notice_api.dart';
+import '../../core/data/current_user.dart';
 import '../../core/data/staff.dart';
 import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
@@ -22,12 +23,15 @@ import '../../core/widgets/pressable.dart';
 
 part 'notice_phone.dart';
 
-/// 공지 화면 (목업)
+/// 공지 화면
 ///
 /// 데스크톱은 좌측 목록 + 우측 본문 2단 구조. 본문은 회의록과 같은
 /// 블록 편집기로 적고, 평소에는 렌더링된 모습으로 읽는다.
 /// 폰은 같은 내용을 목록 화면 + 본문 화면 두 장으로 나눠 보여준다.
-/// 열어보면 읽음 처리가 되고, 누가 확인했는지 아래에서 볼 수 있다.
+/// 열어보면 서버에 읽음이 찍히고, 누가 확인했는지 아래에서 볼 수 있다.
+///
+/// 새 글은 '공지 작성'을 누르면 **빈 글로 시작**해서 편집을 마칠 때 올라간다.
+/// 누를 때마다 올리면 쓰다 말고 나갈 때마다 서버에 빈 공지가 쌓인다.
 class NoticeScreen extends StatefulWidget {
   NoticeScreen({super.key});
 
@@ -91,9 +95,7 @@ class _NoticeScreenState extends State<NoticeScreen> {
   }
 
   List<_Notice> get _visible {
-    final list = _notices
-        .where((n) => !_unreadOnly || !n.readers.contains(me))
-        .toList();
+    final list = _notices.where((n) => !_unreadOnly || !n.read).toList();
     // 고정 공지가 위, 그다음 최신순
     list.sort((a, b) {
       if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
@@ -124,7 +126,6 @@ class _NoticeScreenState extends State<NoticeScreen> {
       body: '',
       author: me,
       date: DateTime.now(),
-      readers: {me},
     );
     setState(() {
       _notices.add(notice);
@@ -185,7 +186,7 @@ class _NoticeScreenState extends State<NoticeScreen> {
     }
 
     final list = _visible;
-    final unread = _notices.where((n) => !n.readers.contains(me)).length;
+    final unread = _notices.where((n) => !n.read).length;
 
     if (!isDesktop) {
       return _NoticePhone(
@@ -199,7 +200,7 @@ class _NoticeScreenState extends State<NoticeScreen> {
 
     final selected = _syncSelection(list);
     // 목록을 처음 그릴 때 자동으로 고른 공지도 읽음 처리한다
-    if (selected != null && !selected.readers.contains(me)) {
+    if (selected != null && !selected.read) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() => _markRead(selected));
       });
@@ -375,7 +376,7 @@ class _NoticeTileState extends State<_NoticeTile> {
   @override
   Widget build(BuildContext context) {
     final notice = widget.notice;
-    final unread = !notice.readers.contains(me);
+    final unread = !notice.read;
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -447,7 +448,7 @@ class _NoticeTileState extends State<_NoticeTile> {
                   ),
                   Spacer(),
                   Text(
-                    '${notice.readers.length}/${staffList.length} 확인',
+                    '${notice.readCount}명 확인',
                     style: AppTextStyles.caption.copyWith(fontSize: 11),
                   ),
                 ],
@@ -598,11 +599,6 @@ class _NoticeViewState extends State<_NoticeView> {
   @override
   Widget build(BuildContext context) {
     final notice = widget.notice;
-    final unreadNames = [
-      for (final staff in staffList)
-        if (!notice.readers.contains(staff.name)) staff.name,
-    ];
-
     final phone = widget.phone;
 
     final title = _editing
@@ -841,7 +837,7 @@ class _NoticeViewState extends State<_NoticeView> {
           else
             MarkdownView(source: notice.body, onCheckbox: _toggleCheckbox),
           SizedBox(height: 24),
-          _ReadCard(notice: notice, unreadNames: unreadNames),
+          _ReadCard(notice: notice),
         ],
       ],
     );
@@ -850,60 +846,81 @@ class _NoticeViewState extends State<_NoticeView> {
 
 /// 읽음 현황 — 누가 확인했고 누가 안 봤는지
 class _ReadCard extends StatelessWidget {
-  _ReadCard({required this.notice, required this.unreadNames});
+  _ReadCard({required this.notice});
 
   final _Notice notice;
-  final List<String> unreadNames;
 
   @override
   Widget build(BuildContext context) {
-    final readNames = [
-      for (final staff in staffList)
-        if (notice.readers.contains(staff.name)) staff.name,
-    ];
-
     return Container(
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(20, 18, 20, 18),
       decoration: AppDecorations.card(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+      child: FutureBuilder<NoticeReaders>(
+        // 본문을 볼 때만 따로 받는다 — 목록에는 인원수(readCount)만 있으면 된다
+        future: _readersOf(notice),
+        builder: (context, snapshot) {
+          final data = snapshot.data;
+          final people = data?.people ?? const <NoticeReader>[];
+          final total = data?.total ?? 0;
+          final readCount = data?.readCount ?? notice.readCount;
+          final allRead = data != null && readCount >= total && total > 0;
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('확인 현황', style: AppTextStyles.label),
-              SizedBox(width: 6),
-              Text(
-                '${readNames.length}/${staffList.length}',
-                style: AppTextStyles.label.copyWith(
-                  color: AppColors.textTertiary,
-                ),
-              ),
-              Spacer(),
-              if (unreadNames.isEmpty)
-                Text(
-                  '모두 확인했어요',
-                  style: AppTextStyles.caption.copyWith(
-                    color: AppColors.success,
-                    fontWeight: FontWeight.w700,
+              Row(
+                children: [
+                  Text('확인 현황', style: AppTextStyles.label),
+                  SizedBox(width: 6),
+                  Text(
+                    data == null ? '$readCount' : '$readCount/$total',
+                    style: AppTextStyles.label.copyWith(
+                      color: AppColors.textTertiary,
+                    ),
                   ),
+                  Spacer(),
+                  if (allRead)
+                    Text(
+                      '모두 확인했어요',
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.success,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                ],
+              ),
+              if (people.isNotEmpty) ...[
+                SizedBox(height: 12),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    // 서버가 읽은 사람을 앞에 놓아 준다
+                    for (final person in people)
+                      _ReaderChip(name: person.name, read: person.read),
+                  ],
                 ),
+              ],
             ],
-          ),
-          SizedBox(height: 12),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (final name in readNames) _ReaderChip(name: name, read: true),
-              for (final name in unreadNames)
-                _ReaderChip(name: name, read: false),
-            ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
+}
+
+/// 확인 현황 — 같은 공지를 다시 열 때 또 받지 않도록 들고 있는다
+final _readersCache = <String, Future<NoticeReaders>>{};
+
+Future<NoticeReaders> _readersOf(_Notice notice) {
+  final id = notice.id;
+  if (id == null) {
+    return Future.value(
+      NoticeReaders(total: 0, readCount: 0, people: const []),
+    );
+  }
+  return _readersCache[id] ??= NoticeApi.readers(id);
 }
 
 /// 확인 여부 알약 — 안 본 사람은 흐리게
@@ -959,14 +976,19 @@ class _Notice {
     required this.body,
     required this.author,
     required this.date,
-    required this.readers,
     this.id,
+    this.authorId,
     this.pinned = false,
+    this.read = false,
+    this.readCount = 0,
   });
 
   /// 서버가 준 uuid — **null 이면 아직 안 올린 새 글이다.**
   /// '공지 작성'을 누르면 빈 글로 시작해서, 편집을 마칠 때 서버에 올린다.
   String? id;
+
+  /// 작성자 uuid — 수정·삭제 권한이 이 값으로 갈린다 ([_canEdit])
+  String? authorId;
 
   String title;
   String body;
@@ -976,8 +998,12 @@ class _Notice {
   /// 상단 고정 (중요 공지)
   bool pinned;
 
-  /// 확인한 사람
-  final Set<String> readers;
+  /// 내가 열어 봤는지 (서버 `readByMe`)
+  bool read;
+
+  /// 확인한 사람 수 (서버 `readCount`).
+  /// 전체 인원과 사람별 목록은 `/notices/{id}/readers` 로 따로 받는다.
+  int readCount;
 
   String get displayTitle => title.isEmpty ? '제목 없는 공지' : title;
 
@@ -1001,13 +1027,6 @@ final _notices = <_Notice>[];
 /// 한 번이라도 받아왔는지 — 탭을 다시 열 때 빈 목록을 깜빡이지 않게 한다
 bool _noticesLoaded = false;
 
-/// 이 앱을 켠 뒤로 내가 열어 본 공지
-///
-/// **서버에 읽음 상태가 없어서**(backend-gap.md 35번) 앱이 대신 들고 있다.
-/// 목록을 다시 받아도 유지되도록 [_notices] 바깥에 따로 둔다.
-/// 앱을 껐다 켜면 지워지고, 다른 기기와도 공유되지 않는다.
-final _readNoticeIds = <String>{};
-
 Future<void> _loadNotices() async {
   final rows = await NoticeApi.list();
   _notices
@@ -1024,12 +1043,14 @@ _Notice _fromServer(Notice row) {
   final author = StaffDirectory.instance.byId(row.authorId);
   return _Notice(
     id: row.id,
+    authorId: row.authorId,
     title: row.title,
     body: row.body,
     author: author?.name ?? '',
     date: row.createdAt,
     pinned: row.pinned,
-    readers: {if (_readNoticeIds.contains(row.id)) me},
+    read: row.readByMe,
+    readCount: row.readCount,
   );
 }
 
@@ -1048,8 +1069,10 @@ Future<void> _saveNotice(_Notice notice) async {
       pinned: notice.pinned,
     );
     notice.id = created.id;
-    _readNoticeIds.add(created.id);
-    notice.readers.add(me);
+    notice.authorId = created.authorId;
+    // 내가 쓴 글은 이미 본 것이다 — 서버도 작성자를 읽음으로 잡아 준다
+    notice.read = created.readByMe;
+    notice.readCount = created.readCount;
     return;
   }
 
@@ -1066,25 +1089,32 @@ Future<void> _deleteNotice(_Notice notice) async {
   final id = notice.id;
   if (id != null) await NoticeApi.delete(id);
   _notices.remove(notice);
-  _readNoticeIds.remove(id);
+  _readersCache.remove(id);
 }
 
-/// 열어 봤다고 표시 — 이 기기에서만 기억한다
+/// 열어 봤다고 찍는다
+///
+/// 화면을 먼저 바꾸고 서버에 알린다. 실패해도 되돌리지 않는다 — 읽음은
+/// 다시 열면 또 찍히는 값이라, 여기서 에러를 띄우면 성가시기만 하다.
 void _markRead(_Notice notice) {
-  notice.readers.add(me);
   final id = notice.id;
-  if (id != null) _readNoticeIds.add(id);
+  if (id == null || notice.read) return;
+  notice.read = true;
+  notice.readCount++;
+  // 확인 현황에 내가 더해졌으니 받아 둔 목록은 버린다
+  _readersCache.remove(id);
+  NoticeApi.markRead(id).catchError((_) {});
 }
 
 /// 이 공지를 고치거나 지울 수 있는가
 ///
-/// 서버가 `require_role(ADMIN, MANAGER)` 로 막는다 (MASTER 는 자동 포함).
-/// **작성은 전 직원이 되는데 수정·삭제는 안 된다** — 본인이 쓴 글도 마찬가지다
-/// (backend-gap.md 36번). 앱도 같은 기준으로 버튼을 감춘다.
+/// 서버 기준과 같다 — **작성자 본인 또는 관리자·점장·대표**.
+/// 남이 쓴 글을 일반 직원이 건드리면 403 이라 버튼을 감춘다.
 ///
-/// 아직 안 올린 새 글([_Notice.id]가 null)은 예외다. 작성 자체는 누구나
-/// 되는데 여기서 막으면 쓰다 말고 저장도 못 하는 상태가 된다.
-bool _canEdit(_Notice notice) => notice.id == null || myRole.strong;
+/// 아직 안 올린 새 글([_Notice.id]가 null)도 열어 둔다. 작성은 누구나 되는데
+/// 여기서 막으면 쓰다 말고 저장도 못 하는 상태가 된다.
+bool _canEdit(_Notice notice) =>
+    notice.id == null || notice.authorId == currentUser?.id || myRole.strong;
 
 // ── 표시용 계산 ──
 
@@ -1110,7 +1140,7 @@ class NoticeBrief {
   String get title => _notice.displayTitle;
   String get author => _notice.author;
   bool get pinned => _notice.pinned;
-  bool get unread => !_notice.readers.contains(me);
+  bool get unread => !_notice.read;
 
   /// '오늘' · '어제' · '3일 전' · '7.12'
   String get time {
@@ -1128,7 +1158,7 @@ class NoticeBrief {
 
   /// 폰: 읽음 처리하고 본문을 옆에서 밀어 연다
   Future<void> open(BuildContext context) {
-    _notice.readers.add(me);
+    _markRead(_notice);
     return Navigator.push(
       context,
       CupertinoPageRoute(

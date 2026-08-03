@@ -59,7 +59,6 @@ class _NoticePhone extends StatelessWidget {
       body: '',
       author: me,
       date: DateTime.now(),
-      readers: {me},
     );
     _notices.add(notice);
     onFilter(false);
@@ -106,7 +105,7 @@ class _NoticeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final unread = !notice.readers.contains(me);
+    final unread = !notice.read;
 
     return Pressable(
       onTap: onTap,
@@ -169,7 +168,7 @@ class _NoticeCard extends StatelessWidget {
                 ),
                 Spacer(),
                 Text(
-                  '${notice.readers.length}/${staffList.length} 확인',
+                  '${notice.readCount}명 확인',
                   style: AppTextStyles.caption.copyWith(fontSize: 12),
                 ),
               ],
