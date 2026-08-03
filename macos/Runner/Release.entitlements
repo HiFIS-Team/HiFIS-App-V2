@@ -7,7 +7,8 @@
 	<!-- 서버 API 호출에 필요하다 (DebugProfile 과 동일) -->
 	<key>com.apple.security.network.client</key>
 	<true/>
-	<key>com.apple.security.files.user-selected.read-only</key>
+	<!-- 문서함: 올릴 파일 고르기(읽기) + 내려받아 저장하기(쓰기) -->
+	<key>com.apple.security.files.user-selected.read-write</key>
 	<true/>
 </dict>
 </plist>

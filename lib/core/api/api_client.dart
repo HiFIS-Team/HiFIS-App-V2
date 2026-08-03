@@ -194,6 +194,12 @@ class ApiClient {
     return data is Map ? data.cast<String, dynamic>() : null;
   }
 
+  /// 목록으로 답하는 POST (예: 폴더 트리 만들기)
+  Future<List<dynamic>> postList(String path, {Object? body}) async {
+    final response = await _send('POST', path, body: body);
+    return response.data as List<dynamic>;
+  }
+
   Future<Map<String, dynamic>?> patch(String path, {Object? body}) async {
     final response = await _send('PATCH', path, body: body);
     final data = response.data;
@@ -201,4 +207,35 @@ class ApiClient {
   }
 
   Future<void> delete(String path) => _send('DELETE', path);
+
+  /// 파일 통째로 받기 — 본문이 JSON 이 아니라 바이트다
+  ///
+  /// [_send] 는 응답을 Map 으로 읽어서 파일에는 못 쓴다.
+  /// 401 재시도 규칙은 같게 두되, 에러 본문도 바이트라 봉투를 못 읽으므로
+  /// 상태 코드만 보고 문장을 만든다.
+  Future<List<int>> getBytes(String path) async {
+    Future<Response<List<int>>> once() => dio.get<List<int>>(
+      path,
+      options: Options(responseType: ResponseType.bytes),
+    );
+
+    var response = await once();
+    if (response.statusCode == 401) {
+      if (await _refresh()) {
+        response = await once();
+      } else {
+        onSessionExpired?.call();
+      }
+    }
+
+    final status = response.statusCode ?? 0;
+    if (status >= 400) {
+      throw ApiException(
+        code: 'DOWNLOAD_FAILED',
+        message: status == 404 ? '서버에 파일이 없어요.' : '파일을 받지 못했어요. (오류 $status)',
+        status: status,
+      );
+    }
+    return response.data ?? const [];
+  }
 }

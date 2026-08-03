@@ -77,11 +77,14 @@ class _Item {
     required this.name,
     required this.id,
     this.ownerId,
+    this.updated,
     List<_Item>? children,
   }) : kind = _Kind.folder,
        bytes = 0,
        path = null,
        url = null,
+       // 서버가 폴더에는 즐겨찾기를 안 준다
+       starred = false,
        children = children ?? [];
 
   _Item.file({
@@ -92,6 +95,8 @@ class _Item {
     this.ownerId,
     this.url,
     this.path,
+    this.updated,
+    this.starred = false,
   }) : children = null;
 
   /// 서버 uuid
@@ -106,9 +111,12 @@ class _Item {
   /// 만든 사람·올린 사람 — 본인이나 관리자만 고치고 지울 수 있다
   final String? ownerId;
 
-  /// 즐겨찾기 — **서버에 담을 자리가 없다** (backend-gap.md 51번).
-  /// 앱이 화면 안에서만 기억하다가 껐다 켜면 풀린다
-  bool starred = false;
+  /// 마지막으로 손댄 시각 (서버 `updatedAt`)
+  DateTime? updated;
+
+  /// 즐겨찾기 — 서버에 **사람마다 따로** 남는다 (`favoritedByMe`).
+  /// 폴더에는 없다 — 서버가 문서에만 준다
+  bool starred;
 
   /// 서버에 올라간 파일 주소 (서명 포함). 폴더는 null
   final String? url;
@@ -134,15 +142,26 @@ class _Item {
     if (bytes >= 1000) return '${(bytes / 1000).round()}KB';
     return '${bytes}B';
   }
+
+  /// 목록의 '수정한 날짜' 칸 — 오늘이면 시각만 보여준다 (파인더와 같게)
+  String get updatedLabel {
+    final at = updated;
+    if (at == null) return '--';
+    final now = DateTime.now();
+    final time =
+        '${at.hour.toString().padLeft(2, '0')}:'
+        '${at.minute.toString().padLeft(2, '0')}';
+    if (at.year == now.year && at.month == now.month && at.day == now.day) {
+      return '오늘 $time';
+    }
+    return '${at.year % 100}. ${at.month}. ${at.day}. $time';
+  }
 }
 
 /// 최상위 폴더 — 탭을 오가도 유지되도록 모듈 전역으로 둔다
 final _root = _Item.folder(name: '문서함', id: '', children: []);
 
 bool _treeLoaded = false;
-
-/// 즐겨찾기 — 서버에 없어서 앱이 들고 있는다 (backend-gap.md 51번)
-final _starred = <String>{};
 
 /// 서버에서 받아 트리를 다시 세운다
 ///
@@ -162,6 +181,7 @@ void _buildTree(List<Folder> folders, List<Document> documents) {
         name: folder.name,
         id: folder.id,
         ownerId: folder.createdById,
+        updated: folder.updatedAt ?? folder.createdAt,
       ),
   };
 
@@ -174,17 +194,23 @@ void _buildTree(List<Folder> folders, List<Document> documents) {
   }
 
   for (final document in documents) {
-    final node = _Item.file(
-      name: document.name,
-      kind: _Kind.of('x.${document.ext}'),
-      bytes: document.sizeBytes,
-      id: document.id,
-      ownerId: document.uploaderId,
-      url: document.fileUrl,
-    )..starred = _starred.contains(document.id);
+    final node = _itemOf(document);
     (nodes[document.folderId]?.children ?? _root.children!).add(node);
   }
 }
+
+/// 서버 문서 하나를 화면 항목으로. [path] 는 방금 고른 파일의 로컬 경로다
+_Item _itemOf(Document document, {String? path}) => _Item.file(
+  name: document.name,
+  kind: _Kind.of('x.${document.ext}'),
+  bytes: document.sizeBytes,
+  id: document.id,
+  ownerId: document.uploaderId,
+  url: document.fileUrl,
+  updated: document.updatedAt ?? document.createdAt,
+  starred: document.favoritedByMe,
+  path: path,
+);
 
 /// uuid → 올린 사람 이름
 String _uploaderName(String id) =>
@@ -210,9 +236,11 @@ _Item? _parentOf(_Item folder, _Item target) {
   return null;
 }
 
-/// 올리는 중임을 알리는 작은 알약 (우하단)
+/// 올리는·받는 중임을 알리는 작은 알약 (우하단)
 class _UploadingChip extends StatelessWidget {
-  _UploadingChip();
+  _UploadingChip({required this.label});
+
+  final String label;
 
   @override
   Widget build(BuildContext context) {
@@ -243,7 +271,7 @@ class _UploadingChip extends StatelessWidget {
           ),
           SizedBox(width: 10),
           Text(
-            '올리는 중…',
+            label,
             style: AppTextStyles.body2.copyWith(
               fontSize: 13,
               fontWeight: FontWeight.w600,

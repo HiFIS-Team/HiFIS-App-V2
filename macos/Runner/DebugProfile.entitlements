@@ -12,7 +12,9 @@
 	     macOS에서만 로그인이 안 된다 (실제 발생). -->
 	<key>com.apple.security.network.client</key>
 	<true/>
-	<key>com.apple.security.files.user-selected.read-only</key>
+	<!-- 문서함: 올릴 파일 고르기(읽기) + 내려받아 저장하기(쓰기).
+	     read-only 로 두면 저장 창은 뜨는데 쓰기에서 막힌다. -->
+	<key>com.apple.security.files.user-selected.read-write</key>
 	<true/>
 </dict>
 </plist>

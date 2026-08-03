@@ -52,6 +52,21 @@ class _DocumentScreenState extends State<DocumentScreen> {
   /// 서버에 올리는 중 — 여러 개면 한 개씩 올라간다
   bool _uploading = false;
 
+  /// 올리는 일이 몇 겹 겹쳐 있는지. 폴더째 올리면 폴더 만들기 + 폴더마다 파일
+  /// 올리기가 중첩돼서, 단순 bool 이면 중간에 알약이 껌뻑인다
+  int _busy = 0;
+
+  /// 파일을 받아 오는 중 — 큰 파일이면 시간이 걸린다
+  bool _downloading = false;
+
+  void _beginBusy() {
+    if (_busy++ == 0) setState(() => _uploading = true);
+  }
+
+  void _endBusy() {
+    if (--_busy == 0 && mounted) setState(() => _uploading = false);
+  }
+
   bool _loading = !_treeLoaded;
 
   String _query = '';
@@ -80,7 +95,7 @@ class _DocumentScreenState extends State<DocumentScreen> {
 
   void _open(_Item item) {
     if (!item.isFolder) {
-      _showFilePreview(context, item);
+      _showFilePreview(context, item, onDownload: () => _download(item));
       return;
     }
     setState(() {
@@ -145,6 +160,7 @@ class _DocumentScreenState extends State<DocumentScreen> {
         name: created.name,
         id: created.id,
         ownerId: created.createdById,
+        updated: created.updatedAt ?? created.createdAt,
       );
       setState(() {
         target.children!.add(folder);
@@ -174,34 +190,128 @@ class _DocumentScreenState extends State<DocumentScreen> {
 
   /// 창에 끌어다 놓은 것들을 담는다 (데스크톱 전용)
   ///
-  /// **폴더는 못 받는다** — 서버에 한 번에 올리는 길이 없어서 파일만 걸러 낸다
-  /// (backend-gap.md 54번).
+  /// 폴더를 놓으면 **안쪽 구조를 그대로** 가져온다 — 폴더는 `/folders/tree` 로
+  /// 한 번에 만들고(중간에 실패해도 반쯤 남지 않는다), 파일은 제자리에 올린다.
   Future<void> _drop(List<String> paths) async {
     final target = _place == _Place.all ? _current : _root;
     final files = <(String, String)>[];
-    var folders = 0;
+    final folders = <String>[];
 
     for (final path in paths) {
       final name = path.split(Platform.pathSeparator).last;
       // 맥의 .DS_Store 같은 숨김 파일은 건너뛴다
       if (name.startsWith('.')) continue;
       if (Directory(path).existsSync()) {
-        folders++;
-        continue;
+        folders.add(path);
+      } else {
+        files.add((path, name));
       }
-      files.add((path, name));
     }
 
+    if (folders.isNotEmpty) await _dropFolders(folders, target);
+    if (!mounted) return;
     await _uploadPaths(files, target);
-    if (folders > 0 && mounted) {
-      AppToast.show(context, '폴더는 아직 통째로 못 올려요 · 파일만 담았어요');
+  }
+
+  /// 끌어다 놓은 폴더들을 구조째 담는다
+  Future<void> _dropFolders(List<String> paths, _Item target) async {
+    _beginBusy();
+    var added = 0;
+    try {
+      // 1) 폴더 구조만 먼저 훑어서 한 번에 만든다
+      final created = await DocumentApi.createFolderTree([
+        for (final path in paths) _scanFolder(Directory(path)),
+      ], parentId: target.id.isEmpty ? null : target.id);
+      if (!mounted) return;
+
+      // 2) 만들어진 id 를 로컬 경로에 짝지어 트리에 반영한다
+      final byPath = <String, _Item>{};
+      for (var i = 0; i < created.length; i++) {
+        _graftFolder(created[i], Directory(paths[i]), target, byPath);
+      }
+      setState(() {});
+
+      // 3) 폴더마다 그 안의 파일을 올린다.
+      //    폴더 수만큼 알림이 뜨면 시끄러워서 여기서 한 번에 알린다
+      for (final entry in byPath.entries) {
+        if (!mounted) return;
+        added += await _uploadPaths(
+          _filesIn(Directory(entry.key)),
+          entry.value,
+          announce: false,
+        );
+      }
+      if (mounted) {
+        AppToast.show(context, '폴더 ${byPath.length}개 · 파일 $added개를 담았어요');
+      }
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+    _endBusy();
+  }
+
+  /// 디렉터리를 재귀로 훑어 폴더 구조만 뽑는다 (파일은 뒤에 따로 올린다)
+  FolderTreeNode _scanFolder(Directory dir) {
+    final name = dir.path.split(Platform.pathSeparator).last;
+    final children = [
+      for (final entry in dir.listSync())
+        if (entry is Directory &&
+            !entry.path.split(Platform.pathSeparator).last.startsWith('.'))
+          _scanFolder(entry),
+    ];
+    return FolderTreeNode(name, children);
+  }
+
+  /// 서버가 돌려준 id 트리를 화면 트리에 붙이면서 `로컬 경로 → 항목` 을 모은다
+  ///
+  /// 하위끼리는 **이름으로** 짝짓는다. `listSync()` 순서가 두 번 부를 때
+  /// 같다는 보장이 없어서, 차례로 맞추면 엉뚱한 폴더에 파일이 들어갈 수 있다.
+  void _graftFolder(
+    FolderTreeResult created,
+    Directory dir,
+    _Item parent,
+    Map<String, _Item> byPath,
+  ) {
+    final folder = _Item.folder(
+      name: created.name,
+      id: created.id,
+      ownerId: currentUser?.id,
+      updated: DateTime.now(),
+    );
+    parent.children!.add(folder);
+    byPath[dir.path] = folder;
+
+    final madeByName = {
+      for (final child in created.children) child.name: child,
+    };
+    for (final entry in dir.listSync()) {
+      if (entry is! Directory) continue;
+      final name = entry.path.split(Platform.pathSeparator).last;
+      if (name.startsWith('.')) continue;
+      if (madeByName[name] case final made?) {
+        _graftFolder(made, entry, folder, byPath);
+      }
     }
   }
 
-  /// 고른 파일들을 하나씩 올린다 — 하나가 실패해도 나머지는 계속 간다
-  Future<void> _uploadPaths(List<(String, String)> files, _Item target) async {
-    if (files.isEmpty) return;
-    setState(() => _uploading = true);
+  /// 그 디렉터리 **바로 아래**의 파일들 (하위 폴더 것은 그 폴더가 맡는다)
+  List<(String, String)> _filesIn(Directory dir) => [
+    for (final entry in dir.listSync())
+      if (entry is File)
+        if (entry.path.split(Platform.pathSeparator).last case final name
+            when !name.startsWith('.'))
+          (entry.path, name),
+  ];
+
+  /// 고른 파일들을 하나씩 올린다 — 하나가 실패해도 나머지는 계속 간다.
+  /// 담은 개수를 돌려준다 (폴더째 올릴 때 합쳐서 한 번에 알리려고)
+  Future<int> _uploadPaths(
+    List<(String, String)> files,
+    _Item target, {
+    bool announce = true,
+  }) async {
+    if (files.isEmpty) return 0;
+    _beginBusy();
 
     var added = 0;
     Object? failure;
@@ -212,20 +322,10 @@ class _DocumentScreenState extends State<DocumentScreen> {
           filename: name,
           folderId: target.id.isEmpty ? null : target.id,
         );
-        if (!mounted) return;
+        if (!mounted) return added;
         setState(() {
-          target.children!.add(
-            _Item.file(
-              name: uploaded.name,
-              kind: _Kind.of('x.${uploaded.ext}'),
-              bytes: uploaded.sizeBytes,
-              id: uploaded.id,
-              ownerId: uploaded.uploaderId,
-              url: uploaded.fileUrl,
-              // 방금 고른 파일이라 서버를 안 거치고도 미리보기가 된다
-              path: path,
-            ),
-          );
+          // 방금 고른 파일이라 서버를 안 거치고도 미리보기가 된다
+          target.children!.add(_itemOf(uploaded, path: path));
         });
         added++;
       } catch (error) {
@@ -233,13 +333,12 @@ class _DocumentScreenState extends State<DocumentScreen> {
       }
     }
 
-    if (!mounted) return;
-    setState(() {
-      _uploading = false;
-      _place = _Place.all;
-    });
-    if (added > 0) AppToast.show(context, '$added개 파일을 올렸어요');
+    _endBusy();
+    if (!mounted) return added;
+    setState(() => _place = _Place.all);
+    if (announce && added > 0) AppToast.show(context, '$added개 파일을 올렸어요');
     if (failure != null) AppToast.show(context, messageOf(failure));
+    return added;
   }
 
   Future<void> _rename(_Item item) async {
@@ -259,10 +358,11 @@ class _DocumentScreenState extends State<DocumentScreen> {
     setState(() => item.name = name);
     try {
       if (item.isFolder) {
-        await DocumentApi.renameFolder(item.id, name: name);
+        await DocumentApi.updateFolder(item.id, name: name);
       } else {
         await DocumentApi.updateDocument(item.id, name: name);
       }
+      if (mounted) setState(() => item.updated = DateTime.now());
     } catch (error) {
       if (!mounted) return;
       setState(() => item.name = before);
@@ -275,18 +375,13 @@ class _DocumentScreenState extends State<DocumentScreen> {
       AppToast.show(context, '올린 사람만 지울 수 있어요');
       return;
     }
-    // 폴더를 지우면 안에 든 문서도 서버에서 같이 지워진다
+    // 폴더를 지우면 **하위 폴더와 그 안의 문서까지** 서버에서 같이 지워진다
     if (item.isFolder) {
-      // **하위 폴더가 있으면 서버가 500 을 낸다** (backend-gap.md 55번).
-      // 부르기 전에 막는다 — 안 그러면 원인 모를 오류만 뜬다
-      if (item.children!.any((child) => child.isFolder)) {
-        AppToast.show(context, '안에 폴더가 있어요 · 하위 폴더부터 지워주세요');
-        return;
-      }
+      final nested = item.children!.any((child) => child.isFolder);
       final ok = await showConfirmDialog(
         context,
         title: "'${item.name}' 폴더를 지울까요?",
-        message: '폴더 안에 든 문서도 같이 지워져요.',
+        message: nested ? '안에 든 하위 폴더와 문서까지 모두 지워져요.' : '폴더 안에 든 문서도 같이 지워져요.',
         confirmLabel: '삭제',
         destructive: true,
       );
@@ -317,17 +412,52 @@ class _DocumentScreenState extends State<DocumentScreen> {
     AppToast.show(context, '${item.name}을(를) 삭제했어요');
   }
 
-  /// 즐겨찾기 — **서버에 담을 자리가 없어서** 앱이 기억한다.
-  /// 껐다 켜면 풀린다 (backend-gap.md 51번)
-  void _toggleStar(_Item item) {
-    setState(() {
-      item.starred = !item.starred;
-      if (item.starred) {
-        _starred.add(item.id);
-      } else {
-        _starred.remove(item.id);
-      }
-    });
+  /// 즐겨찾기 — 서버에 **사람마다 따로** 남는다
+  ///
+  /// 별은 누르는 순간 바뀌어야 해서 먼저 칠하고 서버에 보낸다.
+  /// 실패하면 되돌린다.
+  Future<void> _toggleStar(_Item item) async {
+    // 서버는 문서에만 즐겨찾기를 준다
+    if (item.isFolder) {
+      AppToast.show(context, '폴더는 즐겨찾기에 못 담아요');
+      return;
+    }
+
+    final next = !item.starred;
+    setState(() => item.starred = next);
+    try {
+      await (next
+          ? DocumentApi.favorite(item.id)
+          : DocumentApi.unfavorite(item.id));
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => item.starred = !next);
+      AppToast.show(context, messageOf(error));
+    }
+  }
+
+  /// 파일을 컴퓨터에 내려받는다
+  ///
+  /// 서버가 원본 이름으로 내려주지만 **어디에 둘지는 사람이 고른다** —
+  /// 데스크톱에서 저장 위치를 안 묻고 받아 두면 어디 갔는지 알 수 없다.
+  Future<void> _download(_Item item) async {
+    if (item.isFolder) return;
+
+    final target = await FilePicker.saveFile(
+      dialogTitle: '저장할 위치를 고르세요',
+      fileName: item.name,
+    );
+    if (target == null || !mounted) return;
+
+    setState(() => _downloading = true);
+    try {
+      final bytes = await DocumentApi.download(item.id);
+      await File(target).writeAsBytes(bytes);
+      if (mounted) AppToast.show(context, '${item.name}을(를) 저장했어요');
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+    if (mounted) setState(() => _downloading = false);
   }
 
   // ── 우클릭 메뉴 ──
@@ -343,16 +473,23 @@ class _DocumentScreenState extends State<DocumentScreen> {
             : Icons.visibility_rounded,
         onTap: () => _open(item),
       ),
+      if (!item.isFolder)
+        _MenuEntry(
+          label: '내려받기',
+          icon: Icons.download_rounded,
+          onTap: () => _download(item),
+        ),
       _MenuEntry(
         label: '이름 바꾸기',
         icon: Icons.drive_file_rename_outline_rounded,
         onTap: () => _rename(item),
       ),
-      _MenuEntry(
-        label: item.starred ? '즐겨찾기 해제' : '즐겨찾기에 추가',
-        icon: item.starred ? Icons.star_rounded : Icons.star_border_rounded,
-        onTap: () => _toggleStar(item),
-      ),
+      if (!item.isFolder)
+        _MenuEntry(
+          label: item.starred ? '즐겨찾기 해제' : '즐겨찾기에 추가',
+          icon: item.starred ? Icons.star_rounded : Icons.star_border_rounded,
+          onTap: () => _toggleStar(item),
+        ),
       _MenuEntry.divider(),
       _MenuEntry(
         label: '삭제',
@@ -387,10 +524,17 @@ class _DocumentScreenState extends State<DocumentScreen> {
   List<_Item> get _visible {
     final list = switch (_place) {
       _Place.all => [..._current.children!],
-      // 위치 보기는 폴더 구조와 상관없이 조건에 맞는 파일을 그러모은다.
-      // **서버가 올린 시각을 안 줘서** 정렬을 못 한다 (backend-gap.md 51번) —
-      // 대신 서버가 최신순으로 준 목록 순서를 그대로 따른다
-      _Place.recent => _collect(_root).where((i) => !i.isFolder).toList(),
+      // 위치 보기는 폴더 구조와 상관없이 조건에 맞는 파일을 그러모은다
+      _Place.recent =>
+        _collect(_root).where((i) => !i.isFolder).toList()
+          // 손댄 시각이 늦은 것부터. 시각이 없는 건 뒤로 민다
+          ..sort((a, b) {
+            final left = a.updated, right = b.updated;
+            if (left == null || right == null) {
+              return left == null ? (right == null ? 0 : 1) : -1;
+            }
+            return right.compareTo(left);
+          }),
       _Place.starred => _collect(_root).where((i) => i.starred).toList(),
     };
 
@@ -458,8 +602,14 @@ class _DocumentScreenState extends State<DocumentScreen> {
                   _pane(items),
                   if (_dragging) _DropOverlay(folder: _current.name),
                   // 여러 개면 한 개씩 올라가서 시간이 걸린다 — 진행 중임을 알린다
-                  if (_uploading)
-                    Positioned(right: 24, bottom: 24, child: _UploadingChip()),
+                  if (_uploading || _downloading)
+                    Positioned(
+                      right: 24,
+                      bottom: 24,
+                      child: _UploadingChip(
+                        label: _uploading ? '올리는 중…' : '받는 중…',
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -506,6 +656,7 @@ class _DocumentScreenState extends State<DocumentScreen> {
                     onSelect: (i) => setState(() => _selected = i),
                     onOpen: _open,
                     onStar: _toggleStar,
+                    onDownload: _download,
                     onRename: _rename,
                     onDelete: _delete,
                     onMenu: _itemMenu,
@@ -516,6 +667,7 @@ class _DocumentScreenState extends State<DocumentScreen> {
                     onSelect: (i) => setState(() => _selected = i),
                     onOpen: _open,
                     onStar: _toggleStar,
+                    onDownload: _download,
                     onRename: _rename,
                     onDelete: _delete,
                     onMenu: _itemMenu,
@@ -1110,6 +1262,7 @@ class _GridBody extends StatelessWidget {
     required this.onSelect,
     required this.onOpen,
     required this.onStar,
+    required this.onDownload,
     required this.onRename,
     required this.onDelete,
     required this.onMenu,
@@ -1120,6 +1273,7 @@ class _GridBody extends StatelessWidget {
   final ValueChanged<_Item> onSelect;
   final ValueChanged<_Item> onOpen;
   final ValueChanged<_Item> onStar;
+  final ValueChanged<_Item> onDownload;
   final ValueChanged<_Item> onRename;
   final ValueChanged<_Item> onDelete;
 
@@ -1147,6 +1301,7 @@ class _GridBody extends StatelessWidget {
             onSelect: () => onSelect(items[index]),
             onOpen: () => onOpen(items[index]),
             onStar: () => onStar(items[index]),
+            onDownload: () => onDownload(items[index]),
             onRename: () => onRename(items[index]),
             onDelete: () => onDelete(items[index]),
             onMenu: (position) => onMenu(items[index], position),
@@ -1165,6 +1320,7 @@ class _GridTile extends StatefulWidget {
     required this.onSelect,
     required this.onOpen,
     required this.onStar,
+    required this.onDownload,
     required this.onRename,
     required this.onDelete,
     required this.onMenu,
@@ -1175,6 +1331,7 @@ class _GridTile extends StatefulWidget {
   final VoidCallback onSelect;
   final VoidCallback onOpen;
   final VoidCallback onStar;
+  final VoidCallback onDownload;
   final VoidCallback onRename;
   final VoidCallback onDelete;
 
@@ -1260,8 +1417,9 @@ class _GridTileState extends State<_GridTile> {
                 height: 18,
                 child: _hover || widget.selected
                     ? _RowActions(
-                        starred: item.starred,
+                        item: item,
                         onStar: widget.onStar,
+                        onDownload: widget.onDownload,
                         onRename: widget.onRename,
                         onDelete: widget.onDelete,
                       )
@@ -1289,6 +1447,7 @@ class _ListBody extends StatelessWidget {
     required this.onSelect,
     required this.onOpen,
     required this.onStar,
+    required this.onDownload,
     required this.onRename,
     required this.onDelete,
     required this.onMenu,
@@ -1299,6 +1458,7 @@ class _ListBody extends StatelessWidget {
   final ValueChanged<_Item> onSelect;
   final ValueChanged<_Item> onOpen;
   final ValueChanged<_Item> onStar;
+  final ValueChanged<_Item> onDownload;
   final ValueChanged<_Item> onRename;
   final ValueChanged<_Item> onDelete;
 
@@ -1318,7 +1478,7 @@ class _ListBody extends StatelessWidget {
               SizedBox(width: 130, child: _head('수정한 날짜')),
               SizedBox(width: 90, child: _head('크기')),
               SizedBox(width: 92, child: _head('종류')),
-              SizedBox(width: 84),
+              SizedBox(width: 108),
             ],
           ),
         ),
@@ -1333,6 +1493,7 @@ class _ListBody extends StatelessWidget {
               onSelect: () => onSelect(items[index]),
               onOpen: () => onOpen(items[index]),
               onStar: () => onStar(items[index]),
+              onDownload: () => onDownload(items[index]),
               onRename: () => onRename(items[index]),
               onDelete: () => onDelete(items[index]),
               onMenu: (position) => onMenu(items[index], position),
@@ -1361,6 +1522,7 @@ class _ListRow extends StatefulWidget {
     required this.onSelect,
     required this.onOpen,
     required this.onStar,
+    required this.onDownload,
     required this.onRename,
     required this.onDelete,
     required this.onMenu,
@@ -1371,6 +1533,7 @@ class _ListRow extends StatefulWidget {
   final VoidCallback onSelect;
   final VoidCallback onOpen;
   final VoidCallback onStar;
+  final VoidCallback onDownload;
   final VoidCallback onRename;
   final VoidCallback onDelete;
 
@@ -1449,10 +1612,8 @@ class _ListRowState extends State<_ListRow> {
               ),
               SizedBox(
                 width: 130,
-                // 서버가 올린 시각을 안 준다 (backend-gap.md 51번) —
-                // 자리는 남겨 두고 값만 비운다
                 child: Text(
-                  '--',
+                  item.updatedLabel,
                   style: AppTextStyles.caption.copyWith(fontSize: 12),
                 ),
               ),
@@ -1471,11 +1632,12 @@ class _ListRowState extends State<_ListRow> {
                 ),
               ),
               SizedBox(
-                width: 84,
+                width: 108,
                 child: _hover || widget.selected
                     ? _RowActions(
-                        starred: item.starred,
+                        item: item,
                         onStar: widget.onStar,
+                        onDownload: widget.onDownload,
                         onRename: widget.onRename,
                         onDelete: widget.onDelete,
                       )
@@ -1489,17 +1651,22 @@ class _ListRowState extends State<_ListRow> {
   }
 }
 
-/// 커서를 올렸을 때 나오는 줄 동작 (즐겨찾기 · 이름 바꾸기 · 삭제)
+/// 커서를 올렸을 때 나오는 줄 동작 (즐겨찾기 · 내려받기 · 이름 바꾸기 · 삭제)
+///
+/// **폴더에는 즐겨찾기·내려받기가 없다** — 서버가 문서에만 준다.
+/// 자리를 늘 같게 잡아 두려고 폴더는 두 칸을 비워 둔다.
 class _RowActions extends StatelessWidget {
   _RowActions({
-    required this.starred,
+    required this.item,
     required this.onStar,
+    required this.onDownload,
     required this.onRename,
     required this.onDelete,
   });
 
-  final bool starred;
+  final _Item item;
   final VoidCallback onStar;
+  final VoidCallback onDownload;
   final VoidCallback onRename;
   final VoidCallback onDelete;
 
@@ -1509,12 +1676,22 @@ class _RowActions extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.end,
       mainAxisSize: MainAxisSize.min,
       children: [
-        _action(
-          starred ? Icons.star_rounded : Icons.star_border_rounded,
-          starred ? AppColors.warning : AppColors.gray400,
-          onStar,
-          '즐겨찾기',
-        ),
+        if (item.isFolder)
+          SizedBox(width: 44)
+        else ...[
+          _action(
+            item.starred ? Icons.star_rounded : Icons.star_border_rounded,
+            item.starred ? AppColors.warning : AppColors.gray400,
+            onStar,
+            '즐겨찾기',
+          ),
+          _action(
+            Icons.download_rounded,
+            AppColors.gray500,
+            onDownload,
+            '내려받기',
+          ),
+        ],
         _action(CupertinoIcons.pencil, AppColors.gray500, onRename, '이름 바꾸기'),
         _action(CupertinoIcons.delete, AppColors.error, onDelete, '삭제'),
       ],
@@ -1952,14 +2129,22 @@ class _MenuRowState extends State<_MenuRow> {
 ///
 /// 올린 이미지는 실제로 그려주고, 그 밖의 형식은 아직 뷰어가 없어
 /// 파일 정보만 보여준다.
-void _showFilePreview(BuildContext context, _Item item) {
-  showAppDialog<void>(context, (context) => _FilePreviewCard(item: item));
+void _showFilePreview(
+  BuildContext context,
+  _Item item, {
+  required VoidCallback onDownload,
+}) {
+  showAppDialog<void>(
+    context,
+    (context) => _FilePreviewCard(item: item, onDownload: onDownload),
+  );
 }
 
 class _FilePreviewCard extends StatelessWidget {
-  _FilePreviewCard({required this.item});
+  _FilePreviewCard({required this.item, required this.onDownload});
 
   final _Item item;
+  final VoidCallback onDownload;
 
   @override
   Widget build(BuildContext context) {
@@ -2020,28 +2205,71 @@ class _FilePreviewCard extends StatelessWidget {
           SizedBox(height: 16),
           _info('종류', item.kind.label),
           _info('크기', item.sizeLabel),
-          // 올린 시각은 서버가 안 준다 (backend-gap.md 51번)
+          if (item.updated != null) _info('수정한 날짜', item.updatedLabel),
           if (item.ownerId case final owner?)
             _info('올린 사람', _uploaderName(owner)),
           SizedBox(height: 14),
-          Pressable(
-            onTap: () => Navigator.pop(context),
-            scale: 0.97,
-            child: Container(
-              height: 46,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppColors.gray50,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '닫기',
-                style: AppTextStyles.body2.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textSecondary,
+          Row(
+            children: [
+              Expanded(
+                child: Pressable(
+                  onTap: () => Navigator.pop(context),
+                  scale: 0.97,
+                  child: Container(
+                    height: 46,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.gray50,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '닫기',
+                      style: AppTextStyles.body2.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ),
+              SizedBox(width: 8),
+              Expanded(
+                // 미리보기가 안 되는 형식은 여기가 **유일한 출구**다
+                child: Pressable(
+                  onTap: () {
+                    Navigator.pop(context);
+                    onDownload();
+                  },
+                  scale: 0.97,
+                  child: Container(
+                    height: 46,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.download_rounded,
+                          size: 16,
+                          color: Colors.white,
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          '내려받기',
+                          style: AppTextStyles.body2.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
