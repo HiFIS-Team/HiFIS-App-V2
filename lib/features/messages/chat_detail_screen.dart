@@ -59,6 +59,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   late final _nameController = TextEditingController(text: _name);
 
   bool _saving = false;
+  bool _muting = false;
 
   static const _shareTabs = ['사진', '영상', '파일'];
 
@@ -126,6 +127,22 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       }
     }
     if (mounted) setState(() => _saving = false);
+  }
+
+  /// 이 방 알림 끄기/켜기 — 나에게만 적용된다
+  Future<void> _toggleMute() async {
+    final room = _room;
+    if (room == null || _muting) return;
+    setState(() => _muting = true);
+    try {
+      await _store.setMuted(widget.roomId, !room.muted);
+      if (mounted) {
+        AppToast.show(context, room.muted ? '알림을 다시 받아요' : '이 방 알림을 껐어요');
+      }
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+    if (mounted) setState(() => _muting = false);
   }
 
   Future<void> _invite() async {
@@ -259,6 +276,38 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                             ),
                           ),
                         ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 24),
+                _SectionLabel('알림'),
+                SizedBox(height: 8),
+                _SettingBox(
+                  onTap: _toggleMute,
+                  child: Row(
+                    children: [
+                      Icon(
+                        (_room?.muted ?? false)
+                            ? CupertinoIcons.bell_slash
+                            : CupertinoIcons.bell,
+                        size: 20,
+                        color: AppColors.gray600,
+                      ),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '알림 받기',
+                          style: AppTextStyles.body1.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      // 끄면 대화는 그대로 오고 푸시만 안 온다
+                      CupertinoSwitch(
+                        value: !(_room?.muted ?? false),
+                        activeTrackColor: AppColors.primary,
+                        onChanged: _muting ? null : (_) => _toggleMute(),
                       ),
                     ],
                   ),

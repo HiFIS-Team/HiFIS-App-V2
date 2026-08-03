@@ -542,6 +542,8 @@ class _ConversationTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final name = chatRoomTitle(room);
     final unread = room.unreadCount > 0;
+    // 상대가 치고 있으면 미리보기 자리를 잠깐 내준다 (새로 그리는 건 없다)
+    final typing = ChatStore.instance.typingIn(room.id).isNotEmpty;
     // 그룹방은 사람 하나로 표현할 수 없어서 브랜드 색으로 둔다
     final color = chatRoomPeer(room)?.color ?? staffOf(name).color;
 
@@ -582,13 +584,19 @@ class _ConversationTile extends StatelessWidget {
                   ),
                   SizedBox(height: 2),
                   Text(
-                    '${chatPreview(room.lastMessage)} · '
-                    '${chatListTime(room.sortAt)}',
+                    typing
+                        ? '입력 중…'
+                        : '${chatPreview(room.lastMessage)} · '
+                              '${chatListTime(room.sortAt)}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: AppTextStyles.caption.copyWith(
-                      color: unread ? AppColors.gray900 : AppColors.gray400,
-                      fontWeight: unread ? FontWeight.w600 : FontWeight.w400,
+                      color: typing
+                          ? AppColors.primary
+                          : (unread ? AppColors.gray900 : AppColors.gray400),
+                      fontWeight: unread || typing
+                          ? FontWeight.w600
+                          : FontWeight.w400,
                     ),
                   ),
                 ],

@@ -193,6 +193,7 @@ class ChatRoom {
     this.name,
     this.lastMessage,
     this.unreadCount = 0,
+    this.muted = false,
   });
 
   factory ChatRoom.fromJson(Map<String, dynamic> json) => ChatRoom(
@@ -206,6 +207,7 @@ class ChatRoom {
     ],
     lastMessage: _last(json['lastMessage']),
     unreadCount: json['unreadCount'] as int? ?? 0,
+    muted: json['muted'] as bool? ?? false,
     updatedAt: DateTime.parse(json['updatedAt'] as String).toLocal(),
   );
 
@@ -219,6 +221,11 @@ class ChatRoom {
   final List<String> memberIds;
   final ChatMessage? lastMessage;
   final int unreadCount;
+
+  /// 내가 이 방 알림을 껐는지 — **사람마다 다르다**.
+  /// 꺼도 메시지는 그대로 오고 안읽음도 센다. 푸시만 안 온다.
+  final bool muted;
+
   final DateTime updatedAt;
 
   /// 목록을 세울 때 쓰는 시각 — 마지막 메시지가 있으면 그 시각
@@ -282,7 +289,16 @@ class ChatApi {
     return ChatRoom.fromJson(row!);
   }
 
-  /// 방 나가기 — 마지막 사람이 나가면 서버가 방을 지운다
+  /// 이 방 알림 끄기/켜기 — **나에게만** 적용된다
+  static Future<ChatRoom> setMuted(String roomId, bool muted) async {
+    final row = await _client.patch(
+      '/chat/rooms/$roomId/mute',
+      body: {'muted': muted},
+    );
+    return ChatRoom.fromJson(row!);
+  }
+
+  /// 방 나가기 — 나간 기록은 남는다 ('최근 나간 항목')
   static Future<void> leave(String roomId) =>
       _client.delete('/chat/rooms/$roomId/members/me');
 

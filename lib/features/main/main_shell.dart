@@ -21,6 +21,9 @@ import '../home/home_screen.dart';
 import '../meeting/meeting_screen.dart';
 import '../messages/desktop_chat_screen.dart';
 import '../work/work_screen.dart';
+import '../../core/api/chat_api.dart';
+import '../../core/data/staff.dart';
+import '../messages/chat_store.dart';
 import '../messages/message_screen.dart';
 import '../notice/notice_screen.dart';
 import '../notifications/notification_screen.dart';
@@ -496,6 +499,7 @@ class _ChatDockState extends State<_ChatDock> {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             // 사내톡 패널 — 필 위로 떠오른다
+            // (필 안의 배지·아바타가 스토어를 따라가야 해서 아래에서 듣는다)
             _FloatingPanel(
               open: _open,
               alignment: Alignment.bottomRight,
@@ -511,7 +515,11 @@ class _ChatDockState extends State<_ChatDock> {
               ),
             ),
             SizedBox(height: 12),
-            _buildPill(),
+            // 새 메시지가 오면 필의 빨간 점·아바타가 바로 따라간다
+            ListenableBuilder(
+              listenable: ChatStore.instance,
+              builder: (context, _) => _buildPill(),
+            ),
           ],
         );
       },
@@ -601,20 +609,42 @@ class _ChatDockState extends State<_ChatDock> {
     );
   }
 
+  /// 필 아바타 색 — DM 은 상대 색, 그룹은 이름에서 만든 색
+  Color _pillColor(ChatRoom room) =>
+      chatRoomPeer(room)?.color ?? staffOf(chatRoomTitle(room)).color;
+
   Widget _pillContent() {
-    // 사내톡 목업의 최근 대화 상대 3명 (기능 연동 시 실제 데이터로 교체)
+    // 최근 대화 상대 3명 — 목록 맨 위 세 방에서 뽑는다
     final people = [
-      ('민', AppColors.primary),
-      ('김', AppColors.warning),
-      ('유', AppColors.success),
+      for (final room in ChatStore.instance.rooms.take(3))
+        (chatRoomTitle(room).characters.first, _pillColor(room)),
     ];
 
     return Row(
       children: [
-        Icon(
-          Icons.chat_bubble_outline_rounded,
-          size: 17,
-          color: AppColors.gray700,
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Icon(
+              Icons.chat_bubble_outline_rounded,
+              size: 17,
+              color: AppColors.gray700,
+            ),
+            // 안 읽은 방이 있으면 빨간 점 — 알림 종과 같은 규칙
+            if (ChatStore.instance.unreadRooms.value > 0)
+              Positioned(
+                right: -3,
+                top: -2,
+                child: Container(
+                  width: 7,
+                  height: 7,
+                  decoration: BoxDecoration(
+                    color: AppColors.error,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+          ],
         ),
         SizedBox(width: 7),
         Text(
@@ -626,39 +656,43 @@ class _ChatDockState extends State<_ChatDock> {
           ),
         ),
         Spacer(),
-        // 최근 대화 상대 아바타 겹침 스택
-        SizedBox(
-          width: 24.0 + 16 * (people.length - 1),
-          height: 24,
-          child: Stack(
-            children: [
-              for (var i = 0; i < people.length; i++)
-                Positioned(
-                  left: i * 16.0,
-                  child: Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: people[i].$2,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.surface, width: 2),
-                    ),
-                    child: Center(
-                      child: Text(
-                        people[i].$1,
-                        style: TextStyle(
-                          fontFamily: AppTextStyles.fontFamily,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
+        // 최근 대화 상대 아바타 겹침 스택 (대화가 없으면 안 그린다 —
+        // 비어 있으면 폭이 음수가 된다)
+        if (people.isEmpty)
+          SizedBox.shrink()
+        else
+          SizedBox(
+            width: 24.0 + 16 * (people.length - 1),
+            height: 24,
+            child: Stack(
+              children: [
+                for (var i = 0; i < people.length; i++)
+                  Positioned(
+                    left: i * 16.0,
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: people[i].$2,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.surface, width: 2),
+                      ),
+                      child: Center(
+                        child: Text(
+                          people[i].$1,
+                          style: TextStyle(
+                            fontFamily: AppTextStyles.fontFamily,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
-        ),
       ],
     );
   }
@@ -737,13 +771,18 @@ class _HeaderButtonsState extends State<_HeaderButtons> {
             onPressed: _openBarcode,
           ),
           SizedBox(width: 10),
-          // 데스크톱은 우하단 사내톡 필이 있어 헤더 메시지 버튼을 뺀다
-          GlassIconButton(
-            symbol: 'message',
-            enabled: !_overlayOpen,
-            onPressed: () => Navigator.push(
-              context,
-              CupertinoPageRoute(builder: (_) => MessageScreen()),
+          // 데스크톱은 우하단 사내톡 필이 있어 헤더 메시지 버튼을 뺀다.
+          // 빨간 점은 알림 종과 같은 규칙 — 안 읽은 방이 있을 때만 뜬다
+          ValueListenableBuilder<int>(
+            valueListenable: ChatStore.instance.unreadRooms,
+            builder: (context, unread, child) => GlassIconButton(
+              symbol: 'message',
+              showBadge: unread > 0,
+              enabled: !_overlayOpen,
+              onPressed: () => Navigator.push(
+                context,
+                CupertinoPageRoute(builder: (_) => MessageScreen()),
+              ),
             ),
           ),
           SizedBox(width: 10),

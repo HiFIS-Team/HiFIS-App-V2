@@ -63,6 +63,9 @@ class AuthSession extends ValueNotifier<bool> {
       // **기다리지 않는다** — WebSocket 연결은 서버가 안 받으면 OS 타임아웃까지
       // 수십 초를 끌 수 있어서, await 하면 그동안 앱이 로그인 화면에서 멈춘다.
       unawaited(ChatSocket.instance.connect());
+      // 방 목록도 미리 받아 둔다 — 사내톡을 한 번도 안 열면 안 읽음 배지가
+      // 안 뜬다 (헤더 메시지 버튼·우하단 필의 빨간 점이 이 값을 본다)
+      unawaited(ChatStore.instance.loadRooms().catchError((_) {}));
       value = true;
     } catch (_) {
       // 서버가 꺼져 있거나 토큰이 죽었다 — 조용히 로그인 화면부터 시작한다
@@ -100,6 +103,7 @@ class AuthSession extends ValueNotifier<bool> {
     // 소켓은 기다리지 않는다 (restore 와 같은 이유) — 붙는 동안에도 메시지
     // 전송은 REST 로 나가므로 대화가 막히지 않는다
     unawaited(ChatSocket.instance.connect());
+    unawaited(ChatStore.instance.loadRooms().catchError((_) {}));
 
     value = true;
   }

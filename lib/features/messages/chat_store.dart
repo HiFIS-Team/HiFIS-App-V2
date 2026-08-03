@@ -56,8 +56,14 @@ class ChatStore extends ChangeNotifier {
     return null;
   }
 
-  /// 안 읽은 방이 몇 개인지 — 하단바·사이드바 배지에 쓴다
-  int get unreadRooms => _rooms.where((r) => r.unreadCount > 0).length;
+  /// 안 읽은 방이 몇 개인지 — 헤더 버튼·사내톡 필의 빨간 점에 쓴다
+  ///
+  /// 알림 배지(`unreadNotifications`)와 같은 방식으로 내보낸다 — 셸이
+  /// 스토어 전체를 듣지 않고 이 값만 보면 된다.
+  final unreadRooms = ValueNotifier<int>(0);
+
+  void _syncUnread() =>
+      unreadRooms.value = _rooms.where((r) => r.unreadCount > 0).length;
 
   @override
   void dispose() {
@@ -72,6 +78,7 @@ class ChatStore extends ChangeNotifier {
     _typing.clear();
     _hasMore.clear();
     loaded = false;
+    unreadRooms.value = 0;
     notifyListeners();
   }
 
@@ -80,6 +87,7 @@ class ChatStore extends ChangeNotifier {
     try {
       _rooms = await ChatApi.rooms();
       loaded = true;
+      _syncUnread();
     } finally {
       _loadingRooms = false;
       notifyListeners();
@@ -185,6 +193,13 @@ class ChatStore extends ChangeNotifier {
     _replaceDraft(roomId, '', sent);
   }
 
+  /// 이 방 알림 끄기/켜기
+  Future<ChatRoom> setMuted(String roomId, bool muted) async {
+    final room = await ChatApi.setMuted(roomId, muted);
+    _upsertRoom(room);
+    return room;
+  }
+
   /// 내가 나간 방들 — '최근 나간 항목'
   Future<List<ChatRoom>> leftRooms() => ChatApi.leftRooms();
 
@@ -246,6 +261,7 @@ class ChatStore extends ChangeNotifier {
     ];
     _messages.remove(roomId);
     _typing.remove(roomId);
+    _syncUnread();
     notifyListeners();
   }
 
@@ -365,9 +381,11 @@ class ChatStore extends ChangeNotifier {
       memberIds: old.memberIds,
       lastMessage: message,
       unreadCount: old.unreadCount + bump,
+      muted: old.muted,
       updatedAt: message.createdAt,
     );
     _rooms = [updated, ...(_rooms..removeAt(at))];
+    _syncUnread();
   }
 
   void _setUnread(String roomId, int count) {
@@ -395,6 +413,7 @@ class ChatStore extends ChangeNotifier {
     } else {
       _rooms = [room, ..._rooms];
     }
+    _syncUnread();
     notifyListeners();
   }
 }

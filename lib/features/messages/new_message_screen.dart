@@ -20,7 +20,7 @@ import 'chat_store.dart';
 /// 그룹 이름(선택)과 멤버를 고르면 대화가 시작된다.
 /// [inviteMode]가 true면 기존 채팅방 멤버 초대 용도로 동작해,
 /// 그룹 이름 없이 선택한 멤버 이름 목록을 pop 결과로 돌려준다.
-/// 멤버 데이터는 하드코딩된 샘플이며, 기능 개발 시 실제 직원 목록으로 교체한다.
+/// 명단은 서버 직원 목록(`StaffDirectory`)에서 가져온다. **나는 빠진다.**
 class NewMessageScreen extends StatefulWidget {
   NewMessageScreen({super.key, this.inviteMode = false});
 

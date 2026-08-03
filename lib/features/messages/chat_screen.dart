@@ -433,6 +433,21 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  /// 상대가 치고 있으면 대화 맨 아래에 붙는 한 줄
+  ///
+  /// 목록이 아니라 대화 안에서도 보여야 답을 기다릴지 알 수 있다.
+  /// 붙었다 사라지는 줄이라 고정 요소가 늘지 않는다.
+  String? get _typingLabel {
+    final who = _store.typingIn(_roomId);
+    if (who.isEmpty) return null;
+    final names = [
+      for (final id in who) ?StaffDirectory.instance.byId(id)?.name,
+    ];
+    if (names.isEmpty) return '입력 중…';
+    if (names.length == 1) return '${names.first}님이 입력 중…';
+    return '${names.first}님 외 ${names.length - 1}명이 입력 중…';
+  }
+
   /// 마지막 내 메시지 아래에 붙는 '읽음' — 목업의 그 자리 그대로다
   String? get _readLabel {
     final messages = _messages;
@@ -543,6 +558,20 @@ class _ChatScreenState extends State<ChatScreen> {
                       child: Text(
                         label,
                         style: AppTextStyles.caption.copyWith(fontSize: 12),
+                      ),
+                    ),
+                  ),
+                if (_typingLabel case final label?)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
+                      padding: EdgeInsets.only(left: 4, top: 4),
+                      child: Text(
+                        label,
+                        style: AppTextStyles.caption.copyWith(
+                          fontSize: 12,
+                          color: AppColors.primary,
+                        ),
                       ),
                     ),
                   ),
