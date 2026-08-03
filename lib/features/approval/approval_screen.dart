@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../core/data/staff.dart';
+import '../../core/api/api_exception.dart';
+import '../../core/api/approval_api.dart';
+import '../../core/data/current_user.dart';
+import '../../core/data/employee.dart';
+import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
+import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/avatar.dart';
 import '../../core/widgets/placeholder_screen.dart';
@@ -26,54 +31,136 @@ class ApprovalScreen extends StatefulWidget {
 
 class _ApprovalScreenState extends State<ApprovalScreen> {
   _State _filter = _State.pending;
-  _Doc? _selected;
+
+  /// 고른 문서 — 목록이 갈릴 때마다 새 객체가 오므로 id 로 들고 있는다
+  String? _selectedId;
+
+  bool _loading = !_docsLoaded;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      await _loadDocs();
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+    if (mounted) setState(() => _loading = false);
+  }
 
   List<_Doc> get _visible {
-    final list = _docs.where((d) => d.state == _filter).toList()
+    // 회수는 흔치 않아 탭을 따로 두지 않고 반려 칸에 같이 보여준다
+    bool matches(_Doc doc) => _filter == _State.rejected
+        ? doc.state == _State.rejected || doc.state == _State.withdrawn
+        : doc.state == _filter;
+    return _docs.where(matches).toList()
       ..sort((a, b) => b.date.compareTo(a.date));
-    return list;
   }
 
   _Doc? _syncSelection(List<_Doc> list) {
     if (list.isEmpty) return null;
-    if (_selected != null && list.contains(_selected)) return _selected;
+    for (final doc in list) {
+      if (doc.id == _selectedId) return doc;
+    }
     return list.first;
   }
 
   Future<void> _create() async {
-    final created = await _showComposer(context);
-    if (created == null || !mounted) return;
-    setState(() {
-      _docs.add(created);
-      _filter = _State.pending;
-      _selected = created;
-    });
-    AppToast.show(context, '결재를 올렸어요');
+    final draft = await _showComposer(context);
+    if (draft == null || !mounted) return;
+
+    final approver = _defaultApprover;
+    if (approver == null) {
+      AppToast.show(context, '결재를 받을 대표를 찾지 못했어요');
+      return;
+    }
+    try {
+      final created = _fromServer(
+        await ApprovalApi.create(
+          kind: draft.kind.label,
+          title: draft.title,
+          content: draft.body,
+          approverIds: [approver.id],
+          amount: draft.amount == 0 ? null : draft.amount,
+        ),
+      );
+      if (!mounted) return;
+      setState(() {
+        _docs.add(created);
+        _filter = _State.pending;
+        _selectedId = created.id;
+      });
+      AppToast.show(context, '결재를 올렸어요');
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
   }
 
   /// 승인·반려 모두 의견을 남겨야 처리된다
   Future<void> _decide(_Doc doc, {required bool approve}) async {
-    if (doc.state != _State.pending) return;
+    if (!doc.myTurn) return;
     final comment = await _showDecisionDialog(
       context,
       doc: doc,
       approve: approve,
     );
-    if (comment == null) return;
+    if (comment == null || !mounted) return;
 
-    setState(() {
-      doc
-        ..state = approve ? _State.approved : _State.rejected
-        ..comment = comment
-        ..decidedAt = DateTime.now();
-    });
-    if (!mounted) return;
-    AppToast.show(context, approve ? '결재를 승인했어요' : '결재를 반려했어요');
+    try {
+      final saved = approve
+          ? await ApprovalApi.approve(doc.id, comment: comment)
+          : await ApprovalApi.reject(doc.id, comment: comment);
+      if (!mounted) return;
+      setState(() => _replace(_fromServer(saved)));
+      AppToast.show(context, approve ? '결재를 승인했어요' : '결재를 반려했어요');
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+  }
+
+  /// 회수 — 올린 사람이 진행 중인 결재를 물린다
+  Future<void> _withdraw(_Doc doc) async {
+    final ok = await showConfirmDialog(
+      context,
+      title: '결재를 회수할까요?',
+      message: '올린 문서를 물립니다. 다시 올리려면 새로 작성해야 해요.',
+      confirmLabel: '회수',
+      destructive: true,
+    );
+    if (!ok || !mounted) return;
+
+    try {
+      final saved = await ApprovalApi.withdraw(doc.id);
+      if (!mounted) return;
+      setState(() {
+        _replace(_fromServer(saved));
+        // 회수한 건 대기 목록에서 빠져 반려 칸으로 간다
+        _filter = _State.rejected;
+      });
+      AppToast.show(context, '결재를 회수했어요');
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     if (!isDesktop) return PlaceholderScreen(emoji: '✅', title: '전자결재');
+
+    if (_loading) {
+      return Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2.4,
+            valueColor: AlwaysStoppedAnimation(AppColors.primary),
+          ),
+        ),
+      );
+    }
 
     final list = _visible;
     final selected = _syncSelection(list);
@@ -91,9 +178,9 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
                 filter: _filter,
                 onFilter: (v) => setState(() {
                   _filter = v;
-                  _selected = null;
+                  _selectedId = null;
                 }),
-                onSelect: (doc) => setState(() => _selected = doc),
+                onSelect: (doc) => setState(() => _selectedId = doc.id),
                 onCreate: _create,
               ),
             ),
@@ -103,10 +190,11 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
             child: selected == null
                 ? _EmptyDetail(filter: _filter, onCreate: _create)
                 : _DocDetail(
-                    key: ValueKey(selected),
+                    key: ValueKey(selected.id),
                     doc: selected,
                     onApprove: () => _decide(selected, approve: true),
                     onReject: () => _decide(selected, approve: false),
+                    onWithdraw: () => _withdraw(selected),
                   ),
           ),
         ],
@@ -228,7 +316,8 @@ class _StateTabs extends StatelessWidget {
       ),
       child: Row(
         children: [
-          for (final state in _State.values)
+          // 회수는 탭을 따로 두지 않는다 — 반려 칸에 같이 들어간다
+          for (final state in _State.tabs)
             Expanded(
               child: Pressable(
                 onTap: () => onSelect(state),
@@ -422,11 +511,13 @@ class _DocDetail extends StatelessWidget {
     required this.doc,
     required this.onApprove,
     required this.onReject,
+    required this.onWithdraw,
   });
 
   final _Doc doc;
   final VoidCallback onApprove;
   final VoidCallback onReject;
+  final VoidCallback onWithdraw;
 
   @override
   Widget build(BuildContext context) {
@@ -469,7 +560,7 @@ class _DocDetail extends StatelessWidget {
             Avatar(name: doc.writer, size: 22),
             SizedBox(width: 8),
             Text(
-              '${doc.writer} ${staffOf(doc.writer).role} · ${_date(doc.date)} 신청',
+              '${doc.writer} ${_rankOf(doc.writerId)} · ${_date(doc.date)} 신청',
               style: AppTextStyles.caption,
             ),
           ],
@@ -530,9 +621,11 @@ class _DocDetail extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(
-                  doc.state == _State.approved
-                      ? Icons.check_circle_rounded
-                      : Icons.cancel_rounded,
+                  switch (doc.state) {
+                    _State.approved => Icons.check_circle_rounded,
+                    _State.withdrawn => Icons.undo_rounded,
+                    _ => Icons.cancel_rounded,
+                  },
                   size: 20,
                   color: doc.state.color,
                 ),
@@ -544,24 +637,29 @@ class _DocDetail extends StatelessWidget {
                       Row(
                         children: [
                           Text(
-                            doc.state == _State.approved ? '승인됨' : '반려됨',
+                            switch (doc.state) {
+                              _State.approved => '승인됨',
+                              _State.withdrawn => '회수됨',
+                              _ => '반려됨',
+                            },
                             style: AppTextStyles.body2.copyWith(
                               color: doc.state.color,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                           SizedBox(width: 8),
+                          // 처리한 사람은 결재선에서 꺼낸다 — 회수는 올린 사람이다
                           Text(
-                            '$_admin ${staffOf(_admin).role}'
-                            '${doc.decidedAt == null ? '' : ' · ${_date(doc.decidedAt!)}'}',
+                            _decidedBy(doc),
                             style: AppTextStyles.caption.copyWith(fontSize: 12),
                           ),
                         ],
                       ),
-                      if (doc.comment.isNotEmpty) ...[
+                      if (doc.lastActed?.comment case final comment?
+                          when comment.isNotEmpty) ...[
                         SizedBox(height: 4),
                         Text(
-                          doc.comment,
+                          comment,
                           style: AppTextStyles.body2.copyWith(
                             color: AppColors.textSecondary,
                           ),
@@ -576,56 +674,79 @@ class _DocDetail extends StatelessWidget {
         ],
         if (doc.state == _State.pending) ...[
           SizedBox(height: 18),
-          // 안내는 왼쪽, 버튼은 오른쪽에 작게
+          // 안내는 왼쪽, 버튼은 오른쪽에 작게.
+          // 버튼은 **내 차례일 때만** 나온다 — 아니면 서버가 403 을 준다
           Row(
             children: [
               Expanded(
                 child: Text(
-                  '$_admin ${staffOf(_admin).role} 결재 대기 · 의견을 남겨야 처리돼요',
+                  doc.myTurn
+                      ? '내 결재 차례예요 · 의견을 남겨야 처리돼요'
+                      : '${_nameOf(doc.currentApproverId)} '
+                            '${_rankOf(doc.currentApproverId)} 결재 대기',
                   style: AppTextStyles.caption.copyWith(fontSize: 12),
                 ),
               ),
               SizedBox(width: 12),
-              Pressable(
-                onTap: onReject,
-                scale: 0.96,
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(11),
-                    border: Border.all(color: AppColors.gray200),
-                  ),
+              // 올린 사람은 아직 아무도 처리하지 않은 결재를 물릴 수 있다
+              if (doc.canWithdraw)
+                Pressable(
+                  onTap: onWithdraw,
+                  scale: 0.96,
+                  pressedColor: AppColors.gray100,
+                  borderRadius: BorderRadius.circular(11),
+                  padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   child: Text(
-                    '반려',
+                    '회수',
                     style: AppTextStyles.body2.copyWith(
                       fontSize: 14,
-                      color: AppColors.error,
+                      color: AppColors.textSecondary,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
-              ),
-              SizedBox(width: 8),
-              Pressable(
-                onTap: onApprove,
-                scale: 0.96,
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 22, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(11),
-                  ),
-                  child: Text(
-                    '승인',
-                    style: AppTextStyles.body2.copyWith(
-                      fontSize: 14,
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
+              if (doc.myTurn) ...[
+                Pressable(
+                  onTap: onReject,
+                  scale: 0.96,
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(11),
+                      border: Border.all(color: AppColors.gray200),
+                    ),
+                    child: Text(
+                      '반려',
+                      style: AppTextStyles.body2.copyWith(
+                        fontSize: 14,
+                        color: AppColors.error,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ),
-              ),
+                SizedBox(width: 8),
+                Pressable(
+                  onTap: onApprove,
+                  scale: 0.96,
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: Text(
+                      '승인',
+                      style: AppTextStyles.body2.copyWith(
+                        fontSize: 14,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ],
@@ -662,8 +783,8 @@ class _StateBadge extends StatelessWidget {
 
 // ── 결재 올리기 ──
 
-Future<_Doc?> _showComposer(BuildContext context) {
-  return showDialog<_Doc>(
+Future<_Draft?> _showComposer(BuildContext context) {
+  return showDialog<_Draft>(
     context: context,
     barrierColor: Colors.black.withValues(alpha: 0.45),
     builder: (context) => Center(
@@ -712,13 +833,11 @@ class _ComposerState extends State<_Composer> {
     }
     Navigator.pop(
       context,
-      _Doc(
+      _Draft(
         kind: _kind,
         title: title,
         amount: int.tryParse(_amount.text.replaceAll(',', '')) ?? 0,
         body: _body.text.trim(),
-        writer: me,
-        date: DateTime.now(),
       ),
     );
   }
@@ -805,20 +924,30 @@ class _ComposerState extends State<_Composer> {
                       lines: 4,
                     ),
                     SizedBox(height: 14),
-                    // 결재는 최고관리자 한 사람이 처리한다
+                    // 결재선은 아직 못 고른다 — 대표 한 사람에게 올린다
+                    // (서버는 여러 명을 순서대로 세울 수 있다, backend-gap.md 48번)
                     Row(
                       children: [
                         Text('결재자', style: AppTextStyles.label),
                         SizedBox(width: 10),
-                        Avatar(name: _admin, size: 24),
-                        SizedBox(width: 6),
-                        Text(
-                          '$_admin ${staffOf(_admin).role}',
-                          style: AppTextStyles.body2.copyWith(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                        if (_defaultApprover case final approver?) ...[
+                          Avatar(name: approver.name, size: 24),
+                          SizedBox(width: 6),
+                          Text(
+                            '${approver.name} ${approver.rank.label}',
+                            style: AppTextStyles.body2.copyWith(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        ),
+                        ] else
+                          Text(
+                            '대표를 찾지 못했어요',
+                            style: AppTextStyles.body2.copyWith(
+                              fontSize: 14,
+                              color: AppColors.error,
+                            ),
+                          ),
                       ],
                     ),
                   ],
@@ -1219,9 +1348,12 @@ class _ThousandsFormatter extends TextInputFormatter {
   }
 }
 
-// ── 데이터 (목업) ──
+// ── 데이터 ──
 
 /// 결재 종류
+///
+/// 서버는 종류를 enum 이 아니라 **자유 문자열**로 받는다. [label] 을 그대로
+/// 주고받으므로 라벨을 고치면 이미 올라간 결재가 '기타 품의'로 떨어진다.
 enum _Kind {
   expense('지출결의', Icons.credit_card_rounded),
   purchase('구매 요청', Icons.shopping_cart_rounded),
@@ -1234,121 +1366,193 @@ enum _Kind {
 
   final String label;
   final IconData icon;
+
+  static _Kind parse(String? value) =>
+      _Kind.values.firstWhere((k) => k.label == value, orElse: () => _Kind.etc);
 }
 
 /// 처리 상태 (목록 탭 순서와 같다)
 enum _State {
   pending('대기'),
   approved('승인'),
-  rejected('반려');
+  rejected('반려'),
+
+  /// 신청자가 스스로 물린 것 — 반려와 섞이면 안 돼서 따로 둔다
+  withdrawn('회수');
 
   const _State(this.label);
 
   final String label;
 
+  /// 목록 탭에 올리는 것 — 회수는 흔치 않아 탭을 늘리지 않고 '반려' 칸에 같이 둔다
+  static const tabs = [_State.pending, _State.approved, _State.rejected];
+
   Color get color => switch (this) {
     _State.pending => AppColors.warning,
     _State.approved => AppColors.success,
     _State.rejected => AppColors.error,
+    _State.withdrawn => AppColors.gray400,
+  };
+
+  static _State of(ApprovalStatus status) => switch (status) {
+    ApprovalStatus.inProgress => _State.pending,
+    ApprovalStatus.approved => _State.approved,
+    ApprovalStatus.rejected => _State.rejected,
+    ApprovalStatus.withdrawn => _State.withdrawn,
   };
 }
 
-/// 결재는 최고관리자(대표)가 처리한다
+/// 결재선 기본값 — 대표에게 올린다
 ///
-/// 서버 명단에는 대표 직급이 없을 수도 있어서 못 찾으면 첫 사람으로 떨어진다.
-/// (상수로 두면 명단을 받아오기 전 값에 굳어 버리므로 getter 다.)
-String get _admin {
-  final staff = staffList;
-  if (staff.isEmpty) return me;
-  return staff
-      .firstWhere((s) => s.role == '대표', orElse: () => staff.first)
-      .name;
+/// 서버는 여러 명을 순서대로 세울 수 있지만 앱에는 아직 결재선을 짜는 자리가
+/// 없다 (backend-gap.md 48번). 명단에 대표가 없으면 못 올린다.
+Employee? get _defaultApprover {
+  final people = StaffDirectory.instance.employees;
+  for (final person in people) {
+    if (person.role == Role.master) return person;
+  }
+  return null;
 }
 
-/// 결재 문서 한 건
-class _Doc {
-  _Doc({
+/// 폼이 돌려주는 것 — 아직 서버에 없어서 id·결재선이 없다
+class _Draft {
+  _Draft({
     required this.kind,
     required this.title,
     required this.amount,
     required this.body,
-    required this.writer,
-    required this.date,
-    this.state = _State.pending,
-    this.comment = '',
-    this.decidedAt,
   });
 
   final _Kind kind;
   final String title;
   final int amount;
   final String body;
-  final String writer;
-  final DateTime date;
-
-  /// 처리 상태 — 최고관리자가 승인·반려하면 바뀐다
-  _State state;
-
-  /// 처리하며 남긴 의견
-  String comment;
-  DateTime? decidedAt;
 }
 
-/// 올라온 결재 (목업). 탭을 오가도 유지되도록 모듈 전역으로 둔다.
-final _docs = <_Doc>[..._seed()];
+/// 결재 문서 한 건
+class _Doc {
+  _Doc({
+    required this.id,
+    required this.kind,
+    required this.title,
+    required this.amount,
+    required this.body,
+    required this.writerId,
+    required this.date,
+    required this.state,
+    required this.approverIds,
+    required this.steps,
+    this.currentApproverId,
+  });
 
-List<_Doc> _seed() {
-  final now = DateTime.now();
-  DateTime day(int offset) => DateTime(now.year, now.month, now.day + offset);
+  final String id;
+  final _Kind kind;
+  final String title;
+  final int amount;
+  final String body;
 
-  return [
-    _Doc(
-      kind: _Kind.purchase,
-      title: 'PT룸 소도구 구매',
-      amount: 1240000,
-      body: '노후된 케틀벨·밴드 교체가 필요합니다.\n견적 3곳 비교 후 최저가 업체로 진행하려 합니다.',
-      writer: '박준현',
-      date: day(0),
-    ),
-    _Doc(
-      kind: _Kind.supply,
-      title: '수건·세제 정기 발주',
-      amount: 380000,
-      body: '월 정기 발주 건입니다. 수량은 지난달과 동일합니다.',
-      writer: me,
-      date: day(-1),
-    ),
-    _Doc(
-      kind: _Kind.trip,
-      title: '피트니스 박람회 참관',
-      amount: 0,
-      body: '8월 12일 코엑스 박람회 참관 요청드립니다.\n신규 기구 도입 검토를 위한 사전 조사 목적입니다.',
-      writer: '유찬빈',
-      date: day(-2),
-    ),
-    _Doc(
-      kind: _Kind.expense,
-      title: '7월 회식비 지출',
-      amount: 460000,
-      body: '7월 팀 회식 지출 건입니다. 영수증 첨부 예정입니다.',
-      writer: '민중기',
-      date: day(-5),
-      state: _State.approved,
-      comment: '고생 많았습니다. 승인합니다',
-      decidedAt: day(-4),
-    ),
-    _Doc(
-      kind: _Kind.shift,
-      title: '8월 첫째 주 근무 변경',
-      amount: 0,
-      body: '개인 사정으로 8월 4일 오전 근무를 오후로 변경하고자 합니다.',
-      writer: '전상현',
-      date: day(-6),
-      state: _State.rejected,
-      comment: '해당 날짜는 인원이 부족합니다. 다른 날로 조정 부탁드려요',
-      decidedAt: day(-5),
-    ),
-  ];
+  /// 신청자 uuid
+  final String writerId;
+
+  final DateTime date;
+
+  /// 처리 상태 — 결재선을 다 돌면 바뀐다
+  final _State state;
+
+  final List<String> approverIds;
+  final List<ApprovalStep> steps;
+  final String? currentApproverId;
+
+  String get writer => _nameOf(writerId);
+
+  /// 마지막으로 처리한 사람이 남긴 의견
+  ApprovalStep? get lastActed {
+    ApprovalStep? last;
+    for (final step in steps) {
+      if (step.status == ApprovalStepStatus.pending) continue;
+      last = step;
+    }
+    return last;
+  }
+
+  bool get myTurn =>
+      state == _State.pending && currentApproverId == currentUser?.id;
+
+  bool get canWithdraw =>
+      state == _State.pending && writerId == currentUser?.id;
+}
+
+/// 받아 둔 결재. 탭을 오가도 유지되도록 모듈 전역으로 둔다.
+final _docs = <_Doc>[];
+
+bool _docsLoaded = false;
+
+/// 서버는 '전체 결재'를 안 준다 — 내가 얽힌 세 함을 합쳐서 목록을 만든다
+///
+/// 그래서 이 목록은 '모든 결재'가 아니라 **내가 올렸거나 내가 결재하는 것**이다.
+/// 남의 결재는 애초에 열람 권한이 없다 (서버 `_require_participant`).
+Future<void> _loadDocs() async {
+  final boxes = await Future.wait([
+    for (final box in ApprovalBox.values) ApprovalApi.list(box),
+  ]);
+  // 함끼리 겹친다 — 내가 올리고 내가 결재하는 문서는 mine·inbox 둘 다에 있다
+  final merged = <String, Approval>{};
+  for (final rows in boxes) {
+    for (final row in rows) {
+      merged[row.id] = row;
+    }
+  }
+  _docs
+    ..clear()
+    ..addAll([for (final row in merged.values) _fromServer(row)]);
+  _docsLoaded = true;
+}
+
+_Doc _fromServer(Approval row) => _Doc(
+  id: row.id,
+  kind: _Kind.parse(row.kind),
+  title: row.title,
+  amount: row.amount ?? 0,
+  body: row.content,
+  writerId: row.requesterId,
+  date: row.createdAt,
+  state: _State.of(row.status),
+  approverIds: row.approverIds,
+  steps: row.steps,
+  currentApproverId: row.currentApproverId,
+);
+
+/// 목록에서 바뀐 한 건만 갈아끼운다
+void _replace(_Doc doc) {
+  final index = _docs.indexWhere((d) => d.id == doc.id);
+  if (index >= 0) _docs[index] = doc;
+}
+
+/// uuid → 이름. 명단에 없으면(퇴사자 등) '알 수 없음'
+String _nameOf(String? id) {
+  if (id == null) return '알 수 없음';
+  final name = StaffDirectory.instance.byId(id)?.name;
+  return name == null || name.isEmpty ? '알 수 없음' : name;
+}
+
+/// uuid → 직급 라벨. 이름 옆에 붙인다
+String _rankOf(String? id) {
+  if (id == null) return '';
+  return StaffDirectory.instance.byId(id)?.rank.label ?? '';
+}
+
+/// 처리한 사람과 처리한 날 — '대표 · 8.3' 꼴
+///
+/// 회수는 결재선에 안 남으니 올린 사람을 쓴다
+String _decidedBy(_Doc doc) {
+  if (doc.state == _State.withdrawn) {
+    return '${doc.writer} ${_rankOf(doc.writerId)}';
+  }
+  final step = doc.lastActed;
+  if (step == null) return '';
+  final who = '${_nameOf(step.approverId)} ${_rankOf(step.approverId)}'.trim();
+  final when = step.actedAt;
+  return when == null ? who : '$who · ${_date(when)}';
 }
 
 // ── 표시용 계산 ──
