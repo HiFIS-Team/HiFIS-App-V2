@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../core/api/api_exception.dart';
+import '../../core/api/event_api.dart';
+import '../../core/data/current_user.dart';
 import '../../core/data/staff.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -9,11 +12,14 @@ import '../../core/widgets/avatar.dart';
 import '../../core/widgets/placeholder_screen.dart';
 import '../../core/widgets/pressable.dart';
 
-/// 일정 화면 (목업)
+/// 일정 화면
 ///
 /// 데스크톱은 화면을 꽉 채우는 월 달력 한 장으로 보여준다.
 /// 날짜 칸을 누르면 그 날 일정이 열리고, 거기서 추가·수정·삭제한다.
 /// 모바일 화면은 아직 준비 중 — PC를 먼저 다듬는다.
+///
+/// 일정은 **보고 있는 달만** 받는다. 한 번 받은 달은 다시 안 받으므로
+/// 달을 오가도 요청이 늘지 않는다.
 class ScheduleScreen extends StatefulWidget {
   ScheduleScreen({super.key});
 
@@ -25,10 +31,35 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   /// 보고 있는 달 (1일로 맞춰 둔다)
   late DateTime _month = _monthOf(DateTime.now());
 
+  bool _loading = true;
+
   static DateTime _monthOf(DateTime time) => DateTime(time.year, time.month);
 
-  void _move(int delta) =>
-      setState(() => _month = DateTime(_month.year, _month.month + delta));
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  /// 보고 있는 달을 받는다 — 이미 받은 달이면 바로 끝난다
+  Future<void> _load() async {
+    try {
+      await _loadMonth(_month);
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  void _move(int delta) {
+    setState(() => _month = DateTime(_month.year, _month.month + delta));
+    _load();
+  }
+
+  void _goToday() {
+    setState(() => _month = _monthOf(DateTime.now()));
+    _load();
+  }
 
   Future<void> _openDay(DateTime date) async {
     await showDialog<void>(
@@ -45,10 +76,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final base = _monthOf(now) == _month
         ? DateTime(now.year, now.month, now.day)
         : _month;
-    final created = await showEventDialog(context, date: base);
-    if (created == null || !mounted) return;
-    setState(() => events.add(created));
-    AppToast.show(context, '일정을 추가했어요');
+    final draft = await showEventDialog(context, date: base);
+    if (draft == null || !mounted) return;
+    try {
+      final created = await _createEvent(draft);
+      if (!mounted) return;
+      setState(() => events.add(created));
+      AppToast.show(context, '일정을 추가했어요');
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
   }
 
   @override
@@ -80,7 +117,18 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   style: AppTextStyles.title1,
                 ),
                 SizedBox(width: 10),
-                Text('일정 $monthCount', style: AppTextStyles.caption),
+                // 받아오는 중에는 개수를 감춘다 — 0에서 튀어 오르는 게 보인다
+                if (_loading)
+                  SizedBox(
+                    width: 13,
+                    height: 13,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation(AppColors.gray400),
+                    ),
+                  )
+                else
+                  Text('일정 $monthCount', style: AppTextStyles.caption),
                 SizedBox(width: 14),
                 _RoundButton(
                   icon: Icons.chevron_left_rounded,
@@ -93,8 +141,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 ),
                 SizedBox(width: 8),
                 Pressable(
-                  onTap: () =>
-                      setState(() => _month = _monthOf(DateTime.now())),
+                  onTap: _goToday,
                   scale: 0.95,
                   pressedColor: AppColors.gray100,
                   borderRadius: BorderRadius.circular(100),
@@ -397,9 +444,14 @@ class _DayDialog extends StatefulWidget {
 
 class _DayDialogState extends State<_DayDialog> {
   Future<void> _add() async {
-    final created = await showEventDialog(context, date: widget.date);
-    if (created == null) return;
-    setState(() => events.add(created));
+    final draft = await showEventDialog(context, date: widget.date);
+    if (draft == null || !mounted) return;
+    try {
+      final created = await _createEvent(draft);
+      if (mounted) setState(() => events.add(created));
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
   }
 
   Future<void> _edit(Event event) async {
@@ -408,17 +460,25 @@ class _DayDialogState extends State<_DayDialog> {
       date: event.date,
       origin: event,
     );
-    if (edited == null) return;
-    // 폼이 돌려준 값으로 갈아끼운다 (삭제면 목록에서 뺀다)
-    setState(() {
-      final index = events.indexOf(event);
-      if (index < 0) return;
+    if (edited == null || !mounted) return;
+
+    final id = event.id;
+    try {
       if (edited.deleted) {
-        events.removeAt(index);
-      } else {
-        events[index] = edited;
+        if (id != null) await EventApi.delete(id);
+        if (mounted) setState(() => events.remove(event));
+        return;
       }
-    });
+      // 서버가 돌려준 값으로 갈아끼운다 — 앱이 계산한 값과 어긋나지 않게
+      final saved = id == null ? edited : await _updateEvent(id, edited);
+      if (!mounted) return;
+      setState(() {
+        final index = events.indexOf(event);
+        if (index >= 0) events[index] = saved;
+      });
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
   }
 
   @override
@@ -627,11 +687,23 @@ class _EventDialogState extends State<_EventDialog> {
 
   bool get _editing => widget.origin != null;
 
+  /// 남이 만든 일정은 열어서 보기만 한다 — 저장하면 서버가 403 을 준다
+  bool get _locked => !(widget.origin?.canEdit ?? true);
+
+  /// 잠겼으면 눌러도 아무 일 없게 한다.
+  ///
+  /// 폼 전체를 `IgnorePointer` 로 덮는 게 짧지만 그러면 **스크롤도 같이 막혀서**
+  /// 참석자 아래 메모를 못 읽는다. 그래서 누르는 자리만 하나씩 막는다.
+  VoidCallback _tap(VoidCallback action) => _locked ? _ignore : action;
+
+  static void _ignore() {}
+
   @override
   void initState() {
     super.initState();
     _title.addListener(() => setState(() {}));
-    _titleFocus.requestFocus();
+    // 잠긴 폼에 커서를 세우면 고칠 수 있는 것처럼 보인다
+    if (!_locked) _titleFocus.requestFocus();
   }
 
   @override
@@ -702,6 +774,9 @@ class _EventDialogState extends State<_EventDialog> {
     Navigator.pop(
       context,
       Event(
+        // 수정이면 어느 일정을 고친 것인지 들고 나가야 서버에 보낼 수 있다
+        id: widget.origin?.id,
+        ownerId: widget.origin?.ownerId,
         title: title,
         date: DateTime(_date.year, _date.month, _date.day),
         kind: _kind,
@@ -740,7 +815,22 @@ class _EventDialogState extends State<_EventDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(_editing ? '일정 수정' : '새 일정', style: AppTextStyles.title2),
+            Row(
+              children: [
+                Text(
+                  _locked
+                      ? '일정'
+                      : _editing
+                      ? '일정 수정'
+                      : '새 일정',
+                  style: AppTextStyles.title2,
+                ),
+                if (_locked) ...[
+                  SizedBox(width: 8),
+                  Text('만든 사람만 고칠 수 있어요', style: AppTextStyles.caption),
+                ],
+              ],
+            ),
             SizedBox(height: 16),
             Flexible(
               child: SingleChildScrollView(
@@ -752,6 +842,7 @@ class _EventDialogState extends State<_EventDialog> {
                       focusNode: _titleFocus,
                       hint: '일정 이름',
                       bold: true,
+                      readOnly: _locked,
                       onSubmitted: _submit,
                     ),
                     SizedBox(height: 12),
@@ -760,33 +851,36 @@ class _EventDialogState extends State<_EventDialog> {
                       runSpacing: 6,
                       children: [
                         for (final kind in Kind.values)
-                          Pressable(
-                            onTap: () => setState(() => _kind = kind),
-                            scale: 0.96,
-                            borderRadius: BorderRadius.circular(100),
-                            child: Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 7,
-                              ),
-                              decoration: BoxDecoration(
-                                color: kind == _kind
-                                    ? kind.color.withValues(alpha: 0.14)
-                                    : AppColors.gray50,
-                                borderRadius: BorderRadius.circular(100),
-                              ),
-                              child: Text(
-                                kind.label,
-                                style: AppTextStyles.body2.copyWith(
-                                  fontSize: 13,
+                          // 잠겼으면 고른 것만 남긴다 — 못 누르는 칩이 줄줄이
+                          // 남아 있으면 고를 수 있는 것처럼 보인다
+                          if (!_locked || kind == _kind)
+                            Pressable(
+                              onTap: _tap(() => setState(() => _kind = kind)),
+                              scale: 0.96,
+                              borderRadius: BorderRadius.circular(100),
+                              child: Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 7,
+                                ),
+                                decoration: BoxDecoration(
                                   color: kind == _kind
-                                      ? kind.color
-                                      : AppColors.textSecondary,
-                                  fontWeight: FontWeight.w700,
+                                      ? kind.color.withValues(alpha: 0.14)
+                                      : AppColors.gray50,
+                                  borderRadius: BorderRadius.circular(100),
+                                ),
+                                child: Text(
+                                  kind.label,
+                                  style: AppTextStyles.body2.copyWith(
+                                    fontSize: 13,
+                                    color: kind == _kind
+                                        ? kind.color
+                                        : AppColors.textSecondary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
                       ],
                     ),
                     SizedBox(height: 16),
@@ -800,7 +894,7 @@ class _EventDialogState extends State<_EventDialog> {
                           icon: Icons.calendar_today_rounded,
                           label:
                               '${_date.month}.${_date.day} (${_weekdays[_date.weekday % 7]})',
-                          onTap: _pickDate,
+                          onTap: _tap(_pickDate),
                         ),
                       ],
                     ),
@@ -812,7 +906,7 @@ class _EventDialogState extends State<_EventDialog> {
                           child: Text('시간', style: AppTextStyles.label),
                         ),
                         Pressable(
-                          onTap: () => setState(() => _allDay = !_allDay),
+                          onTap: _tap(() => setState(() => _allDay = !_allDay)),
                           scale: 0.96,
                           borderRadius: BorderRadius.circular(100),
                           child: Container(
@@ -843,7 +937,7 @@ class _EventDialogState extends State<_EventDialog> {
                           _PickButton(
                             icon: Icons.schedule_rounded,
                             label: _time(_start),
-                            onTap: () => _pickTime(start: true),
+                            onTap: _tap(() => _pickTime(start: true)),
                           ),
                           Padding(
                             padding: EdgeInsets.symmetric(horizontal: 4),
@@ -851,13 +945,17 @@ class _EventDialogState extends State<_EventDialog> {
                           ),
                           _PickButton(
                             label: _time(_end),
-                            onTap: () => _pickTime(start: false),
+                            onTap: _tap(() => _pickTime(start: false)),
                           ),
                         ],
                       ],
                     ),
                     SizedBox(height: 12),
-                    _Field(controller: _place, hint: '장소 (선택)'),
+                    _Field(
+                      controller: _place,
+                      hint: '장소 (선택)',
+                      readOnly: _locked,
+                    ),
                     SizedBox(height: 14),
                     Text('참석자', style: AppTextStyles.label),
                     SizedBox(height: 8),
@@ -866,21 +964,29 @@ class _EventDialogState extends State<_EventDialog> {
                       runSpacing: 6,
                       children: [
                         for (final staff in staffList)
-                          _PersonChip(
-                            staff: staff,
-                            joined: _members.contains(staff.name),
-                            onTap: () => setState(() {
-                              if (_members.contains(staff.name)) {
-                                _members.remove(staff.name);
-                              } else {
-                                _members.add(staff.name);
-                              }
-                            }),
-                          ),
+                          if (!_locked || _members.contains(staff.name))
+                            _PersonChip(
+                              staff: staff,
+                              joined: _members.contains(staff.name),
+                              onTap: _tap(
+                                () => setState(() {
+                                  if (_members.contains(staff.name)) {
+                                    _members.remove(staff.name);
+                                  } else {
+                                    _members.add(staff.name);
+                                  }
+                                }),
+                              ),
+                            ),
                       ],
                     ),
                     SizedBox(height: 14),
-                    _Field(controller: _memo, hint: '메모 (선택)', lines: 2),
+                    _Field(
+                      controller: _memo,
+                      hint: '메모 (선택)',
+                      lines: 2,
+                      readOnly: _locked,
+                    ),
                   ],
                 ),
               ),
@@ -888,7 +994,7 @@ class _EventDialogState extends State<_EventDialog> {
             SizedBox(height: 18),
             Row(
               children: [
-                if (_editing)
+                if (_editing && !_locked)
                   Pressable(
                     onTap: _delete,
                     scale: 0.97,
@@ -911,33 +1017,38 @@ class _EventDialogState extends State<_EventDialog> {
                   borderRadius: BorderRadius.circular(12),
                   padding: EdgeInsets.symmetric(horizontal: 16, vertical: 11),
                   child: Text(
-                    '취소',
+                    _locked ? '닫기' : '취소',
                     style: AppTextStyles.body2.copyWith(
                       color: AppColors.textSecondary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
-                SizedBox(width: 8),
-                Pressable(
-                  onTap: _submit,
-                  scale: 0.97,
-                  child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                    decoration: BoxDecoration(
-                      // 이름을 적기 전에는 흐리게 — 눌러도 안내만 뜬다
-                      color: empty ? AppColors.gray200 : AppColors.primary,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      _editing ? '저장' : '추가',
-                      style: AppTextStyles.body2.copyWith(
-                        color: empty ? AppColors.gray500 : Colors.white,
-                        fontWeight: FontWeight.w700,
+                if (!_locked) ...[
+                  SizedBox(width: 8),
+                  Pressable(
+                    onTap: _submit,
+                    scale: 0.97,
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        // 이름을 적기 전에는 흐리게 — 눌러도 안내만 뜬다
+                        color: empty ? AppColors.gray200 : AppColors.primary,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        _editing ? '저장' : '추가',
+                        style: AppTextStyles.body2.copyWith(
+                          color: empty ? AppColors.gray500 : Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ),
-                ),
+                ],
               ],
             ),
           ],
@@ -1028,6 +1139,7 @@ class _Field extends StatelessWidget {
     this.focusNode,
     this.lines = 1,
     this.bold = false,
+    this.readOnly = false,
     this.onSubmitted,
   });
 
@@ -1036,6 +1148,10 @@ class _Field extends StatelessWidget {
   final FocusNode? focusNode;
   final int lines;
   final bool bold;
+
+  /// 남이 만든 일정을 열어 볼 때 — 읽히기만 한다
+  final bool readOnly;
+
   final VoidCallback? onSubmitted;
 
   @override
@@ -1049,6 +1165,7 @@ class _Field extends StatelessWidget {
       child: TextField(
         controller: controller,
         focusNode: focusNode,
+        readOnly: readOnly,
         style: bold
             ? AppTextStyles.body1.copyWith(fontWeight: FontWeight.w600)
             : AppTextStyles.body2,
@@ -1072,9 +1189,12 @@ class _Field extends StatelessWidget {
   }
 }
 
-// ── 데이터 (목업) ──
+// ── 데이터 ──
 
 /// 일정 종류 — 색으로 종류를 구분한다
+///
+/// 서버는 종류를 enum 이 아니라 **자유 문자열**로 받는다. [label] 을 그대로
+/// 주고받으므로 라벨을 고치면 이미 쌓인 일정이 '기타'로 떨어진다.
 enum Kind {
   meeting('회의'),
   lesson('수업'),
@@ -1085,6 +1205,9 @@ enum Kind {
   const Kind(this.label);
 
   final String label;
+
+  static Kind parse(String? value) =>
+      Kind.values.firstWhere((k) => k.label == value, orElse: () => Kind.etc);
 
   Color get color => switch (this) {
     Kind.meeting => AppColors.primary,
@@ -1100,6 +1223,8 @@ class Event {
   Event({
     required this.title,
     required this.date,
+    this.id,
+    this.ownerId,
     this.kind = Kind.meeting,
     this.start,
     this.end,
@@ -1107,6 +1232,12 @@ class Event {
     this.memo = '',
     this.members = const [],
   });
+
+  /// 서버 uuid — null 이면 아직 안 올린 것 (폼이 막 돌려준 값)
+  final String? id;
+
+  /// 만든 사람 — 본인이나 관리자만 고칠 수 있다 ([canEdit])
+  final String? ownerId;
 
   final String title;
 
@@ -1117,9 +1248,13 @@ class Event {
   /// null이면 종일 일정
   final TimeOfDay? start;
   final TimeOfDay? end;
+
+  /// 장소 · 참석자 — **서버에 담을 자리가 없다** (backend-gap.md 39번).
+  /// 적을 수는 있지만 다시 받아오면 비어 있다
   final String place;
-  final String memo;
   final List<String> members;
+
+  final String memo;
 
   /// 수정 폼에서 삭제를 눌렀다는 표시
   bool deleted = false;
@@ -1128,10 +1263,127 @@ class Event {
 
   String get timeLabel =>
       allDay ? '종일' : '${_time(start!)} ~ ${_time(end ?? start!)}';
+
+  /// 고치거나 지울 수 있는지 — 서버 `_get_owned` 와 같은 기준이다
+  bool get canEdit =>
+      id == null ||
+      ownerId == null ||
+      ownerId == currentUser?.id ||
+      myRole.strong;
 }
 
-/// 등록된 일정 (목업). 달을 옮겨도 유지되도록 모듈 전역으로 둔다.
-final events = <Event>[..._seed()];
+/// 받아 둔 일정. 달을 옮겨도 유지되도록 모듈 전역으로 둔다.
+final events = <Event>[];
+
+/// 받아 본 달 (`2026-8`) — 오갈 때마다 다시 받지 않는다
+final _loadedMonths = <String>{};
+
+/// 그 달 달력에 그려질 것들을 받는다 — 한 번 받은 달은 넘어간다
+///
+/// 달력이 **그 달 1일이 낀 주부터** 그려서 앞뒤 달 며칠이 같이 보인다.
+/// 그 칸이 비지 않게 앞뒤로 한 주씩 넓혀 받는다.
+Future<void> _loadMonth(DateTime month) async {
+  final key = '${month.year}-${month.month}';
+  if (_loadedMonths.contains(key)) return;
+  final rows = await EventApi.list(
+    from: DateTime(month.year, month.month).subtract(Duration(days: 7)),
+    to: DateTime(
+      month.year,
+      month.month + 1,
+      0,
+      23,
+      59,
+      59,
+    ).add(Duration(days: 7)),
+  );
+  // 넓혀 받은 만큼 옆 달과 겹친다 — 같은 걸 두 번 넣지 않게 id 로 거른다
+  final known = {for (final event in events) ?event.id};
+  events.addAll([
+    for (final row in rows)
+      if (!known.contains(row.id)) _fromServer(row),
+  ]);
+  _loadedMonths.add(key);
+}
+
+/// 서버 일정 → 화면 모델
+///
+/// 장소·참석자는 서버에 없어서 빈 채로 온다.
+/// 색도 서버 값을 안 쓴다 — 앱은 종류에서 색을 뽑는다
+Event _fromServer(CalendarEvent row) {
+  final start = row.startAt;
+  final end = row.endAt;
+  final allDay = _isAllDay(start, end);
+  return Event(
+    id: row.id,
+    ownerId: row.ownerId,
+    title: row.title,
+    date: DateTime(start.year, start.month, start.day),
+    kind: Kind.parse(row.category),
+    start: allDay ? null : TimeOfDay.fromDateTime(start),
+    end: allDay ? null : TimeOfDay.fromDateTime(end),
+    memo: row.memo ?? '',
+  );
+}
+
+/// 종일 판정 — 서버에 종일 표시가 없어서 시각으로 가른다.
+/// 올릴 때 `00:00 ~ 23:59` 로 넣으므로 그 모양이면 종일로 본다
+bool _isAllDay(DateTime start, DateTime end) =>
+    start.hour == 0 && start.minute == 0 && end.hour == 23 && end.minute == 59;
+
+/// 화면 모델 → 서버가 받는 시작·끝
+(DateTime, DateTime) _range(Event event) {
+  final date = event.date;
+  if (event.allDay) {
+    return (
+      DateTime(date.year, date.month, date.day),
+      DateTime(date.year, date.month, date.day, 23, 59),
+    );
+  }
+  final start = event.start!;
+  final end = event.end ?? start;
+  return (
+    DateTime(date.year, date.month, date.day, start.hour, start.minute),
+    DateTime(date.year, date.month, date.day, end.hour, end.minute),
+  );
+}
+
+/// 서버는 색을 `#RRGGBB` 로 받는다
+String _hexOf(Color color) =>
+    '#${(color.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
+
+/// 공개 범위 — 앱에 아직 개념이 없다. 서버가 필수로 받아서 한 값으로만 보낸다
+const _scope = '전사';
+
+/// 새 일정을 올린다
+Future<Event> _createEvent(Event draft) async {
+  final (startAt, endAt) = _range(draft);
+  final created = await EventApi.create(
+    title: draft.title,
+    startAt: startAt,
+    endAt: endAt,
+    category: draft.kind.label,
+    scope: _scope,
+    color: _hexOf(draft.kind.color),
+    memo: draft.memo.isEmpty ? null : draft.memo,
+  );
+  return _fromServer(created);
+}
+
+/// 고친 내용을 올린다 — 서버가 돌려준 값으로 갈아끼운다
+Future<Event> _updateEvent(String id, Event edited) async {
+  final (startAt, endAt) = _range(edited);
+  final saved = await EventApi.update(
+    id,
+    title: edited.title,
+    startAt: startAt,
+    endAt: endAt,
+    category: edited.kind.label,
+    color: _hexOf(edited.kind.color),
+    // 비운 메모도 넘겨야 지워진다 (안 넘기면 서버가 그대로 둔다)
+    memo: edited.memo,
+  );
+  return _fromServer(saved);
+}
 
 /// 그날 일정 — 종일이 먼저, 그다음 시작 시각순
 List<Event> eventsOn(DateTime date) =>
@@ -1140,87 +1392,6 @@ List<Event> eventsOn(DateTime date) =>
       if (a.allDay) return 0;
       return _minutes(a.start!).compareTo(_minutes(b.start!));
     });
-
-List<Event> _seed() {
-  final now = DateTime.now();
-  DateTime day(int offset) => DateTime(now.year, now.month, now.day + offset);
-  TimeOfDay at(int hour, [int minute = 0]) =>
-      TimeOfDay(hour: hour, minute: minute);
-
-  return [
-    Event(
-      title: '주간 운영 회의',
-      date: day(0),
-      kind: Kind.meeting,
-      start: at(10),
-      end: at(11),
-      place: '2층 회의실',
-      members: [me, '민중기', '이준승', '전상현'],
-      memo: '이번 주 매출과 이벤트 진행 상황 공유',
-    ),
-    Event(
-      title: 'GX 필라테스',
-      date: day(0),
-      kind: Kind.lesson,
-      start: at(19),
-      end: at(20),
-      place: 'GX룸',
-      members: ['유찬빈'],
-    ),
-    Event(
-      title: '신규 회원 상담',
-      date: day(1),
-      kind: Kind.etc,
-      start: at(14),
-      end: at(15),
-      place: '상담실',
-      members: ['전상현'],
-    ),
-    Event(
-      title: '여름 이벤트 오픈',
-      date: day(2),
-      kind: Kind.event,
-      place: '센터 전체',
-      members: [me, '민중기', '박준현'],
-    ),
-    Event(
-      title: '기구 정기 점검',
-      date: day(3),
-      kind: Kind.etc,
-      start: at(9),
-      end: at(12),
-      place: '헬스장',
-      members: ['박준현'],
-    ),
-    Event(title: '박준현 트레이너 휴무', date: day(4), kind: Kind.off, members: ['박준현']),
-    Event(
-      title: 'PT 신규 등록 상담',
-      date: day(5),
-      kind: Kind.etc,
-      start: at(16),
-      end: at(17),
-      members: [me],
-    ),
-    Event(
-      title: '월간 전체 회의',
-      date: day(7),
-      kind: Kind.meeting,
-      start: at(9, 30),
-      end: at(11),
-      place: '2층 회의실',
-      members: [me, '이준승', '민중기', '박준현', '유찬빈', '전상현'],
-    ),
-    Event(
-      title: '트레이너 교육',
-      date: day(-2),
-      kind: Kind.lesson,
-      start: at(15),
-      end: at(17),
-      place: '2층 회의실',
-      members: [me, '유찬빈'],
-    ),
-  ];
-}
 
 // ── 표시용 계산 ──
 
