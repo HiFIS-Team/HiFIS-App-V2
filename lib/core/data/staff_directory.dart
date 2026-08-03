@@ -15,18 +15,40 @@ class StaffDirectory {
 
   List<Employee> employees = const [];
 
+  /// 지점 — 사람·업무 데이터가 `branchId` 로만 와서 이름을 붙이려면 필요하다.
+  /// 명단과 같이 한 번 받아 두고 화면이 동기적으로 읽는다.
+  List<Branch> branches = const [];
+
   bool get isEmpty => employees.isEmpty;
 
   /// 명단 받아오기 — 실패해도 앱은 떠야 하므로 조용히 넘긴다
   Future<void> load() async {
+    final people = StaffApi.list();
+    final places = BranchApi.list();
     try {
-      employees = await StaffApi.list();
+      employees = await people;
     } catch (_) {
       // 서버가 꺼져 있거나 권한이 없다 — 목업 명단으로 계속 간다
     }
+    try {
+      branches = await places;
+    } catch (_) {
+      // 지점 이름을 못 받으면 화면이 uuid 대신 빈 값으로 떨어진다
+    }
   }
 
-  void clear() => employees = const [];
+  void clear() {
+    employees = const [];
+    branches = const [];
+  }
+
+  /// 지점 이름 — 못 찾으면 빈 문자열 (화면이 빈 값은 빼고 그린다)
+  String branchName(String? id) {
+    for (final branch in branches) {
+      if (branch.id == id) return branch.name;
+    }
+    return '';
+  }
 
   /// uuid 로 찾기 — 서버 데이터를 다루는 화면이 쓴다
   Employee? byId(String id) {

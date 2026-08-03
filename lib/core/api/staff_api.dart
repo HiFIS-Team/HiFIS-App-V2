@@ -4,6 +4,40 @@ import '../data/current_user.dart';
 import '../data/employee.dart';
 import 'api_client.dart';
 
+/// 지점 (서버 `BranchOut`)
+class Branch {
+  Branch({required this.id, required this.name, required this.type});
+
+  factory Branch.fromJson(Map<String, dynamic> json) => Branch(
+    id: json['id'] as String,
+    name: json['name'] as String,
+    type: json['type'] as String? ?? '',
+  );
+
+  final String id;
+  final String name;
+
+  /// `HQ`(본사) · `BRANCH`(지점)
+  final String type;
+
+  bool get isHq => type == 'HQ';
+}
+
+/// `/branches` — 지점 목록
+///
+/// 사람·업무 데이터가 전부 `branchId` 로만 오기 때문에 이름을 붙이려면 필요하다.
+class BranchApi {
+  BranchApi._();
+
+  static Future<List<Branch>> list() async {
+    final rows = await ApiClient.instance.getList('/branches');
+    return [
+      for (final row in rows)
+        Branch.fromJson((row as Map).cast<String, dynamic>()),
+    ];
+  }
+}
+
 /// `/employees` — 전사 인원 디렉터리와 내 계정
 ///
 /// 목록은 지점 업무 데이터가 아니라 '사람' 목록이라 지점 제한이 없다.
@@ -28,6 +62,33 @@ class StaffApi {
       for (final row in rows)
         Employee.fromJson((row as Map).cast<String, dynamic>()),
     ];
+  }
+
+  /// 남의 계정 고치기 — **점장 이상만** 된다 (MEMBER 는 403)
+  ///
+  /// 직급·권한·재직 상태·팀·지점처럼 **남이 정해 주는 값**이 여기 있다.
+  /// 본인이 바꾸는 것들은 [updateMe] 쪽이다.
+  static Future<Employee> updateEmployee(
+    String id, {
+    Rank? rank,
+    Role? role,
+    EmployeeStatus? status,
+    String? team,
+    String? branchId,
+    String? phone,
+  }) async {
+    final data = await _client.patch(
+      '/employees/$id',
+      body: {
+        'rank': ?rank?.wire,
+        'role': ?role?.wire,
+        'status': ?status?.wire,
+        'team': ?team,
+        'branchId': ?branchId,
+        'phone': ?phone,
+      },
+    );
+    return Employee.fromJson(data!);
   }
 
   /// 내 계정 다시 받기

@@ -32,110 +32,92 @@ enum _Status {
 }
 
 /// 재직 상태 — 서로 겹치지 않아 탭으로 나눈다
-enum _Employment {
-  active('재직자'),
-  pending('대기자'),
-  left('퇴사자');
-
-  const _Employment(this.label);
-
-  final String label;
-}
-
-/// 대기자가 무엇을 기다리는지
-enum _Waiting {
-  /// 초대키로 가입 신청까지 하고 관리자 승인을 기다리는 사람
-  approval('가입 승인 대기'),
-
-  /// 채용이 확정돼 출근일만 기다리는 사람
-  incoming('입사 예정');
-
-  const _Waiting(this.label);
-
-  final String label;
-}
-
-/// 직원 한 명 (목업)
 ///
-/// 이름과 아바타 색은 공용 명단([staffList])을 따르고, 조직도에서만 쓰는
-/// 소속·연락처·근태 요약을 여기에 덧붙인다.
+/// 서버 `EmployeeStatus` 와 1:1 이다. 가운데 칸은 예전에 '대기자'(가입 승인
+/// 대기)였는데, **서버가 승인 대기를 폐지**해서 지금은 잠가 둔 계정을 뜻한다
+/// (backend-gap.md 11·58번).
+enum _Employment {
+  active('재직자', EmployeeStatus.active),
+  inactive('비활성', EmployeeStatus.inactive),
+  left('퇴사자', EmployeeStatus.resigned);
+
+  const _Employment(this.label, this.wire);
+
+  final String label;
+  final EmployeeStatus wire;
+
+  static _Employment of(EmployeeStatus status) =>
+      _Employment.values.firstWhere((e) => e.wire == status);
+}
+
+/// 직원 한 명 — 서버 `EmployeeOut` 을 화면 말로 옮긴 것
+///
+/// 값을 복사하지 않고 [source] 를 그대로 들고 있는다. 프로필에서 이름·색을
+/// 바꾸면 명단을 다시 받는데, 복사해 두면 두 벌이 어긋난다.
 class _Member {
-  _Member({
-    required this.name,
-    required this.role,
-    required this.team,
-    required this.branch,
-    required this.permission,
-    this.employment = _Employment.active,
-    this.waiting,
-    this.appliedAt,
-    this.startAt,
-    this.leftAt,
-    required this.code,
-    required this.phone,
-    required this.email,
-    required this.joined,
-    required this.status,
-    this.note,
-    this.clients = 0,
-    this.sessions = 0,
-    required this.workedDays,
-    required this.workedHours,
-    this.lateCount = 0,
-    this.leaveUsed = 0,
-  });
+  _Member(this.source);
 
-  final String name;
-  final String role;
-  final String team;
+  final Employee source;
 
-  /// 소속 지점 — 한 번에 한 곳만 본다
-  final String branch;
-  final Role permission;
+  String get id => source.id;
+  String get name => source.name;
 
-  /// 재직 상태 — 승인하면 대기자에서 재직자로 바뀐다
-  _Employment employment;
+  /// 직급 (트레이너·FC·점장…)
+  String get role => source.rank.label;
 
-  /// 대기자일 때만 채운다
-  final _Waiting? waiting;
+  /// 소속 팀 — 서버가 비워 둘 수 있다
+  String get team =>
+      (source.team == null || source.team!.isEmpty) ? _noTeam : source.team!;
 
-  /// 가입 신청일 · 입사 예정일 · 퇴사일
-  final DateTime? appliedAt;
-  final DateTime? startAt;
-  final DateTime? leftAt;
+  /// 소속 지점 이름 — 서버는 uuid 로만 준다
+  String get branch => StaffDirectory.instance.branchName(source.branchId);
+
+  Role get permission => source.role;
+
+  _Employment get employment => _Employment.of(source.status);
 
   /// 사번
-  final String code;
-  final String phone;
-  final String email;
-  final DateTime joined;
+  String get code => source.empNo ?? '미발급';
+  String get phone => source.phone ?? '';
+  String get email => source.email;
 
-  final _Status status;
+  DateTime? get joined => source.joinedAt;
 
   /// 상태 메시지 (예: 14시까지 외근)
-  final String? note;
+  String? get note => source.statusMessage;
 
-  /// 담당 회원 수 · 이번 달 세션 (트레이너·FC만 채운다)
-  final int clients;
-  final int sessions;
+  Color get color => source.color ?? avatarColorFor(name);
 
-  /// 이번 달 근태 요약
-  final int workedDays;
-  final int workedHours;
-  final int lateCount;
-  final double leaveUsed;
+  String? get avatarUrl => source.avatarImageUrl;
 
-  Color get color => staffOf(name).color;
-
-  bool get isMe => name == me;
+  bool get isMe => source.id == currentUser?.id;
 
   bool get active => employment == _Employment.active;
 
+  /// 지금 상태 — 스스로 고른 값이 먼저고, 없으면 오늘 출퇴근으로 가른다
+  ///
+  /// 서버 `workStatus` 가 `AUTO` 면 "출근 기준으로 알아서"라는 뜻이라
+  /// 오늘 기록을 봐야 한다. 그 기록은 [_todayWorking] 이 한 번에 받아 둔다.
+  ///
+  /// **월차는 못 가린다** — 오늘 휴가인 사람을 전원 분량으로 주는 길이 없다
+  /// (backend-gap.md 59번). 휴가 중인 사람은 '퇴근'으로 보인다.
+  _Status get status => switch (source.workStatus) {
+    WorkStatus.meeting => _Status.meeting,
+    WorkStatus.meal => _Status.meal,
+    WorkStatus.out => _Status.out,
+    WorkStatus.away => _Status.away,
+    WorkStatus.auto =>
+      _todayWorking.contains(source.id) ? _Status.working : _Status.off,
+  };
+
   /// '3년 4개월' — 한 해가 안 됐으면 개월만
   String get career {
+    final start = joined;
+    if (start == null) return '-';
     final now = DateTime.now();
-    var months = (now.year - joined.year) * 12 + now.month - joined.month;
-    if (now.day < joined.day) months--;
+    var months = (now.year - start.year) * 12 + now.month - start.month;
+    if (now.day < start.day) months--;
+    if (months < 0) months = 0;
     if (months < 12) return '$months개월';
     final years = months ~/ 12;
     final rest = months % 12;
@@ -143,283 +125,83 @@ class _Member {
   }
 }
 
-final _members = <_Member>[
-  _Member(
-    name: '이준승',
-    role: '대표',
-    team: '대표',
-    branch: '강남점',
-    permission: Role.master,
-    code: 'FS-0001',
-    phone: '010-4410-0001',
-    email: 'js.lee@hifis.app',
-    joined: DateTime(2019, 1, 2),
-    status: _Status.meeting,
-    note: '본사 임원 회의',
-    workedDays: 19,
-    workedHours: 162,
-  ),
-  _Member(
-    name: '민중기',
-    role: '점장',
-    team: '대표',
-    branch: '강남점',
-    permission: Role.admin,
-    code: 'FS-0044',
-    phone: '010-7720-0044',
-    email: 'jk.min@hifis.app',
-    joined: DateTime(2020, 7, 13),
-    status: _Status.working,
-    workedDays: 19,
-    workedHours: 171,
-    leaveUsed: 1,
-  ),
-  _Member(
-    name: '이준경',
-    role: '개발',
-    team: '개발',
-    branch: '강남점',
-    permission: Role.admin,
-    code: 'FS-0102',
-    phone: '010-3388-0102',
-    email: 'jk.lee@hifis.app',
-    joined: DateTime(2024, 5, 20),
-    status: _Status.out,
-    note: '14시까지 외근',
-    workedDays: 18,
-    workedHours: 152,
-    lateCount: 2,
-  ),
-  _Member(
-    name: '문명진',
-    role: '마케터',
-    team: '마케팅',
-    branch: '강남점',
-    permission: Role.member,
-    code: 'FS-0826',
-    phone: '010-6650-0826',
-    email: 'mj.moon@hifis.app',
-    joined: DateTime(2023, 8, 21),
-    status: _Status.working,
-    workedDays: 18,
-    workedHours: 150,
-    leaveUsed: 2,
-  ),
-  _Member(
-    name: me,
-    role: '트레이너',
-    team: '트레이너',
-    branch: '강남점',
-    permission: Role.member,
-    code: 'FS-0903',
-    phone: '010-2913-0903',
-    email: 'peace@hifis.app',
-    joined: DateTime(2023, 3, 2),
-    status: _Status.working,
-    clients: 14,
-    sessions: 62,
-    workedDays: 18,
-    workedHours: 148,
-    lateCount: 1,
-    leaveUsed: 3,
-  ),
-  _Member(
-    name: '박준현',
-    role: '트레이너',
-    team: '트레이너',
-    branch: '강남점',
-    permission: Role.member,
-    code: 'FS-0311',
-    phone: '010-9042-0311',
-    email: 'jh.park@hifis.app',
-    joined: DateTime(2022, 11, 1),
-    status: _Status.meal,
-    clients: 11,
-    sessions: 51,
-    workedDays: 18,
-    workedHours: 145,
-    leaveUsed: 2,
-  ),
-  _Member(
-    name: '유찬빈',
-    role: '트레이너',
-    team: '트레이너',
-    branch: '강남점',
-    permission: Role.member,
-    code: 'FS-0520',
-    phone: '010-5517-0520',
-    email: 'cb.yoo@hifis.app',
-    joined: DateTime(2025, 2, 17),
-    status: _Status.leave,
-    clients: 9,
-    sessions: 40,
-    workedDays: 17,
-    workedHours: 139,
-    leaveUsed: 4,
-  ),
-  _Member(
-    name: '전상현',
-    role: 'FC',
-    team: 'FC',
-    branch: '강남점',
-    permission: Role.member,
-    code: 'FS-0715',
-    phone: '010-2266-0715',
-    email: 'sh.jeon@hifis.app',
-    joined: DateTime(2021, 9, 6),
-    status: _Status.working,
-    clients: 23,
-    sessions: 0,
-    workedDays: 19,
-    workedHours: 158,
-    lateCount: 1,
-    leaveUsed: 1,
-  ),
-  _Member(
-    name: '이지영',
-    role: '트레이너',
-    team: '트레이너',
-    branch: '잠실점',
-    permission: Role.member,
-    code: 'FS-1120',
-    phone: '010-8834-1120',
-    email: 'jy.lee@hifis.app',
-    joined: DateTime(2024, 1, 8),
-    status: _Status.working,
-    clients: 12,
-    sessions: 55,
-    workedDays: 19,
-    workedHours: 160,
-  ),
-  _Member(
-    name: '김재훈',
-    role: 'FC',
-    team: 'FC',
-    branch: '잠실점',
-    permission: Role.member,
-    code: 'FS-1133',
-    phone: '010-2077-1133',
-    email: 'jh.kim@hifis.app',
-    joined: DateTime(2022, 4, 11),
-    status: _Status.meal,
-    clients: 18,
-    workedDays: 18,
-    workedHours: 149,
-    lateCount: 1,
-  ),
-  // 대기자 — 가입 승인을 기다리는 사람
-  _Member(
-    name: '오세진',
-    role: '트레이너',
-    team: '트레이너',
-    branch: '강남점',
-    permission: Role.member,
-    employment: _Employment.pending,
-    waiting: _Waiting.approval,
-    appliedAt: DateTime(2026, 7, 28),
-    code: '미발급',
-    phone: '010-4471-2250',
-    email: 'sj.oh@hifis.app',
-    joined: DateTime(2026, 7, 28),
-    status: _Status.off,
-    workedDays: 0,
-    workedHours: 0,
-  ),
-  // 대기자 — 출근일만 기다리는 사람
-  _Member(
-    name: '한지후',
-    role: 'FC',
-    team: 'FC',
-    branch: '강남점',
-    permission: Role.member,
-    employment: _Employment.pending,
-    waiting: _Waiting.incoming,
-    startAt: DateTime(2026, 8, 4),
-    code: 'FS-0930',
-    phone: '010-3312-0930',
-    email: 'jh.han@hifis.app',
-    joined: DateTime(2026, 8, 4),
-    status: _Status.off,
-    workedDays: 0,
-    workedHours: 0,
-  ),
-  // 퇴사자
-  _Member(
-    name: '서민재',
-    role: '트레이너',
-    team: '트레이너',
-    branch: '강남점',
-    permission: Role.member,
-    employment: _Employment.left,
-    leftAt: DateTime(2026, 3, 31),
-    code: 'FS-0288',
-    phone: '010-5590-0288',
-    email: 'mj.seo@hifis.app',
-    joined: DateTime(2021, 6, 14),
-    status: _Status.off,
-    workedDays: 0,
-    workedHours: 0,
-  ),
-  _Member(
-    name: '노경훈',
-    role: '마케터',
-    team: '마케팅',
-    branch: '강남점',
-    permission: Role.member,
-    employment: _Employment.left,
-    leftAt: DateTime(2025, 12, 20),
-    code: 'FS-0173',
-    phone: '010-7043-0173',
-    email: 'kh.noh@hifis.app',
-    joined: DateTime(2022, 2, 7),
-    status: _Status.off,
-    workedDays: 0,
-    workedHours: 0,
-  ),
-];
+/// 팀이 비어 있는 사람을 모으는 칸 — 서버 `team` 이 nullable 이다
+const _noTeam = '팀 미지정';
 
-/// 목업 명단에서 나를 찾는다 — 없으면 로그인 정보로 만든다
+/// 화면이 쓰는 명단
+final _members = <_Member>[];
+
+/// 오늘 출근해서 아직 퇴근을 안 찍은 사람
 ///
-/// 이 명단은 아직 목업이라 **로그인한 사람이 여기 없는 게 정상**이다.
-/// 서버 계정(`관리자`·`테스트 트레이너`…)과 목업 이름(`이준승`…)이 겹치지 않는다.
-/// 예전에는 `firstWhere` 로 찾다가 그대로 터졌다 (`Bad state: No element` —
-/// 화면 전체가 빨간 에러로 덮였다).
-///
-/// 명단에 끼워 넣지는 않는다. 옆의 동료·팀·근무중 수는 목업 13명을 센 값이고,
-/// 거기에 실제 계정을 한 명 섞으면 어느 쪽 숫자도 아니게 된다.
-_Member get _meOrSelf {
-  for (final member in _members) {
-    if (member.isMe) return member;
+/// `GET /attendance?month=` 을 **한 번** 불러 채운다. 사람마다 부르면
+/// 인원수만큼 요청이 나간다.
+final _todayWorking = <String>{};
+
+bool _staffLoaded = false;
+
+/// 명단·지점·오늘 근태를 받아 화면 모델을 세운다
+Future<void> _loadStaff() async {
+  final directory = StaffDirectory.instance;
+  final now = DateTime.now();
+  final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+  // 명단과 근태를 같이 띄운다 — 근태는 실패해도 명단은 보여야 한다
+  final attendance = AttendanceApi.list(month: month);
+
+  await directory.load();
+
+  _members
+    ..clear()
+    ..addAll([for (final employee in directory.employees) _Member(employee)]);
+
+  _todayWorking.clear();
+  try {
+    for (final row in await attendance) {
+      final at = row.date;
+      final today =
+          at.year == now.year && at.month == now.month && at.day == now.day;
+      // 퇴근을 찍었으면 지금은 자리에 없다
+      if (today && row.checkOut == null) _todayWorking.add(row.employeeId);
+    }
+  } catch (_) {
+    // 근태를 못 받으면 자동 상태인 사람이 전부 '퇴근'으로 보인다
   }
 
-  final user = currentUser;
-  return _Member(
-    name: me,
-    role: user?.rank.label ?? '',
-    team: '',
-    // 서버는 지점을 uuid(`branchId`)로 주고 목업은 이름('강남점')으로 쓴다.
-    // 짝지을 방법이 없어 비워 두고, 카드에서 빈 값은 빼고 그린다.
-    branch: '',
-    permission: myRole,
-    code: user?.empNo ?? '-',
-    phone: user?.phone ?? '-',
-    email: user?.email ?? '-',
-    joined: DateTime.now(),
-    status: _Status.working,
-    workedDays: 0,
-    workedHours: 0,
-  );
+  _staffLoaded = true;
 }
 
 /// 지점 필터 목록 — 맨 앞은 모든 지점을 함께 보는 '전체'
 const _allBranches = '전체';
-final _branches = [
+
+List<String> get _branches => [
   _allBranches,
-  ...{for (final m in _members) m.branch},
+  for (final branch in StaffDirectory.instance.branches) branch.name,
 ];
 
 /// 필터에 쓸 팀 목록 — 명단에 실제로 있는 팀만 명단 순서대로
-final _teams = [
+List<String> get _teams => [
   '전체',
   ...{for (final m in _members) m.team},
 ];
+
+/// 명단에서 나를 찾는다 — 못 찾으면 로그인 정보로 만든다
+///
+/// 서버 명단에는 내가 반드시 있다. 다만 명단을 못 받아온 동안
+/// (서버가 꺼져 있거나 요청이 실패)에도 내 카드는 떠야 해서 폴백을 둔다.
+_Member get _meOrSelf {
+  final id = currentUser?.id;
+  for (final member in _members) {
+    if (member.id == id) return member;
+  }
+  return _Member(
+    currentUser ??
+        Employee(
+          id: '',
+          name: me,
+          email: '',
+          branchId: '',
+          rank: Rank.trainer,
+          role: myRole,
+          avatarColor: '',
+        ),
+  );
+}

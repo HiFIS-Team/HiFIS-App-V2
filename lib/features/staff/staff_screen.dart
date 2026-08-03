@@ -2,9 +2,13 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/api/api_exception.dart';
+import '../../core/api/attendance_api.dart';
+import '../../core/api/staff_api.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
 import '../../core/data/staff.dart';
+import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -22,7 +26,7 @@ import '../messages/chat_screen.dart';
 
 part 'staff_models.dart';
 
-/// 직원 화면 (목업)
+/// 직원 화면
 ///
 /// 지점 구성원을 찾아보고 바로 연락하는 화면이다. 카드마다 지금 상태
 /// (근무중·회의중·외출…)가 보이고, 카드를 누르면 연락처와 이번 달 근태
@@ -30,6 +34,9 @@ part 'staff_models.dart';
 ///
 /// 사람은 팀으로 나눈다 — 일이 팀 단위로 움직이기 때문이다.
 /// 시스템 권한(MASTER·ADMIN·MEMBER)은 찾는 기준이 아니라서 배지로만 붙인다.
+///
+/// 명단은 `/employees`, 지점 이름은 `/branches`, 지금 나와 있는 사람은
+/// `/attendance?month=` 한 번으로 채운다 ([_loadStaff]).
 class StaffScreen extends StatefulWidget {
   StaffScreen({super.key});
 
@@ -44,11 +51,28 @@ class _StaffScreenState extends State<StaffScreen> {
   /// 지점은 전체로 시작한다 (내 지점만 보려면 직접 고른다)
   String _branch = _allBranches;
 
-  /// 0 재직자 · 1 대기자 · 2 퇴사자
+  /// 0 재직자 · 1 비활성 · 2 퇴사자
   int _tab = 0;
 
   /// 카드 보기(true) · 목록 보기(false)
   bool _grid = true;
+
+  bool _loading = !_staffLoaded;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      await _loadStaff();
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+    if (mounted) setState(() => _loading = false);
+  }
 
   _Employment get _employment => _Employment.values[_tab];
 
@@ -77,25 +101,63 @@ class _StaffScreenState extends State<StaffScreen> {
     showFullPage<void>(context, (_) => _MemberDetail(member: member));
   }
 
-  /// 가입 신청 승인 — 대기자에서 재직자로 옮긴다
+  /// 잠가 둔 계정을 다시 연다
   ///
-  /// 실제로는 ADMIN 이상만 할 수 있어야 한다. 목업이라 권한 검사는 생략.
-  void _approve(_Member member) {
-    setState(() => member.employment = _Employment.active);
-    AppToast.show(context, '${member.name}님의 가입을 승인했어요');
-  }
+  /// 예전에는 '가입 승인'이었는데 **서버가 승인 대기를 폐지**해서
+  /// 비활성 계정을 여는 일이 됐다 (backend-gap.md 58번).
+  Future<void> _activate(_Member member) => _setStatus(
+    member,
+    EmployeeStatus.active,
+    done: '${member.name}님을 재직자로 되돌렸어요',
+  );
 
-  Future<void> _reject(_Member member) async {
+  /// 퇴사 처리 — 명단에서 지우지 않고 퇴사자 탭으로 옮긴다
+  ///
+  /// 서버에 `DELETE /employees/{id}` 도 있지만 **되돌릴 수 없는 완전 삭제**라
+  /// 조직도에 버튼으로 두지 않는다 (근태·급여 기록이 딸려 있다).
+  Future<void> _resign(_Member member) async {
     final ok = await showConfirmDialog(
       context,
-      title: '가입 신청을 반려할까요?',
-      message: '${member.name}님의 신청이 명단에서 사라져요.',
-      confirmLabel: '반려',
+      title: '${member.name}님을 퇴사 처리할까요?',
+      message: '퇴사자 탭으로 옮겨져요. 기록은 그대로 남아요.',
+      confirmLabel: '퇴사 처리',
       destructive: true,
     );
     if (!ok || !mounted) return;
-    setState(() => _members.remove(member));
-    AppToast.show(context, '가입 신청을 반려했어요');
+    await _setStatus(
+      member,
+      EmployeeStatus.resigned,
+      done: '${member.name}님을 퇴사 처리했어요',
+    );
+  }
+
+  /// 재직 상태 바꾸기 — **점장 이상만** 된다 (서버가 MEMBER 를 403 으로 막는다)
+  Future<void> _setStatus(
+    _Member member,
+    EmployeeStatus status, {
+    required String done,
+  }) async {
+    if (!myRole.strong) {
+      AppToast.show(context, '점장 이상만 바꿀 수 있어요');
+      return;
+    }
+    try {
+      final saved = await StaffApi.updateEmployee(member.id, status: status);
+      if (!mounted) return;
+      setState(() => _replace(saved));
+      AppToast.show(context, done);
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+  }
+
+  /// 서버가 돌려준 사람으로 명단의 그 자리를 갈아끼운다
+  void _replace(Employee saved) {
+    final index = _members.indexWhere((m) => m.id == saved.id);
+    if (index >= 0) _members[index] = _Member(saved);
+    final directory = StaffDirectory.instance;
+    final at = directory.employees.indexWhere((e) => e.id == saved.id);
+    if (at >= 0) directory.employees = [...directory.employees]..[at] = saved;
   }
 
   /// 1:1 사내톡 — 상대 이름으로 대화방을 연다
@@ -144,8 +206,8 @@ class _StaffScreenState extends State<StaffScreen> {
                 onTap: () => _open(member),
                 onChat: () => _chat(member),
                 onCopy: () => _copy('이메일', member.email),
-                onApprove: () => _approve(member),
-                onReject: () => _reject(member),
+                onApprove: () => _activate(member),
+                onReject: () => _resign(member),
               ),
             ),
         ],
@@ -164,8 +226,8 @@ class _StaffScreenState extends State<StaffScreen> {
             onTap: () => _open(member),
             onChat: () => _chat(member),
             onCopy: () => _copy('이메일', member.email),
-            onApprove: () => _approve(member),
-            onReject: () => _reject(member),
+            onApprove: () => _activate(member),
+            onReject: () => _resign(member),
           ),
         ),
     ],
@@ -174,6 +236,17 @@ class _StaffScreenState extends State<StaffScreen> {
   @override
   Widget build(BuildContext context) {
     if (!isDesktop) return PlaceholderScreen(emoji: '👥', title: '직원');
+
+    if (_loading) {
+      return Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2.4,
+            valueColor: AlwaysStoppedAnimation(AppColors.primary),
+          ),
+        ),
+      );
+    }
 
     final list = _visible;
 
@@ -244,7 +317,7 @@ class _StaffScreenState extends State<StaffScreen> {
               EmptyCard(
                 icon: CupertinoIcons.person_2,
                 text: switch (_employment) {
-                  _Employment.pending => '기다리는 사람이 없어요',
+                  _Employment.inactive => '잠긴 계정이 없어요',
                   _Employment.left => '퇴사한 사람이 없어요',
                   _ => '찾는 직원이 없어요',
                 },
@@ -272,7 +345,12 @@ class _MyCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final mine = _meOrSelf;
-    final here = _members.where((m) => m.branch == branch && m.active).toList();
+    // '전체'를 보고 있으면 전사를 센다 — 지점을 고르면 그 지점만
+    final here = _members
+        .where(
+          (m) => m.active && (branch == _allBranches || m.branch == branch),
+        )
+        .toList();
     final teams = {for (final m in here) m.team}.length;
     final working = here.where((m) => m.status.present).length;
 
@@ -688,7 +766,7 @@ class _StatusAvatar extends StatelessWidget {
       height: size,
       child: Stack(
         children: [
-          Avatar(name: member.name, size: size),
+          Avatar(name: member.name, size: size, imageUrl: member.avatarUrl),
           Positioned(
             right: 0,
             bottom: 0,
@@ -738,7 +816,7 @@ class _MemberCardState extends State<_MemberCard> {
   bool _hovered = false;
 
   /// 상태마다 할 수 있는 일이 다르다.
-  /// 승인 대기는 승인·반려, 퇴사자는 연락처 복사만.
+  /// 비활성은 활성화·퇴사 처리(점장 이상), 퇴사자는 연락처 복사만.
   List<Widget> _actions() {
     final member = widget.member;
     final copy = _IconAction(
@@ -746,23 +824,24 @@ class _MemberCardState extends State<_MemberCard> {
       onTap: widget.onCopy,
     );
 
-    if (member.waiting == _Waiting.approval) {
+    // 잠긴 계정을 여닫는 건 점장 이상만 된다 — 아니면 눌러도 서버가 막는다
+    if (member.employment == _Employment.inactive && myRole.strong) {
       return [
         Expanded(
           child: _SmallButton(
-            label: '승인',
+            label: '활성화',
             onTap: widget.onApprove,
             filled: true,
           ),
         ),
         SizedBox(width: 8),
         Expanded(
-          child: _SmallButton(label: '반려', onTap: widget.onReject),
+          child: _SmallButton(label: '퇴사 처리', onTap: widget.onReject),
         ),
       ];
     }
 
-    if (member.employment == _Employment.left) {
+    if (member.employment != _Employment.active) {
       return [
         Expanded(
           child: _SmallButton(label: '연락처 보기', onTap: widget.onTap),
@@ -1142,22 +1221,13 @@ class _StatusLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 퇴사일·비활성 처리일을 서버가 안 준다 (backend-gap.md 58번) —
+    // 언제인지는 못 적고 상태만 보여준다
     if (member.employment == _Employment.left) {
-      return _line(AppColors.gray400, '퇴사', _date(member.leftAt!));
+      return _line(AppColors.gray400, '퇴사', '기록은 남아 있어요');
     }
-    if (member.waiting == _Waiting.approval) {
-      return _line(
-        AppColors.warning,
-        _Waiting.approval.label,
-        '${_date(member.appliedAt!)} 신청',
-      );
-    }
-    if (member.waiting == _Waiting.incoming) {
-      return _line(
-        AppColors.primary,
-        _Waiting.incoming.label,
-        '${_date(member.startAt!)}부터',
-      );
+    if (member.employment == _Employment.inactive) {
+      return _line(AppColors.warning, '비활성', '계정이 잠겨 있어요');
     }
     return _StatusBadge(member: member);
   }
@@ -1239,10 +1309,55 @@ class _StatusBadge extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 /// 직원 한 명 상세 — 연락처와 이번 달 근태 요약
-class _MemberDetail extends StatelessWidget {
+///
+/// 근태 요약은 열 때 따로 받는다. 명단과 같이 받으면 인원수만큼 요청이 나간다.
+class _MemberDetail extends StatefulWidget {
   _MemberDetail({required this.member});
 
   final _Member member;
+
+  @override
+  State<_MemberDetail> createState() => _MemberDetailState();
+}
+
+class _MemberDetailState extends State<_MemberDetail> {
+  _MonthSummary? _month;
+  bool _loading = false;
+
+  _Member get member => widget.member;
+
+  /// 남의 근태를 볼 수 있는지
+  ///
+  /// 서버가 `/attendance/calendar`·`/leaves/balance` 를 **점장 이상**에게만 연다
+  /// (일반 직원이 부르면 403). 지각 횟수는 원래 남이 볼 것도 아니라
+  /// 앱도 같은 기준으로 카드를 감춘다.
+  bool get _canSeeMonth => member.isMe || myRole.strong;
+
+  @override
+  void initState() {
+    super.initState();
+    if (member.active && _canSeeMonth) _loadMonth();
+  }
+
+  Future<void> _loadMonth() async {
+    setState(() => _loading = true);
+    final now = DateTime.now();
+    final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    try {
+      final days = AttendanceApi.calendar(
+        month: month,
+        employeeId: member.isMe ? null : member.id,
+      );
+      final balance = AttendanceApi.balance(
+        employeeId: member.isMe ? null : member.id,
+      );
+      final summary = _MonthSummary.of(await days, await balance);
+      if (mounted) setState(() => _month = summary);
+    } catch (_) {
+      // 권한이 없거나 서버가 못 주면 카드를 안 그린다
+    }
+    if (mounted) setState(() => _loading = false);
+  }
 
   void _copy(BuildContext context, String label, String value) {
     Clipboard.setData(ClipboardData(text: value));
@@ -1308,21 +1423,22 @@ class _MemberDetail extends StatelessWidget {
               ('지점', member.branch),
               ('소속', '${member.team} · ${member.role}'),
               ('권한', member.permission.label),
-              ('상태', _employmentLine(member)),
-              if (member.active) ('입사일', _date(member.joined)),
-              if (member.active) ('근속', member.career),
-              ('전화번호', member.phone),
+              ('상태', member.employment.label),
+              if (member.joined case final at?) ('입사일', _date(at)),
+              if (member.active && member.joined != null) ('근속', member.career),
+              // 서버가 전화번호를 안 채워 주는 사람이 많다 (backend-gap.md 2·46번)
+              ('전화번호', member.phone.isEmpty ? '없음' : member.phone),
               ('이메일', member.email),
             ],
           ),
-          // 대기자·퇴사자는 이번 달 기록이 없다
-          if (member.active) ...[
+          // 비활성·퇴사자는 이번 달 기록이 없다.
+          // 남의 근태는 점장 이상만 본다 ([_canSeeMonth])
+          if (member.active && _canSeeMonth) ...[
             SizedBox(height: 12),
-            _MonthCard(member: member),
-            if (member.clients > 0) ...[
-              SizedBox(height: 12),
-              _ClientCard(member: member),
-            ],
+            if (_month case final summary?)
+              _MonthCard(summary: summary)
+            else if (_loading)
+              _MonthPlaceholder(),
           ],
         ],
       ),
@@ -1466,11 +1582,72 @@ class _InfoCard extends StatelessWidget {
   }
 }
 
+/// 근태를 받아오는 동안 자리만 잡아 둔다 — 카드가 뒤늦게 끼어들면 화면이 튄다
+class _MonthPlaceholder extends StatelessWidget {
+  _MonthPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 106,
+      alignment: Alignment.center,
+      decoration: AppDecorations.card(),
+      child: SizedBox(
+        width: 18,
+        height: 18,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          valueColor: AlwaysStoppedAnimation(AppColors.gray300),
+        ),
+      ),
+    );
+  }
+}
+
+/// 이번 달 근태 요약 값 — `/attendance/calendar` 와 `/leaves/balance` 로 만든다
+///
+/// 판정(정상·지각·결근…)은 **서버가 한 것을 그대로 센다.** 급여·평가가 같은
+/// 기준을 쓰므로 앱이 다시 계산하지 않는다.
+class _MonthSummary {
+  _MonthSummary({
+    required this.workedDays,
+    required this.workedHours,
+    required this.lateCount,
+    required this.leaveUsed,
+  });
+
+  factory _MonthSummary.of(List<AttendanceDay> days, LeaveBalance balance) {
+    var worked = 0;
+    var minutes = 0;
+    var late = 0;
+    for (final day in days) {
+      // 출근한 날만 센다 — 휴무·휴가·결근은 근무일이 아니다
+      if (day.checkIn != null) worked++;
+      minutes += day.workMinutes ?? 0;
+      if (day.status == AttendanceStatus.late ||
+          day.status == AttendanceStatus.lateAndEarly) {
+        late++;
+      }
+    }
+    return _MonthSummary(
+      workedDays: worked,
+      workedHours: minutes ~/ 60,
+      lateCount: late,
+      leaveUsed: balance.used,
+    );
+  }
+
+  final int workedDays;
+  final int workedHours;
+  final int lateCount;
+  final double leaveUsed;
+}
+
 /// 이번 달 근태 요약 — 근태·월차 화면의 요약 카드와 같은 눈금
 class _MonthCard extends StatelessWidget {
-  _MonthCard({required this.member});
+  _MonthCard({required this.summary});
 
-  final _Member member;
+  final _MonthSummary summary;
 
   @override
   Widget build(BuildContext context) {
@@ -1494,21 +1671,21 @@ class _MonthCard extends StatelessWidget {
           SizedBox(height: 16),
           Row(
             children: [
-              _stat('근무일', '${member.workedDays}일', AppColors.textPrimary),
+              _stat('근무일', '${summary.workedDays}일', AppColors.textPrimary),
               _divider(),
-              _stat('총 근무', '${member.workedHours}시간', AppColors.primary),
+              _stat('총 근무', '${summary.workedHours}시간', AppColors.primary),
               _divider(),
               _stat(
                 '지각',
-                '${member.lateCount}회',
-                member.lateCount > 0
+                '${summary.lateCount}회',
+                summary.lateCount > 0
                     ? AppColors.warning
                     : AppColors.textPrimary,
               ),
               _divider(),
               _stat(
                 '월차',
-                '${_count(member.leaveUsed)}일',
+                '${_count(summary.leaveUsed)}일',
                 AppColors.textPrimary,
               ),
             ],
@@ -1538,79 +1715,6 @@ class _MonthCard extends StatelessWidget {
   Widget _divider() =>
       Container(width: 1, height: 30, color: AppColors.gray100);
 }
-
-/// 담당 회원 — 트레이너·FC만
-class _ClientCard extends StatelessWidget {
-  _ClientCard({required this.member});
-
-  final _Member member;
-
-  @override
-  Widget build(BuildContext context) {
-    final trainer = member.sessions > 0;
-
-    return Container(
-      padding: EdgeInsets.fromLTRB(20, 18, 20, 18),
-      decoration: AppDecorations.card(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(trainer ? '수업' : '상담', style: AppTextStyles.label),
-          SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  children: [
-                    Text(
-                      '${member.clients}명',
-                      style: AppTextStyles.title3.copyWith(
-                        fontSize: 19,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      trainer ? '담당 회원' : '이번 달 상담',
-                      style: AppTextStyles.caption.copyWith(fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-              if (trainer) ...[
-                Container(width: 1, height: 32, color: AppColors.gray100),
-                Expanded(
-                  child: Column(
-                    children: [
-                      Text(
-                        '${member.sessions}회',
-                        style: AppTextStyles.title3.copyWith(fontSize: 19),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        '이번 달 세션',
-                        style: AppTextStyles.caption.copyWith(fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 상세의 '상태' 줄 — 대기·퇴사는 날짜까지 붙인다
-String _employmentLine(_Member member) => switch (member.employment) {
-  _Employment.active => '재직 중',
-  _Employment.pending when member.waiting == _Waiting.approval =>
-    '가입 승인 대기 (${_date(member.appliedAt!)} 신청)',
-  _Employment.pending => '입사 예정 (${_date(member.startAt!)})',
-  _Employment.left => '퇴사 (${_date(member.leftAt!)})',
-};
 
 /// '2023년 3월 2일'
 String _date(DateTime value) => '${value.year}년 ${value.month}월 ${value.day}일';

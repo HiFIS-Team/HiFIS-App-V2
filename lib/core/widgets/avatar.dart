@@ -5,15 +5,19 @@ import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 
 /// 이름 첫 글자 동그라미 — 색은 직원 명단에서 가져온다
+///
+/// [imageUrl] 이 있으면 프로필 사진을 대신 그린다. 사진을 못 받아오면
+/// 첫 글자 동그라미로 떨어지므로, 로딩 중이나 서명 만료 때도 자리가 안 빈다.
 class Avatar extends StatelessWidget {
-  Avatar({super.key, required this.name, this.size = 24});
+  Avatar({super.key, required this.name, this.size = 24, this.imageUrl});
 
   final String name;
   final double size;
+  final String? imageUrl;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final initial = Container(
       width: size,
       height: size,
       alignment: Alignment.center,
@@ -29,6 +33,21 @@ class Avatar extends StatelessWidget {
           fontWeight: FontWeight.w600,
           color: Colors.white,
         ),
+      ),
+    );
+
+    final url = imageUrl;
+    if (url == null || url.isEmpty) return initial;
+
+    return ClipOval(
+      child: Image.network(
+        url,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stack) => initial,
+        loadingBuilder: (context, child, progress) =>
+            progress == null ? child : initial,
       ),
     );
   }

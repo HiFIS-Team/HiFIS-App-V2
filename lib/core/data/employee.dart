@@ -53,6 +53,24 @@ enum Rank {
   );
 }
 
+/// 재직 상태 — 서버 `EmployeeStatus` 와 같은 값
+///
+/// `INACTIVE` 는 계정을 잠가 둔 사람이다. 예전 앱은 이 자리를 '가입 승인 대기'로
+/// 썼는데 **서버가 승인 대기를 폐지**했다 (backend-gap.md 11번).
+enum EmployeeStatus {
+  active('ACTIVE', '재직자'),
+  inactive('INACTIVE', '비활성'),
+  resigned('RESIGNED', '퇴사자');
+
+  const EmployeeStatus(this.wire, this.label);
+
+  final String wire;
+  final String label;
+
+  static EmployeeStatus parse(String? value) => EmployeeStatus.values
+      .firstWhere((s) => s.wire == value, orElse: () => EmployeeStatus.active);
+}
+
 /// 스스로 바꾸는 업무 상태 — 서버 `WorkStatus` 와 같은 값
 ///
 /// '근무중'·'오프라인'은 출퇴근 기록에서 서버가 정하는 값이라 여기 없다.
@@ -92,6 +110,9 @@ class Employee {
     this.avatarUrl,
     this.statusMessage,
     this.workStatus = WorkStatus.auto,
+    this.status = EmployeeStatus.active,
+    this.joinedAt,
+    this.lastActiveAt,
     this.shiftStart,
     this.shiftEnd,
     this.workDays = const [],
@@ -111,6 +132,9 @@ class Employee {
     avatarUrl: json['avatarUrl'] as String?,
     statusMessage: json['statusMessage'] as String?,
     workStatus: WorkStatus.parse(json['workStatus'] as String?),
+    status: EmployeeStatus.parse(json['status'] as String?),
+    joinedAt: _date(json['joinedAt']),
+    lastActiveAt: _date(json['lastActiveAt']),
     workDays: [
       for (final day in (json['workDays'] as List<dynamic>? ?? const []))
         day as int,
@@ -144,6 +168,15 @@ class Employee {
   /// 스스로 고른 업무 상태 (조직도·사내톡에 보인다)
   final WorkStatus workStatus;
 
+  /// 재직 상태 — 조직도가 재직자·비활성·퇴사자 탭으로 가른다
+  final EmployeeStatus status;
+
+  /// 입사일 — 근속 계산에 쓴다
+  final DateTime? joinedAt;
+
+  /// 마지막으로 앱을 쓴 시각. **출근 여부가 아니다**
+  final DateTime? lastActiveAt;
+
   /// 바로 불러 쓸 수 있는 프로필 사진 주소 — 없으면 null
   String? get avatarImageUrl {
     final path = avatarUrl;
@@ -174,3 +207,6 @@ class Employee {
     return value == null ? null : Color(0xFF000000 | value);
   }
 }
+
+DateTime? _date(dynamic value) =>
+    value is String ? DateTime.tryParse(value)?.toLocal() : null;
