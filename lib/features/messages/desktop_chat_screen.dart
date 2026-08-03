@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/api/chat_api.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/pressable.dart';
 import 'chat_screen.dart';
@@ -33,13 +34,13 @@ class _DesktopChatScreenState extends State<DesktopChatScreen> {
     );
   }
 
+  /// 새 사내톡 — 사내톡 패널과 같은 길([showFullPage])로 연다
+  ///
+  /// 예전에는 오른쪽 pane 내비게이터에 밀어 넣었는데, `currentState` 가 없으면
+  /// **아무 일도 안 일어나고 아무 표시도 안 남는다** (`?.push` 가 조용히 넘어간다).
+  /// 눌렀는데 반응이 없다는 신고가 이 자리였다. 실패할 수 없는 길로 바꾼다.
   void _newMessage() {
-    _rightNavKey.currentState?.push(
-      CupertinoPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => NewMessageScreen(),
-      ),
-    );
+    showFullPage<void>(context, (_) => NewMessageScreen());
   }
 
   @override
@@ -56,8 +57,7 @@ class _DesktopChatScreenState extends State<DesktopChatScreen> {
                 child: MessageScreen(
                   embedded: true,
                   onOpenChat: _openChat,
-                  // 연필도 가운데 '메시지 보내기' 와 같은 자리에 연다.
-                  // 안 넘기면 이 화면 자체를 덮는 최상위로 열린다
+                  // 연필도 가운데 '메시지 보내기' 와 같은 자리에 연다
                   onNewMessage: _newMessage,
                 ),
               ),
