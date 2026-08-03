@@ -390,19 +390,29 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
 
   late final _name = TextEditingController(text: me);
 
-  /// 고른 아바타 색 — 서버 값과 같은 게 없으면 첫 번째로 둔다
-  late int _selectedColor = _indexOfMyColor();
+  /// 고른 아바타 색. **null 이면 아직 안 골랐다는 뜻**이다.
+  ///
+  /// 서버 색이 이 팔레트에 없을 수 있다 — 지금 명단 16명이 전부 그렇다
+  /// (`#6366f1` 등, backend-gap.md 14번). 못 찾았다고 0번을 고른 것처럼 두면
+  /// **이름만 바꾸려고 저장을 눌러도 색이 몰래 바뀐다.**
+  late int? _selectedColor = _indexOfMyColor();
 
   bool _saving = false;
   bool _uploading = false;
 
-  int _indexOfMyColor() {
+  int? _indexOfMyColor() {
     final mine = currentUser?.color;
-    if (mine == null) return 0;
+    if (mine == null) return null;
     final index = _avatarColors.indexWhere(
       (c) => c.toARGB32() == mine.toARGB32(),
     );
-    return index < 0 ? 0 : index;
+    return index < 0 ? null : index;
+  }
+
+  /// 미리보기에 쓸 색 — 아직 안 골랐으면 지금 내 색 그대로
+  Color? get _previewColor {
+    final index = _selectedColor;
+    return index == null ? null : _avatarColors[index];
   }
 
   @override
@@ -419,10 +429,12 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
     }
     setState(() => _saving = true);
     try {
+      final picked = _previewColor;
       applyCurrentUser(
         await StaffApi.updateMe(
           name: name,
-          avatarColor: _hexOf(_avatarColors[_selectedColor]),
+          // 안 골랐으면 안 보낸다 — 서버가 쓰던 색을 그대로 둔다
+          avatarColor: picked == null ? null : _hexOf(picked),
         ),
       );
       if (!mounted) return;
@@ -475,8 +487,7 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
           SizedBox(height: 10),
           Row(
             children: [
-              // 색을 고르는 중에는 사진을 감춘다 — 안 그러면 색이 안 보인다
-              _Avatar(size: 56, color: _avatarColors[_selectedColor]),
+              _Avatar(size: 56, color: _previewColor),
               SizedBox(width: 14),
               Pressable(
                 onTap: _uploading ? () {} : _pickImage,
@@ -512,7 +523,16 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
             style: AppTextStyles.caption,
           ),
           SizedBox(height: 20),
-          _FieldLabel('아바타 색'),
+          Row(
+            children: [
+              _FieldLabel('아바타 색'),
+              // 지금 색이 팔레트 밖이면 아무 칸에도 체크가 없어서 왜 그런지 안 보인다
+              if (_selectedColor == null) ...[
+                SizedBox(width: 8),
+                Text('고르면 바뀌어요', style: AppTextStyles.caption),
+              ],
+            ],
+          ),
           SizedBox(height: 10),
           Wrap(
             spacing: 10,
