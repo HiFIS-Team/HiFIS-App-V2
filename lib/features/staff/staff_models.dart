@@ -70,6 +70,15 @@ class _Member {
   /// 소속 지점 이름 — 서버는 uuid 로만 준다
   String get branch => StaffDirectory.instance.branchName(source.branchId);
 
+  /// 화면에 적을 소속
+  ///
+  /// MASTER·ADMIN 은 한 지점을 맡지 않는다. 서버에는 본사(HQ) 소속으로
+  /// 들어 있지만 그걸 그대로 적으면 지점 하나인 것처럼 보인다.
+  String get branchLabel => switch (permission) {
+    Role.master || Role.admin => '전 지점',
+    _ => branch,
+  };
+
   Role get permission => source.role;
 
   _Employment get employment => _Employment.of(source.status);
@@ -80,6 +89,7 @@ class _Member {
   String get email => source.email;
 
   DateTime? get joined => source.joinedAt;
+  DateTime? get resigned => source.resignedAt;
 
   /// 상태 메시지 (예: 14시까지 외근)
   String? get note => source.statusMessage;
@@ -92,20 +102,26 @@ class _Member {
 
   bool get active => employment == _Employment.active;
 
-  /// 지금 상태 — 스스로 고른 값이 먼저고, 없으면 오늘 출퇴근으로 가른다
+  /// 지금 상태 — 스스로 고른 값이 먼저고, 없으면 서버의 오늘 판정을 따른다
   ///
   /// 서버 `workStatus` 가 `AUTO` 면 "출근 기준으로 알아서"라는 뜻이라
-  /// 오늘 기록을 봐야 한다. 그 기록은 [_todayWorking] 이 한 번에 받아 둔다.
+  /// 오늘 판정([Employee.todayStatus])을 본다. 명단에 같이 실려 온다.
   ///
-  /// **월차는 못 가린다** — 오늘 휴가인 사람을 전원 분량으로 주는 길이 없다
-  /// (backend-gap.md 59번). 휴가 중인 사람은 '퇴근'으로 보인다.
+  /// **휴가도 가린다** — 예전에는 `GET /attendance` 를 받아 앱이 갈랐는데
+  /// 그 응답에는 휴가가 안 나와서 휴가 중인 사람이 '퇴근'으로 보였다
+  /// (backend-gap.md 59번).
   _Status get status => switch (source.workStatus) {
     WorkStatus.meeting => _Status.meeting,
     WorkStatus.meal => _Status.meal,
     WorkStatus.out => _Status.out,
     WorkStatus.away => _Status.away,
-    WorkStatus.auto =>
-      _todayWorking.contains(source.id) ? _Status.working : _Status.off,
+    WorkStatus.auto => switch (source.todayStatus) {
+      AttendanceStatus.onLeave => _Status.leave,
+      // 출근했고 아직 퇴근을 안 찍었다
+      final s? when s.working => _Status.working,
+      // 퇴근했거나(NORMAL·LATE…) 휴무거나 아직 출근 전(null)
+      _ => _Status.off,
+    },
   };
 
   /// '3년 4개월' — 한 해가 안 됐으면 개월만
@@ -126,21 +142,14 @@ class _Member {
 /// 화면이 쓰는 명단
 final _members = <_Member>[];
 
-/// 오늘 출근해서 아직 퇴근을 안 찍은 사람
-///
-/// `GET /attendance?month=` 을 **한 번** 불러 채운다. 사람마다 부르면
-/// 인원수만큼 요청이 나간다.
-final _todayWorking = <String>{};
-
 bool _staffLoaded = false;
 
-/// 명단·지점·오늘 근태를 받아 화면 모델을 세운다
+/// 명단·지점을 받아 화면 모델을 세운다
+///
+/// 오늘 근태는 따로 부르지 않는다 — 명단에 사람마다 실려 온다
+/// ([Employee.todayStatus]).
 Future<void> _loadStaff() async {
   final directory = StaffDirectory.instance;
-  final now = DateTime.now();
-  final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
-  // 명단과 근태를 같이 띄운다 — 근태는 실패해도 명단은 보여야 한다
-  final attendance = AttendanceApi.list(month: month);
 
   await directory.load();
 
@@ -149,20 +158,23 @@ Future<void> _loadStaff() async {
     ..addAll([for (final employee in directory.employees) _Member(employee)])
     ..sort(_byRoleThenBranch);
 
-  _todayWorking.clear();
-  try {
-    for (final row in await attendance) {
-      final at = row.date;
-      final today =
-          at.year == now.year && at.month == now.month && at.day == now.day;
-      // 퇴근을 찍었으면 지금은 자리에 없다
-      if (today && row.checkOut == null) _todayWorking.add(row.employeeId);
-    }
-  } catch (_) {
-    // 근태를 못 받으면 자동 상태인 사람이 전부 '퇴근'으로 보인다
-  }
-
   _staffLoaded = true;
+}
+
+/// 서버가 돌려준 사람으로 명단의 그 자리를 갈아끼운다
+///
+/// 명단(`_members`)과 디렉터리(`StaffDirectory`) 둘 다 고친다 — 디렉터리는
+/// 다른 화면(멘션·참석자)도 보는 곳이라 어긋나면 안 된다.
+/// 지점·권한이 바뀌면 정렬 자리도 달라지므로 다시 세운다.
+void _replaceMember(Employee saved) {
+  final index = _members.indexWhere((m) => m.id == saved.id);
+  if (index >= 0) {
+    _members[index] = _Member(saved);
+    _members.sort(_byRoleThenBranch);
+  }
+  final directory = StaffDirectory.instance;
+  final at = directory.employees.indexWhere((e) => e.id == saved.id);
+  if (at >= 0) directory.employees = [...directory.employees]..[at] = saved;
 }
 
 /// 명단 정렬 — **권한이 먼저, 그다음 지점**
@@ -184,17 +196,30 @@ int _byRoleThenBranch(_Member a, _Member b) {
 }
 
 /// 지점 필터 목록 — 맨 앞은 모든 지점을 함께 보는 '전체'
+///
+/// **본사(HQ)는 세우지 않는다.** 지점이 아니라 전사라서 고를 대상이 아니다.
+/// 거기 소속인 MASTER·ADMIN 은 어느 지점을 골라도 보인다 ([_inBranch]).
 const _allBranches = '전체';
 
 List<String> get _branches {
   final directory = StaffDirectory.instance;
-  final sorted = [...directory.branches]
+  final sorted = [...directory.branches.where((b) => !b.isHq)]
     ..sort(
       (a, b) =>
           directory.branchRank(a.id).compareTo(directory.branchRank(b.id)),
     );
   return [_allBranches, for (final branch in sorted) branch.name];
 }
+
+/// 이 사람이 고른 지점에 드는가
+///
+/// **MASTER·ADMIN 은 전 지점 소속이라 늘 든다.** 한 지점을 맡는 게 아니라
+/// 전사를 보는 자리라, 화순을 골라도 첨단을 골라도 명단에 있어야 한다.
+bool _inBranch(_Member member, String branch) =>
+    branch == _allBranches ||
+    member.permission == Role.master ||
+    member.permission == Role.admin ||
+    member.branch == branch;
 
 /// 필터에 쓸 직급 목록 — 서버 `Rank` 를 그대로 쓴다
 ///

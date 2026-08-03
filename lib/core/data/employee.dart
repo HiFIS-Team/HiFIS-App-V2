@@ -1,6 +1,7 @@
 import 'dart:ui' show Color;
 
 import '../api/api_client.dart' show apiBaseUrl;
+import 'attendance_status.dart';
 
 /// 권한 — 서버 `Role` 과 같은 값. MASTER > ADMIN > MANAGER > MEMBER
 ///
@@ -127,7 +128,9 @@ class Employee {
     this.workStatus = WorkStatus.auto,
     this.status = EmployeeStatus.active,
     this.joinedAt,
+    this.resignedAt,
     this.lastActiveAt,
+    this.todayStatus,
     this.shiftStart,
     this.shiftEnd,
     this.workDays = const [],
@@ -149,7 +152,11 @@ class Employee {
     workStatus: WorkStatus.parse(json['workStatus'] as String?),
     status: EmployeeStatus.parse(json['status'] as String?),
     joinedAt: _date(json['joinedAt']),
+    resignedAt: _date(json['resignedAt']),
     lastActiveAt: _date(json['lastActiveAt']),
+    todayStatus: AttendanceStatus.parseOrNull(
+      json['todayAttendanceStatus'] as String?,
+    ),
     workDays: [
       for (final day in (json['workDays'] as List<dynamic>? ?? const []))
         day as int,
@@ -189,8 +196,23 @@ class Employee {
   /// 입사일 — 근속 계산에 쓴다
   final DateTime? joinedAt;
 
+  /// 퇴사한 시각 — [status] 가 `RESIGNED` 일 때만 값이 있다
+  ///
+  /// 복직시키면(다시 `ACTIVE`) 서버가 지운다.
+  final DateTime? resignedAt;
+
   /// 마지막으로 앱을 쓴 시각. **출근 여부가 아니다**
   final DateTime? lastActiveAt;
+
+  /// 오늘 근태 판정 — **null 이면 '출근 전'**
+  ///
+  /// 서버가 목록에 얹어 준다 (`todayAttendanceStatus`). 근태 화면·홈과 같은
+  /// 기준이라 앱이 따로 계산하지 않는다.
+  ///
+  /// 예전에는 `GET /attendance?month=` 을 받아 앱이 직접 갈랐는데,
+  /// 서버가 권한 가드를 걸면서 **MEMBER 는 본인 것만** 오게 됐다
+  /// (backend-gap.md 59·60번). 그 길로는 남이 근무 중인지 알 수 없다.
+  final AttendanceStatus? todayStatus;
 
   /// 바로 불러 쓸 수 있는 프로필 사진 주소 — 없으면 null
   String? get avatarImageUrl {

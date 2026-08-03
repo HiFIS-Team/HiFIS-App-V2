@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../core/api/attendance_api.dart';
+import '../../core/api/invite_key_api.dart';
 import '../../core/api/staff_api.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
@@ -13,6 +14,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
+import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/avatar.dart';
@@ -24,6 +26,7 @@ import '../../core/widgets/placeholder_screen.dart';
 import '../../core/widgets/pressable.dart';
 import '../messages/chat_screen.dart';
 
+part 'staff_manage.dart';
 part 'staff_models.dart';
 
 /// 직원 화면
@@ -35,8 +38,11 @@ part 'staff_models.dart';
 /// 사람은 직급으로 나눈다 — 누구를 찾을 때 먼저 떠올리는 기준이다.
 /// 시스템 권한(MASTER·ADMIN·MEMBER)은 찾는 기준이 아니라서 배지로만 붙인다.
 ///
-/// 명단은 `/employees`, 지점 이름은 `/branches`, 지금 나와 있는 사람은
-/// `/attendance?month=` 한 번으로 채운다 ([_loadStaff]).
+/// 명단은 `/employees`, 지점 이름은 `/branches` 로 채운다 ([_loadStaff]).
+/// 지금 나와 있는 사람은 명단에 같이 실려 온다 (`todayAttendanceStatus`).
+///
+/// 지점 필터에 **본사(HQ)는 세우지 않는다** — 지점이 아니라 전사다.
+/// MASTER·ADMIN 은 전 지점 소속이라 어느 지점을 골라도 명단에 있다.
 class StaffScreen extends StatefulWidget {
   StaffScreen({super.key});
 
@@ -77,11 +83,8 @@ class _StaffScreenState extends State<StaffScreen> {
   _Employment get _employment => _Employment.values[_tab];
 
   /// 지점 + 재직 상태까지만 걸러낸 명단 (직급 칩 인원 수의 기준)
-  bool _inBranch(_Member member) =>
-      _branch == _allBranches || member.branch == _branch;
-
   List<_Member> get _scoped => _members
-      .where((m) => _inBranch(m) && m.employment == _employment)
+      .where((m) => _inBranch(m, _branch) && m.employment == _employment)
       .toList();
 
   List<_Member> get _visible {
@@ -96,8 +99,15 @@ class _StaffScreenState extends State<StaffScreen> {
     }).toList();
   }
 
-  void _open(_Member member) {
-    showFullPage<void>(context, (_) => _MemberDetail(member: member));
+  Future<void> _open(_Member member) async {
+    await showFullPage<void>(context, (_) => _MemberDetail(member: member));
+    // 상세에서 인사 정보를 바꿨을 수 있다 — 명단은 `_replaceMember` 가 이미
+    // 갈아끼웠으므로 다시 그리기만 하면 된다
+    if (mounted) setState(() {});
+  }
+
+  void _openInvites() {
+    showFullPage<void>(context, (_) => _InviteKeyScreen());
   }
 
   /// 잠가 둔 계정을 다시 연다
@@ -143,20 +153,11 @@ class _StaffScreenState extends State<StaffScreen> {
     try {
       final saved = await StaffApi.updateEmployee(member.id, status: status);
       if (!mounted) return;
-      setState(() => _replace(saved));
+      setState(() => _replaceMember(saved));
       AppToast.show(context, done);
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
     }
-  }
-
-  /// 서버가 돌려준 사람으로 명단의 그 자리를 갈아끼운다
-  void _replace(Employee saved) {
-    final index = _members.indexWhere((m) => m.id == saved.id);
-    if (index >= 0) _members[index] = _Member(saved);
-    final directory = StaffDirectory.instance;
-    final at = directory.employees.indexWhere((e) => e.id == saved.id);
-    if (at >= 0) directory.employees = [...directory.employees]..[at] = saved;
   }
 
   /// 1:1 사내톡 — 상대 이름으로 대화방을 연다
@@ -258,13 +259,23 @@ class _StaffScreenState extends State<StaffScreen> {
             DesktopHeader(
               title: '직원',
               subtitle: '지점 구성원을 찾아보고 바로 연락해요',
-              // 지점은 한 번에 한 곳만 보므로 목록에서 골라 바꾼다
-              trailing: _BranchPicker(
-                selected: _branch,
-                onSelect: (branch) => setState(() {
-                  _branch = branch;
-                  _rank = _allRanks;
-                }),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 신규 입사자의 지점·직급은 초대키가 정한다 (staff_manage.dart)
+                  if (_canManageStaff) ...[
+                    _InviteButton(onTap: _openInvites),
+                    SizedBox(width: 8),
+                  ],
+                  // 지점은 한 번에 한 곳만 보므로 목록에서 골라 바꾼다
+                  _BranchPicker(
+                    selected: _branch,
+                    onSelect: (branch) => setState(() {
+                      _branch = branch;
+                      _rank = _allRanks;
+                    }),
+                  ),
+                ],
               ),
             ),
             SizedBox(height: 22),
@@ -280,7 +291,7 @@ class _StaffScreenState extends State<StaffScreen> {
                   child: SegmentedTabs(
                     labels: [
                       for (final e in _Employment.values)
-                        '${e.label} ${_members.where((m) => _inBranch(m) && m.employment == e).length}',
+                        '${e.label} ${_members.where((m) => _inBranch(m, _branch) && m.employment == e).length}',
                     ],
                     selected: _tab,
                     onSelect: (i) => setState(() {
@@ -346,9 +357,7 @@ class _MyCard extends StatelessWidget {
     final mine = _meOrSelf;
     // '전체'를 보고 있으면 전사를 센다 — 지점을 고르면 그 지점만
     final here = _members
-        .where(
-          (m) => m.active && (branch == _allBranches || m.branch == branch),
-        )
+        .where((m) => m.active && _inBranch(m, branch))
         .toList();
     final ranks = {for (final m in here) m.rank}.length;
     final working = here.where((m) => m.status.present).length;
@@ -425,7 +434,7 @@ class _MyCard extends StatelessWidget {
 
   /// '강남점 · 대표' — 모르는 값은 빼고 잇는다
   String _subtitle(_Member member) =>
-      [member.branch, member.role].where((s) => s.isNotEmpty).join(' · ');
+      [member.branchLabel, member.role].where((s) => s.isNotEmpty).join(' · ');
 
   Widget _count(String label, int value, {Color? color}) => SizedBox(
     width: 74,
@@ -526,7 +535,7 @@ class _BranchPicker extends StatelessWidget {
                 ),
                 Spacer(),
                 Text(
-                  '${_members.where((m) => (branch == _allBranches || m.branch == branch) && m.active).length}명',
+                  '${_members.where((m) => _inBranch(m, branch) && m.active).length}명',
                   style: AppTextStyles.caption.copyWith(fontSize: 12),
                 ),
               ],
@@ -907,7 +916,7 @@ class _MemberCardState extends State<_MemberCard> {
                         SizedBox(height: 2),
                         Text(
                           widget.showBranch
-                              ? '${member.branch} · ${member.role}'
+                              ? '${member.branchLabel} · ${member.role}'
                               : member.role,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -1014,7 +1023,7 @@ class _MemberRowState extends State<_MemberRow> {
                 width: widget.showBranch ? 148 : 96,
                 child: Text(
                   widget.showBranch
-                      ? '${member.branch} · ${member.role}'
+                      ? '${member.branchLabel} · ${member.role}'
                       : member.role,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -1221,11 +1230,16 @@ class _StatusLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 퇴사일·비활성 처리일을 서버가 안 준다 (backend-gap.md 58번) —
-    // 언제인지는 못 적고 상태만 보여준다
     if (member.employment == _Employment.left) {
-      return _line(AppColors.gray400, '퇴사', '기록은 남아 있어요');
+      final at = member.resigned;
+      // 서버가 퇴사일을 주기 전에 나간 사람은 날짜가 비어 있다
+      return _line(
+        AppColors.gray400,
+        '퇴사',
+        at == null ? '기록은 남아 있어요' : '${_date(at)}에 나갔어요',
+      );
     }
+    // 비활성으로 바꾼 날짜는 서버가 안 준다 (backend-gap.md 58번)
     if (member.employment == _Employment.inactive) {
       return _line(AppColors.warning, '비활성', '계정이 잠겨 있어요');
     }
@@ -1324,7 +1338,10 @@ class _MemberDetailState extends State<_MemberDetail> {
   _MonthSummary? _month;
   bool _loading = false;
 
-  _Member get member => widget.member;
+  /// 인사 정보를 바꿨으면 갈아끼운 사람 — 닫을 때 명단으로 돌려준다
+  _Member? _edited;
+
+  _Member get member => _edited ?? widget.member;
 
   /// 남의 근태를 볼 수 있는지
   ///
@@ -1362,6 +1379,18 @@ class _MemberDetailState extends State<_MemberDetail> {
   void _copy(BuildContext context, String label, String value) {
     Clipboard.setData(ClipboardData(text: value));
     AppToast.show(context, '$label을 복사했어요');
+  }
+
+  /// 지점·직급·권한 바꾸기 (MASTER·ADMIN 만)
+  Future<void> _manage() async {
+    final saved = await showFullPage<Employee>(
+      context,
+      (_) => _ManageSheet(member: member),
+    );
+    if (saved == null || !mounted) return;
+    _replaceMember(saved);
+    setState(() => _edited = _Member(saved));
+    AppToast.show(context, '${saved.name}님의 인사 정보를 바꿨어요');
   }
 
   @override
@@ -1418,13 +1447,17 @@ class _MemberDetailState extends State<_MemberDetail> {
           SizedBox(height: 12),
           _InfoCard(
             title: '기본 정보',
+            // 지점·직급·권한은 남이 정해 주는 값이라 여기서 바꾼다
+            // (본인이 바꾸는 이름·전화번호는 프로필 화면이다)
+            action: _canManage(member) ? ('인사 정보 변경', _manage) : null,
             rows: [
               ('사번', member.code),
-              ('지점', member.branch),
+              ('지점', member.branchLabel),
               ('직급', member.role),
               ('권한', member.permission.label),
               ('상태', member.employment.label),
               if (member.joined case final at?) ('입사일', _date(at)),
+              if (member.resigned case final at?) ('퇴사일', _date(at)),
               if (member.active && member.joined != null) ('근속', member.career),
               // 서버가 전화번호를 안 채워 주는 사람이 많다 (backend-gap.md 2·46번)
               ('전화번호', member.phone.isEmpty ? '없음' : member.phone),
@@ -1540,10 +1573,13 @@ class _ActionButton extends StatelessWidget {
 }
 
 class _InfoCard extends StatelessWidget {
-  _InfoCard({required this.title, required this.rows});
+  _InfoCard({required this.title, required this.rows, this.action});
 
   final String title;
   final List<(String, String)> rows;
+
+  /// 머리말 오른쪽에 붙는 글자 버튼 — (이름, 누르면 할 일)
+  final (String, VoidCallback)? action;
 
   @override
   Widget build(BuildContext context) {
@@ -1553,7 +1589,28 @@ class _InfoCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: AppTextStyles.label),
+          Row(
+            children: [
+              Text(title, style: AppTextStyles.label),
+              if (action case (final label, final onTap)) ...[
+                Spacer(),
+                Pressable(
+                  onTap: onTap,
+                  scale: 0.96,
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    child: Text(
+                      label,
+                      style: AppTextStyles.caption.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
           SizedBox(height: 6),
           for (final (label, value) in rows)
             Padding(

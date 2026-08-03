@@ -1,5 +1,10 @@
+import '../data/attendance_status.dart';
 import '../data/employee.dart';
 import 'api_client.dart';
+
+// 근태 판정은 직원 명단(`Employee.todayStatus`)도 쓴다 — 서로 import 하지
+// 않도록 `data/attendance_status.dart` 로 빼 두고 여기서 다시 내보낸다.
+export '../data/attendance_status.dart';
 
 /// 휴가 종류 — 서버 `LeaveType`
 ///
@@ -42,33 +47,6 @@ enum HalfPeriod {
           (p) => p.wire == value,
           orElse: () => HalfPeriod.am,
         );
-}
-
-/// 하루 근태 판정 — 서버 `AttendanceStatus`
-///
-/// 기록이 없는 날(결근·휴무)까지 서버가 판정해 준다. 급여·평가가 같은 기준을
-/// 쓰므로 앱이 따로 계산하지 않는다.
-enum AttendanceStatus {
-  normal('NORMAL'),
-  late('LATE'),
-  earlyLeave('EARLY_LEAVE'),
-  lateAndEarly('LATE_AND_EARLY'),
-  inProgress('IN_PROGRESS'),
-  noCheckout('NO_CHECKOUT'),
-  absent('ABSENT'),
-  onLeave('ON_LEAVE'),
-  dayOff('DAY_OFF'),
-  unknown('UNKNOWN');
-
-  const AttendanceStatus(this.wire);
-
-  final String wire;
-
-  static AttendanceStatus parse(String? value) =>
-      AttendanceStatus.values.firstWhere(
-        (s) => s.wire == value,
-        orElse: () => AttendanceStatus.unknown,
-      );
 }
 
 /// 캘린더 하루 (서버 `AttendanceDayOut`)
