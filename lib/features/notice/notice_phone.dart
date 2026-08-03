@@ -29,7 +29,7 @@ class _NoticePhone extends StatelessWidget {
     bool editing = false,
   }) async {
     // 열어보면 읽은 것으로 표시한다
-    notice.readers.add(me);
+    _markRead(notice);
     onChanged();
     final result = await Navigator.push<String>(
       context,
@@ -39,22 +39,26 @@ class _NoticePhone extends StatelessWidget {
     );
     if (!context.mounted) return;
     if (result == 'delete') {
-      _notices.remove(notice);
-      AppToast.show(context, '공지를 삭제했어요');
-    } else if (notice.title.isEmpty && notice.body.trim().isEmpty) {
-      // 아무것도 안 적고 나온 새 공지는 목록에 남기지 않는다
+      try {
+        await _deleteNotice(notice);
+        if (context.mounted) AppToast.show(context, '공지를 삭제했어요');
+      } catch (error) {
+        if (context.mounted) AppToast.show(context, messageOf(error));
+      }
+    } else if (notice.id == null) {
+      // 아무것도 안 적어서 서버에 못 올라간 새 공지는 목록에 남기지 않는다
       _notices.remove(notice);
     }
     onChanged();
   }
 
+  /// 빈 글로 시작한다 — 서버에는 편집을 마칠 때 올린다
   Future<void> _create(BuildContext context) async {
-    final now = DateTime.now();
     final notice = _Notice(
       title: '',
       body: '',
       author: me,
-      date: DateTime(now.year, now.month, now.day),
+      date: DateTime.now(),
       readers: {me},
     );
     _notices.add(notice);
@@ -191,8 +195,30 @@ class _NoticePage extends StatefulWidget {
 class _NoticePageState extends State<_NoticePage> {
   late bool _editing = widget.editing;
 
+  /// 편집을 마치면 서버에 올린다 — 실패하면 적던 내용을 지키려고 편집으로 되돌린다
+  Future<void> _toggleEdit() async {
+    if (!_editing) return setState(() => _editing = true);
+
+    final isNew = widget.notice.id == null;
+    setState(() => _editing = false);
+    try {
+      await _saveNotice(widget.notice);
+      if (!mounted) return;
+      setState(() {});
+      if (isNew && widget.notice.id != null) {
+        AppToast.show(context, '공지를 올렸어요');
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _editing = true);
+      AppToast.show(context, messageOf(error));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final canEdit = _canEdit(widget.notice);
+
     return PhoneDetailScaffold(
       title: '공지',
       // 편집·삭제는 헤더 글래스 버튼으로 올린다
@@ -203,20 +229,21 @@ class _NoticePageState extends State<_NoticePage> {
             symbolColor: AppColors.error,
             onPressed: () => Navigator.pop(context, 'delete'),
           ),
-        GlassIconButton(
-          // 심볼이 바뀌어도 네이티브 버튼을 새로 만들지 않게 고정 식별자를 준다
-          stableId: 'edit',
-          symbol: _editing ? 'checkmark' : 'square.and.pencil',
-          symbolColor: _editing ? AppColors.primary : null,
-          onPressed: () => setState(() => _editing = !_editing),
-        ),
+        if (canEdit)
+          GlassIconButton(
+            // 심볼이 바뀌어도 네이티브 버튼을 새로 만들지 않게 고정 식별자를 준다
+            stableId: 'edit',
+            symbol: _editing ? 'checkmark' : 'square.and.pencil',
+            symbolColor: _editing ? AppColors.primary : null,
+            onPressed: _toggleEdit,
+          ),
       ],
       child: _NoticeView(
         notice: widget.notice,
         editing: _editing,
         onChanged: () => setState(() {}),
         onDelete: () => Navigator.pop(context, 'delete'),
-        onToggleEdit: () => setState(() => _editing = !_editing),
+        onToggleEdit: _toggleEdit,
         phone: true,
       ),
     );

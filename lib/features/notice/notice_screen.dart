@@ -1,7 +1,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/api/api_exception.dart';
+import '../../core/api/notice_api.dart';
 import '../../core/data/staff.dart';
+import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -41,12 +44,25 @@ class _NoticeScreenState extends State<NoticeScreen> {
   /// 새로 쓴 공지는 바로 편집 모드로 연다
   bool _startEditing = false;
 
+  /// 첫 진입에만 스피너를 돌린다 — 탭을 다시 열 때는 받아둔 목록을 바로 그린다
+  bool _loading = !_noticesLoaded;
+
   @override
   void initState() {
     super.initState();
     // 홈에서 넘어오며 걸어둔 요청은 첫 빌드 전에 반영한다 (setState 필요 없음)
     _consumeRequest();
     requestedNotice.addListener(_onRequest);
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      await _loadNotices();
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+    if (mounted) setState(() => _loading = false);
   }
 
   @override
@@ -67,7 +83,7 @@ class _NoticeScreenState extends State<NoticeScreen> {
     requestedNotice.value = null;
     final notice = brief._notice;
     // 홈에서 열었으니 읽음 처리도 같이 한다
-    notice.readers.add(me);
+    _markRead(notice);
     _unreadOnly = false;
     _startEditing = false;
     _selected = notice;
@@ -97,17 +113,17 @@ class _NoticeScreenState extends State<NoticeScreen> {
     setState(() {
       _selected = notice;
       _startEditing = false;
-      notice.readers.add(me);
+      _markRead(notice);
     });
   }
 
+  /// 빈 글로 시작한다 — 서버에는 편집을 마칠 때 올린다
   void _create() {
-    final now = DateTime.now();
     final notice = _Notice(
       title: '',
       body: '',
       author: me,
-      date: DateTime(now.year, now.month, now.day),
+      date: DateTime.now(),
       readers: {me},
     );
     setState(() {
@@ -118,16 +134,56 @@ class _NoticeScreenState extends State<NoticeScreen> {
     });
   }
 
-  void _delete(_Notice notice) {
-    setState(() {
-      _notices.remove(notice);
-      _selected = null;
-    });
-    AppToast.show(context, '공지를 삭제했어요');
+  /// 편집을 마쳤다 — 여기서 서버에 올리거나 고친다
+  Future<void> _finishEditing(_Notice notice) async {
+    setState(() => _startEditing = false);
+    final isNew = notice.id == null;
+    try {
+      await _saveNotice(notice);
+      if (!mounted) return;
+      // 아무것도 안 적고 끝낸 새 글은 목록에 남기지 않는다
+      if (notice.id == null) {
+        setState(() {
+          _notices.remove(notice);
+          _selected = null;
+        });
+        return;
+      }
+      setState(() {});
+      if (isNew) AppToast.show(context, '공지를 올렸어요');
+    } catch (error) {
+      if (!mounted) return;
+      // 실패하면 적던 내용을 지키기 위해 편집 상태로 되돌린다
+      setState(() => _startEditing = true);
+      AppToast.show(context, messageOf(error));
+    }
+  }
+
+  Future<void> _delete(_Notice notice) async {
+    try {
+      await _deleteNotice(notice);
+      if (!mounted) return;
+      setState(() => _selected = null);
+      AppToast.show(context, '공지를 삭제했어요');
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return Scaffold(
+        backgroundColor: isDesktop ? null : AppColors.background,
+        body: Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2.4,
+            valueColor: AlwaysStoppedAnimation(AppColors.primary),
+          ),
+        ),
+      );
+    }
+
     final list = _visible;
     final unread = _notices.where((n) => !n.readers.contains(me)).length;
 
@@ -145,7 +201,7 @@ class _NoticeScreenState extends State<NoticeScreen> {
     // 목록을 처음 그릴 때 자동으로 고른 공지도 읽음 처리한다
     if (selected != null && !selected.readers.contains(me)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => selected.readers.add(me));
+        if (mounted) setState(() => _markRead(selected));
       });
     }
 
@@ -181,8 +237,9 @@ class _NoticeScreenState extends State<NoticeScreen> {
                     editing: _startEditing,
                     onChanged: () => setState(() {}),
                     onDelete: () => _delete(selected),
-                    onToggleEdit: () =>
-                        setState(() => _startEditing = !_startEditing),
+                    onToggleEdit: () => _startEditing
+                        ? _finishEditing(selected)
+                        : setState(() => _startEditing = true),
                   ),
           ),
         ],
@@ -580,6 +637,12 @@ class _NoticeViewState extends State<_NoticeView> {
     final actions = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (!_canEdit(notice))
+          // 권한이 없으면 버튼을 감추되, 왜 없는지는 알려 준다
+          Text(
+            '관리자·점장만 고칠 수 있어요',
+            style: AppTextStyles.caption.copyWith(color: AppColors.gray400),
+          ),
         if (_editing) ...[
           Pressable(
             onTap: widget.onDelete,
@@ -598,36 +661,37 @@ class _NoticeViewState extends State<_NoticeView> {
           ),
           SizedBox(width: 6),
         ],
-        Pressable(
-          onTap: _toggleEdit,
-          scale: 0.95,
-          child: Container(
-            padding: EdgeInsets.fromLTRB(12, 8, 14, 8),
-            decoration: BoxDecoration(
-              color: _editing ? AppColors.primary : AppColors.gray50,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  _editing ? Icons.check_rounded : Icons.edit_rounded,
-                  size: 15,
-                  color: _editing ? Colors.white : AppColors.textSecondary,
-                ),
-                SizedBox(width: 4),
-                Text(
-                  _editing ? '완료' : '편집',
-                  style: AppTextStyles.body2.copyWith(
-                    fontSize: 14,
+        if (_canEdit(notice))
+          Pressable(
+            onTap: _toggleEdit,
+            scale: 0.95,
+            child: Container(
+              padding: EdgeInsets.fromLTRB(12, 8, 14, 8),
+              decoration: BoxDecoration(
+                color: _editing ? AppColors.primary : AppColors.gray50,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _editing ? Icons.check_rounded : Icons.edit_rounded,
+                    size: 15,
                     color: _editing ? Colors.white : AppColors.textSecondary,
-                    fontWeight: FontWeight.w700,
                   ),
-                ),
-              ],
+                  SizedBox(width: 4),
+                  Text(
+                    _editing ? '완료' : '편집',
+                    style: AppTextStyles.body2.copyWith(
+                      fontSize: 14,
+                      color: _editing ? Colors.white : AppColors.textSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
       ],
     );
 
@@ -896,8 +960,13 @@ class _Notice {
     required this.author,
     required this.date,
     required this.readers,
+    this.id,
     this.pinned = false,
   });
+
+  /// 서버가 준 uuid — **null 이면 아직 안 올린 새 글이다.**
+  /// '공지 작성'을 누르면 빈 글로 시작해서, 편집을 마칠 때 서버에 올린다.
+  String? id;
 
   String title;
   String body;
@@ -925,79 +994,97 @@ class _Notice {
   }
 }
 
-/// 올라온 공지 (목업). 탭을 오가도 유지되도록 모듈 전역으로 둔다.
-final _notices = <_Notice>[..._seed()];
+/// 올라온 공지 — 서버에서 받아 온다.
+/// 탭을 오가도 다시 받지 않도록 모듈 전역으로 둔다.
+final _notices = <_Notice>[];
 
-List<_Notice> _seed() {
-  final now = DateTime.now();
-  DateTime day(int offset) => DateTime(now.year, now.month, now.day + offset);
+/// 한 번이라도 받아왔는지 — 탭을 다시 열 때 빈 목록을 깜빡이지 않게 한다
+bool _noticesLoaded = false;
 
-  return [
-    _Notice(
-      title: '여름 이벤트 기간 근무 안내',
-      author: '민중기',
-      date: day(0),
-      pinned: true,
-      readers: {'민중기', '이준승', '박준현'},
-      body: '''
-## 기간
-7월 28일 ~ 8월 31일
+/// 이 앱을 켠 뒤로 내가 열어 본 공지
+///
+/// **서버에 읽음 상태가 없어서**(backend-gap.md 35번) 앱이 대신 들고 있다.
+/// 목록을 다시 받아도 유지되도록 [_notices] 바깥에 따로 둔다.
+/// 앱을 껐다 켜면 지워지고, 다른 기기와도 공유되지 않는다.
+final _readNoticeIds = <String>{};
 
-## 안내
-- 이벤트 기간 동안 **오전 6시 오픈**으로 30분 앞당깁니다
-- 주말 마감은 기존과 동일하게 22시입니다
-- 상담 문의가 늘 수 있으니 데스크 응대를 우선해주세요
-
-> 근무표 변경이 필요하면 전자결재로 근무 변경 신청을 올려주세요
-
-## 체크
-- [ ] 오픈 시간 변경 확인
-- [ ] 담당 구역 이벤트 안내물 부착
-''',
-    ),
-    _Notice(
-      title: '기구 정기 점검 일정',
-      author: '박준현',
-      date: day(-1),
-      readers: {'박준현', me},
-      body: '''
-8월 2일 오전 9시부터 12시까지 헬스장 기구 정기 점검이 있습니다.
-
-- 점검 중에는 러닝머신 3~5번 사용이 어렵습니다
-- 회원님께는 데스크에서 미리 안내 부탁드립니다
-- 점검 완료 후 이상 있는 기구는 바로 공유해주세요
-''',
-    ),
-    _Notice(
-      title: '8월 급여 지급일 안내',
-      author: '이준승',
-      date: day(-3),
-      readers: {'이준승', '민중기'},
-      body: '''
-8월 급여는 **8월 10일(월)** 지급 예정입니다.
-
-- 지급일이 주말인 경우 앞당겨 지급합니다
-- 급여 명세는 앱 급여 탭에서 확인할 수 있습니다
-- 문의는 대표에게 개별 메시지 주세요
-''',
-    ),
-    _Notice(
-      title: '탈의실 이용 안내 재공지',
-      author: '전상현',
-      date: day(-6),
-      readers: {'전상현', '민중기', '유찬빈', '이준승', '박준현', me},
-      body: '''
-탈의실 사용 관련 회원 문의가 반복되어 다시 안내드립니다.
-
-1. 사용한 수건은 반드시 수거함에 넣도록 안내
-2. 락커 장기 미사용 시 정리 안내 문자 발송
-3. 샤워부스 청소는 마감 담당자가 확인
-
-> 반복 문의 건은 회원 친절도 컴플레인으로 올라올 수 있으니 미리 챙겨주세요
-''',
-    ),
-  ];
+Future<void> _loadNotices() async {
+  final rows = await NoticeApi.list();
+  _notices
+    ..clear()
+    ..addAll([for (final row in rows) _fromServer(row)]);
+  _noticesLoaded = true;
 }
+
+/// 서버 공지 → 화면 모델
+///
+/// 서버는 작성자를 uuid 로 주는데 화면은 이름으로 아바타·직급을 찾는다.
+/// 명단에 없으면(퇴사자 등) uuid 대신 빈 이름을 두어 아바타만 회색으로 뜬다.
+_Notice _fromServer(Notice row) {
+  final author = StaffDirectory.instance.byId(row.authorId);
+  return _Notice(
+    id: row.id,
+    title: row.title,
+    body: row.body,
+    author: author?.name ?? '',
+    date: row.createdAt,
+    pinned: row.pinned,
+    readers: {if (_readNoticeIds.contains(row.id)) me},
+  );
+}
+
+/// 편집을 마쳤을 때 — 새 글이면 올리고, 있던 글이면 고친다
+///
+/// 제목·본문이 모두 비었으면 아무것도 안 한다. 빈 글로 시작하는 구조라
+/// 작성을 눌렀다가 그냥 나가는 일이 흔한데, 그때마다 서버에 빈 공지가 쌓인다.
+Future<void> _saveNotice(_Notice notice) async {
+  if (notice.title.trim().isEmpty && notice.body.trim().isEmpty) return;
+
+  final id = notice.id;
+  if (id == null) {
+    final created = await NoticeApi.create(
+      title: notice.title,
+      body: notice.body,
+      pinned: notice.pinned,
+    );
+    notice.id = created.id;
+    _readNoticeIds.add(created.id);
+    notice.readers.add(me);
+    return;
+  }
+
+  await NoticeApi.update(
+    id,
+    title: notice.title,
+    body: notice.body,
+    pinned: notice.pinned,
+  );
+}
+
+/// 지우기 — 아직 안 올린 새 글은 서버를 부르지 않는다
+Future<void> _deleteNotice(_Notice notice) async {
+  final id = notice.id;
+  if (id != null) await NoticeApi.delete(id);
+  _notices.remove(notice);
+  _readNoticeIds.remove(id);
+}
+
+/// 열어 봤다고 표시 — 이 기기에서만 기억한다
+void _markRead(_Notice notice) {
+  notice.readers.add(me);
+  final id = notice.id;
+  if (id != null) _readNoticeIds.add(id);
+}
+
+/// 이 공지를 고치거나 지울 수 있는가
+///
+/// 서버가 `require_role(ADMIN, MANAGER)` 로 막는다 (MASTER 는 자동 포함).
+/// **작성은 전 직원이 되는데 수정·삭제는 안 된다** — 본인이 쓴 글도 마찬가지다
+/// (backend-gap.md 36번). 앱도 같은 기준으로 버튼을 감춘다.
+///
+/// 아직 안 올린 새 글([_Notice.id]가 null)은 예외다. 작성 자체는 누구나
+/// 되는데 여기서 막으면 쓰다 말고 저장도 못 하는 상태가 된다.
+bool _canEdit(_Notice notice) => notice.id == null || myRole.strong;
 
 // ── 표시용 계산 ──
 
