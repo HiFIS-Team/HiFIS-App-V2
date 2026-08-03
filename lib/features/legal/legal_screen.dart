@@ -14,13 +14,22 @@ import '../../core/widgets/pressable.dart';
 /// 원문은 `assets/legal/*.md` 하나뿐이다. 웹에 올릴 공개 페이지도 같은 파일을
 /// 쓰므로 사본을 만들지 않는다 — 두 벌이 되면 반드시 한쪽만 고쳐진다.
 enum LegalDocument {
-  terms('이용약관', 'assets/legal/terms.md'),
-  privacy('개인정보처리방침', 'assets/legal/privacy.md');
+  terms('이용약관', 'assets/legal/terms.md', 'TERMS', '2026-08-01'),
+  privacy('개인정보처리방침', 'assets/legal/privacy.md', 'PRIVACY', '2026-08-01');
 
-  const LegalDocument(this.title, this.asset);
+  const LegalDocument(this.title, this.asset, this.wire, this.version);
 
   final String title;
   final String asset;
+
+  /// 서버 `docType` (`POST /employees/me/consents`)
+  final String wire;
+
+  /// 동의 이력에 남길 문서 버전 — **md 파일 첫머리의 `시행일` 과 같아야 한다**
+  ///
+  /// 문서를 고치면 여기도 같이 올린다. 안 올리면 옛 버전에 동의한 것으로
+  /// 남아서, 나중에 재동의를 받아야 할 때 누가 안 봤는지 가릴 수 없다.
+  final String version;
 }
 
 /// 전문 보기 — 폰은 밀려 들어오는 화면, PC는 가운데 모달
