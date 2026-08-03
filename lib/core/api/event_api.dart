@@ -13,11 +13,14 @@ class CalendarEvent {
     required this.title,
     required this.startAt,
     required this.endAt,
+    required this.allDay,
     required this.category,
     required this.scope,
     required this.color,
+    required this.attendeeIds,
     required this.ownerId,
     required this.createdAt,
+    this.place,
     this.memo,
   });
 
@@ -26,9 +29,15 @@ class CalendarEvent {
     title: json['title'] as String,
     startAt: _time(json['startAt'])!,
     endAt: _time(json['endAt'])!,
+    allDay: json['allDay'] as bool? ?? false,
     category: json['category'] as String? ?? '',
     scope: json['scope'] as String? ?? '',
     color: json['color'] as String? ?? '',
+    place: json['place'] as String?,
+    attendeeIds: [
+      for (final id in (json['attendeeIds'] as List<dynamic>? ?? const []))
+        id as String,
+    ],
     memo: json['memo'] as String?,
     ownerId: json['ownerId'] as String,
     createdAt: _time(json['createdAt'])!,
@@ -37,10 +46,11 @@ class CalendarEvent {
   final String id;
   final String title;
 
-  /// 시작·끝 — **종일 여부를 담는 자리가 따로 없다.**
-  /// 앱은 `00:00 ~ 23:59` 를 종일로 본다 (backend-gap.md 39번)
   final DateTime startAt;
   final DateTime endAt;
+
+  /// 종일 일정인지 — 예전에는 `00:00 ~ 23:59` 로 흉내 냈는데 이제 서버가 담는다
+  final bool allDay;
 
   /// 종류 (`회의` `수업` `이벤트` `휴무` `기타`)
   final String category;
@@ -50,6 +60,12 @@ class CalendarEvent {
 
   /// `#RRGGBB`. 앱은 종류에서 색을 뽑아 쓰므로 보낼 때만 채운다
   final String color;
+
+  /// 회의실·GX룸 같은 자리
+  final String? place;
+
+  /// 참석자 uuid — 프로젝트 `assigneeIds` 와 같은 모양이다
+  final List<String> attendeeIds;
 
   final String? memo;
 
@@ -71,8 +87,8 @@ class EventApi {
 
   static final _client = ApiClient.instance;
 
-  /// 시작 시각순. [from]·[to] 는 **시작 시각**을 기준으로 거른다 —
-  /// 걸쳐 있는 일정은 시작일이 범위 밖이면 안 온다
+  /// 시작 시각순. [from]·[to] 는 **겹치는 것**을 다 준다 —
+  /// 7월에 시작해 8월까지 가는 일정도 8월 조회에 잡힌다
   static Future<List<CalendarEvent>> list({
     DateTime? from,
     DateTime? to,
@@ -99,6 +115,9 @@ class EventApi {
     required String category,
     required String scope,
     required String color,
+    bool allDay = false,
+    String? place,
+    List<String> attendeeIds = const [],
     String? memo,
   }) async {
     final data = await _client.post(
@@ -107,9 +126,12 @@ class EventApi {
         'title': title,
         'startAt': startAt.toUtc().toIso8601String(),
         'endAt': endAt.toUtc().toIso8601String(),
+        'allDay': allDay,
         'category': category,
         'scope': scope,
         'color': color,
+        'place': ?place,
+        'attendeeIds': attendeeIds,
         'memo': ?memo,
       },
     );
@@ -122,9 +144,12 @@ class EventApi {
     String? title,
     DateTime? startAt,
     DateTime? endAt,
+    bool? allDay,
     String? category,
     String? scope,
     String? color,
+    String? place,
+    List<String>? attendeeIds,
     String? memo,
   }) async {
     final data = await _client.patch(
@@ -133,9 +158,12 @@ class EventApi {
         'title': ?title,
         'startAt': ?startAt?.toUtc().toIso8601String(),
         'endAt': ?endAt?.toUtc().toIso8601String(),
+        'allDay': ?allDay,
         'category': ?category,
         'scope': ?scope,
         'color': ?color,
+        'place': ?place,
+        'attendeeIds': ?attendeeIds,
         'memo': ?memo,
       },
     );

@@ -4,6 +4,7 @@ import '../../core/api/api_exception.dart';
 import '../../core/api/event_api.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/staff.dart';
+import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
@@ -1249,9 +1250,10 @@ class Event {
   final TimeOfDay? start;
   final TimeOfDay? end;
 
-  /// 장소 · 참석자 — **서버에 담을 자리가 없다** (backend-gap.md 39번).
-  /// 적을 수는 있지만 다시 받아오면 비어 있다
+  /// 장소 (회의실·GX룸 같은 것)
   final String place;
+
+  /// 참석자 **이름** — 서버에는 uuid 로 오간다 (`_idsOf` · `_namesOf`)
   final List<String> members;
 
   final String memo;
@@ -1307,30 +1309,43 @@ Future<void> _loadMonth(DateTime month) async {
 
 /// 서버 일정 → 화면 모델
 ///
-/// 장소·참석자는 서버에 없어서 빈 채로 온다.
-/// 색도 서버 값을 안 쓴다 — 앱은 종류에서 색을 뽑는다
+/// 색은 서버 값을 안 쓴다 — 앱은 종류에서 색을 뽑는다
 Event _fromServer(CalendarEvent row) {
   final start = row.startAt;
   final end = row.endAt;
-  final allDay = _isAllDay(start, end);
   return Event(
     id: row.id,
     ownerId: row.ownerId,
     title: row.title,
     date: DateTime(start.year, start.month, start.day),
     kind: Kind.parse(row.category),
-    start: allDay ? null : TimeOfDay.fromDateTime(start),
-    end: allDay ? null : TimeOfDay.fromDateTime(end),
+    start: row.allDay ? null : TimeOfDay.fromDateTime(start),
+    end: row.allDay ? null : TimeOfDay.fromDateTime(end),
+    place: row.place ?? '',
+    members: _namesOf(row.attendeeIds),
     memo: row.memo ?? '',
   );
 }
 
-/// 종일 판정 — 서버에 종일 표시가 없어서 시각으로 가른다.
-/// 올릴 때 `00:00 ~ 23:59` 로 넣으므로 그 모양이면 종일로 본다
-bool _isAllDay(DateTime start, DateTime end) =>
-    start.hour == 0 && start.minute == 0 && end.hour == 23 && end.minute == 59;
+/// 참석자 uuid → 이름
+///
+/// 폼과 아바타 줄이 아직 이름을 사람 키로 쓴다 (backend-gap.md 10번).
+/// 명단에 없는 사람(퇴사 등)은 뺀다 — 이름을 모르면 아바타를 못 그린다.
+List<String> _namesOf(List<String> ids) => [
+  for (final id in ids) ?StaffDirectory.instance.byId(id)?.name,
+];
+
+/// 이름 → 참석자 uuid
+///
+/// 서버 명단에 없는 이름(목업으로 남은 사람)은 보낼 id 가 없어서 빠진다.
+List<String> _idsOf(List<String> names) => [
+  for (final name in names) ?StaffDirectory.instance.byName(name)?.id,
+];
 
 /// 화면 모델 → 서버가 받는 시작·끝
+///
+/// 종일은 `allDay` 로 따로 보내지만 시각 자체는 여전히 있어야 한다
+/// (서버가 `startAt`·`endAt` 을 필수로 받고, 달력도 그날에 그린다).
 (DateTime, DateTime) _range(Event event) {
   final date = event.date;
   if (event.allDay) {
@@ -1361,9 +1376,12 @@ Future<Event> _createEvent(Event draft) async {
     title: draft.title,
     startAt: startAt,
     endAt: endAt,
+    allDay: draft.allDay,
     category: draft.kind.label,
     scope: _scope,
     color: _hexOf(draft.kind.color),
+    place: draft.place.isEmpty ? null : draft.place,
+    attendeeIds: _idsOf(draft.members),
     memo: draft.memo.isEmpty ? null : draft.memo,
   );
   return _fromServer(created);
@@ -1377,9 +1395,12 @@ Future<Event> _updateEvent(String id, Event edited) async {
     title: edited.title,
     startAt: startAt,
     endAt: endAt,
+    allDay: edited.allDay,
     category: edited.kind.label,
     color: _hexOf(edited.kind.color),
-    // 비운 메모도 넘겨야 지워진다 (안 넘기면 서버가 그대로 둔다)
+    // 비운 장소·메모도 넘겨야 지워진다 (안 넘기면 서버가 그대로 둔다)
+    place: edited.place,
+    attendeeIds: _idsOf(edited.members),
     memo: edited.memo,
   );
   return _fromServer(saved);
