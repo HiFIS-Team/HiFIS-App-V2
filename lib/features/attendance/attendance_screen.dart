@@ -17,6 +17,7 @@ import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/avatar.dart';
 import '../../core/widgets/decide_buttons.dart';
 import '../../core/widgets/desktop_header.dart';
+import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/glass_bottom_button.dart';
 import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/phone_scaffold.dart';

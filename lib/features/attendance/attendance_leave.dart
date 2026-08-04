@@ -19,6 +19,12 @@ class _LeaveBalance extends StatefulWidget {
 }
 
 class _LeaveBalanceState extends State<_LeaveBalance> {
+  /// 결재함이 비었을 때 잡아 두는 높이
+  ///
+  /// 신청 한 건이 들어갔을 때와 같은 값이다 — 신청 줄(아바타·기간·사유 상자)
+  /// 89 + 사이 18 + 버튼 40. 다 처리하고 나면 카드가 줄어들어 옆 카드와 어긋난다.
+  static const _emptyInboxHeight = 147.0;
+
   /// 지금 보고 있는 결재 대기 순번
   int _index = 0;
 
@@ -75,20 +81,15 @@ class _LeaveBalanceState extends State<_LeaveBalance> {
             Text('월차 결재', style: AppTextStyles.label),
             SizedBox(height: 16),
             if (waiting == null)
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(vertical: 22),
-                decoration: BoxDecoration(
-                  color: AppColors.gray50,
-                  borderRadius: BorderRadius.circular(14),
-                ),
+              // 신청이 있을 때와 같은 높이를 잡아 둔다 — 다 처리하고 나면
+              // 카드가 쪼그라들어서 옆 카드와 어긋난다
+              SizedBox(
+                height: _emptyInboxHeight,
                 child: Center(
-                  child: Text(
-                    '들어온 월차 신청이 없어요',
-                    style: AppTextStyles.body2.copyWith(
-                      fontSize: 13,
-                      color: AppColors.textTertiary,
-                    ),
+                  child: EmptyCard(
+                    icon: CupertinoIcons.tray,
+                    text: '들어온 월차 신청이 없어요',
+                    framed: false,
                   ),
                 ),
               )
