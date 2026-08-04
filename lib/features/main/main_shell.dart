@@ -516,8 +516,30 @@ class _ChatDockState extends State<_ChatDock> {
     );
   }
 
+  /// 아이콘 + `사내톡` + 좌우 여백만 있을 때의 폭
+  static const double _pillBase = 94;
+
+  /// 아바타 지름과 겹쳐 놓는 간격
+  static const double _avatarSize = 24;
+  static const double _avatarStep = 16;
+
+  /// 필에 세우는 최근 대화 상대 수 — 넷째부터는 안 그린다
+  static const int _maxPeople = 3;
+
+  int get _peopleCount {
+    final rooms = ChatStore.instance.rooms.length;
+    return rooms < _maxPeople ? rooms : _maxPeople;
+  }
+
   /// 펼친 필의 전체 폭 — 접힘(X 버튼) 폭은 높이와 같은 44
-  static const double _pillWidth = 158;
+  ///
+  /// **대화가 늘 때마다 아바타 하나만큼 늘어난다.** 하나도 없으면 아이콘과
+  /// 글씨만 남아서 제일 좁고, 셋이 차면 158 로 예전 폭과 같아진다.
+  double get _pillWidth {
+    final people = _peopleCount;
+    if (people == 0) return _pillBase;
+    return _pillBase + 8 + _avatarSize + _avatarStep * (people - 1);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -600,15 +622,12 @@ class _ChatDockState extends State<_ChatDock> {
                   height: 42,
                   child: Stack(
                     children: [
-                      // 펼침: 아이콘 + 사내톡 + 아바타 (세로 가운데 정렬)
+                      // 펼침: 아이콘 + 사내톡 + 아바타 (가로·세로 모두 가운데)
                       Positioned.fill(
                         child: AnimatedOpacity(
                           duration: Duration(milliseconds: 150),
                           opacity: _open ? 0 : 1,
-                          child: Padding(
-                            padding: EdgeInsets.fromLTRB(14, 0, 10, 0),
-                            child: _pillContent(),
-                          ),
+                          child: _pillContent(),
                         ),
                       ),
                       // 접힘: X (필의 오른쪽 끝 원 안에 자리한다)
@@ -645,86 +664,93 @@ class _ChatDockState extends State<_ChatDock> {
       chatRoomPeer(room)?.color ?? staffOf(chatRoomTitle(room)).color;
 
   Widget _pillContent() {
-    // 최근 대화 상대 3명 — 목록 맨 위 세 방에서 뽑는다
+    // 최근 대화 상대 — 목록 맨 위에서 [_maxPeople] 개까지만 뽑는다
     final people = [
-      for (final room in ChatStore.instance.rooms.take(3))
+      for (final room in ChatStore.instance.rooms.take(_maxPeople))
         (chatRoomTitle(room).characters.first, _pillColor(room)),
     ];
 
-    return Row(
-      children: [
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Icon(
-              Icons.chat_bubble_outline_rounded,
-              size: 17,
-              color: AppColors.gray700,
-            ),
-            // 안 읽은 방이 있으면 빨간 점 — 알림 종과 같은 규칙
-            if (ChatStore.instance.unreadRooms.value > 0)
-              Positioned(
-                right: -3,
-                top: -2,
-                child: Container(
-                  width: 7,
-                  height: 7,
-                  decoration: BoxDecoration(
-                    color: AppColors.error,
-                    shape: BoxShape.circle,
+    // 폭을 내용에 맞춰 잡으므로 남는 자리 없이 가운데에 선다.
+    // 대화가 없으면 아이콘과 글씨만 남아 저절로 가운데 정렬된다.
+    return Center(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Icon(
+                Icons.chat_bubble_outline_rounded,
+                size: 17,
+                color: AppColors.gray700,
+              ),
+              // 안 읽은 방이 있으면 빨간 점 — 알림 종과 같은 규칙
+              if (ChatStore.instance.unreadRooms.value > 0)
+                Positioned(
+                  right: -3,
+                  top: -2,
+                  child: Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: AppColors.error,
+                      shape: BoxShape.circle,
+                    ),
                   ),
                 ),
-              ),
-          ],
-        ),
-        SizedBox(width: 7),
-        Text(
-          '사내톡',
-          style: AppTextStyles.label.copyWith(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
+            ],
           ),
-        ),
-        Spacer(),
-        // 최근 대화 상대 아바타 겹침 스택 (대화가 없으면 안 그린다 —
-        // 비어 있으면 폭이 음수가 된다)
-        if (people.isEmpty)
-          SizedBox.shrink()
-        else
-          SizedBox(
-            width: 24.0 + 16 * (people.length - 1),
-            height: 24,
-            child: Stack(
-              children: [
-                for (var i = 0; i < people.length; i++)
-                  Positioned(
-                    left: i * 16.0,
-                    child: Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: people[i].$2,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.surface, width: 2),
-                      ),
-                      child: Center(
-                        child: Text(
-                          people[i].$1,
-                          style: TextStyle(
-                            fontFamily: AppTextStyles.fontFamily,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
+          SizedBox(width: 7),
+          Text(
+            '사내톡',
+            style: AppTextStyles.label.copyWith(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          // 최근 대화 상대 아바타 겹침 스택 (대화가 없으면 안 그린다 —
+          // 비어 있으면 폭이 음수가 된다)
+          if (people.isNotEmpty) ...[
+            SizedBox(width: 8),
+            SizedBox(
+              width: _avatarSize + _avatarStep * (people.length - 1),
+              height: _avatarSize,
+              child: Stack(
+                children: [
+                  for (var i = 0; i < people.length; i++)
+                    Positioned(
+                      left: i * _avatarStep,
+                      child: Container(
+                        width: _avatarSize,
+                        height: _avatarSize,
+                        decoration: BoxDecoration(
+                          color: people[i].$2,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.surface,
+                            width: 2,
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            people[i].$1,
+                            style: TextStyle(
+                              fontFamily: AppTextStyles.fontFamily,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
-          ),
-      ],
+          ],
+        ],
+      ),
     );
   }
 }
