@@ -49,7 +49,8 @@ class HomeAttendance {
 enum InboxKind {
   payslip('PAYSLIP'),
   leave('LEAVE'),
-  approval('APPROVAL');
+  approval('APPROVAL'),
+  event('EVENT');
 
   const InboxKind(this.wire);
 

@@ -263,6 +263,7 @@ enum NotificationTarget {
   project,
   ranking,
   approval,
+  schedule,
 }
 
 /// 알림에서 열어달라고 요청한 화면 — `MainShell` 이 보고 탭을 옮긴다
@@ -271,7 +272,8 @@ final requestedScreen = ValueNotifier<NotificationTarget?>(null);
 /// 서버 링크 → 갈 화면. 갈 데가 없으면 null (읽음 처리만 한다)
 ///
 /// **아직 안 잇는 것들이 있다.**
-/// - `/schedule` `/approvals/{id}` — 데스크톱에만 있는 화면이라 폰에서 갈 데가 없다
+/// - `/approvals/{id}` — 데스크톱에만 있는 화면이라 폰에서 갈 데가 없다
+/// - `/schedule` — 일정도 데스크톱 전용이라 폰에서는 읽음 처리만 된다
 /// - `/chat/rooms/{id}` — 사내톡이 아직 목업이라 방을 지정해 열 수 없다
 NotificationTarget? _targetOf(String? link) {
   if (link == null) return null;
@@ -283,6 +285,7 @@ NotificationTarget? _targetOf(String? link) {
     'notices' => NotificationTarget.notice,
     'projects' => NotificationTarget.project,
     'ranking' => NotificationTarget.ranking,
+    'schedule' => NotificationTarget.schedule,
     _ => null,
   };
 }

@@ -127,12 +127,16 @@ class _MainShellState extends State<MainShell> {
         NotificationTarget.notice => 10,
         NotificationTarget.ranking => 11,
         NotificationTarget.approval => 6,
+        NotificationTarget.schedule => 3,
       };
       return;
     }
 
-    // 폰에는 전자결재 탭이 없다 — 갈 데가 없으면 아무 일도 안 한다
-    if (target == NotificationTarget.approval) return;
+    // 폰에는 전자결재·일정 탭이 없다 — 갈 데가 없으면 아무 일도 안 한다
+    if (target == NotificationTarget.approval ||
+        target == NotificationTarget.schedule) {
+      return;
+    }
 
     if (!isApple) {
       setState(
@@ -143,6 +147,7 @@ class _MainShellState extends State<MainShell> {
           NotificationTarget.notice => 6,
           NotificationTarget.ranking => 7,
           NotificationTarget.approval => _androidTab,
+          NotificationTarget.schedule => _androidTab,
         },
       );
       return;
@@ -166,6 +171,7 @@ class _MainShellState extends State<MainShell> {
           _subMenu = true;
           _subIndex = 4;
         case NotificationTarget.approval:
+        case NotificationTarget.schedule:
           break; // 위에서 걸러진다
       }
     });

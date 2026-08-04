@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/api/event_api.dart';
 import '../../core/data/current_user.dart';
+import '../../core/data/employee.dart';
 import '../../core/data/staff.dart';
 import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
@@ -12,6 +13,7 @@ import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/avatar.dart';
 import '../../core/widgets/placeholder_screen.dart';
 import '../../core/widgets/pressable.dart';
+import '../../core/widgets/reject_reason_dialog.dart';
 import '../../core/widgets/scroll_box.dart';
 
 /// 일정 화면
@@ -84,7 +86,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       final created = await _createEvent(draft);
       if (!mounted) return;
       setState(() => events.add(created));
-      AppToast.show(context, '일정을 추가했어요');
+      AppToast.show(context, created.pending ? '일정을 신청했어요' : '일정을 추가했어요');
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
     }
@@ -414,8 +416,12 @@ class _Chip extends StatelessWidget {
       padding: EdgeInsets.symmetric(horizontal: 6),
       alignment: Alignment.centerLeft,
       decoration: BoxDecoration(
-        color: event.kind.color.withValues(alpha: 0.12),
+        // 대기 중인 것은 옅게 깔고 테두리로 가른다 — 아직 확정이 아니다
+        color: event.kind.color.withValues(alpha: event.pending ? 0.05 : 0.12),
         borderRadius: BorderRadius.circular(6),
+        border: event.pending
+            ? Border.all(color: event.kind.color.withValues(alpha: 0.4))
+            : null,
       ),
       child: Text(
         event.allDay ? event.title : '${_time(event.start!)} ${event.title}',
@@ -423,7 +429,7 @@ class _Chip extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: AppTextStyles.caption.copyWith(
           fontSize: 11,
-          color: event.kind.color,
+          color: event.kind.color.withValues(alpha: event.pending ? 0.6 : 1),
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -468,6 +474,27 @@ class _DayDialogState extends State<_DayDialog> {
       if (edited.deleted) {
         if (id != null) await EventApi.delete(id);
         if (mounted) setState(() => events.remove(event));
+        return;
+      }
+      // 반려는 서버가 일정을 지운다 — 되돌릴 게 없어서 목록에서도 뺀다
+      if (edited.decision == EventDecision.reject) {
+        if (id != null) {
+          await EventApi.reject(id, reason: edited.rejectReason);
+        }
+        if (!mounted) return;
+        setState(() => events.remove(event));
+        AppToast.show(context, '반려했어요');
+        return;
+      }
+      if (edited.decision == EventDecision.approve) {
+        if (id == null) return;
+        final ok = _fromServer(await EventApi.approve(id));
+        if (!mounted) return;
+        setState(() {
+          final index = events.indexOf(event);
+          if (index >= 0) events[index] = ok;
+        });
+        AppToast.show(context, '승인했어요');
         return;
       }
       // 서버가 돌려준 값으로 갈아끼운다 — 앱이 계산한 값과 어긋나지 않게
@@ -620,6 +647,7 @@ class _EventRow extends StatelessWidget {
                 SizedBox(height: 2),
                 Text(
                   [
+                    if (event.pending) '승인 대기',
                     event.timeLabel,
                     event.kind.label,
                     if (event.place.isNotEmpty) event.place,
@@ -863,6 +891,24 @@ class _EventDialogState extends State<_EventDialog> {
     Navigator.pop(context, widget.origin!..deleted = true);
   }
 
+  /// 승인 대기 중인 남의 신청을 결재할 수 있는 자리인지
+  bool get _deciding => (widget.origin?.pending ?? false) && _canDecide;
+
+  void _approve() {
+    Navigator.pop(context, widget.origin!..decision = EventDecision.approve);
+  }
+
+  Future<void> _reject() async {
+    final reason = await askRejectReason(context, hint: '예) 그날은 이미 다른 행사가 있어요');
+    if (reason == null || !mounted) return;
+    Navigator.pop(
+      context,
+      widget.origin!
+        ..decision = EventDecision.reject
+        ..rejectReason = reason,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final empty = _title.text.trim().isEmpty;
@@ -1048,20 +1094,23 @@ class _EventDialogState extends State<_EventDialog> {
             SizedBox(height: 18),
             Row(
               children: [
-                if (_editing && !_locked)
-                  Pressable(
+                // 대기 중인 신청은 삭제 대신 결재를 낸다 — 반려가 곧 지우는 것이다
+                if (_deciding) ...[
+                  _TextButton(
+                    label: '반려',
+                    color: AppColors.error,
+                    onTap: _reject,
+                  ),
+                  _TextButton(
+                    label: '승인',
+                    color: AppColors.primary,
+                    onTap: _approve,
+                  ),
+                ] else if (_editing && !_locked)
+                  _TextButton(
+                    label: '삭제',
+                    color: AppColors.error,
                     onTap: _delete,
-                    scale: 0.97,
-                    pressedColor: AppColors.gray100,
-                    borderRadius: BorderRadius.circular(12),
-                    padding: EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-                    child: Text(
-                      '삭제',
-                      style: AppTextStyles.body2.copyWith(
-                        color: AppColors.error,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
                   ),
                 Spacer(),
                 Pressable(
@@ -1112,6 +1161,33 @@ class _EventDialogState extends State<_EventDialog> {
   }
 }
 
+/// 폼 아래쪽 글자 버튼 (삭제·반려·승인)
+class _TextButton extends StatelessWidget {
+  _TextButton({required this.label, required this.color, required this.onTap});
+
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      scale: 0.97,
+      pressedColor: AppColors.gray100,
+      borderRadius: BorderRadius.circular(12),
+      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      child: Text(
+        label,
+        style: AppTextStyles.body2.copyWith(
+          color: color,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
 /// 날짜·시간 고르는 버튼
 class _PickButton extends StatelessWidget {
   _PickButton({required this.label, required this.onTap, this.icon});
@@ -1144,6 +1220,12 @@ class _PickButton extends StatelessWidget {
     );
   }
 }
+
+/// 일정 신청을 승인·반려할 수 있는 사람 — 승인 없이 올릴 수 있는 사람과 같다
+bool get _canDecide => myRole == Role.master || myRole == Role.admin;
+
+/// 폼이 들고 나오는 결재 — 반려는 서버가 일정을 지운다
+enum EventDecision { approve, reject }
 
 /// 참석자 알약을 한 줄에 몇 개 세울지 (폼 폭 440 기준)
 const _perRow = 3;
@@ -1293,6 +1375,7 @@ class Event {
     this.place = '',
     this.memo = '',
     this.members = const [],
+    this.pending = false,
   }) : until = until ?? date;
 
   /// 서버 uuid — null 이면 아직 안 올린 것 (폼이 막 돌려준 값)
@@ -1323,8 +1406,18 @@ class Event {
 
   final String memo;
 
+  /// 승인 대기 중인지 — MASTER·ADMIN 이 아닌 사람이 올리면 켜진다.
+  /// 서버가 걸러 주므로 **올린 사람과 MASTER·ADMIN 에게만** 온다.
+  final bool pending;
+
   /// 수정 폼에서 삭제를 눌렀다는 표시
   bool deleted = false;
+
+  /// 수정 폼에서 승인·반려를 눌렀다는 표시 ([deleted] 와 같은 전달용 값)
+  EventDecision? decision;
+
+  /// 반려 사유 — 신청자에게 알림으로 간다
+  String? rejectReason;
 
   bool get allDay => start == null;
 
@@ -1401,6 +1494,7 @@ Event _fromServer(CalendarEvent row) {
     place: row.place ?? '',
     members: _namesOf(row.attendeeIds),
     memo: row.memo ?? '',
+    pending: row.pending,
   );
 }
 

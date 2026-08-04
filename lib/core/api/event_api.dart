@@ -19,6 +19,7 @@ class CalendarEvent {
     required this.color,
     required this.attendeeIds,
     required this.ownerId,
+    required this.pending,
     required this.createdAt,
     this.place,
     this.memo,
@@ -40,6 +41,7 @@ class CalendarEvent {
     ],
     memo: json['memo'] as String?,
     ownerId: json['ownerId'] as String,
+    pending: json['status'] == 'PENDING',
     createdAt: _time(json['createdAt'])!,
   );
 
@@ -71,6 +73,10 @@ class CalendarEvent {
 
   /// 만든 사람 — **본인이나 관리자만 고치고 지울 수 있다**
   final String ownerId;
+
+  /// 승인 대기 중인지 — MASTER·ADMIN 이 아닌 사람이 올리면 켜진다.
+  /// 대기 중에는 **올린 사람과 MASTER·ADMIN 에게만** 보인다 (서버가 거른다).
+  final bool pending;
 
   final DateTime createdAt;
 }
@@ -169,6 +175,16 @@ class EventApi {
     );
     return CalendarEvent.fromJson(data!);
   }
+
+  /// 신청 승인 — 이때부터 전 직원 달력에 뜬다 (MASTER·ADMIN)
+  static Future<CalendarEvent> approve(String id) async {
+    final data = await _client.post('/events/$id/approve');
+    return CalendarEvent.fromJson(data!);
+  }
+
+  /// 신청 반려 — **서버가 일정을 지운다.** 신청자에게는 알림이 간다
+  static Future<void> reject(String id, {String? reason}) =>
+      _client.post('/events/$id/reject', query: {'reason': ?reason});
 
   static Future<void> delete(String id) => _client.delete('/events/$id');
 }

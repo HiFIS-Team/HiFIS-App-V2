@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/api/approval_api.dart';
 import '../../core/api/attendance_api.dart';
+import '../../core/api/event_api.dart';
 import '../../core/api/home_api.dart';
 import '../../core/api/payroll_api.dart';
 import '../../core/data/current_user.dart';
@@ -290,6 +291,14 @@ class _InboxCardState extends State<_InboxCard> {
     }
   }
 
+  /// 버튼을 낼지 — 눌러도 403 날 버튼은 안 낸다
+  ///
+  /// **일정만 ADMIN 도 누른다.** 승인 없이 일정을 올릴 수 있는 사람이
+  /// 남의 신청도 결재한다 (서버 `_DECIDERS`). 나머지는 MASTER 뿐이다.
+  bool _canDecideOn(InboxItem item) => item.kind == InboxKind.event
+      ? myRole == Role.master || myRole == Role.admin
+      : myRole.canApprove;
+
   /// 종류마다 부르는 곳이 다르다 — id 는 그 테이블의 것이다
   Future<void> _approve(InboxItem item) => _run(item, () async {
     switch (item.kind) {
@@ -299,6 +308,8 @@ class _InboxCardState extends State<_InboxCard> {
         await AttendanceApi.approveLeave(item.id);
       case InboxKind.approval:
         await ApprovalApi.approve(item.id);
+      case InboxKind.event:
+        await EventApi.approve(item.id);
     }
   }, '승인했어요');
 
@@ -309,6 +320,7 @@ class _InboxCardState extends State<_InboxCard> {
         InboxKind.payslip => '예) 추가 근무 시간이 기록과 달라요',
         InboxKind.leave => '예) 그날은 인원이 모자라요',
         InboxKind.approval => '예) 금액 근거를 더 적어주세요',
+        InboxKind.event => '예) 그날은 이미 다른 행사가 있어요',
       },
     );
     if (reason == null || !mounted) return;
@@ -320,6 +332,8 @@ class _InboxCardState extends State<_InboxCard> {
           await AttendanceApi.rejectLeave(item.id, reason);
         case InboxKind.approval:
           await ApprovalApi.reject(item.id, comment: reason);
+        case InboxKind.event:
+          await EventApi.reject(item.id, reason: reason);
       }
     }, '반려했어요');
   }
@@ -352,9 +366,14 @@ class _InboxCardState extends State<_InboxCard> {
       InboxKind.payslip => NotificationTarget.salary,
       InboxKind.leave => NotificationTarget.attendance,
       InboxKind.approval => NotificationTarget.approval,
+      InboxKind.event => NotificationTarget.schedule,
     };
-    // 전자결재는 폰에 탭이 아예 없다
-    if (target == NotificationTarget.approval && !isDesktop) return null;
+    // 전자결재·일정은 폰에 탭이 아예 없다
+    if (!isDesktop &&
+        (target == NotificationTarget.approval ||
+            target == NotificationTarget.schedule)) {
+      return null;
+    }
     return () => widget.onOpen!.call(target);
   }
 
@@ -365,8 +384,8 @@ class _InboxCardState extends State<_InboxCard> {
       for (final item in shown)
         _InboxRow(
           item: item,
-          onApprove: myRole.canApprove ? () => _approve(item) : null,
-          onReject: myRole.canApprove ? () => _reject(item) : null,
+          onApprove: _canDecideOn(item) ? () => _approve(item) : null,
+          onReject: _canDecideOn(item) ? () => _reject(item) : null,
         ),
     ];
 
