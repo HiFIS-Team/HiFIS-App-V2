@@ -16,6 +16,7 @@ import '../../core/widgets/phone_scaffold.dart';
 import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/avatar.dart';
+import '../../core/widgets/decide_buttons.dart';
 import '../../core/widgets/glass_bottom_button.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/glass_input_bar.dart';
@@ -930,62 +931,6 @@ class _ExtensionCard extends StatelessWidget {
 
   bool get _canDecide => onApprove != null && onReject != null;
 
-  /// 반려·승인 버튼 (폰은 [fill]로 가로를 꽉 채운다)
-  Widget _buttons({required bool fill}) {
-    final reject = Pressable(
-      onTap: onReject!,
-      scale: 0.96,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.gray200),
-        ),
-        child: Text(
-          '반려',
-          style: AppTextStyles.body2.copyWith(
-            fontSize: 14,
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
-    );
-    final approve = Pressable(
-      onTap: onApprove!,
-      scale: 0.96,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: AppColors.primary,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Text(
-          '승인',
-          style: AppTextStyles.body2.copyWith(
-            fontSize: 14,
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
-    );
-
-    return Row(
-      mainAxisSize: fill ? MainAxisSize.max : MainAxisSize.min,
-      children: fill
-          ? [
-              Expanded(child: reject),
-              SizedBox(width: 8),
-              Expanded(child: approve),
-            ]
-          : [reject, SizedBox(width: 6), approve],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final request = project.request!;
@@ -1048,7 +993,10 @@ class _ExtensionCard extends StatelessWidget {
                 icon,
                 SizedBox(width: 10),
                 Expanded(child: info),
-                if (_canDecide) ...[SizedBox(width: 12), _buttons(fill: false)],
+                if (_canDecide) ...[
+                  SizedBox(width: 12),
+                  DecideButtons(onApprove: onApprove!, onReject: onReject!),
+                ],
               ],
             )
           : Column(
@@ -1062,7 +1010,14 @@ class _ExtensionCard extends StatelessWidget {
                     Expanded(child: info),
                   ],
                 ),
-                if (_canDecide) ...[SizedBox(height: 12), _buttons(fill: true)],
+                if (_canDecide) ...[
+                  SizedBox(height: 12),
+                  DecideButtons(
+                    onApprove: onApprove!,
+                    onReject: onReject!,
+                    fill: true,
+                  ),
+                ],
               ],
             ),
     );
