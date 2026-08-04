@@ -353,46 +353,40 @@ class _MonthSummary extends StatelessWidget {
 
 /// 대표가 보는 오늘 근무 — 숫자 대신 **누가** 그런지를 띄운다
 ///
-/// 대표는 자기 출퇴근이 없어서 달 요약이 빈 껍데기다. 그 자리에 오늘
-/// 챙겨야 할 사람만 세운다. 판정은 서버가 명단에 얹어 주는
-/// `Employee.todayStatus` 를 그대로 쓴다 (근태 달력·홈과 같은 기준).
+/// 대표는 자기 출퇴근이 없어서 달 요약이 빈 껍데기다. 칸 모양은 달 요약과
+/// 그대로 두고 값만 이름으로 바꾼다. 판정은 서버가 명단에 얹어 주는
+/// `Employee.todayStatus` 를 쓴다 (근태 달력·홈과 같은 기준).
+///
+/// **자정이 지나면 저절로 전원 미출근으로 돌아간다** — 날짜가 바뀌면 그날
+/// 기록이 아직 없고, 결근 판정도 '퇴근 시간이 지났나'를 보므로 새벽에는 안 걸린다.
 class _TodayBoard extends StatelessWidget {
   _TodayBoard();
-
-  /// 한 줄에 이름을 몇 개까지 적을지 — 넘으면 `외 N명`
-  static const _maxNames = 3;
 
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    // 챙겨야 하는 순서다 — 문제 되는 것 먼저, 예정된 것 나중
-    final rows = <(String, Color, List<Employee>)>[
+    // 지각·조기퇴근을 같이 한 사람은 두 칸에 다 선다 (판정 값은 하나뿐이라)
+    final both = _todayWith(AttendanceStatus.lateAndEarly);
+    final cells = <(String, Color, List<Employee>)>[
+      ('출근', AppColors.success, _todayWith(AttendanceStatus.inProgress)),
+      ('퇴근', AppColors.textPrimary, _todayWith(AttendanceStatus.normal)),
+      ('야근', AppColors.primary, _todayWith(AttendanceStatus.overtime)),
+      (
+        '조기퇴근',
+        AppColors.warning,
+        [..._todayWith(AttendanceStatus.earlyLeave), ...both],
+      ),
       (
         '지각',
         AppColors.warning,
-        [
-          ..._todayWith(AttendanceStatus.late),
-          ..._todayWith(AttendanceStatus.lateAndEarly),
-        ],
+        [..._todayWith(AttendanceStatus.late), ...both],
       ),
       ('결근', AppColors.error, _todayWith(AttendanceStatus.absent)),
-      ('미출근', AppColors.textSecondary, _todayWith(null)),
-      (
-        '조기 퇴근',
-        AppColors.warning,
-        [
-          ..._todayWith(AttendanceStatus.earlyLeave),
-          ..._todayWith(AttendanceStatus.lateAndEarly),
-        ],
-      ),
-      ('야근', AppColors.success, _todayWith(AttendanceStatus.overtime)),
       ('월차', AppColors.primary, _todayWith(AttendanceStatus.onLeave)),
-      ('휴무', AppColors.gray400, _todayWith(AttendanceStatus.dayOff)),
+      ('미출근', AppColors.textSecondary, _todayWith(null)),
     ];
-    final shown = [
-      for (final row in rows)
-        if (row.$3.isNotEmpty) row,
-    ];
+    // 폰은 칸이 좁아 두 개씩 네 줄, 데스크톱은 네 개씩 두 줄
+    final perRow = isDesktop ? 4 : 2;
 
     return Container(
       width: double.infinity,
@@ -411,61 +405,56 @@ class _TodayBoard extends StatelessWidget {
             ],
           ),
           SizedBox(height: 16),
-          if (shown.isEmpty)
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.symmetric(vertical: 22),
-              decoration: BoxDecoration(
-                color: AppColors.gray50,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Center(
-                child: Text(
-                  '오늘은 다들 제시간에 있어요',
-                  style: AppTextStyles.body2.copyWith(
-                    color: AppColors.textTertiary,
-                  ),
-                ),
-              ),
-            )
-          else
-            for (var i = 0; i < shown.length; i++) ...[
-              if (i > 0) SizedBox(height: 14),
-              _row(shown[i].$1, shown[i].$2, shown[i].$3),
+          for (var start = 0; start < cells.length; start += perRow) ...[
+            if (start > 0) ...[
+              SizedBox(height: 16),
+              Container(height: 1, color: AppColors.gray100),
+              SizedBox(height: 16),
             ],
+            Row(
+              children: [
+                for (var i = start; i < start + perRow; i++) ...[
+                  if (i > start) _divider(),
+                  _cell(cells[i].$1, cells[i].$2, cells[i].$3),
+                ],
+              ],
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _row(String label, Color color, List<Employee> people) => Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      SizedBox(
-        width: 76,
-        child: Text(
-          label,
-          style: AppTextStyles.body2.copyWith(
-            color: color,
-            fontWeight: FontWeight.w700,
+  /// 달 요약의 `_stat` 과 같은 칸 — 숫자 자리에 이름이 들어간다
+  Widget _cell(String label, Color color, List<Employee> people) => Expanded(
+    child: Column(
+      children: [
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            _names(people),
+            maxLines: 1,
+            style: AppTextStyles.title3.copyWith(
+              fontSize: 17,
+              // 아무도 없는 칸은 색까지 빼서 눈이 안 가게 한다
+              color: people.isEmpty ? AppColors.gray300 : color,
+            ),
           ),
         ),
-      ),
-      SizedBox(width: 8),
-      Expanded(
-        child: Text(
-          _names(people),
-          style: AppTextStyles.body1.copyWith(fontWeight: FontWeight.w600),
-        ),
-      ),
-    ],
+        SizedBox(height: 4),
+        Text(label, style: AppTextStyles.caption.copyWith(fontSize: 11)),
+      ],
+    ),
   );
 
-  /// `김트레이너 · 박FC 외 2명`
+  Widget _divider() =>
+      Container(width: 1, height: 30, color: AppColors.gray100);
+
+  /// 없으면 `-`, 한 명이면 이름, 여럿이면 `김트레이너 외 2명`
   String _names(List<Employee> people) {
-    final head = people.take(_maxNames).map((p) => p.name).join(' · ');
-    final rest = people.length - _maxNames;
-    return rest > 0 ? '$head 외 $rest명' : head;
+    if (people.isEmpty) return '-';
+    if (people.length == 1) return people.first.name;
+    return '${people.first.name} 외 ${people.length - 1}명';
   }
 }
 
