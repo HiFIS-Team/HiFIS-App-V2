@@ -26,6 +26,85 @@ enum ScoreCategory {
   );
 }
 
+/// 랭킹판 한 줄 (서버 `RankingBoardItem`)
+///
+/// **순위는 앱이 매긴다.** 서버는 사람마다 항목별 값만 주고, 지점 필터를
+/// 바꿀 때마다 다시 요청하지 않아도 되게 앱이 그 안에서 세운다.
+class RankingRow {
+  RankingRow({
+    required this.employeeId,
+    required this.name,
+    required this.branchId,
+    required this.revenue,
+    required this.newSignups,
+    required this.reSignups,
+    required this.kindness,
+    required this.reviews,
+    required this.stars,
+    required this.projectScore,
+    required this.projectDone,
+    required this.projectTotal,
+    required this.careScore,
+    required this.care,
+    required this.lessons,
+    required this.lessonScore,
+    required this.lastRank,
+  });
+
+  factory RankingRow.fromJson(Map<String, dynamic> json) => RankingRow(
+    employeeId: json['employeeId'] as String,
+    name: json['name'] as String,
+    branchId: json['branchId'] as String? ?? '',
+    revenue: json['revenue'] as int? ?? 0,
+    newSignups: json['newSignups'] as int? ?? 0,
+    reSignups: json['reSignups'] as int? ?? 0,
+    kindness: json['kindness'] as int? ?? 0,
+    reviews: json['reviews'] as int? ?? 0,
+    stars: (json['stars'] as num?)?.toDouble() ?? 0,
+    projectScore: json['projectScore'] as int? ?? 0,
+    projectDone: json['projectDone'] as int? ?? 0,
+    projectTotal: json['projectTotal'] as int? ?? 0,
+    careScore: json['careScore'] as int? ?? 0,
+    care: json['care'] as int? ?? 0,
+    lessons: json['lessons'] as int? ?? 0,
+    lessonScore: json['lessonScore'] as int? ?? 0,
+    lastRank: [
+      for (final r in (json['lastRank'] as List<dynamic>? ?? const []))
+        r as int,
+    ],
+  );
+
+  final String employeeId;
+  final String name;
+  final String branchId;
+
+  /// 그 달 등록권 결제액 (원)
+  final int revenue;
+  final int newSignups;
+  final int reSignups;
+
+  /// 친절 점수(원장 합)와 리뷰 수·별점 평균
+  final int kindness;
+  final int reviews;
+  final double stars;
+
+  /// 프로젝트 점수(원장 합)와 그 달 기한인 프로젝트 중 담당분
+  final int projectScore;
+  final int projectDone;
+  final int projectTotal;
+
+  /// 환경정비 점수(원장 합)와 수행 횟수
+  final int careScore;
+  final int care;
+
+  /// 그 달 수행한 세션 수와 그것으로 쌓인 점수
+  final int lessons;
+  final int lessonScore;
+
+  /// 지난달 순위 — [매출, 친절, 프로젝트, 환경, 수업, 종합]. **0 이면 순위 없음**
+  final List<int> lastRank;
+}
+
 /// 점수 원장 한 줄 (서버 `ScoreEventOut`)
 class ScoreEvent {
   ScoreEvent({
@@ -114,6 +193,25 @@ class ScoreApi {
   ScoreApi._();
 
   static final _client = ApiClient.instance;
+
+  /// 랭킹판 — 사람마다 항목별 값과 지난달 순위
+  ///
+  /// [period] 를 비우면 이번 달. [branchId] 를 주면 그 지점만 센다
+  /// (앱은 전사로 한 번 받아 화면에서 거른다 — 지점 탭을 옮길 때마다
+  /// 다시 요청하지 않으려고).
+  static Future<List<RankingRow>> board({
+    String? period,
+    String? branchId,
+  }) async {
+    final rows = await _client.getList(
+      '/scores/ranking/board',
+      query: {'period': ?period, 'branchId': ?branchId},
+    );
+    return [
+      for (final row in rows)
+        RankingRow.fromJson((row as Map).cast<String, dynamic>()),
+    ];
+  }
 
   /// 원장 조회 (최신순)
   static Future<List<ScoreEvent>> events({

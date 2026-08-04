@@ -1,13 +1,18 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/api/api_exception.dart';
+import '../../core/api/score_api.dart';
+import '../../core/data/current_user.dart';
 import '../../core/data/staff.dart';
+import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
 import '../../core/widgets/avatar.dart';
 import '../../core/widgets/desktop_header.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/phone_scaffold.dart';
@@ -15,10 +20,11 @@ import '../../core/widgets/pressable.dart';
 
 part 'ranking_models.dart';
 
-/// 랭킹 화면 (목업)
+/// 랭킹 화면
 ///
-/// 이번 달 실적을 항목별로 줄 세운다. 매출·친절 점수·프로젝트 달성·환경정비를
-/// 각각 보고, 종합은 네 항목을 100점으로 환산해 평균 낸 값이다.
+/// 이번 달 실적을 항목별로 줄 세운다. 매출(금액) · 친절 점수 · 프로젝트 달성(점수) ·
+/// 환경정비(점수) · 수업 개수를 각각 보고, 종합은 다섯 항목을 100점으로 환산해
+/// 평균 낸 값이다.
 ///
 /// 순위표보다 "내가 몇 등인지"를 먼저 보게 맨 위에 내 순위 카드를 둔다.
 class RankingScreen extends StatefulWidget {
@@ -31,6 +37,21 @@ class RankingScreen extends StatefulWidget {
 class _RankingScreenState extends State<RankingScreen> {
   /// 고른 항목 ([_Metric] 순서)
   int _tab = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      await _loadRanking();
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+    if (mounted) setState(() {});
+  }
 
   /// 지점은 전체로 시작한다 (내 지점만 보려면 직접 고른다)
   String _branch = _allBranches;
@@ -163,9 +184,9 @@ class _RankingScreenState extends State<RankingScreen> {
 // 항목 · 지점 고르기
 // ---------------------------------------------------------------------------
 
-/// 폰 항목 탭 — 다섯 칸을 균등하게 나눈 밑줄 탭 (업무 탭과 같은 결)
+/// 폰 항목 탭 — 항목 수만큼 균등하게 나눈 밑줄 탭 (업무 탭과 같은 결)
 ///
-/// 알약 다섯 개를 늘어놓으면 화면 폭을 넘겨 옆으로 밀어야 하는데,
+/// 알약을 늘어놓으면 화면 폭을 넘겨 옆으로 밀어야 하는데,
 /// 항목이 몇 개인지 한눈에 안 보인다. 한 화면에 다 세운다.
 class _PhoneTabs extends StatelessWidget {
   _PhoneTabs({required this.selected, required this.onSelect});
@@ -557,8 +578,8 @@ class _ChaseLine extends StatelessWidget {
         ? '${target.ranker.name}님과 동점이에요'
         : chasing
         ? '${target.rank}위 ${target.ranker.name}까지 '
-              '${_gapLabel(metric, gap, entry.ranker)} 남았어요'
-        : '${target.rank}위와 ${_gapLabel(metric, gap, entry.ranker)} 차이로 앞서요';
+              '${_gapLabel(metric, gap)} 남았어요'
+        : '${target.rank}위와 ${_gapLabel(metric, gap)} 차이로 앞서요';
 
     final line = Row(
       children: [
@@ -616,7 +637,7 @@ class _DeltaBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final last = entry.ranker.lastRank[metric.index];
+    final last = entry.ranker.lastRankOf(metric);
 
     // 지난달에 없던 사람은 비교할 게 없다
     if (last == 0) {
