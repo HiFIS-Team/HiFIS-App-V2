@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/api/home_api.dart';
 import '../../core/data/current_user.dart';
+import '../../core/data/employee.dart';
 import '../../core/data/staff.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
@@ -29,11 +30,14 @@ import '../project/project_screen.dart';
 /// 카드가 비어 보인다.
 /// 요약의 `monthScore` 는 지금 놓을 자리가 없어 안 쓴다 — 화면을 늘리지 않는다.
 class HomeScreen extends StatefulWidget {
-  HomeScreen({super.key, this.onOpenProjects, this.onOpenNotices});
+  HomeScreen({super.key, this.onOpenProjects, this.onOpenNotices, this.onOpen});
 
   /// 카드의 '전체'를 눌렀을 때 해당 탭으로 옮겨달라고 셸에 알린다
   final VoidCallback? onOpenProjects;
   final VoidCallback? onOpenNotices;
+
+  /// 처리할 일 카드가 쓰는 통로 — 갈 곳이 셋이라 하나로 받는다
+  final void Function(NotificationTarget)? onOpen;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -120,7 +124,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               children: [
                 _GreetingCard(),
                 SizedBox(height: 16),
-                _HeroStatusCard(attendance: _summary?.attendance),
+                // 대표·관리자는 출근을 안 해서 근무 카드가 늘 비어 있다.
+                // 그 자리에 '지금 눌러야 할 것'을 놓는다.
+                //
+                // **권한으로 가른다** — 요약이 도착해야 아는 `pending` 으로 가르면
+                // 대표 화면에 근무 카드가 깜빡 떴다 바뀐다.
+                if (myRole == Role.master || myRole == Role.admin)
+                  _PendingCard(
+                    pending: _summary?.pending,
+                    onOpen: widget.onOpen,
+                  )
+                else
+                  _HeroStatusCard(attendance: _summary?.attendance),
                 SizedBox(height: 16),
                 if (desktop)
                   // 두 카드의 높이를 큰 쪽에 맞춰 같게 만든다
@@ -197,6 +212,132 @@ class _GreetingCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// 처리할 일 — 대표·관리자 홈의 히어로 자리 (근무 카드 대신)
+///
+/// 셋 다 **전사 기준**이다. ADMIN 은 승인 권한이 없지만 건수는 같이 본다 —
+/// 승인·반려 버튼만 각 화면에서 MASTER 에게 나간다.
+class _PendingCard extends StatelessWidget {
+  _PendingCard({required this.pending, this.onOpen});
+
+  /// 요약이 아직 안 왔으면 null — 0 으로 그린다
+  final HomePending? pending;
+
+  final void Function(NotificationTarget)? onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = pending?.total ?? 0;
+    final color = total > 0 ? AppColors.primary : AppColors.textTertiary;
+
+    return Container(
+      padding: EdgeInsets.all(24),
+      decoration: AppDecorations.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('처리할 일', style: AppTextStyles.label),
+          SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                '$total',
+                style: TextStyle(
+                  fontFamily: AppTextStyles.fontFamily,
+                  fontSize: 40,
+                  fontWeight: FontWeight.w700,
+                  height: 1.1,
+                  color: color,
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
+              ),
+              Text('건', style: AppTextStyles.title3.copyWith(color: color)),
+            ],
+          ),
+          SizedBox(height: 4),
+          Text(
+            total > 0 ? '기다리고 있어요' : '다 처리했어요',
+            textAlign: TextAlign.center,
+            style: AppTextStyles.caption,
+          ),
+          SizedBox(height: 20),
+          Container(height: 1, color: AppColors.divider),
+          SizedBox(height: 6),
+          // 폰에는 전자결재 탭이 아예 없다 — 그 줄만 못 누른다(화살표도 안 그린다)
+          _PendingRow(
+            label: '전자결재',
+            count: pending?.approvals ?? 0,
+            onTap: isDesktop
+                ? () => onOpen?.call(NotificationTarget.approval)
+                : null,
+          ),
+          _PendingRow(
+            label: '급여 승인',
+            count: pending?.payslips ?? 0,
+            onTap: () => onOpen?.call(NotificationTarget.salary),
+          ),
+          _PendingRow(
+            label: '월차 승인',
+            count: pending?.leaves ?? 0,
+            onTap: () => onOpen?.call(NotificationTarget.attendance),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PendingRow extends StatelessWidget {
+  _PendingRow({required this.label, required this.count, this.onTap});
+
+  final String label;
+  final int count;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    // 0 건이면 눌러도 빈 화면이라 회색으로 둔다 (줄은 남긴다 — 자리가 안 흔들리게)
+    final waiting = count > 0;
+    final row = Padding(
+      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 11),
+      child: Row(
+        children: [
+          Expanded(child: Text(label, style: AppTextStyles.body2)),
+          Text(
+            '$count건',
+            style: AppTextStyles.body2.copyWith(
+              fontWeight: FontWeight.w700,
+              color: waiting ? AppColors.primary : AppColors.textTertiary,
+            ),
+          ),
+          SizedBox(width: 6),
+          SizedBox(
+            width: 16,
+            child: onTap == null
+                ? null
+                : Icon(
+                    Icons.chevron_right_rounded,
+                    size: 16,
+                    color: AppColors.gray400,
+                  ),
+          ),
+        ],
+      ),
+    );
+
+    final go = onTap;
+    if (go == null) return row;
+    return Pressable(
+      onTap: go,
+      scale: 0.99,
+      borderRadius: BorderRadius.circular(12),
+      child: row,
     );
   }
 }

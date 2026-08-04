@@ -94,7 +94,11 @@ class _MainShellState extends State<MainShell> {
   // static으로 두면 핫 리로드 시 페이지 교체가 반영되지 않아 getter로 만든다.
   // IndexedStack이 타입/위치 기준으로 상태를 유지하므로 매 빌드 생성해도 안전하다.
   List<Widget> get _mainPages => [
-    HomeScreen(onOpenProjects: _goProjects, onOpenNotices: _goNotices),
+    HomeScreen(
+      onOpenProjects: _goProjects,
+      onOpenNotices: _goNotices,
+      onOpen: _go,
+    ),
     WorkScreen(),
     ProjectScreen(),
     MeetingScreen(),
@@ -122,9 +126,13 @@ class _MainShellState extends State<MainShell> {
         NotificationTarget.salary => 9,
         NotificationTarget.notice => 10,
         NotificationTarget.ranking => 11,
+        NotificationTarget.approval => 6,
       };
       return;
     }
+
+    // 폰에는 전자결재 탭이 없다 — 갈 데가 없으면 아무 일도 안 한다
+    if (target == NotificationTarget.approval) return;
 
     if (!isApple) {
       setState(
@@ -134,6 +142,7 @@ class _MainShellState extends State<MainShell> {
           NotificationTarget.salary => 5,
           NotificationTarget.notice => 6,
           NotificationTarget.ranking => 7,
+          NotificationTarget.approval => _androidTab,
         },
       );
       return;
@@ -156,6 +165,8 @@ class _MainShellState extends State<MainShell> {
         case NotificationTarget.ranking:
           _subMenu = true;
           _subIndex = 4;
+        case NotificationTarget.approval:
+          break; // 위에서 걸러진다
       }
     });
   }
@@ -199,7 +210,11 @@ class _MainShellState extends State<MainShell> {
   /// 맨 뒤 '접속 기록'은 MASTER·ADMIN 에게만 붙는다. 사이드바도 같은 조건으로
   /// 메뉴를 세우므로 **둘이 같은 판정을 써야** 인덱스가 안 어긋난다.
   List<Widget> get _desktopPages => [
-    HomeScreen(onOpenProjects: _goProjects, onOpenNotices: _goNotices),
+    HomeScreen(
+      onOpenProjects: _goProjects,
+      onOpenNotices: _goNotices,
+      onOpen: _go,
+    ),
     WorkScreen(),
     ProjectScreen(),
     ScheduleScreen(),

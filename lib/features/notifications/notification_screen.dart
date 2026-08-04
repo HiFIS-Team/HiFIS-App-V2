@@ -256,7 +256,14 @@ Future<void> loadNotificationsIfNeeded() async {
 ///
 /// 서버 `link` 를 앱 화면으로 옮긴 것이다. 탭 번호는 플랫폼마다 달라서
 /// 여기서는 '어디로' 만 정하고 자리는 `MainShell` 이 고른다.
-enum NotificationTarget { attendance, salary, notice, project, ranking }
+enum NotificationTarget {
+  attendance,
+  salary,
+  notice,
+  project,
+  ranking,
+  approval,
+}
 
 /// 알림에서 열어달라고 요청한 화면 — `MainShell` 이 보고 탭을 옮긴다
 final requestedScreen = ValueNotifier<NotificationTarget?>(null);

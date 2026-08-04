@@ -45,6 +45,35 @@ class HomeAttendance {
   final HalfPeriod? halfPeriod;
 }
 
+/// 결재를 기다리는 것 (서버 `HomePendingOut`)
+///
+/// **MASTER · ADMIN 에게만 온다.** 대표·관리자는 출근을 안 해서 홈의 출퇴근
+/// 카드가 늘 비어 있다. 그 자리에 '지금 눌러야 할 것'을 대신 놓는다.
+class HomePending {
+  HomePending({
+    required this.approvals,
+    required this.payslips,
+    required this.leaves,
+  });
+
+  factory HomePending.fromJson(Map<String, dynamic> json) => HomePending(
+    approvals: json['approvals'] as int? ?? 0,
+    payslips: json['payslips'] as int? ?? 0,
+    leaves: json['leaves'] as int? ?? 0,
+  );
+
+  /// 아직 안 끝난 전자결재
+  final int approvals;
+
+  /// 제출된 급여
+  final int payslips;
+
+  /// 대기 중인 월차
+  final int leaves;
+
+  int get total => approvals + payslips + leaves;
+}
+
 /// 홈 첫 화면 요약 (서버 `HomeSummaryOut`)
 class HomeSummary {
   HomeSummary({
@@ -53,6 +82,7 @@ class HomeSummary {
     required this.incompleteProjects,
     required this.unreadNotices,
     required this.monthScore,
+    this.pending,
   });
 
   factory HomeSummary.fromJson(Map<String, dynamic> json) => HomeSummary(
@@ -63,6 +93,10 @@ class HomeSummary {
     incompleteProjects: json['incompleteProjects'] as int? ?? 0,
     unreadNotices: json['unreadNotices'] as int? ?? 0,
     monthScore: json['monthScore'] as int? ?? 0,
+    pending: switch (json['pending']) {
+      final Map row => HomePending.fromJson(row.cast<String, dynamic>()),
+      _ => null,
+    },
   );
 
   /// `2026-07` — 이번 달
@@ -78,6 +112,9 @@ class HomeSummary {
 
   /// 이번 달 내 점수 합 (점수 원장 전 항목)
   final int monthScore;
+
+  /// MASTER·ADMIN 이 아니면 null — 나머지 직원 홈은 모양이 그대로다
+  final HomePending? pending;
 }
 
 /// `/me/home` — 개인 홈 요약
