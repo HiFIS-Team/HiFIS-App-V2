@@ -94,4 +94,35 @@ class AuditLogApi {
         AuditLog.fromJson((row as Map).cast<String, dynamic>()),
     ];
   }
+
+  /// 번호 페이지 한 장 — [total] 전체 건수 · [failed] 그중 막힌 시도
+  ///
+  /// 90일치가 쌓이면 한 번에 다 받을 수 없어서 목록은 이 길로 받는다.
+  /// 두 건수는 막힘 여부 필터와 무관한 전체값이라 탭 라벨에 그대로 쓴다.
+  /// [before] 는 장을 넘기는 동안 고정하는 기준선이다 — 안 주면 조회가 만든
+  /// 새 로그 때문에 같은 줄이 두 장에 걸쳐 나온다.
+  static Future<({List<AuditLog> items, int total, int failed})> page({
+    bool failedOnly = false,
+    int limit = 100,
+    int offset = 0,
+    DateTime? before,
+  }) async {
+    final result = await _client.getLogPage(
+      '/audit-logs',
+      query: {
+        if (failedOnly) 'failedOnly': 'true',
+        'limit': '$limit',
+        'offset': '$offset',
+        'before': ?before?.toUtc().toIso8601String(),
+      },
+    );
+    return (
+      items: [
+        for (final row in result.items)
+          AuditLog.fromJson((row as Map).cast<String, dynamic>()),
+      ],
+      total: result.total,
+      failed: result.failed,
+    );
+  }
 }

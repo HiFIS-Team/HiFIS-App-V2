@@ -86,4 +86,34 @@ class AccessLogApi {
         AccessLog.fromJson((row as Map).cast<String, dynamic>()),
     ];
   }
+
+  /// 번호 페이지 한 장 — [total] 전체 건수 · [failed] 그중 로그인 실패
+  ///
+  /// 90일치가 쌓이면 한 번에 다 받을 수 없어서 목록은 이 길로 받는다.
+  /// 두 건수는 필터와 무관한 전체값이라 탭 라벨에 그대로 쓴다.
+  /// [before] 는 장을 넘기는 동안 고정하는 기준선이다 (활동 로그와 같은 이유)
+  static Future<({List<AccessLog> items, int total, int failed})> page({
+    AccessEvent? event,
+    int limit = 100,
+    int offset = 0,
+    DateTime? before,
+  }) async {
+    final result = await _client.getLogPage(
+      '/access-logs',
+      query: {
+        'event': ?event?.wire,
+        'limit': '$limit',
+        'offset': '$offset',
+        'before': ?before?.toUtc().toIso8601String(),
+      },
+    );
+    return (
+      items: [
+        for (final row in result.items)
+          AccessLog.fromJson((row as Map).cast<String, dynamic>()),
+      ],
+      total: result.total,
+      failed: result.failed,
+    );
+  }
 }

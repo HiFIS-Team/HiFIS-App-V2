@@ -13,6 +13,7 @@ import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/avatar.dart';
 import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/mode_switch.dart';
+import '../../core/widgets/page_numbers.dart';
 import '../../core/widgets/pressable.dart';
 
 /// 활동 기록 — 누가 무엇을 등록·수정·삭제했는지 (모니터링 둘째 탭)
@@ -27,11 +28,29 @@ class ActivityPanel extends StatefulWidget {
 }
 
 class _ActivityPanelState extends State<ActivityPanel> {
+  /// 한 장에 몇 줄까지
+  static const _perPage = 100;
+
   List<AuditLog> _logs = const [];
   bool _loading = true;
 
   /// 0 전체 · 1 막힌 시도
   int _tab = 0;
+
+  /// 지금 보고 있는 장 (0부터)
+  int _page = 0;
+
+  /// 서버가 헤더로 알려 준 전체 건수 — 장 수와 탭 라벨이 이걸 쓴다
+  int _total = 0;
+  int _blocked = 0;
+
+  /// 장을 넘기는 동안 고정하는 기준선
+  ///
+  /// **이 화면을 여는 것 자체가 활동 로그로 남는다.** 기준을 안 잡으면
+  /// 2장으로 넘어가는 사이에 새 줄이 앞에 끼어들어 1장 마지막 줄이 또 나온다.
+  /// 새로고침은 이 판을 통째로 다시 만들어서(`ValueKey('activity-N')`)
+  /// 기준선도 그때 새로 잡힌다.
+  final DateTime _since = DateTime.now();
 
   /// 펼쳐 둔 줄
   final _open = <String>{};
@@ -44,10 +63,17 @@ class _ActivityPanelState extends State<ActivityPanel> {
 
   Future<void> _load() async {
     try {
-      final rows = await AuditLogApi.list(limit: 300);
+      final result = await AuditLogApi.page(
+        failedOnly: _tab == 1,
+        limit: _perPage,
+        offset: _page * _perPage,
+        before: _since,
+      );
       if (!mounted) return;
       setState(() {
-        _logs = rows;
+        _logs = result.items;
+        _total = result.total;
+        _blocked = result.failed;
         _loading = false;
       });
     } catch (error) {
@@ -57,14 +83,24 @@ class _ActivityPanelState extends State<ActivityPanel> {
     }
   }
 
-  int get _blocked => _logs.where((log) => !log.ok).length;
+  /// 탭·장을 옮기면 그 자리를 새로 받아온다 (펼쳐 둔 줄은 접는다)
+  void _go({int? tab, int? page}) {
+    setState(() {
+      if (tab != null && tab != _tab) {
+        _tab = tab;
+        _page = 0; // 다른 탭의 5장째로 넘어가면 빈 화면이 뜬다
+      }
+      if (page != null) _page = page;
+      _open.clear();
+      _loading = true;
+    });
+    _load();
+  }
 
-  List<AuditLog> get _shown => _tab == 0
-      ? _logs
-      : [
-          for (final log in _logs)
-            if (!log.ok) log,
-        ];
+  /// 지금 탭에 걸린 건수 — 장 수를 셀 때 쓴다
+  int get _count => _tab == 0 ? _total : _blocked;
+
+  int get _pages => (_count / _perPage).ceil();
 
   @override
   Widget build(BuildContext context) {
@@ -80,14 +116,14 @@ class _ActivityPanelState extends State<ActivityPanel> {
       );
     }
 
-    final rows = _shown;
+    final rows = _logs;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SegmentedTabs(
-          labels: ['전체 ${_logs.length}', '막힌 시도 $_blocked'],
+          labels: ['전체 $_total', '막힌 시도 $_blocked'],
           selected: _tab,
-          onSelect: (i) => setState(() => _tab = i),
+          onSelect: (i) => _go(tab: i),
         ),
         SizedBox(height: 16),
         if (rows.isEmpty)
@@ -118,6 +154,11 @@ class _ActivityPanelState extends State<ActivityPanel> {
               ],
             ),
           ),
+        PageNumbers(
+          page: _page,
+          pages: _pages,
+          onPick: (i) => _go(page: i),
+        ),
       ],
     );
   }

@@ -183,6 +183,24 @@ class ApiClient {
     return response.data as List<dynamic>;
   }
 
+  /// 번호 페이지로 받는 목록 — 몇 장인지는 헤더에 실려 온다
+  ///
+  /// 접속·활동 로그가 쓴다. 90일치가 쌓이면 한 번에 다 받을 수 없어서
+  /// 서버가 `offset` 으로 잘라 주고 총 건수를 헤더로 알려 준다.
+  Future<({List<dynamic> items, int total, int failed})> getLogPage(
+    String path, {
+    Map<String, dynamic>? query,
+  }) async {
+    final response = await _send('GET', path, query: query);
+    int head(String key) =>
+        int.tryParse(response.headers.value(key) ?? '') ?? 0;
+    return (
+      items: response.data as List<dynamic>,
+      total: head('x-total-count'),
+      failed: head('x-failed-count'),
+    );
+  }
+
   /// 본문이 없는 응답(204)도 있어서 Map 이 아닐 수 있다
   Future<Map<String, dynamic>?> post(
     String path, {

@@ -17,6 +17,7 @@ import '../../core/widgets/avatar.dart';
 import '../../core/widgets/desktop_header.dart';
 import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/mode_switch.dart';
+import '../../core/widgets/page_numbers.dart';
 import '../../core/widgets/pressable.dart';
 import 'activity_panel.dart';
 import 'chat_audit_panel.dart';
@@ -48,8 +49,29 @@ class MonitoringScreen extends StatefulWidget {
 const _grassDays = 14;
 
 class _MonitoringScreenState extends State<MonitoringScreen> {
+  /// 통계·잔디가 보는 창 — 최근 14일을 덮을 만큼 넉넉히 받는다.
+  /// **목록은 여기서 안 뽑는다** (아래 [_rows] 가 번호 페이지로 따로 받는다).
   List<AccessLog> _logs = const [];
   bool _loading = true;
+
+  /// 목록 한 장에 몇 줄까지
+  static const _perPage = 100;
+
+  /// 지금 보고 있는 장 (0부터)
+  int _listPage = 0;
+
+  /// 그 장에 실린 줄 — 통계용 [_logs] 와 다른 조회다
+  List<AccessLog> _rows = const [];
+
+  /// 서버가 헤더로 알려 준 전체 건수 — 장 수와 탭 라벨이 이걸 쓴다
+  int _total = 0;
+  int _failed = 0;
+
+  /// 장을 넘기는 동안 고정하는 기준선
+  ///
+  /// **이 화면을 여는 것 자체가 접속·활동 로그로 남는다.** 기준을 안 잡으면
+  /// 2장으로 넘어가는 사이에 새 줄이 앞에 끼어들어 1장 마지막 줄이 또 나온다.
+  DateTime _since = DateTime.now();
 
   /// 0 접속 · 1 활동 · 2 대화
   int _page = 0;
@@ -81,10 +103,15 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
 
   Future<void> _load() async {
     try {
-      final rows = await AccessLogApi.list(limit: 500);
+      // 통계·잔디용 창 + 목록 한 장 — 보는 범위가 달라 따로 받는다
+      final stats = await AccessLogApi.list(limit: 500);
+      final page = await _fetchPage();
       if (!mounted) return;
       setState(() {
-        _logs = rows;
+        _logs = stats;
+        _rows = page.items;
+        _total = page.total;
+        _failed = page.failed;
         _loading = false;
       });
     } catch (error) {
@@ -93,6 +120,41 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
       AppToast.show(context, messageOf(error));
     }
   }
+
+  Future<({List<AccessLog> items, int total, int failed})> _fetchPage() =>
+      AccessLogApi.page(
+        event: _tab == 1 ? AccessEvent.loginFail : null,
+        limit: _perPage,
+        offset: _listPage * _perPage,
+        before: _since,
+      );
+
+  /// 탭·장을 옮기면 목록만 새로 받는다 (통계는 그대로 둔다)
+  Future<void> _goList({int? tab, int? page}) async {
+    setState(() {
+      if (tab != null && tab != _tab) {
+        _tab = tab;
+        _listPage = 0; // 다른 탭의 5장째로 넘어가면 빈 화면이 뜬다
+      }
+      if (page != null) _listPage = page;
+    });
+    try {
+      final result = await _fetchPage();
+      if (!mounted) return;
+      setState(() {
+        _rows = result.items;
+        _total = result.total;
+        _failed = result.failed;
+      });
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+  }
+
+  /// 지금 탭에 걸린 건수 — 장 수를 셀 때 쓴다
+  int get _listCount => _tab == 0 ? _total : _failed;
+
+  int get _listPages => (_listCount / _perPage).ceil();
 
   bool _isToday(DateTime time) {
     final now = DateTime.now();
@@ -106,20 +168,11 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
       if (_isToday(log.createdAt)) log,
   ];
 
-  List<AccessLog> get _shown => _tab == 0
-      ? _logs
-      : [
-          for (final log in _logs)
-            if (log.event.failed) log,
-        ];
-
   /// 오늘 들어온 사람 수 (같은 사람이 여러 번 들어와도 하나)
   int get _todayPeople => {
     for (final log in _today)
       if (!log.event.failed && log.employeeId != null) log.employeeId!,
   }.length;
-
-  int get _failedTotal => _logs.where((log) => log.event.failed).length;
 
   /// 접속률의 분모 — 재직 중인 사람만 센다 (퇴사·비활성은 안 들어오는 게 맞다)
   int get _staffTotal => StaffDirectory.instance.employees
@@ -183,7 +236,12 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
 
   /// 새로고침 — 보고 있는 탭만 다시 받는다
   void _refresh() {
-    setState(() => _reload++);
+    // 새로고침은 기준선을 지금으로 다시 잡는다 — 그동안 쌓인 것까지 본다
+    setState(() {
+      _reload++;
+      _since = DateTime.now();
+      _listPage = 0;
+    });
     if (_page == 0) _load();
   }
 
@@ -276,18 +334,23 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
               ),
               SizedBox(height: 16),
               SegmentedTabs(
-                labels: ['전체 ${_logs.length}', '실패 $_failedTotal'],
+                labels: ['전체 $_total', '실패 $_failed'],
                 selected: _tab,
-                onSelect: (i) => setState(() => _tab = i),
+                onSelect: (i) => _goList(tab: i),
               ),
               SizedBox(height: 16),
-              if (_shown.isEmpty)
+              if (_rows.isEmpty)
                 EmptyCard(
                   icon: CupertinoIcons.checkmark_shield,
                   text: _tab == 0 ? '아직 접속 기록이 없어요' : '로그인 실패가 없어요',
                 )
               else
-                _LogList(logs: _shown),
+                _LogList(logs: _rows),
+              PageNumbers(
+                page: _listPage,
+                pages: _listPages,
+                onPick: (i) => _goList(page: i),
+              ),
             ],
           ],
         ),
