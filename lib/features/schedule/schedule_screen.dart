@@ -98,10 +98,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final first = _month.subtract(Duration(days: _month.weekday % 7));
     final last = DateTime(_month.year, _month.month + 1, 0);
     final weeks = ((last.difference(first).inDays + 1) / 7).ceil();
+    // 걸치는 일정은 지난달에 시작했어도 이 달에 보이므로 겹치면 센다
     final monthCount = events
-        .where(
-          (e) => e.date.year == _month.year && e.date.month == _month.month,
-        )
+        .where((e) => !e.date.isAfter(last) && !e.until.isBefore(_month))
         .length;
 
     // 배경은 다른 화면과 같은 회색, 달력은 그 위에 얹힌 흰 카드로 둔다
@@ -680,6 +679,10 @@ class _EventDialogState extends State<_EventDialog> {
   final _titleFocus = FocusNode();
 
   late DateTime _date = widget.origin?.date ?? widget.date;
+
+  /// 끝나는 날 — 하루짜리면 [_date]와 같다
+  late DateTime _until = widget.origin?.until ?? widget.date;
+
   late Kind _kind = widget.origin?.kind ?? Kind.meeting;
   late bool _allDay = widget.origin?.allDay ?? false;
   late TimeOfDay _start =
@@ -729,16 +732,27 @@ class _EventDialogState extends State<_EventDialog> {
             ),
   );
 
-  Future<void> _pickDate() async {
+  Future<void> _pickDate({required bool start}) async {
+    final base = start ? _date : _until;
     final picked = await showDatePicker(
       context: context,
-      initialDate: _date,
-      firstDate: DateTime(_date.year - 2),
-      lastDate: DateTime(_date.year + 3),
+      initialDate: base,
+      // 종료일은 시작일보다 앞을 못 고르게 막는다
+      firstDate: start ? DateTime(base.year - 2) : _date,
+      lastDate: DateTime(base.year + 3),
       builder: (context, child) =>
           Theme(data: _pickerTheme(context), child: child!),
     );
-    if (picked != null) setState(() => _date = picked);
+    if (picked == null) return;
+    setState(() {
+      if (start) {
+        _date = picked;
+        // 시작이 끝을 넘어가면 끝도 같이 옮긴다 (시간 고르개와 같은 방식)
+        if (_until.isBefore(picked)) _until = picked;
+      } else {
+        _until = picked;
+      }
+    });
   }
 
   Future<void> _pickTime({required bool start}) async {
@@ -769,7 +783,10 @@ class _EventDialogState extends State<_EventDialog> {
       _titleFocus.requestFocus();
       return;
     }
-    if (!_allDay && _minutes(_end) <= _minutes(_start)) {
+    // 날이 갈리면 끝 시각이 시작보다 일러도 된다 (10일 18시 ~ 12일 09시)
+    if (!_allDay &&
+        _isSameDay(_date, _until) &&
+        _minutes(_end) <= _minutes(_start)) {
       AppToast.show(context, '종료 시간이 시작보다 빨라요');
       return;
     }
@@ -781,6 +798,7 @@ class _EventDialogState extends State<_EventDialog> {
         ownerId: widget.origin?.ownerId,
         title: title,
         date: DateTime(_date.year, _date.month, _date.day),
+        until: DateTime(_until.year, _until.month, _until.day),
         kind: _kind,
         start: _allDay ? null : _start,
         end: _allDay ? null : _end,
@@ -791,6 +809,53 @@ class _EventDialogState extends State<_EventDialog> {
             if (_members.contains(staff.name)) staff.name,
         ],
       ),
+    );
+  }
+
+  /// 참석자 알약 — 한 줄에 [_perRow]개씩 **같은 폭**으로 세운다
+  ///
+  /// 이름 길이대로 흘려 보내면(Wrap) 줄 끝이 들쭉날쭉해 오른쪽이 비어 보인다.
+  Widget _personGrid() {
+    final people = [
+      for (final staff in staffList)
+        // 잠겼으면 고른 사람만 남긴다 — 못 누르는 알약이 줄줄이 남으면
+        // 고를 수 있는 것처럼 보인다
+        if (!_locked || _members.contains(staff.name)) staff,
+    ];
+
+    return Column(
+      children: [
+        for (var row = 0; row * _perRow < people.length; row++) ...[
+          if (row > 0) SizedBox(height: 6),
+          Row(
+            children: [
+              for (var col = 0; col < _perRow; col++) ...[
+                if (col > 0) SizedBox(width: 6),
+                Expanded(
+                  child: switch (row * _perRow + col) {
+                    // 마지막 줄의 빈칸 — 자리를 차지해야 폭이 안 늘어난다
+                    final i when i >= people.length => SizedBox.shrink(),
+                    final i => _PersonChip(
+                      staff: people[i],
+                      joined: _members.contains(people[i].name),
+                      onTap: _tap(
+                        () => setState(() {
+                          final name = people[i].name;
+                          if (_members.contains(name)) {
+                            _members.remove(name);
+                          } else {
+                            _members.add(name);
+                          }
+                        }),
+                      ),
+                    ),
+                  },
+                ),
+              ],
+            ],
+          ),
+        ],
+      ],
     );
   }
 
@@ -894,9 +959,16 @@ class _EventDialogState extends State<_EventDialog> {
                         ),
                         _PickButton(
                           icon: Icons.calendar_today_rounded,
-                          label:
-                              '${_date.month}.${_date.day} (${_weekdays[_date.weekday % 7]})',
-                          onTap: _tap(_pickDate),
+                          label: _dayLabel(_date),
+                          onTap: _tap(() => _pickDate(start: true)),
+                        ),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 4),
+                          child: Text('~', style: AppTextStyles.caption),
+                        ),
+                        _PickButton(
+                          label: _dayLabel(_until),
+                          onTap: _tap(() => _pickDate(start: false)),
                         ),
                       ],
                     ),
@@ -961,30 +1033,7 @@ class _EventDialogState extends State<_EventDialog> {
                     SizedBox(height: 14),
                     Text('참석자', style: AppTextStyles.label),
                     SizedBox(height: 8),
-                    ScrollBox(
-                      maxHeight: kChipBoxHeight,
-                      child: Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
-                          for (final staff in staffList)
-                            if (!_locked || _members.contains(staff.name))
-                              _PersonChip(
-                                staff: staff,
-                                joined: _members.contains(staff.name),
-                                onTap: _tap(
-                                  () => setState(() {
-                                    if (_members.contains(staff.name)) {
-                                      _members.remove(staff.name);
-                                    } else {
-                                      _members.add(staff.name);
-                                    }
-                                  }),
-                                ),
-                              ),
-                        ],
-                      ),
-                    ),
+                    ScrollBox(maxHeight: kChipBoxHeight, child: _personGrid()),
                     SizedBox(height: 14),
                     _Field(
                       controller: _memo,
@@ -1096,6 +1145,9 @@ class _PickButton extends StatelessWidget {
   }
 }
 
+/// 참석자 알약을 한 줄에 몇 개 세울지 (폼 폭 440 기준)
+const _perRow = 3;
+
 /// 참석자 고르는 알약
 class _PersonChip extends StatelessWidget {
   _PersonChip({required this.staff, required this.joined, required this.onTap});
@@ -1117,16 +1169,20 @@ class _PersonChip extends StatelessWidget {
           borderRadius: BorderRadius.circular(100),
         ),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
           children: [
             Avatar(name: staff.name, size: 22),
             SizedBox(width: 6),
-            Text(
-              staff.name == me ? '나' : staff.name,
-              style: AppTextStyles.caption.copyWith(
-                fontSize: 12,
-                color: joined ? AppColors.primary : AppColors.textSecondary,
-                fontWeight: FontWeight.w600,
+            // 칸 폭이 정해져 있어 긴 이름은 말줄임으로 자른다
+            Expanded(
+              child: Text(
+                staff.name == me ? '나' : staff.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.caption.copyWith(
+                  fontSize: 12,
+                  color: joined ? AppColors.primary : AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
@@ -1228,6 +1284,7 @@ class Event {
   Event({
     required this.title,
     required this.date,
+    DateTime? until,
     this.id,
     this.ownerId,
     this.kind = Kind.meeting,
@@ -1236,7 +1293,7 @@ class Event {
     this.place = '',
     this.memo = '',
     this.members = const [],
-  });
+  }) : until = until ?? date;
 
   /// 서버 uuid — null 이면 아직 안 올린 것 (폼이 막 돌려준 값)
   final String? id;
@@ -1246,8 +1303,12 @@ class Event {
 
   final String title;
 
-  /// 날짜만 담는다 (시각은 start/end)
+  /// 시작하는 날 (시각은 start/end)
   final DateTime date;
+
+  /// 끝나는 날 — 하루짜리면 [date]와 같다
+  final DateTime until;
+
   final Kind kind;
 
   /// null이면 종일 일정
@@ -1267,8 +1328,19 @@ class Event {
 
   bool get allDay => start == null;
 
-  String get timeLabel =>
-      allDay ? '종일' : '${_time(start!)} ~ ${_time(end ?? start!)}';
+  /// 여러 날에 걸치는지
+  bool get spans => !_isSameDay(date, until);
+
+  /// 하루짜리는 예전 그대로 시각만, 걸치는 것만 날짜를 붙인다
+  String get timeLabel {
+    if (!spans) {
+      return allDay ? '종일' : '${_time(start!)} ~ ${_time(end ?? start!)}';
+    }
+    final from = '${date.month}.${date.day}';
+    final to = '${until.month}.${until.day}';
+    if (allDay) return '$from ~ $to';
+    return '$from ${_time(start!)} ~ $to ${_time(end ?? start!)}';
+  }
 
   /// 고치거나 지울 수 있는지 — 서버 `_get_owned` 와 같은 기준이다
   bool get canEdit =>
@@ -1322,6 +1394,7 @@ Event _fromServer(CalendarEvent row) {
     ownerId: row.ownerId,
     title: row.title,
     date: DateTime(start.year, start.month, start.day),
+    until: DateTime(end.year, end.month, end.day),
     kind: Kind.parse(row.category),
     start: row.allDay ? null : TimeOfDay.fromDateTime(start),
     end: row.allDay ? null : TimeOfDay.fromDateTime(end),
@@ -1351,18 +1424,19 @@ List<String> _idsOf(List<String> names) => [
 /// 종일은 `allDay` 로 따로 보내지만 시각 자체는 여전히 있어야 한다
 /// (서버가 `startAt`·`endAt` 을 필수로 받고, 달력도 그날에 그린다).
 (DateTime, DateTime) _range(Event event) {
-  final date = event.date;
+  final from = event.date;
+  final to = event.until;
   if (event.allDay) {
     return (
-      DateTime(date.year, date.month, date.day),
-      DateTime(date.year, date.month, date.day, 23, 59),
+      DateTime(from.year, from.month, from.day),
+      DateTime(to.year, to.month, to.day, 23, 59),
     );
   }
   final start = event.start!;
   final end = event.end ?? start;
   return (
-    DateTime(date.year, date.month, date.day, start.hour, start.minute),
-    DateTime(date.year, date.month, date.day, end.hour, end.minute),
+    DateTime(from.year, from.month, from.day, start.hour, start.minute),
+    DateTime(to.year, to.month, to.day, end.hour, end.minute),
   );
 }
 
@@ -1411,8 +1485,10 @@ Future<Event> _updateEvent(String id, Event edited) async {
 }
 
 /// 그날 일정 — 종일이 먼저, 그다음 시작 시각순
+///
+/// 여러 날에 걸치는 일정은 **걸치는 날마다** 나온다.
 List<Event> eventsOn(DateTime date) =>
-    events.where((e) => _isSameDay(e.date, date)).toList()..sort((a, b) {
+    events.where((e) => _covers(e, date)).toList()..sort((a, b) {
       if (a.allDay != b.allDay) return a.allDay ? -1 : 1;
       if (a.allDay) return 0;
       return _minutes(a.start!).compareTo(_minutes(b.start!));
@@ -1423,7 +1499,20 @@ List<Event> eventsOn(DateTime date) =>
 bool _isSameDay(DateTime a, DateTime b) =>
     a.year == b.year && a.month == b.month && a.day == b.day;
 
+/// 그 일정이 이 날을 덮는지 — 시작일과 종료일 사이(양끝 포함)
+bool _covers(Event event, DateTime day) {
+  final target = _dayOf(day);
+  return !target.isBefore(_dayOf(event.date)) &&
+      !target.isAfter(_dayOf(event.until));
+}
+
+DateTime _dayOf(DateTime time) => DateTime(time.year, time.month, time.day);
+
 int _minutes(TimeOfDay time) => time.hour * 60 + time.minute;
+
+/// '8.10 (월)' 형태 — 폼의 날짜 버튼
+String _dayLabel(DateTime date) =>
+    '${date.month}.${date.day} (${_weekdays[date.weekday % 7]})';
 
 /// '09:30' 형태
 String _time(TimeOfDay time) =>
