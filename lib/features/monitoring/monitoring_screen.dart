@@ -18,15 +18,22 @@ import '../../core/widgets/desktop_header.dart';
 import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/pressable.dart';
+import 'activity_panel.dart';
+import 'chat_audit_panel.dart';
 
-/// 모니터링 — 누가 언제 어디서 들어왔는지 (MASTER · ADMIN)
+/// 모니터링 — 누가 언제 들어와서 무엇을 했는지 (MASTER · ADMIN)
 ///
-/// 판을 여러 장 깔아 한눈에 훑게 만든다 — 잔디(언제 붐볐나) · 오늘 요약 ·
-/// 많이 들어온 사람 · 접속한 프로그램 · 들어온 순서.
+/// 탭 세 개다.
+/// - **접속** 잔디(언제 붐볐나) · 오늘 요약 · 많이 들어온 사람 · 프로그램 · 들어온 순서
+/// - **활동** 누가 무엇을 등록·수정·삭제했는지 ([ActivityPanel])
+/// - **대화** 사내톡 방 목록과 주고받은 말 ([ChatAuditPanel])
 ///
 /// **색은 앱 토큰 그대로다.** 진하기만 바꿔서 밀도를 만든다.
 /// 서버가 준 값도 그대로 쓴다 — 프로그램 이름(`userAgent`)을 해석하지 않는 건
 /// 지금 앱이 기기를 안 밝혀서 해석해 봐야 틀린 말이 되기 때문이다.
+///
+/// 활동·대화 판은 **고른 탭에서만 만든다.** 셋을 같이 띄우면 열어 보지도 않은
+/// 대화를 조회하게 되고, 서버가 그걸 '대화방 목록 열람' 으로 남긴다.
 class MonitoringScreen extends StatefulWidget {
   MonitoringScreen({super.key});
 
@@ -44,7 +51,13 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
   List<AccessLog> _logs = const [];
   bool _loading = true;
 
-  /// 0 전체 · 1 실패만
+  /// 0 접속 · 1 활동 · 2 대화
+  int _page = 0;
+
+  /// 새로고침을 누른 횟수 — 활동·대화 판을 새로 만들어 다시 받게 하는 열쇠
+  int _reload = 0;
+
+  /// 접속 탭 안쪽 — 0 전체 · 1 실패만
   int _tab = 0;
 
   /// 상대 시각('방금', '12분 전')이 멈춰 보이지 않게 1분마다 다시 그린다.
@@ -168,6 +181,12 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
     return rows.take(5).toList();
   }
 
+  /// 새로고침 — 보고 있는 탭만 다시 받는다
+  void _refresh() {
+    setState(() => _reload++);
+    if (_page == 0) _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -178,11 +197,28 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
           children: [
             DesktopHeader(
               title: '모니터링',
-              subtitle: '누가 언제 어디서 들어왔는지 확인해요',
-              trailing: _RefreshButton(onTap: _load),
+              subtitle: '누가 언제 들어와서 무엇을 했는지 확인해요',
+              trailing: _RefreshButton(onTap: _refresh),
             ),
             SizedBox(height: 22),
-            if (_loading)
+            SegmentedTabs(
+              labels: ['접속', '활동', '대화'],
+              selected: _page,
+              onSelect: (i) => setState(() => _page = i),
+            ),
+            SizedBox(height: 16),
+            if (_page == 1)
+              ActivityPanel(key: ValueKey('activity-$_reload'))
+            else if (_page == 2)
+              ChatAuditPanel(
+                key: ValueKey('chat-$_reload'),
+                // 2단이라 스스로 높이를 못 정한다. 창 높이에서 머리말 자리를 뺀다
+                height: (MediaQuery.sizeOf(context).height - 300).clamp(
+                  420.0,
+                  1000.0,
+                ),
+              )
+            else if (_loading)
               Padding(
                 padding: EdgeInsets.symmetric(vertical: 80),
                 child: Center(
