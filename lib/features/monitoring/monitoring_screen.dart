@@ -24,9 +24,9 @@ import 'anomaly_panel.dart';
 import 'chat_audit_panel.dart';
 import 'performance_panel.dart';
 
-/// 모니터링 — 누가 언제 들어와서 무엇을 했는지 (MASTER · ADMIN)
+/// 모니터링 — 누가 언제 들어와서 무엇을 했는지 (**MASTER 만**)
 ///
-/// 탭 세 개다.
+/// 탭 다섯이다.
 /// - **접속** 잔디(언제 붐볐나) · 오늘 요약 · 많이 들어온 사람 · 프로그램 · 들어온 순서
 /// - **활동** 누가 무엇을 등록·수정·삭제했는지 ([ActivityPanel])
 /// - **대화** 사내톡 방 목록과 주고받은 말 ([ChatAuditPanel])
@@ -42,8 +42,11 @@ import 'performance_panel.dart';
 class MonitoringScreen extends StatefulWidget {
   MonitoringScreen({super.key});
 
-  /// 이 화면을 볼 수 있는 사람 — 서버 `/access-logs` 게이트와 같다
-  static bool get visible => myRole == Role.master || myRole == Role.admin;
+  /// 이 화면을 볼 수 있는 사람 — 서버 게이트와 같다.
+  ///
+  /// **MASTER 만.** 남의 활동과 대화를 들여다보는 자리라 ADMIN 도 못 본다
+  /// (서버도 403 이라, 열어 두면 눌렀을 때 빈 화면만 나온다).
+  static bool get visible => myRole == Role.master;
 
   @override
   State<MonitoringScreen> createState() => _MonitoringScreenState();
