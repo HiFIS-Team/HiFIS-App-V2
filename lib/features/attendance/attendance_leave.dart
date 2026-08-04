@@ -63,6 +63,54 @@ class _LeaveBalanceState extends State<_LeaveBalance> {
     final index = inbox.isEmpty ? 0 : _index.clamp(0, inbox.length - 1);
     final waiting = inbox.isEmpty ? null : inbox[index];
 
+    // 대표는 출퇴근·월차를 쓸 일이 없어서 이 자리를 통째로 결재함으로 쓴다
+    if (myRole == Role.master) {
+      return Container(
+        width: double.infinity,
+        padding: EdgeInsets.all(20),
+        decoration: AppDecorations.card(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('월차 결재', style: AppTextStyles.label),
+            SizedBox(height: 16),
+            if (waiting == null)
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(vertical: 22),
+                decoration: BoxDecoration(
+                  color: AppColors.gray50,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Center(
+                  child: Text(
+                    '들어온 월차 신청이 없어요',
+                    style: AppTextStyles.body2.copyWith(
+                      fontSize: 13,
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                ),
+              )
+            else ...[
+              _LeaveDecideRow(
+                leave: waiting,
+                index: index,
+                total: inbox.length,
+                onMove: _move,
+              ),
+              SizedBox(height: 18),
+              DecideButtons(
+                fill: true,
+                onApprove: () => _approve(waiting),
+                onReject: () => _reject(waiting),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(20),
