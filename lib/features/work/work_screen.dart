@@ -365,9 +365,15 @@ class _WorkScreenState extends State<WorkScreen> {
                             onAdjust: _adjust,
                             onShowHistory: _showHistory,
                           ),
-                          SizedBox(height: 16),
+                          if (isDesktop) SizedBox(height: 16),
                         ],
-                        // 내 내역 / 전체 내역 — 데스크톱은 나란히, 폰은 위아래로
+                        // 내역 카드는 **점검 항목이 없는 사람**(대표·관리자)과
+                        // **데스크톱**에만 둔다.
+                        //
+                        // 폰에서 정비를 하는 사람은 점검 카드 머리말의 `총 N회` 를
+                        // 눌러 시트로 본다 — 그 아래 같은 내용을 또 깔면 화면만 길어진다.
+                        // 데스크톱은 그 자리가 눌리지 않는 글자라(`_ChecklistCard`)
+                        // 카드를 빼면 내역을 볼 길이 없어진다.
                         if (isDesktop)
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -377,7 +383,7 @@ class _WorkScreenState extends State<WorkScreen> {
                               Expanded(child: _allHistoryCard),
                             ],
                           )
-                        else ...[
+                        else if (!_canDoEnv) ...[
                           _myHistoryCard,
                           SizedBox(height: 16),
                           _allHistoryCard,
