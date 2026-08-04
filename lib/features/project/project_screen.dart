@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../core/api/project_api.dart';
+import '../../core/data/employee.dart';
 import '../../core/data/staff.dart';
 import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
@@ -532,8 +533,16 @@ Future<void> _extendProject(
 }
 
 /// 연장 신청을 올릴 수 있는 상태 (끝났거나 이미 올린 신청이 있으면 못 올린다)
+///
+/// **대표·관리자는 못 올린다.** 일을 하는 사람이 올리고 대표가 결재하는 흐름이라,
+/// 자기가 올려서 자기가 승인하는 자리가 되면 결재가 뜻을 잃는다.
 bool _canExtendProject(_Project project) =>
-    project.phase != _Phase.done && project.request == null;
+    myRole.doesFieldWork &&
+    project.phase != _Phase.done &&
+    project.request == null;
+
+/// 연장 신청을 결재할 수 있는 사람 — 서버가 MASTER 로만 열어 뒀다
+bool get _canDecideRequest => myRole == Role.master;
 
 class _ProjectDetail extends StatelessWidget {
   _ProjectDetail({
@@ -825,8 +834,13 @@ class _ProjectDetail extends StatelessWidget {
           SizedBox(height: 14),
           _ExtensionCard(
             project: project,
-            onApprove: () => _decide(context, approve: true),
-            onReject: () => _decide(context, approve: false),
+            // 대표가 아니면 버튼 없이 '대기 중'만 보인다 (눌러도 403 이다)
+            onApprove: _canDecideRequest
+                ? () => _decide(context, approve: true)
+                : null,
+            onReject: _canDecideRequest
+                ? () => _decide(context, approve: false)
+                : null,
           ),
         ],
         SizedBox(height: 18),
@@ -897,13 +911,17 @@ class _ExtensionCard extends StatelessWidget {
   });
 
   final _Project project;
-  final VoidCallback onApprove;
-  final VoidCallback onReject;
+
+  /// null 이면 결재 권한이 없다 — 버튼 대신 기다린다는 안내만 둔다
+  final VoidCallback? onApprove;
+  final VoidCallback? onReject;
+
+  bool get _canDecide => onApprove != null && onReject != null;
 
   /// 반려·승인 버튼 (폰은 [fill]로 가로를 꽉 채운다)
   Widget _buttons({required bool fill}) {
     final reject = Pressable(
-      onTap: onReject,
+      onTap: onReject!,
       scale: 0.96,
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
@@ -924,7 +942,7 @@ class _ExtensionCard extends StatelessWidget {
       ),
     );
     final approve = Pressable(
-      onTap: onApprove,
+      onTap: onApprove!,
       scale: 0.96,
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
@@ -989,7 +1007,10 @@ class _ExtensionCard extends StatelessWidget {
         ),
         SizedBox(height: 4),
         Text(
-          '${request.requester} · ${_relative(request.time)} 신청',
+          _canDecide
+              ? '${request.requester} · ${_relative(request.time)} 신청'
+              : '${request.requester} · ${_relative(request.time)} 신청'
+                    ' · 대표 결재를 기다리고 있어요',
           style: AppTextStyles.caption.copyWith(fontSize: 11),
         ),
       ],
@@ -1015,8 +1036,7 @@ class _ExtensionCard extends StatelessWidget {
                 icon,
                 SizedBox(width: 10),
                 Expanded(child: info),
-                SizedBox(width: 12),
-                _buttons(fill: false),
+                if (_canDecide) ...[SizedBox(width: 12), _buttons(fill: false)],
               ],
             )
           : Column(
@@ -1030,8 +1050,7 @@ class _ExtensionCard extends StatelessWidget {
                     Expanded(child: info),
                   ],
                 ),
-                SizedBox(height: 12),
-                _buttons(fill: true),
+                if (_canDecide) ...[SizedBox(height: 12), _buttons(fill: true)],
               ],
             ),
     );
