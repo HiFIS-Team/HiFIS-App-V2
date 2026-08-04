@@ -18,7 +18,7 @@ import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/pressable.dart';
 
-/// 접속 기록 — 누가 언제 어디서 들어왔는지 (MASTER · ADMIN)
+/// 모니터링 — 누가 언제 어디서 들어왔는지 (MASTER · ADMIN)
 ///
 /// 관제실처럼 **큰 숫자 → 하루 흐름 → 들어온 순서**로 위에서 아래로 읽힌다.
 /// 색·글꼴·카드는 앱 디자인 시스템 그대로다 — 배치만 모니터링 화면 결이다.
@@ -128,7 +128,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
           padding: EdgeInsets.fromLTRB(24, 64, 24, 32),
           children: [
             DesktopHeader(
-              title: '접속 기록',
+              title: '모니터링',
               subtitle: '누가 언제 어디서 들어왔는지 확인해요',
               trailing: _RefreshButton(onTap: _load),
             ),
@@ -268,17 +268,19 @@ class _Cell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 칸 가운데에 세운다. 왼쪽에 붙이면 칸이 넓어서 값 오른쪽이 휑하게 비고,
+    // 네 덩어리가 왼쪽으로 쏠린 것처럼 보인다 (실제로 그렇게 보였다).
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.baseline,
           textBaseline: TextBaseline.alphabetic,
           children: [
             Flexible(
               child: FittedBox(
                 fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
                 child: Text(
                   value,
                   maxLines: 1,
@@ -303,7 +305,15 @@ class _Cell extends StatelessWidget {
           ],
         ),
         SizedBox(height: 4),
-        Text(label, style: AppTextStyles.caption.copyWith(fontSize: 12)),
+        // 칸이 좁아지면 '오늘 접속한 사람' 같은 이름이 두 줄로 접히면서
+        // 네 칸 높이가 서로 달라진다 — 한 줄로 자른다
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: AppTextStyles.caption.copyWith(fontSize: 12),
+        ),
       ],
     );
   }
@@ -323,7 +333,6 @@ class _HourChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final top = hours.fold(0, (a, h) => h.$1 + h.$2 > a ? h.$1 + h.$2 : a);
-    final now = DateTime.now().hour;
 
     return Container(
       padding: EdgeInsets.fromLTRB(24, 20, 24, 16),
@@ -333,7 +342,15 @@ class _HourChart extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text('오늘 시간대별 접속', style: AppTextStyles.label),
+              Flexible(
+                child: Text(
+                  '오늘 시간대별 접속',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.label,
+                ),
+              ),
+              SizedBox(width: 12),
               Spacer(),
               _Legend(color: AppColors.primary, text: '로그인'),
               SizedBox(width: 12),
@@ -352,8 +369,6 @@ class _HourChart extends StatelessWidget {
                       success: hours[i].$1,
                       failed: hours[i].$2,
                       top: top,
-                      // 지금 시각 칸은 눈금을 진하게 해서 어디쯤인지 알려준다
-                      current: i == now,
                     ),
                   ),
               ],
@@ -403,19 +418,13 @@ class _Legend extends StatelessWidget {
 
 /// 막대 한 칸
 class _Bar extends StatelessWidget {
-  _Bar({
-    required this.success,
-    required this.failed,
-    required this.top,
-    required this.current,
-  });
+  _Bar({required this.success, required this.failed, required this.top});
 
   final int success;
   final int failed;
 
   /// 제일 높은 칸의 값 (0이면 다 비어 있다)
   final int top;
-  final bool current;
 
   @override
   Widget build(BuildContext context) {
@@ -449,11 +458,13 @@ class _Bar extends StatelessWidget {
             ),
           ),
           SizedBox(height: 4),
-          // 바닥 눈금 — 지금 시각만 진하다
+          // 바닥 눈금 — 24칸 전부 같은 색이어야 한 줄로 이어져 보인다.
+          // 지금 시각만 파랗게 해 봤더니 막대 밑에 정체 모를 선이 하나 더
+          // 있는 것처럼 보였다.
           Container(
             height: 2,
             decoration: BoxDecoration(
-              color: current ? AppColors.primary : AppColors.gray100,
+              color: AppColors.gray100,
               borderRadius: BorderRadius.circular(1),
             ),
           ),

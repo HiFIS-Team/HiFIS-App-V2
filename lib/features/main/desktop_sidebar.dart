@@ -68,7 +68,7 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
       [(Icons.campaign_rounded, '공지'), (Icons.emoji_events_rounded, '랭킹')],
     ),
     if (MonitoringScreen.visible)
-      ('관리', [(Icons.monitor_heart_rounded, '접속 기록')]),
+      ('관리', [(Icons.monitor_heart_rounded, '모니터링')]),
   ];
 
   /// 펼쳐질 때만 보이는 요소 (메뉴 제목, 섹션 캡션, 워드마크)
