@@ -18,6 +18,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
 import '../../core/widgets/app_toast.dart';
+import '../../core/widgets/mini_button.dart';
 import '../../core/widgets/avatar.dart';
 import '../../core/widgets/pressable.dart';
 import '../../core/widgets/reject_reason_dialog.dart';
@@ -493,47 +494,11 @@ class _InboxRow extends StatelessWidget {
         ),
         if (onApprove != null && onReject != null) ...[
           SizedBox(width: 8),
-          _MiniButton(label: '승인', onTap: onApprove!, filled: true),
+          MiniButton(label: '승인', onTap: onApprove!, filled: true),
           SizedBox(width: 6),
-          _MiniButton(label: '반려', onTap: onReject!, filled: false),
+          MiniButton(label: '반려', onTap: onReject!, filled: false),
         ],
       ],
-    );
-  }
-}
-
-/// 줄 안에 들어가는 작은 처리 버튼 — 카드가 좁아서 기본 버튼(높이 56)은 못 쓴다
-class _MiniButton extends StatelessWidget {
-  _MiniButton({required this.label, required this.onTap, required this.filled});
-
-  final String label;
-  final VoidCallback onTap;
-
-  /// 승인은 채우고 반려는 테두리만 — 실수로 반려를 먼저 누르지 않게
-  final bool filled;
-
-  @override
-  Widget build(BuildContext context) {
-    return Pressable(
-      onTap: onTap,
-      scale: 0.96,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        height: 32,
-        padding: EdgeInsets.symmetric(horizontal: 12),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: filled ? AppColors.primary : AppColors.gray50,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.caption.copyWith(
-            fontWeight: FontWeight.w600,
-            color: filled ? Colors.white : AppColors.textSecondary,
-          ),
-        ),
-      ),
     );
   }
 }
