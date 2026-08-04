@@ -204,6 +204,10 @@ final _days = <_Day>[];
 
 final _leaves = <_Leave>[];
 
+/// 결재를 기다리는 월차 신청 — 승인함을 볼 수 있는 사람에게만 채워진다.
+/// 승인 화면을 따로 두지 않고 '남은 월차' 카드 안에서 바로 처리한다.
+final _leaveInbox = <LeaveRequest>[];
+
 /// 근태·월차를 서버에서 받아 온다
 ///
 /// 달력이 앞뒤 달을 넘겨볼 수 있어야 해서 이번 달과 지난달을 같이 받는다.
@@ -219,12 +223,20 @@ Future<void> _loadAttendance() async {
   ];
   final leaves = await AttendanceApi.leaves(employeeId: currentUser?.id);
   final balance = await AttendanceApi.balance();
+  // 남이 낸 신청은 결재할 수 있는 사람만 받는다 (지점 제한은 서버가 건다)
+  final inbox = _canSeeLeaveInbox
+      ? await AttendanceApi.leaves(status: LeaveStatus.pending)
+      : const <LeaveRequest>[];
 
   _balance = balance;
 
   _leaves
     ..clear()
     ..addAll(leaves.map(_Leave.from));
+
+  _leaveInbox
+    ..clear()
+    ..addAll(inbox);
 
   _days
     ..clear()

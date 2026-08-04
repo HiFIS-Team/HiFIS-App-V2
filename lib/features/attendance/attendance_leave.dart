@@ -3,10 +3,52 @@ part of 'attendance_screen.dart';
 // ── 월차 ──
 
 /// 남은 월차 카드 — 큰 숫자와 사용량 막대, 그리고 신청 버튼
-class _LeaveBalance extends StatelessWidget {
-  _LeaveBalance({required this.onRequest});
+///
+/// 결재할 신청이 밀려 있으면 신청 버튼 자리를 반려·승인이 대신 차지한다
+/// ([_LeaveDecideRow]). 승인 화면을 따로 나누지 않기로 했다.
+class _LeaveBalance extends StatefulWidget {
+  _LeaveBalance({required this.onRequest, required this.onDecided});
 
   final VoidCallback onRequest;
+
+  /// 승인·반려가 끝나면 화면을 다시 받는다 (달력의 월차 색까지 바뀐다)
+  final Future<void> Function() onDecided;
+
+  @override
+  State<_LeaveBalance> createState() => _LeaveBalanceState();
+}
+
+class _LeaveBalanceState extends State<_LeaveBalance> {
+  /// 지금 보고 있는 결재 대기 순번
+  int _index = 0;
+
+  void _move(int delta) {
+    final total = _leaveInbox.length;
+    if (total < 2) return;
+    setState(
+      () => _index = (_index.clamp(0, total - 1) + delta + total) % total,
+    );
+  }
+
+  Future<void> _approve(LeaveRequest leave) =>
+      _run(() => AttendanceApi.approveLeave(leave.id), '승인했어요');
+
+  Future<void> _reject(LeaveRequest leave) async {
+    final reason = await askRejectReason(context, hint: '예) 그날은 인원이 모자라요');
+    if (reason == null || !mounted) return;
+    await _run(() => AttendanceApi.rejectLeave(leave.id, reason), '반려했어요');
+  }
+
+  Future<void> _run(Future<LeaveRequest> Function() action, String done) async {
+    try {
+      await action();
+      if (!mounted) return;
+      AppToast.show(context, done);
+      await widget.onDecided();
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -16,6 +58,10 @@ class _LeaveBalance extends StatelessWidget {
     final pending = _leaves
         .where((l) => l.status == _LeaveStatus.pending)
         .length;
+    // 처리하고 나면 건수가 줄어드니 볼 순번을 다시 잡는다
+    final inbox = _leaveInbox;
+    final index = inbox.isEmpty ? 0 : _index.clamp(0, inbox.length - 1);
+    final waiting = inbox.isEmpty ? null : inbox[index];
 
     return Container(
       width: double.infinity,
@@ -80,33 +126,53 @@ class _LeaveBalance extends StatelessWidget {
               ],
             ),
           ),
+          if (waiting != null) ...[
+            SizedBox(height: 18),
+            Container(height: 1, color: AppColors.divider),
+            SizedBox(height: 16),
+            _LeaveDecideRow(
+              leave: waiting,
+              index: index,
+              total: inbox.length,
+              onMove: _move,
+            ),
+          ],
           SizedBox(height: 18),
-          Pressable(
-            onTap: onRequest,
-            scale: 0.97,
-            child: Container(
-              height: 48,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppColors.primaryLight,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.add_rounded, size: 18, color: AppColors.primary),
-                  SizedBox(width: 6),
-                  Text(
-                    '월차 신청',
-                    style: AppTextStyles.body2.copyWith(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w700,
+          // 결재할 것이 있으면 신청 버튼 자리를 반려·승인이 대신 쓴다.
+          // ADMIN 은 지켜보기만 해서 버튼이 없다 — 그때는 신청 버튼이 남는다
+          if (waiting != null && _canDecideLeave)
+            DecideButtons(
+              fill: true,
+              onApprove: () => _approve(waiting),
+              onReject: () => _reject(waiting),
+            )
+          else
+            Pressable(
+              onTap: widget.onRequest,
+              scale: 0.97,
+              child: Container(
+                height: 48,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.add_rounded, size: 18, color: AppColors.primary),
+                    SizedBox(width: 6),
+                    Text(
+                      '월차 신청',
+                      style: AppTextStyles.body2.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
