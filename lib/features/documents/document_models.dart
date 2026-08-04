@@ -158,8 +158,9 @@ class _Item {
   }
 }
 
-/// 최상위 폴더 — 탭을 오가도 유지되도록 모듈 전역으로 둔다
-final _root = _Item.folder(name: '문서함', id: '', children: []);
+/// 최상위 폴더 — 탭을 오가도 유지되도록 모듈 전역으로 둔다.
+/// 이름은 갈래를 따라간다 (`전사 문서` ↔ `내 문서`) — 경로 줄 첫 칸에 뜬다
+final _root = _Item.folder(name: DocScope.company.label, id: '', children: []);
 
 /// 지금 보고 있는 갈래. 바꾸면 트리를 통째로 다시 받는다
 DocScope _scope = DocScope.company;
@@ -181,6 +182,7 @@ Future<void> _loadTree() async {
 }
 
 void _buildTree(List<Folder> folders, List<Document> documents) {
+  _root.name = _scope.label;
   final nodes = <String, _Item>{
     for (final folder in folders)
       folder.id: _Item.folder(

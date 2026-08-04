@@ -128,6 +128,8 @@ class _DocumentScreenState extends State<DocumentScreen> {
     if (scope == _scope) return;
     setState(() {
       _scope = scope;
+      // 목록이 오기 전에도 경로 줄 첫 칸이 바로 바뀌게 한다
+      _root.name = scope.label;
       _place = _Place.all;
       _path.removeRange(1, _path.length);
       _expanded.clear();
