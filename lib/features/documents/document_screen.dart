@@ -1188,38 +1188,47 @@ class _Breadcrumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      reverse: true,
-      child: Row(
-        children: [
-          for (var i = 0; i < path.length; i++) ...[
-            if (i > 0)
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 2),
-                child: Icon(
-                  CupertinoIcons.chevron_right,
-                  size: 11,
-                  color: AppColors.gray300,
+    // `reverse` 는 경로가 길 때 **끝(지금 폴더)** 이 보이게 하는 것이라,
+    // 그냥 두면 짧은 경로가 오른쪽 검색창 옆에 가서 붙는다.
+    // 최소 폭을 뷰포트만큼 줘서 짧을 때는 왼쪽에 서게 한다
+    // (즐겨찾기·최근 항목 이름과 같은 자리).
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        reverse: true,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minWidth: constraints.maxWidth),
+          child: Row(
+            children: [
+              for (var i = 0; i < path.length; i++) ...[
+                if (i > 0)
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 2),
+                    child: Icon(
+                      CupertinoIcons.chevron_right,
+                      size: 11,
+                      color: AppColors.gray300,
+                    ),
+                  ),
+                Pressable(
+                  onTap: () => onTap(i),
+                  scale: 0.96,
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    child: Text(
+                      path[i].name,
+                      style: i == path.length - 1
+                          ? AppTextStyles.title3
+                          : AppTextStyles.body2.copyWith(
+                              color: AppColors.textTertiary,
+                            ),
+                    ),
+                  ),
                 ),
-              ),
-            Pressable(
-              onTap: () => onTap(i),
-              scale: 0.96,
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                child: Text(
-                  path[i].name,
-                  style: i == path.length - 1
-                      ? AppTextStyles.title3
-                      : AppTextStyles.body2.copyWith(
-                          color: AppColors.textTertiary,
-                        ),
-                ),
-              ),
-            ),
-          ],
-        ],
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
