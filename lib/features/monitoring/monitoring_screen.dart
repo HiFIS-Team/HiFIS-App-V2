@@ -20,7 +20,9 @@ import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/page_numbers.dart';
 import '../../core/widgets/pressable.dart';
 import 'activity_panel.dart';
+import 'anomaly_panel.dart';
 import 'chat_audit_panel.dart';
+import 'performance_panel.dart';
 
 /// 모니터링 — 누가 언제 들어와서 무엇을 했는지 (MASTER · ADMIN)
 ///
@@ -28,6 +30,8 @@ import 'chat_audit_panel.dart';
 /// - **접속** 잔디(언제 붐볐나) · 오늘 요약 · 많이 들어온 사람 · 프로그램 · 들어온 순서
 /// - **활동** 누가 무엇을 등록·수정·삭제했는지 ([ActivityPanel])
 /// - **대화** 사내톡 방 목록과 주고받은 말 ([ChatAuditPanel])
+/// - **성능** 서버가 얼마나 빠른가 ([PerformancePanel])
+/// - **이상** 수상한 흐름 — 찾으면 대표에게 푸시가 간다 ([AnomalyPanel])
 ///
 /// **색은 앱 토큰 그대로다.** 진하기만 바꿔서 밀도를 만든다.
 /// 서버가 준 값도 그대로 쓴다 — 프로그램 이름(`userAgent`)을 해석하지 않는 건
@@ -73,7 +77,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
   /// 2장으로 넘어가는 사이에 새 줄이 앞에 끼어들어 1장 마지막 줄이 또 나온다.
   DateTime _since = DateTime.now();
 
-  /// 0 접속 · 1 활동 · 2 대화
+  /// 0 접속 · 1 활동 · 2 대화 · 3 성능 · 4 이상
   int _page = 0;
 
   /// 새로고침을 누른 횟수 — 활동·대화 판을 새로 만들어 다시 받게 하는 열쇠
@@ -260,12 +264,16 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
             ),
             SizedBox(height: 22),
             SegmentedTabs(
-              labels: ['접속', '활동', '대화'],
+              labels: ['접속', '활동', '대화', '성능', '이상'],
               selected: _page,
               onSelect: (i) => setState(() => _page = i),
             ),
             SizedBox(height: 16),
-            if (_page == 1)
+            if (_page == 3)
+              PerformancePanel(key: ValueKey('perf-$_reload'))
+            else if (_page == 4)
+              AnomalyPanel(key: ValueKey('anomaly-$_reload'))
+            else if (_page == 1)
               ActivityPanel(key: ValueKey('activity-$_reload'))
             else if (_page == 2)
               ChatAuditPanel(
