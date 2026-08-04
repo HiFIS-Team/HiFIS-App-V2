@@ -182,12 +182,15 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           _LeaveBalance(onRequest: _requestLeave, onDecided: _reload),
           SizedBox(height: 12),
           calendar,
-          SizedBox(height: 12),
-          _LeaveList(
-            leaves: _leaves,
-            onCancel: _cancelLeave,
-            onOpenAll: _openLeaveHistory,
-          ),
+          // 대표는 본인 월차를 안 써서 이 카드가 늘 비어 있다
+          if (!_isBoss) ...[
+            SizedBox(height: 12),
+            _LeaveList(
+              leaves: _leaves,
+              onCancel: _cancelLeave,
+              onOpenAll: _openLeaveHistory,
+            ),
+          ],
         ],
       );
     }
@@ -222,12 +225,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             ),
             SizedBox(height: 16),
             calendar,
-            SizedBox(height: 16),
-            _LeaveList(
-              leaves: _leaves,
-              onCancel: _cancelLeave,
-              onOpenAll: _openLeaveHistory,
-            ),
+            if (!_isBoss) ...[
+              SizedBox(height: 16),
+              _LeaveList(
+                leaves: _leaves,
+                onCancel: _cancelLeave,
+                onOpenAll: _openLeaveHistory,
+              ),
+            ],
           ],
         ),
       ),
