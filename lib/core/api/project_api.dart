@@ -98,6 +98,7 @@ class Project {
     required this.todoCount,
     required this.doneCount,
     required this.assigneeIds,
+    required this.ownerId,
     required this.status,
     required this.createdById,
     required this.createdAt,
@@ -119,6 +120,7 @@ class Project {
       for (final id in (json['assigneeIds'] as List<dynamic>? ?? const []))
         id as String,
     ],
+    ownerId: json['ownerId'] as String? ?? json['createdById'] as String,
     color: json['color'] as String?,
     extensionReason: json['extensionReason'] as String?,
     status: ProjectStatus.parse(json['status'] as String?),
@@ -147,6 +149,10 @@ class Project {
   final int doneCount;
 
   final List<String> assigneeIds;
+
+  /// 프로젝트를 맡은 사람 — **만든 사람과 다를 수 있다** (대표가 만들어 맡긴다).
+  /// 서버가 안 정한 옛 프로젝트에는 만든 사람을 채워서 준다
+  final String ownerId;
 
   /// 만들 때 고른 색 (`#RRGGBB`).
   /// **null 이면 앱이 id 에서 만들어 쓴다** — 색 필드가 생기기 전에 올린 것들이다
@@ -318,6 +324,7 @@ class ProjectApi {
     String steps = '',
     DateTime? startAt,
     List<String> assigneeIds = const [],
+    String? ownerId,
     String? color,
   }) async {
     final data = await _client.post(
@@ -329,6 +336,8 @@ class ProjectApi {
         'startAt': ?startAt?.toUtc().toIso8601String(),
         'due': due.toUtc().toIso8601String(),
         'assigneeIds': assigneeIds,
+        // 안 주면 서버가 만든 사람을 담당으로 넣는다
+        'ownerId': ?ownerId,
         'color': ?color,
       },
     );
@@ -345,6 +354,7 @@ class ProjectApi {
     DateTime? startAt,
     DateTime? due,
     List<String>? assigneeIds,
+    String? ownerId,
     String? color,
   }) async {
     final data = await _client.patch(
@@ -356,6 +366,7 @@ class ProjectApi {
         'startAt': ?startAt?.toUtc().toIso8601String(),
         'due': ?due?.toUtc().toIso8601String(),
         'assigneeIds': ?assigneeIds,
+        'ownerId': ?ownerId,
         'color': ?color,
       },
     );

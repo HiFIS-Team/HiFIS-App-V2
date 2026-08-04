@@ -2177,13 +2177,18 @@ class _ProjectComposerState extends State<_ProjectComposer> {
   /// 기본 마감은 2주 뒤
   late DateTime _due = DateTime.now().add(Duration(days: 14));
 
-  /// 나는 항상 참여한다 (담당자 기본값이라 뺄 수 없게 둔다)
-  final _members = <String>[me];
+  /// 참여 멤버 — 직원·점장은 본인이 기본으로 든다.
+  ///
+  /// **대표·관리자는 안 든다.** 프로젝트를 만들어 맡기는 자리라 본인이
+  /// 참여자도 담당자도 아니다 (그래서 [_owner] 도 비운 채로 시작한다).
+  final _members = <String>[if (myRole.doesFieldWork) me];
 
   /// 만들면서 같이 등록할 할 일
   final _todos = <_Todo>[];
 
-  String _owner = me;
+  /// 맡을 사람 — 비어 있으면 아직 안 골랐다는 뜻이다
+  String _owner = myRole.doesFieldWork ? me : '';
+
   Color _color = AppColors.primary;
 
   /// 프로젝트를 구분하는 색 — 빨강은 D-day 배지와 헷갈려서 뺐다
@@ -2242,8 +2247,9 @@ class _ProjectComposerState extends State<_ProjectComposer> {
     setState(() {
       if (_members.contains(name)) {
         _members.remove(name);
-        // 빠진 사람이 맡기로 한 자리는 비워둔다
-        if (_owner == name) _owner = me;
+        // 빠진 사람이 맡기로 한 자리는 정말로 비워둔다 —
+        // 본인으로 되돌리면 대표가 만든 프로젝트의 담당이 대표가 된다
+        if (_owner == name) _owner = '';
         for (final todo in _todos) {
           if (todo.assignee == name) todo.assignee = null;
         }
@@ -2258,6 +2264,10 @@ class _ProjectComposerState extends State<_ProjectComposer> {
     if (name.isEmpty) {
       AppToast.show(context, '프로젝트 이름을 입력해주세요');
       _nameFocus.requestFocus();
+      return;
+    }
+    if (_owner.isEmpty) {
+      AppToast.show(context, '담당자를 정해주세요');
       return;
     }
     final now = DateTime.now();
@@ -2333,16 +2343,22 @@ class _ProjectComposerState extends State<_ProjectComposer> {
           children: [
             SizedBox(width: 62, child: Text('담당', style: AppTextStyles.label)),
             _AssigneeChip(
-              name: _owner,
+              name: _owner.isEmpty ? null : _owner,
               onTap: () async {
                 final picked = await _pickMember(
                   context,
-                  names: _members,
-                  current: _owner,
+                  // **명단 전체에서 고른다.** 참여 멤버 중에서만 고르게 하면
+                  // 대표가 프로젝트를 만들 때 멤버부터 넣어야 담당을 고를 수 있다
+                  names: [for (final staff in staffList) staff.name],
+                  current: _owner.isEmpty ? null : _owner,
                 );
-                // 담당은 비울 수 없다 (빈 문자열 = 담당자 없음)
+                // 담당은 비울 수 없다 (빈 문자열 = 안 고르고 닫음)
                 if (picked == null || picked.isEmpty) return;
-                setState(() => _owner = picked);
+                setState(() {
+                  _owner = picked;
+                  // 맡은 사람은 당연히 참여한다
+                  if (!_members.contains(picked)) _members.add(picked);
+                });
               },
             ),
           ],
@@ -2970,7 +2986,7 @@ _Project _fromServer(Project row, ProjectRequest? request) {
     name: row.title,
     desc: row.purpose,
     colorHex: row.color,
-    owner: _nameOf(row.createdById),
+    owner: _nameOf(row.ownerId),
     createdById: row.createdById,
     start: row.startAt,
     due: row.due,
@@ -3107,6 +3123,8 @@ Future<_Project> _saveNewProject(_Project draft) async {
       for (final name in draft.members)
         ?StaffDirectory.instance.byName(name)?.id,
     ],
+    // 안 고르면 서버가 만든 사람을 담당으로 넣는다
+    ownerId: StaffDirectory.instance.byName(draft.owner)?.id,
     color: draft.colorHex,
   );
 
