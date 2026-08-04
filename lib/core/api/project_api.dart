@@ -167,6 +167,50 @@ class Project {
 }
 
 /// 체크리스트 한 줄 (서버 `ProjectTodoOut`)
+/// 프로젝트 달성 점수 한 건 (서버 `ProjectAwardOut`)
+///
+/// 완료(100%)하면 담당자마다 **자동 10점**이 붙고, 그 위에서 MASTER 가
+/// 올리거나 깎는다. 여기서 매긴 값이 그 사람의 **최종 점수**다 (더해지지 않는다).
+class ProjectAward {
+  ProjectAward({
+    required this.id,
+    required this.projectId,
+    required this.employeeId,
+    required this.points,
+    required this.createdAt,
+    this.comment,
+    this.createdById,
+  });
+
+  factory ProjectAward.fromJson(Map<String, dynamic> json) => ProjectAward(
+    id: json['id'] as String,
+    projectId: json['projectId'] as String? ?? '',
+    employeeId: json['employeeId'] as String? ?? '',
+    points: (json['points'] as num?)?.toInt() ?? 0,
+    comment: json['comment'] as String?,
+    createdById: json['createdById'] as String?,
+    createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
+  );
+
+  final String id;
+  final String projectId;
+  final String employeeId;
+
+  /// -100 ~ 100
+  final int points;
+
+  /// 점수 사유 — 부여할 때 필수다
+  final String? comment;
+
+  /// **null 이면 완료로 자동으로 붙은 10점**이다 (사람이 매기면 그 사람 id)
+  final String? createdById;
+
+  final DateTime createdAt;
+
+  /// 사람이 매긴 점수인지 — 자동 10점과 갈라 보여준다
+  bool get byPerson => createdById != null;
+}
+
 class ProjectTodo {
   ProjectTodo({
     required this.id,
@@ -514,5 +558,29 @@ class ProjectApi {
       body: {'reason': reason},
     );
     return ProjectRequest.fromJson(data!);
+  }
+
+  /// 프로젝트 달성 점수 목록 — 자동 10점과 MASTER 가 매긴 것이 섞여 온다
+  static Future<List<ProjectAward>> awards(String projectId) async {
+    final rows = await _client.getList('/projects/$projectId/awards');
+    return [
+      for (final row in rows)
+        ProjectAward.fromJson((row as Map).cast<String, dynamic>()),
+    ];
+  }
+
+  /// 담당자 점수 매기기 (MASTER 전용) — 사유가 필수다.
+  /// 같은 사람에게 다시 매기면 **덮어쓴다** (더해지지 않는다)
+  static Future<ProjectAward> award(
+    String projectId, {
+    required String employeeId,
+    required int points,
+    required String comment,
+  }) async {
+    final data = await _client.post(
+      '/projects/$projectId/award',
+      body: {'employeeId': employeeId, 'points': points, 'comment': comment},
+    );
+    return ProjectAward.fromJson(data!);
   }
 }

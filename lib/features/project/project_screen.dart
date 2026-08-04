@@ -20,6 +20,7 @@ import '../../core/widgets/glass_bottom_button.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/glass_input_bar.dart';
 import '../../core/widgets/empty_card.dart';
+import '../../core/widgets/mini_button.dart';
 import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/pressable.dart';
 import '../../core/widgets/scroll_box.dart';
@@ -889,6 +890,11 @@ class _ProjectDetail extends StatelessWidget {
           onAssign: (todo) => _assign(context, todo),
         ),
         SizedBox(height: 16),
+        // 완료한 프로젝트의 담당자 점수 — 대표만 매기고 대표만 본다
+        if (project.phase == _Phase.done && myRole == Role.master) ...[
+          _AwardCard(project: project),
+          SizedBox(height: 16),
+        ],
         // 폰은 댓글을 시트로 빼고, 여기엔 눌러서 여는 줄만 둔다
         if (!isDesktop) ...[
           _CommentTeaser(
@@ -1389,6 +1395,321 @@ class _TodoComposerState extends State<_TodoComposer> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// 담당자 점수 카드 — **완료된 프로젝트에만, MASTER 에게만** 보인다
+///
+/// 완료하면 담당자마다 자동 10점이 붙고, 그 위에서 대표가 판단해 올리거나 깎는다.
+/// 여기서 매긴 값이 그 사람의 **최종 점수**다 (10점에 더해지지 않고 덮어쓴다).
+class _AwardCard extends StatefulWidget {
+  _AwardCard({required this.project});
+
+  final _Project project;
+
+  @override
+  State<_AwardCard> createState() => _AwardCardState();
+}
+
+class _AwardCardState extends State<_AwardCard> {
+  /// 직원 uuid → 그 사람의 점수
+  Map<String, ProjectAward> _awards = const {};
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final id = widget.project.id;
+    if (id == null) {
+      setState(() => _loading = false);
+      return;
+    }
+    try {
+      final rows = await ProjectApi.awards(id);
+      if (!mounted) return;
+      setState(() {
+        _awards = {for (final row in rows) row.employeeId: row};
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      AppToast.show(context, messageOf(error));
+    }
+  }
+
+  Future<void> _give(Employee staff) async {
+    final id = widget.project.id;
+    if (id == null) return;
+    final result = await _askAward(context, staff, _awards[staff.id]);
+    if (result == null || !mounted) return;
+    try {
+      final saved = await ProjectApi.award(
+        id,
+        employeeId: staff.id,
+        points: result.$1,
+        comment: result.$2,
+      );
+      if (!mounted) return;
+      setState(() => _awards = {..._awards, staff.id: saved});
+      AppToast.show(context, '${staff.name}님 점수를 매겼어요');
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final people = [
+      for (final id in widget.project.memberIds)
+        ?StaffDirectory.instance.byId(id),
+    ];
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, 18, 20, 16),
+      decoration: AppDecorations.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('담당자 점수', style: AppTextStyles.label),
+          SizedBox(height: 6),
+          if (_loading)
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: 18),
+              child: Center(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation(AppColors.gray400),
+                  ),
+                ),
+              ),
+            )
+          else if (people.isEmpty)
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: 14),
+              child: Text(
+                '참여한 사람이 없어요',
+                style: AppTextStyles.body2.copyWith(
+                  color: AppColors.textTertiary,
+                ),
+              ),
+            )
+          else
+            for (final staff in people)
+              _AwardRow(
+                staff: staff,
+                award: _awards[staff.id],
+                onTap: () => _give(staff),
+              ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 담당자 점수 한 줄
+class _AwardRow extends StatelessWidget {
+  _AwardRow({required this.staff, required this.award, required this.onTap});
+
+  final Employee staff;
+
+  /// null 이면 아직 아무 점수도 없다 (완료 직후에는 자동 10점이 들어 있다)
+  final ProjectAward? award;
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final given = award;
+    final label = given == null
+        ? '점수 없음'
+        : given.byPerson
+        ? '${given.points}점 · ${given.comment ?? ''}'
+        : '완료 ${given.points}점';
+
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Avatar(name: staff.name, size: 30),
+          SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  staff.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.body2.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                SizedBox(height: 1),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.caption.copyWith(
+                    color: given != null && given.points < 0
+                        ? AppColors.error
+                        : AppColors.textTertiary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(width: 8),
+          MiniButton(
+            label: given?.byPerson == true ? '다시' : '점수 주기',
+            onTap: onTap,
+            filled: given?.byPerson != true,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 점수와 사유를 받는다 — 취소하면 null
+Future<(int, String)?> _askAward(
+  BuildContext context,
+  Employee staff,
+  ProjectAward? current,
+) {
+  final points = TextEditingController(
+    text: '${current?.byPerson == true ? current!.points : 10}',
+  );
+  final reason = TextEditingController(
+    text: current?.byPerson == true ? (current!.comment ?? '') : '',
+  );
+
+  return showAppDialog<(int, String)>(
+    context,
+    (context) => Container(
+      width: dialogWidth(context, 320),
+      padding: EdgeInsets.fromLTRB(20, 20, 20, 16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('${staff.name}님 점수', style: AppTextStyles.title3),
+          SizedBox(height: 4),
+          Text(
+            '-100 ~ 100. 매긴 값이 최종 점수예요',
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.textTertiary,
+            ),
+          ),
+          SizedBox(height: 14),
+          _AwardField(controller: points, hint: '점수', number: true),
+          SizedBox(height: 8),
+          _AwardField(controller: reason, hint: '사유 (필수)'),
+          SizedBox(height: 16),
+          Row(
+            children: [
+              Spacer(),
+              Pressable(
+                onTap: () => Navigator.pop(context),
+                scale: 0.97,
+                pressedColor: AppColors.gray100,
+                borderRadius: BorderRadius.circular(12),
+                padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                child: Text(
+                  '취소',
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              SizedBox(width: 6),
+              Pressable(
+                onTap: () {
+                  final value = int.tryParse(points.text.trim());
+                  if (value == null || value < -100 || value > 100) {
+                    AppToast.show(context, '-100 부터 100 까지 적어주세요');
+                    return;
+                  }
+                  final text = reason.text.trim();
+                  if (text.isEmpty) {
+                    AppToast.show(context, '점수 사유를 적어주세요');
+                    return;
+                  }
+                  Navigator.pop(context, (value, text));
+                },
+                scale: 0.97,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '주기',
+                    style: AppTextStyles.body2.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// 점수 팝업 입력칸
+class _AwardField extends StatelessWidget {
+  _AwardField({
+    required this.controller,
+    required this.hint,
+    this.number = false,
+  });
+
+  final TextEditingController controller;
+  final String hint;
+  final bool number;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.gray50,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: TextField(
+        controller: controller,
+        keyboardType: number
+            ? TextInputType.numberWithOptions(signed: true)
+            : null,
+        inputFormatters: number
+            ? [FilteringTextInputFormatter.allow(RegExp(r'[-0-9]'))]
+            : null,
+        style: AppTextStyles.body2,
+        cursorColor: AppColors.primary,
+        decoration: InputDecoration(
+          border: InputBorder.none,
+          hintText: hint,
+          hintStyle: AppTextStyles.body2.copyWith(color: AppColors.gray400),
+        ),
+      ),
     );
   }
 }
