@@ -569,18 +569,24 @@ class ProjectApi {
     ];
   }
 
-  /// 담당자 점수 매기기 (MASTER 전용) — 사유가 필수다.
-  /// 같은 사람에게 다시 매기면 **덮어쓴다** (더해지지 않는다)
-  static Future<ProjectAward> award(
+  /// 프로젝트 점수 매기기 (MASTER 전용) — 사유가 필수다.
+  ///
+  /// [employeeId] 를 안 주면 **담당자 전원**에게 같은 점수가 간다.
+  /// 서버가 한 트랜잭션으로 처리해서 몇 명만 매겨진 상태가 안 남는다.
+  /// 다시 매기면 **덮어쓴다** (더해지지 않는다).
+  static Future<List<ProjectAward>> award(
     String projectId, {
-    required String employeeId,
     required int points,
     required String comment,
+    String? employeeId,
   }) async {
-    final data = await _client.post(
+    final rows = await _client.postList(
       '/projects/$projectId/award',
-      body: {'employeeId': employeeId, 'points': points, 'comment': comment},
+      body: {'employeeId': ?employeeId, 'points': points, 'comment': comment},
     );
-    return ProjectAward.fromJson(data!);
+    return [
+      for (final row in rows)
+        ProjectAward.fromJson((row as Map).cast<String, dynamic>()),
+    ];
   }
 }

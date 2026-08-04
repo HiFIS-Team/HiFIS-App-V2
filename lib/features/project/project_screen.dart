@@ -20,7 +20,6 @@ import '../../core/widgets/glass_bottom_button.dart';
 import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/glass_input_bar.dart';
 import '../../core/widgets/empty_card.dart';
-import '../../core/widgets/mini_button.dart';
 import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/pressable.dart';
 import '../../core/widgets/scroll_box.dart';
@@ -839,7 +838,11 @@ class _ProjectDetail extends StatelessWidget {
           ..._phoneHead(context, dday)
         else
           ..._desktopHead(context, dday),
-        if (project.request != null) ...[
+        // 완료하면 그 자리가 점수 카드가 된다 — 결재할 기한 연장은 이미 끝났다
+        if (project.phase == _Phase.done && myRole == Role.master) ...[
+          SizedBox(height: 14),
+          _AwardCard(project: project),
+        ] else if (project.request != null) ...[
           SizedBox(height: 14),
           _ExtensionCard(
             project: project,
@@ -890,11 +893,6 @@ class _ProjectDetail extends StatelessWidget {
           onAssign: (todo) => _assign(context, todo),
         ),
         SizedBox(height: 16),
-        // 완료한 프로젝트의 담당자 점수 — 대표만 매기고 대표만 본다
-        if (project.phase == _Phase.done && myRole == Role.master) ...[
-          _AwardCard(project: project),
-          SizedBox(height: 16),
-        ],
         // 폰은 댓글을 시트로 빼고, 여기엔 눌러서 여는 줄만 둔다
         if (!isDesktop) ...[
           _CommentTeaser(
@@ -1399,10 +1397,14 @@ class _TodoComposerState extends State<_TodoComposer> {
   }
 }
 
-/// 담당자 점수 카드 — **완료된 프로젝트에만, MASTER 에게만** 보인다
+/// 프로젝트 점수 카드 — **완료된 프로젝트에만, MASTER 에게만** 보인다
 ///
-/// 완료하면 담당자마다 자동 10점이 붙고, 그 위에서 대표가 판단해 올리거나 깎는다.
-/// 여기서 매긴 값이 그 사람의 **최종 점수**다 (10점에 더해지지 않고 덮어쓴다).
+/// 기한 연장 결재가 있던 자리를 그대로 쓴다. 완료된 뒤에는 결재할 연장이 없고,
+/// 대신 여기서 점수를 매긴다.
+///
+/// **참여자 전원에게 같은 점수가 간다.** 프로젝트는 다 같이 하는 일이라
+/// 사람마다 나누지 않는다. 완료하면 자동 10점이 붙고, 그 위에서 대표가
+/// 판단해 올리거나 깎는다 — 매긴 값이 **최종 점수**다 (더해지지 않는다).
 class _AwardCard extends StatefulWidget {
   _AwardCard({required this.project});
 
@@ -1413,8 +1415,7 @@ class _AwardCard extends StatefulWidget {
 }
 
 class _AwardCardState extends State<_AwardCard> {
-  /// 직원 uuid → 그 사람의 점수
-  Map<String, ProjectAward> _awards = const {};
+  List<ProjectAward> _awards = const [];
   bool _loading = true;
 
   @override
@@ -1433,7 +1434,7 @@ class _AwardCardState extends State<_AwardCard> {
       final rows = await ProjectApi.awards(id);
       if (!mounted) return;
       setState(() {
-        _awards = {for (final row in rows) row.employeeId: row};
+        _awards = rows;
         _loading = false;
       });
     } catch (error) {
@@ -1443,21 +1444,24 @@ class _AwardCardState extends State<_AwardCard> {
     }
   }
 
-  Future<void> _give(Employee staff) async {
+  /// 대표가 매긴 점수 (전원 같은 값이라 한 건만 봐도 된다).
+  /// null 이면 아직 완료 자동 10점만 붙어 있다
+  ProjectAward? get _given => _awards.where((a) => a.byPerson).firstOrNull;
+
+  Future<void> _give() async {
     final id = widget.project.id;
     if (id == null) return;
-    final result = await _askAward(context, staff, _awards[staff.id]);
+    final result = await _askAward(context, widget.project, _given);
     if (result == null || !mounted) return;
     try {
       final saved = await ProjectApi.award(
         id,
-        employeeId: staff.id,
         points: result.$1,
         comment: result.$2,
       );
       if (!mounted) return;
-      setState(() => _awards = {..._awards, staff.id: saved});
-      AppToast.show(context, '${staff.name}님 점수를 매겼어요');
+      setState(() => _awards = saved);
+      AppToast.show(context, '참여자 ${saved.length}명에게 점수를 매겼어요');
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
     }
@@ -1465,132 +1469,132 @@ class _AwardCardState extends State<_AwardCard> {
 
   @override
   Widget build(BuildContext context) {
-    final people = [
-      for (final id in widget.project.memberIds)
-        ?StaffDirectory.instance.byId(id),
-    ];
+    final given = _given;
+    final people = widget.project.members.length;
+
+    final info = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 좁은 화면에서는 제목과 점수가 아래로 접힌다
+        Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          runSpacing: 2,
+          children: [
+            Text(
+              '프로젝트 점수',
+              style: AppTextStyles.body2.copyWith(
+                color: AppColors.success,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            Text(
+              _loading
+                  ? '불러오는 중'
+                  : '참여자 $people명 · ${given?.points ?? _autoPoints}점',
+              style: AppTextStyles.body2.copyWith(
+                fontWeight: FontWeight.w600,
+                color: (given?.points ?? 0) < 0
+                    ? AppColors.error
+                    : AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 4),
+        Text(
+          given?.comment ?? '완료해서 붙은 기본 점수예요',
+          style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
+        ),
+        if (given != null) ...[
+          SizedBox(height: 4),
+          Text(
+            '${_relative(given.createdAt)} 매김',
+            style: AppTextStyles.caption.copyWith(fontSize: 11),
+          ),
+        ],
+      ],
+    );
+
+    final button = Pressable(
+      onTap: _loading ? _ignore : _give,
+      scale: 0.96,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppColors.primary,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          given == null ? '점수 주기' : '다시 주기',
+          style: AppTextStyles.body2.copyWith(
+            fontSize: 14,
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+
+    final icon = Icon(
+      Icons.workspace_premium_rounded,
+      size: 18,
+      color: AppColors.success,
+    );
 
     return Container(
-      padding: EdgeInsets.fromLTRB(20, 18, 20, 16),
-      decoration: AppDecorations.card(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('담당자 점수', style: AppTextStyles.label),
-          SizedBox(height: 6),
-          if (_loading)
-            Padding(
-              padding: EdgeInsets.symmetric(vertical: 18),
-              child: Center(
-                child: SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation(AppColors.gray400),
-                  ),
-                ),
-              ),
-            )
-          else if (people.isEmpty)
-            Padding(
-              padding: EdgeInsets.symmetric(vertical: 14),
-              child: Text(
-                '참여한 사람이 없어요',
-                style: AppTextStyles.body2.copyWith(
-                  color: AppColors.textTertiary,
-                ),
-              ),
-            )
-          else
-            for (final staff in people)
-              _AwardRow(
-                staff: staff,
-                award: _awards[staff.id],
-                onTap: () => _give(staff),
-              ),
-        ],
+      padding: EdgeInsets.fromLTRB(16, 14, 14, 14),
+      decoration: BoxDecoration(
+        color: AppColors.success.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
       ),
-    );
-  }
-}
-
-/// 담당자 점수 한 줄
-class _AwardRow extends StatelessWidget {
-  _AwardRow({required this.staff, required this.award, required this.onTap});
-
-  final Employee staff;
-
-  /// null 이면 아직 아무 점수도 없다 (완료 직후에는 자동 10점이 들어 있다)
-  final ProjectAward? award;
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final given = award;
-    final label = given == null
-        ? '점수 없음'
-        : given.byPerson
-        ? '${given.points}점 · ${given.comment ?? ''}'
-        : '완료 ${given.points}점';
-
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Avatar(name: staff.name, size: 30),
-          SizedBox(width: 10),
-          Expanded(
-            child: Column(
+      // 폰은 버튼을 옆에 두면 내용이 눌려서 아래로 내린다 (연장 카드와 같다)
+      child: isDesktop
+          ? Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  staff.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.body2.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                icon,
+                SizedBox(width: 10),
+                Expanded(child: info),
+                SizedBox(width: 12),
+                button,
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    icon,
+                    SizedBox(width: 10),
+                    Expanded(child: info),
+                  ],
                 ),
-                SizedBox(height: 1),
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.caption.copyWith(
-                    color: given != null && given.points < 0
-                        ? AppColors.error
-                        : AppColors.textTertiary,
-                  ),
-                ),
+                SizedBox(height: 12),
+                SizedBox(width: double.infinity, child: button),
               ],
             ),
-          ),
-          SizedBox(width: 8),
-          MiniButton(
-            label: given?.byPerson == true ? '다시' : '점수 주기',
-            onTap: onTap,
-            filled: given?.byPerson != true,
-          ),
-        ],
-      ),
     );
   }
+
+  static void _ignore() {}
 }
+
+/// 완료하면 서버가 자동으로 붙이는 점수 (서버 `PROJECT_POINTS`)
+const _autoPoints = 10;
 
 /// 점수와 사유를 받는다 — 취소하면 null
 Future<(int, String)?> _askAward(
   BuildContext context,
-  Employee staff,
+  _Project project,
   ProjectAward? current,
 ) {
   final points = TextEditingController(
-    text: '${current?.byPerson == true ? current!.points : 10}',
+    text: '${current?.points ?? _autoPoints}',
   );
-  final reason = TextEditingController(
-    text: current?.byPerson == true ? (current!.comment ?? '') : '',
-  );
+  final reason = TextEditingController(text: current?.comment ?? '');
 
   return showAppDialog<(int, String)>(
     context,
@@ -1605,10 +1609,10 @@ Future<(int, String)?> _askAward(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('${staff.name}님 점수', style: AppTextStyles.title3),
+          Text('프로젝트 점수', style: AppTextStyles.title3),
           SizedBox(height: 4),
           Text(
-            '-100 ~ 100. 매긴 값이 최종 점수예요',
+            '참여자 ${project.members.length}명에게 같이 들어가요. -100 ~ 100',
             style: AppTextStyles.caption.copyWith(
               color: AppColors.textTertiary,
             ),
