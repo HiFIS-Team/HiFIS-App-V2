@@ -359,6 +359,22 @@ class _MonthSummary extends StatelessWidget {
       Container(width: 1, height: 30, color: AppColors.gray100);
 }
 
+/// 대표 화면이 쓰는 상태 차례와 색 — 달력 칸·날짜 상세가 같이 쓴다
+///
+/// 출근·퇴근 먼저, 챙길 것 나중. 마지막 값은 '평범한 하루인가' —
+/// 이것만 있는 날은 달력 칸에서 `전원 출근` 한 줄로 줄인다.
+const _workStatusOrder = <(AttendanceStatus, String, Color, bool)>[
+  (AttendanceStatus.inProgress, '출근', AppColors.workIn, true),
+  (AttendanceStatus.normal, '퇴근', AppColors.workOut, true),
+  (AttendanceStatus.overtime, '야근', AppColors.workOvertime, false),
+  (AttendanceStatus.earlyLeave, '조기퇴근', AppColors.workEarly, false),
+  (AttendanceStatus.lateAndEarly, '지각·조퇴', AppColors.workLateEarly, false),
+  (AttendanceStatus.late, '지각', AppColors.workLate, false),
+  (AttendanceStatus.noCheckout, '퇴근누락', AppColors.workNoCheckout, false),
+  (AttendanceStatus.absent, '결근', AppColors.workAbsent, false),
+  (AttendanceStatus.onLeave, '월차', AppColors.workLeave, false),
+];
+
 /// 대표가 보는 오늘 근무 — 숫자 대신 **누가** 그런지를 띄운다
 ///
 /// 대표는 자기 출퇴근이 없어서 달 요약이 빈 껍데기다. 칸 모양은 달 요약과
@@ -375,23 +391,24 @@ class _TodayBoard extends StatelessWidget {
     final now = DateTime.now();
     // 지각·조기퇴근을 같이 한 사람은 두 칸에 다 선다 (판정 값은 하나뿐이라)
     final both = _todayWith(AttendanceStatus.lateAndEarly);
+    // 색은 달력 칸과 같은 토큰을 쓴다 — 두 자리에서 같은 상태가 다른 색이면 안 된다
     final cells = <(String, Color, List<Employee>)>[
-      ('출근', AppColors.success, _todayWith(AttendanceStatus.inProgress)),
-      ('퇴근', AppColors.textPrimary, _todayWith(AttendanceStatus.normal)),
-      ('야근', AppColors.primary, _todayWith(AttendanceStatus.overtime)),
+      ('출근', AppColors.workIn, _todayWith(AttendanceStatus.inProgress)),
+      ('퇴근', AppColors.workOut, _todayWith(AttendanceStatus.normal)),
+      ('야근', AppColors.workOvertime, _todayWith(AttendanceStatus.overtime)),
       (
         '조기퇴근',
-        AppColors.warning,
+        AppColors.workEarly,
         [..._todayWith(AttendanceStatus.earlyLeave), ...both],
       ),
       (
         '지각',
-        AppColors.warning,
+        AppColors.workLate,
         [..._todayWith(AttendanceStatus.late), ...both],
       ),
-      ('결근', AppColors.error, _todayWith(AttendanceStatus.absent)),
-      ('월차', AppColors.primary, _todayWith(AttendanceStatus.onLeave)),
-      ('미출근', AppColors.textSecondary, _todayWith(null)),
+      ('결근', AppColors.workAbsent, _todayWith(AttendanceStatus.absent)),
+      ('월차', AppColors.workLeave, _todayWith(AttendanceStatus.onLeave)),
+      ('미출근', AppColors.workNone, _todayWith(null)),
     ];
     // 폰은 칸이 좁아 두 개씩 네 줄, 데스크톱은 네 개씩 두 줄
     final perRow = isDesktop ? 4 : 2;
@@ -510,7 +527,7 @@ class _MonthCalendar extends StatelessWidget {
     // 칸 안에 근무 시간까지 들어가야 해서 넉넉히 잡는다.
     // 대표 칸은 상태마다 한 줄씩 들어가서 더 높다
     final cellHeight = _isBoss
-        ? (isDesktop ? 118.0 : 92.0)
+        ? (isDesktop ? 132.0 : 104.0)
         : (isDesktop ? 84.0 : 62.0);
 
     return Container(
@@ -747,42 +764,21 @@ class _DayCellState extends State<_DayCell> {
     final groups = _rosterOf(date);
     if (groups.isEmpty) return SizedBox();
 
-    // 카드와 같은 차례다 — 출근·퇴근 먼저, 챙길 것 나중
-    const order = [
-      (AttendanceStatus.inProgress, '출근', 0),
-      (AttendanceStatus.normal, '퇴근', 1),
-      (AttendanceStatus.overtime, '야근', 2),
-      (AttendanceStatus.earlyLeave, '조기퇴근', 3),
-      (AttendanceStatus.lateAndEarly, '지각·조퇴', 3),
-      (AttendanceStatus.late, '지각', 3),
-      (AttendanceStatus.noCheckout, '퇴근누락', 4),
-      (AttendanceStatus.absent, '결근', 4),
-      (AttendanceStatus.onLeave, '월차', 5),
-    ];
-    final colors = [
-      AppColors.success,
-      AppColors.textSecondary,
-      AppColors.primary,
-      AppColors.warning,
-      AppColors.error,
-      AppColors.primary,
-    ];
-
     final lines = <Widget>[];
     var onlyPlain = true;
-    for (final (status, label, tone) in order) {
+    for (final (status, label, color, plain) in _workStatusOrder) {
       final names = groups[status];
       if (names == null || names.isEmpty) continue;
-      if (tone > 1) onlyPlain = false;
-      lines.add(_line('${_who(names)} $label', colors[tone]));
+      if (!plain) onlyPlain = false;
+      lines.add(_line('${_who(names)} $label', color));
     }
     if (lines.isEmpty) return SizedBox();
-    if (onlyPlain) return _line('전원 출근', AppColors.success);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: lines,
+      // 줄이 하나든 넷이든 칸 가운데에 모인다 — 위나 아래로 붙으면 날짜와 떨어져 보인다
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: onlyPlain ? [_line('전원 출근', AppColors.workIn)] : lines,
     );
   }
 
@@ -790,17 +786,24 @@ class _DayCellState extends State<_DayCell> {
   String _who(List<String> names) =>
       names.length == 1 ? names.first : '${names.first} 외 ${names.length - 1}명';
 
-  Widget _line(String text, Color color) => SizedBox(
+  /// 상태 한 줄 — 옅은 바탕에 같은 색 글씨 (앱의 알약과 같은 방식)
+  Widget _line(String text, Color color) => Container(
     width: double.infinity,
+    margin: EdgeInsets.only(top: 2),
+    padding: EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(5),
+    ),
     child: Text(
       text,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: AppTextStyles.caption.copyWith(
         fontSize: 10,
-        height: 1.45,
+        height: 1.3,
         color: color,
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.w700,
       ),
     ),
   );
@@ -860,6 +863,9 @@ class _DayCellState extends State<_DayCell> {
 // ── 날짜 상세 ──
 
 /// 달력에서 날짜를 누르면 뜨는 창 — 그날의 출퇴근과 월차
+///
+/// 대표는 자기 기록이 아니라 **그날 누가 어땠는지**를 본다. 달력 칸은 좁아서
+/// `외 N명` 으로 줄이는데, 여기서는 이름을 다 편다.
 class _DayDialog extends StatelessWidget {
   _DayDialog({required this.date, required this.day, required this.leave});
 
@@ -887,11 +893,15 @@ class _DayDialog extends StatelessWidget {
                   style: AppTextStyles.title3,
                 ),
               ),
-              if (record != null) _StatusChip(status: record.status),
+              // 대표 창은 전 직원 판이라 본인 알약을 달면 헷갈린다
+              if (record != null && !_isBoss)
+                _StatusChip(status: record.status),
             ],
           ),
           SizedBox(height: 18),
-          if (record != null && record.checkIn != null) ...[
+          if (_isBoss)
+            _roster()
+          else if (record != null && record.checkIn != null) ...[
             Row(
               children: [
                 _cell('출근', _clock(record.checkIn)),
@@ -908,7 +918,7 @@ class _DayDialog extends StatelessWidget {
             ),
           ] else
             _empty(),
-          if (leave != null) ...[
+          if (!_isBoss && leave != null) ...[
             SizedBox(height: 16),
             Container(height: 1, color: AppColors.divider),
             SizedBox(height: 14),
@@ -979,13 +989,68 @@ class _DayDialog extends StatelessWidget {
     ),
   );
 
+  /// 대표가 보는 그날 판 — 상태 알약 + 그 상태였던 사람 이름 전부
+  Widget _roster() {
+    final groups = _rosterOf(date);
+    final rows = <Widget>[];
+    for (final (status, label, color, _) in _workStatusOrder) {
+      final names = groups[status];
+      if (names == null || names.isEmpty) continue;
+      rows.add(
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                label,
+                style: AppTextStyles.caption.copyWith(
+                  fontSize: 12,
+                  color: color,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            SizedBox(width: 10),
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(top: 3),
+                child: Text(
+                  names.join(' · '),
+                  style: AppTextStyles.body2.copyWith(fontSize: 13),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    if (rows.isEmpty) return _empty();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < rows.length; i++) ...[
+          if (i > 0) SizedBox(height: 12),
+          rows[i],
+        ],
+      ],
+    );
+  }
+
   Widget _empty() {
-    final text = switch (day?.status) {
-      _DayStatus.off => '쉬는 날이에요',
-      _DayStatus.absent => '출근 기록이 없어요',
-      _DayStatus.leave => '월차를 쓴 날이에요',
-      _ => leave != null ? '월차가 잡혀 있어요' : '아직 기록이 없어요',
-    };
+    final text = _isBoss
+        ? '아직 기록이 없어요'
+        : switch (day?.status) {
+            _DayStatus.off => '쉬는 날이에요',
+            _DayStatus.absent => '출근 기록이 없어요',
+            _DayStatus.leave => '월차를 쓴 날이에요',
+            _ => leave != null ? '월차가 잡혀 있어요' : '아직 기록이 없어요',
+          };
 
     return Container(
       width: double.infinity,

@@ -22,6 +22,22 @@ abstract final class AppColors {
   static const warning = Color(0xFFFF9F0A);
   static const error = Color(0xFFF04452);
 
+  // 근태 상태 (테마 공통)
+  //
+  // **무채색 + 포인트 1개 원칙의 예외다.** 대표 화면은 한 칸·한 카드 안에
+  // 여러 상태가 같이 서서, 색이 그것들을 가르는 유일한 단서다.
+  // 이 색들은 근태 화면 밖에서 쓰지 않는다.
+  static const workIn = success; // 출근
+  static const workOut = Color(0xFF495057); // 퇴근 — 끝난 상태라 진회색
+  static const workOvertime = Color(0xFF7C3AED); // 야근
+  static const workEarly = Color(0xFF00B8D9); // 조기퇴근
+  static const workLate = warning; // 지각
+  static const workLateEarly = Color(0xFFD9480F); // 지각 + 조기퇴근
+  static const workNoCheckout = Color(0xFFD6336C); // 퇴근 누락
+  static const workAbsent = error; // 결근
+  static const workLeave = primary; // 월차
+  static const workNone = Color(0xFFADB5BD); // 미출근 — 아직 아무 일도 없다
+
   static Color get primaryLight =>
       _dark ? const Color(0xFF16283F) : const Color(0xFFE8F3FF);
 
