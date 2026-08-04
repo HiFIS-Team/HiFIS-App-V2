@@ -33,7 +33,10 @@ enum _DayStatus {
   /// 서버는 지각+조기퇴근을 따로 구분하고 퇴근 전·퇴근 누락도 나누는데,
   /// 달력 칸은 색 하나뿐이라 가까운 쪽으로 모은다.
   static _DayStatus of(AttendanceStatus status) => switch (status) {
-    AttendanceStatus.normal || AttendanceStatus.inProgress => _DayStatus.normal,
+    // 야근도 달력 칸에서는 정상 근무다 — 그날 일한 시간이 그대로 보인다
+    AttendanceStatus.normal ||
+    AttendanceStatus.overtime ||
+    AttendanceStatus.inProgress => _DayStatus.normal,
     AttendanceStatus.late || AttendanceStatus.lateAndEarly => _DayStatus.late,
     AttendanceStatus.earlyLeave ||
     AttendanceStatus.noCheckout => _DayStatus.early,
@@ -208,8 +211,11 @@ final _leaves = <_Leave>[];
 /// 승인 화면을 따로 두지 않고 '남은 월차' 카드 안에서 바로 처리한다.
 final _leaveInbox = <LeaveRequest>[];
 
-/// 대표가 보는 전사 달 집계 — 달마다 한 번씩 받아 둔다 (키는 `2026-08`)
-final _summaries = <String, AttendanceSummary>{};
+/// 대표가 보는 오늘 현황의 재료 — 전 직원 명단
+///
+/// `Employee.todayStatus` 에 오늘 판정이 얹혀 온다 (지각·결근·야근·월차·휴무).
+/// 사람마다 캘린더를 부르지 않아도 되게 서버가 명단에 실어 준다.
+final _todayStaff = <Employee>[];
 
 /// 근태·월차를 서버에서 받아 온다
 ///
@@ -230,6 +236,10 @@ Future<void> _loadAttendance() async {
   final inbox = _canSeeLeaveInbox
       ? await AttendanceApi.leaves(status: LeaveStatus.pending)
       : const <LeaveRequest>[];
+  // 대표 화면의 '오늘 근무' 판 — 명단에 오늘 판정이 얹혀 온다
+  final staff = myRole == Role.master
+      ? await StaffApi.list()
+      : const <Employee>[];
 
   _balance = balance;
 
@@ -245,19 +255,25 @@ Future<void> _loadAttendance() async {
     ..clear()
     ..addAll(days.map(_Day.from));
 
-  _summaries.clear();
-  await _loadSummary(_monthKey(now));
+  _todayStaff
+    ..clear()
+    ..addAll(staff);
 }
 
-/// 대표가 보는 전사 달 집계 — 보고 있는 달 것을 받아 둔다
+/// 오늘 이 상태인 사람들 — 대표 화면의 '오늘 근무' 판이 쓴다
 ///
-/// 대표는 자기 출퇴근이 없어서 달 요약이 전부 0이다. 칸은 그대로 두고
-/// 값만 이걸로 바꾼다. 사람마다 캘린더를 부르면 인원수만큼 요청이 나가서
-/// 서버가 한 번에 주는 것([AttendanceApi.summary])을 쓴다.
-Future<void> _loadSummary(String month) async {
-  if (myRole != Role.master || _summaries.containsKey(month)) return;
-  _summaries[month] = await AttendanceApi.summary(month: month);
-}
+/// [status] 가 null 이면 **미출근**이다 (근무일인데 아직 스캔이 없음).
+/// 퇴근 시간이 지나면 서버가 결근으로 바꿔 주므로 여기서 판정하지 않는다.
+///
+/// 다만 **근무 요일을 설정 안 한 사람도 null** 로 온다 — 서버가 근무일인지를
+/// 몰라 판정을 못 하는 것이라 미출근이 아니다. 그 사람들은 빼고 센다
+/// (안 빼면 설정 안 한 사람들이 매일 미출근으로 줄줄이 뜬다).
+List<Employee> _todayWith(AttendanceStatus? status) => [
+  for (final person in _todayStaff)
+    if (person.todayStatus == status &&
+        (status != null || person.workDays.isNotEmpty))
+      person,
+];
 
 /// `2026-07`
 String _monthKey(DateTime date) =>

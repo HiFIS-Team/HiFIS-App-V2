@@ -106,49 +106,6 @@ class LeaveBalance {
   final double remaining;
 }
 
-/// 전사 한 달 근태 집계 (서버 `AttendanceSummaryOut`)
-///
-/// 대표는 자기 출퇴근을 안 찍어서 달 요약이 전부 0이다. 칸은 그대로 두고
-/// 값만 이걸로 바꿔 쓴다. 판정 기준은 캘린더와 같아서 숫자가 갈리지 않는다.
-class AttendanceSummary {
-  AttendanceSummary({
-    required this.people,
-    required this.workedDays,
-    required this.workMinutes,
-    required this.late,
-    required this.earlyLeave,
-    required this.absent,
-    required this.dayOff,
-    required this.leaveDays,
-  });
-
-  factory AttendanceSummary.fromJson(Map<String, dynamic> json) =>
-      AttendanceSummary(
-        people: json['people'] as int,
-        workedDays: json['workedDays'] as int,
-        workMinutes: json['workMinutes'] as int,
-        late: json['late'] as int,
-        earlyLeave: json['earlyLeave'] as int,
-        absent: json['absent'] as int,
-        dayOff: json['dayOff'] as int,
-        leaveDays: (json['leaveDays'] as num).toDouble(),
-      );
-
-  /// 집계에 든 재직자 수
-  final int people;
-
-  /// 사람×날 — 한 사람이 20일 나오면 20이다
-  final int workedDays;
-  final int workMinutes;
-  final int late;
-  final int earlyLeave;
-  final int absent;
-  final int dayOff;
-
-  /// 승인된 월차 일수 (반차 0.5)
-  final double leaveDays;
-}
-
 /// 휴가 신청 상태 — 서버 `LeaveStatus`
 enum LeaveStatus {
   pending('PENDING', '대기'),
@@ -307,17 +264,6 @@ class AttendanceApi {
       for (final row in rows)
         LeaveRequest.fromJson((row as Map).cast<String, dynamic>()),
     ];
-  }
-
-  /// 전사 한 달 근태 집계 — **MASTER · ADMIN · MANAGER 만** (MANAGER 는 자기 지점)
-  ///
-  /// [month]는 `2026-08` 꼴. 사람마다 캘린더를 부르지 않으려고 서버가 한 번에 준다.
-  static Future<AttendanceSummary> summary({required String month}) async {
-    final data = await _client.get(
-      '/attendance/summary',
-      query: {'month': month},
-    );
-    return AttendanceSummary.fromJson(data);
   }
 
   /// 휴가 승인 — **MASTER · MANAGER 만** 된다 (ADMIN 은 보기만)

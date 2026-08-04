@@ -785,11 +785,13 @@ class _HeroStatusCardState extends State<_HeroStatusCard> {
 ({String label, Color color}) _statusBadge(HomeAttendance? attendance) {
   final status = attendance?.status;
   // 기록이 없거나 아직 응답이 안 온 상태.
-  // 서버는 오늘을 결근으로 찍지 않는다 — 하루가 끝나야 알 수 있어서다.
+  // 근무 시간이 다 지나도록 안 찍히면 그때 서버가 결근으로 바꿔 준다.
   if (status == null) return (label: '미출근', color: AppColors.gray500);
   return switch (status) {
     AttendanceStatus.inProgress => (label: '출근', color: AppColors.success),
-    AttendanceStatus.normal => (label: '퇴근', color: AppColors.gray500),
+    // 야근도 '퇴근'으로 둔다 — 이 배지는 지금 상태를 알리는 자리라 문구를 늘리지 않는다
+    AttendanceStatus.normal ||
+    AttendanceStatus.overtime => (label: '퇴근', color: AppColors.gray500),
     AttendanceStatus.late => (label: '지각', color: AppColors.warning),
     AttendanceStatus.earlyLeave => (label: '조기 퇴근', color: AppColors.warning),
     AttendanceStatus.lateAndEarly => (

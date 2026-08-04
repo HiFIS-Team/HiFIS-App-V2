@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../core/api/attendance_api.dart';
+import '../../core/api/staff_api.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
 import '../../core/data/staff.dart';
@@ -66,16 +67,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     if (mounted) setState(() {});
   }
 
-  Future<void> _moveMonth(int delta) async {
-    final month = DateTime(_month.year, _month.month + delta);
-    setState(() => _month = month);
-    // 대표는 달 요약이 전사 집계라 달마다 따로 받아야 한다
-    try {
-      await _loadSummary(_monthKey(month));
-    } catch (error) {
-      if (mounted) AppToast.show(context, messageOf(error));
-    }
-    if (mounted) setState(() {});
+  void _moveMonth(int delta) {
+    setState(() => _month = DateTime(_month.year, _month.month + delta));
   }
 
   /// 보고 있는 달의 기록만 추린다 (요약도 이 달 기준)
@@ -237,9 +230,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
 /// 보고 있는 달의 근무일·근무시간·지각·결근
 ///
-/// 대표는 출퇴근을 안 찍어서 자기 기록이 전부 0이다. **칸은 그대로 두고
-/// 값만 전사 집계로 바꾼다** (`/attendance/summary`). 판정 기준이 캘린더와
-/// 같아서 직원 화면과 숫자가 갈리지 않는다.
+/// 대표는 출퇴근을 안 찍어서 이 값이 전부 0이다. 그래서 대표 화면에서는
+/// 같은 자리에 **오늘 누가 어떤지**를 이름으로 띄운다 ([_TodayBoard]).
 class _MonthSummary extends StatelessWidget {
   _MonthSummary({required this.days, required this.month});
 
@@ -248,24 +240,15 @@ class _MonthSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final all = myRole == Role.master ? _summaries[_monthKey(month)] : null;
+    if (myRole == Role.master) return _TodayBoard();
 
-    final worked = all?.workedDays ?? days.where((d) => d.status.worked).length;
-    final total = all != null
-        ? Duration(minutes: all.workMinutes)
-        : days.fold(Duration.zero, (sum, d) => sum + d.worked);
-    final late =
-        all?.late ?? days.where((d) => d.status == _DayStatus.late).length;
-    final absent =
-        all?.absent ?? days.where((d) => d.status == _DayStatus.absent).length;
-    final early =
-        all?.earlyLeave ??
-        days.where((d) => d.status == _DayStatus.early).length;
-    final leave =
-        all?.leaveDays ??
-        days.where((d) => d.status == _DayStatus.leave).length.toDouble();
-    final off =
-        all?.dayOff ?? days.where((d) => d.status == _DayStatus.off).length;
+    final worked = days.where((d) => d.status.worked).length;
+    final total = days.fold(Duration.zero, (sum, d) => sum + d.worked);
+    final late = days.where((d) => d.status == _DayStatus.late).length;
+    final absent = days.where((d) => d.status == _DayStatus.absent).length;
+    final early = days.where((d) => d.status == _DayStatus.early).length;
+    final leave = days.where((d) => d.status == _DayStatus.leave).length;
+    final off = days.where((d) => d.status == _DayStatus.off).length;
     final average = worked == 0
         ? Duration.zero
         : Duration(minutes: total.inMinutes ~/ worked);
@@ -334,7 +317,7 @@ class _MonthSummary extends StatelessWidget {
                 _divider(),
                 _stat(
                   '월차',
-                  '${_dayCount(leave)}일',
+                  '$leave일',
                   leave > 0 ? AppColors.primary : AppColors.textPrimary,
                 ),
                 _divider(),
@@ -366,6 +349,124 @@ class _MonthSummary extends StatelessWidget {
 
   Widget _divider() =>
       Container(width: 1, height: 30, color: AppColors.gray100);
+}
+
+/// 대표가 보는 오늘 근무 — 숫자 대신 **누가** 그런지를 띄운다
+///
+/// 대표는 자기 출퇴근이 없어서 달 요약이 빈 껍데기다. 그 자리에 오늘
+/// 챙겨야 할 사람만 세운다. 판정은 서버가 명단에 얹어 주는
+/// `Employee.todayStatus` 를 그대로 쓴다 (근태 달력·홈과 같은 기준).
+class _TodayBoard extends StatelessWidget {
+  _TodayBoard();
+
+  /// 한 줄에 이름을 몇 개까지 적을지 — 넘으면 `외 N명`
+  static const _maxNames = 3;
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    // 챙겨야 하는 순서다 — 문제 되는 것 먼저, 예정된 것 나중
+    final rows = <(String, Color, List<Employee>)>[
+      (
+        '지각',
+        AppColors.warning,
+        [
+          ..._todayWith(AttendanceStatus.late),
+          ..._todayWith(AttendanceStatus.lateAndEarly),
+        ],
+      ),
+      ('결근', AppColors.error, _todayWith(AttendanceStatus.absent)),
+      ('미출근', AppColors.textSecondary, _todayWith(null)),
+      (
+        '조기 퇴근',
+        AppColors.warning,
+        [
+          ..._todayWith(AttendanceStatus.earlyLeave),
+          ..._todayWith(AttendanceStatus.lateAndEarly),
+        ],
+      ),
+      ('야근', AppColors.success, _todayWith(AttendanceStatus.overtime)),
+      ('월차', AppColors.primary, _todayWith(AttendanceStatus.onLeave)),
+      ('휴무', AppColors.gray400, _todayWith(AttendanceStatus.dayOff)),
+    ];
+    final shown = [
+      for (final row in rows)
+        if (row.$3.isNotEmpty) row,
+    ];
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(20, 18, 20, 18),
+      decoration: AppDecorations.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Text('오늘 근무', style: AppTextStyles.label)),
+              Text(
+                '${now.month}월 ${now.day}일 (${_weekday(now)})',
+                style: AppTextStyles.caption.copyWith(fontSize: 12),
+              ),
+            ],
+          ),
+          SizedBox(height: 16),
+          if (shown.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(vertical: 22),
+              decoration: BoxDecoration(
+                color: AppColors.gray50,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Center(
+                child: Text(
+                  '오늘은 다들 제시간에 있어요',
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.textTertiary,
+                  ),
+                ),
+              ),
+            )
+          else
+            for (var i = 0; i < shown.length; i++) ...[
+              if (i > 0) SizedBox(height: 14),
+              _row(shown[i].$1, shown[i].$2, shown[i].$3),
+            ],
+        ],
+      ),
+    );
+  }
+
+  Widget _row(String label, Color color, List<Employee> people) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      SizedBox(
+        width: 76,
+        child: Text(
+          label,
+          style: AppTextStyles.body2.copyWith(
+            color: color,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+      SizedBox(width: 8),
+      Expanded(
+        child: Text(
+          _names(people),
+          style: AppTextStyles.body1.copyWith(fontWeight: FontWeight.w600),
+        ),
+      ),
+    ],
+  );
+
+  /// `김트레이너 · 박FC 외 2명`
+  String _names(List<Employee> people) {
+    final head = people.take(_maxNames).map((p) => p.name).join(' · ');
+    final rest = people.length - _maxNames;
+    return rest > 0 ? '$head 외 $rest명' : head;
+  }
 }
 
 // ── 달력 ──

@@ -12,6 +12,7 @@ enum AttendanceStatus {
   late('LATE'),
   earlyLeave('EARLY_LEAVE'),
   lateAndEarly('LATE_AND_EARLY'),
+  overtime('OVERTIME'),
   inProgress('IN_PROGRESS'),
   noCheckout('NO_CHECKOUT'),
   absent('ABSENT'),
@@ -31,8 +32,9 @@ enum AttendanceStatus {
 
   /// 값이 없으면 **null 을 그대로 돌려준다**
   ///
-  /// 오늘 판정에서 null 은 '출근 전'이다 — 오늘은 아직 안 끝나서 결근을 못 찍는다.
-  /// [parse] 처럼 `unknown` 으로 떨어뜨리면 출근 전과 판정불가가 섞인다.
+  /// 오늘 판정에서 null 은 '미출근'이다 — 근무일인데 아직 스캔이 없는 상태로,
+  /// 퇴근 시간이 지나면 그때 서버가 결근으로 찍는다.
+  /// [parse] 처럼 `unknown` 으로 떨어뜨리면 미출근과 판정불가가 섞인다.
   static AttendanceStatus? parseOrNull(String? value) =>
       value == null ? null : parse(value);
 
