@@ -4,13 +4,19 @@ import 'package:flutter/material.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/api/attendance_api.dart';
 import '../../core/data/current_user.dart';
+import '../../core/data/employee.dart';
+import '../../core/data/staff.dart';
+import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
+import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/app_toast.dart';
+import '../../core/widgets/avatar.dart';
 import '../../core/widgets/desktop_header.dart';
+import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/glass_bottom_button.dart';
 import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/phone_scaffold.dart';
@@ -19,6 +25,7 @@ import '../../core/widgets/see_all_button.dart';
 
 part 'attendance_models.dart';
 part 'attendance_leave.dart';
+part 'attendance_approval.dart';
 
 /// 근태·월차 화면 (목업)
 ///
@@ -37,6 +44,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   /// 첫 로딩 — 받아오기 전에는 빈 달력 대신 로딩을 보여준다
   bool _loading = true;
+
+  /// 0 = 내 근태, 1 = 월차 승인. 승인함을 볼 수 없는 사람에게는 탭이 없다
+  int _tab = 0;
 
   @override
   void initState() {
@@ -150,9 +160,27 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       onPick: _openDay,
     );
 
+    // 승인함을 볼 수 있는 사람에게만 탭이 생긴다.
+    // 나머지 사람 화면은 예전 그대로다 (탭 줄 자체가 없다).
+    final tabs = _canSeeLeaveInbox
+        ? SegmentedTabs(
+            labels: const ['내 근태', '월차 승인'],
+            selected: _tab,
+            onSelect: (i) => setState(() => _tab = i),
+          )
+        : null;
+
     if (!isDesktop) {
+      if (tabs != null && _tab == 1) {
+        return PhoneListScaffold(
+          title: '근태·월차',
+          filter: tabs,
+          children: [_LeaveInbox()],
+        );
+      }
       return PhoneListScaffold(
         title: '근태·월차',
+        filter: tabs,
         children: [
           _MonthSummary(days: _monthDays, month: _month),
           SizedBox(height: 12),
@@ -169,6 +197,24 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       );
     }
 
+    if (tabs != null && _tab == 1) {
+      return Scaffold(
+        body: SafeArea(
+          bottom: false,
+          child: ListView(
+            padding: EdgeInsets.fromLTRB(24, 64, 24, 32),
+            children: [
+              DesktopHeader(title: '근태·월차', subtitle: '이번 달 근무 기록과 월차를 관리해요'),
+              SizedBox(height: 22),
+              tabs,
+              SizedBox(height: 16),
+              _LeaveInbox(),
+            ],
+          ),
+        ),
+      );
+    }
+
     // 데스크톱은 폭이 남아서 요약 두 장을 나란히 두고 달력을 넓게 쓴다
     return Scaffold(
       body: SafeArea(
@@ -178,6 +224,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           children: [
             DesktopHeader(title: '근태·월차', subtitle: '이번 달 근무 기록과 월차를 관리해요'),
             SizedBox(height: 22),
+            if (tabs != null) ...[tabs, SizedBox(height: 16)],
             IntrinsicHeight(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -86,6 +87,9 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
           content: draft.body,
           approverIds: [approver.id],
           amount: draft.amount == 0 ? null : draft.amount,
+          startDate: draft.startDate,
+          endDate: draft.endDate,
+          place: draft.place,
         ),
       );
       if (!mounted) return;
@@ -587,6 +591,46 @@ class _DocDetail extends StatelessWidget {
           ),
           SizedBox(height: 16),
         ],
+        if (doc.startDate case final start?) ...[
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.fromLTRB(20, 16, 20, 16),
+            decoration: AppDecorations.card(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text('기간', style: AppTextStyles.label),
+                    Spacer(),
+                    Text(
+                      _period(start, doc.endDate),
+                      style: AppTextStyles.body2.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                if ((doc.place ?? '').isNotEmpty) ...[
+                  SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Text('장소', style: AppTextStyles.label),
+                      Spacer(),
+                      Text(
+                        doc.place!,
+                        style: AppTextStyles.body2.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+          SizedBox(height: 16),
+        ],
         Container(
           width: double.infinity,
           padding: EdgeInsets.fromLTRB(20, 18, 20, 18),
@@ -804,9 +848,14 @@ class _ComposerState extends State<_Composer> {
   final _title = TextEditingController();
   final _amount = TextEditingController();
   final _body = TextEditingController();
+  final _place = TextEditingController();
   final _titleFocus = FocusNode();
 
   _Kind _kind = _Kind.expense;
+
+  /// 외근·출장, 근무 변경일 때만 쓴다 (기본은 오늘 하루)
+  late DateTime _start = DateTime.now();
+  late DateTime _end = DateTime.now();
 
   @override
   void initState() {
@@ -820,8 +869,44 @@ class _ComposerState extends State<_Composer> {
     _title.dispose();
     _amount.dispose();
     _body.dispose();
+    _place.dispose();
     _titleFocus.dispose();
     super.dispose();
+  }
+
+  /// 날짜 고르기 — 일정 화면과 같은 달력을 쓴다
+  Future<void> _pick({required bool start}) async {
+    final base = start ? _start : _end;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: base,
+      firstDate: DateTime(base.year - 1),
+      lastDate: DateTime(base.year + 2),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme:
+              (AppColors.isDark
+                      ? ColorScheme.dark(surface: AppColors.surface)
+                      : ColorScheme.light(surface: AppColors.surface))
+                  .copyWith(
+                    primary: AppColors.primary,
+                    onPrimary: Colors.white,
+                    onSurface: AppColors.textPrimary,
+                  ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked == null) return;
+    setState(() {
+      if (start) {
+        _start = picked;
+        // 시작이 끝보다 뒤로 가면 끝도 같이 민다
+        if (_end.isBefore(_start)) _end = picked;
+      } else {
+        _end = picked.isBefore(_start) ? _start : picked;
+      }
+    });
   }
 
   void _submit() {
@@ -831,6 +916,7 @@ class _ComposerState extends State<_Composer> {
       _titleFocus.requestFocus();
       return;
     }
+    final place = _place.text.trim();
     Navigator.pop(
       context,
       _Draft(
@@ -838,6 +924,10 @@ class _ComposerState extends State<_Composer> {
         title: title,
         amount: int.tryParse(_amount.text.replaceAll(',', '')) ?? 0,
         body: _body.text.trim(),
+        // 기간·장소는 그 종류일 때만 보낸다 — 안 보이는 칸의 값이 따라가면 안 된다
+        startDate: _kind.needsWhen ? _start : null,
+        endDate: _kind.needsWhen ? _end : null,
+        place: _kind.needsWhen && place.isNotEmpty ? place : null,
       ),
     );
   }
@@ -915,6 +1005,43 @@ class _ComposerState extends State<_Composer> {
                       suffix: '원',
                       digitsOnly: true,
                     ),
+                    // 외근·출장, 근무 변경은 언제 어디로 가는지가 결재의 핵심이다.
+                    // 나머지 종류에는 이 두 칸이 안 나온다.
+                    if (_kind.needsWhen) ...[
+                      SizedBox(height: 14),
+                      Text('기간', style: AppTextStyles.label),
+                      SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _DateField(
+                              value: _start,
+                              onTap: () => _pick(start: true),
+                            ),
+                          ),
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 8),
+                            child: Text('~', style: AppTextStyles.body2),
+                          ),
+                          Expanded(
+                            child: _DateField(
+                              value: _end,
+                              onTap: () => _pick(start: false),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Text('장소', style: AppTextStyles.label),
+                          SizedBox(width: 4),
+                          Text('(선택)', style: AppTextStyles.caption),
+                        ],
+                      ),
+                      SizedBox(height: 8),
+                      _Field(controller: _place, hint: '어디로 가나요?'),
+                    ],
                     SizedBox(height: 14),
                     Text('내용', style: AppTextStyles.label),
                     SizedBox(height: 8),
@@ -1255,6 +1382,45 @@ class _DecisionDialogState extends State<_DecisionDialog> {
 
 // ── 공통 조각 ──
 
+/// 날짜 고르는 칸 — 입력칸([_Field])과 같은 면·높이로 맞춘다
+class _DateField extends StatelessWidget {
+  _DateField({required this.value, required this.onTap});
+
+  final DateTime value;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      scale: 0.98,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 14, vertical: 15),
+        decoration: BoxDecoration(
+          color: AppColors.gray50,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                '${value.year}. ${value.month}. ${value.day}.',
+                style: AppTextStyles.body2,
+              ),
+            ),
+            Icon(
+              CupertinoIcons.calendar,
+              size: 16,
+              color: AppColors.textTertiary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// 폼 입력칸
 class _Field extends StatelessWidget {
   _Field({
@@ -1358,14 +1524,20 @@ enum _Kind {
   expense('지출결의', Icons.credit_card_rounded),
   purchase('구매 요청', Icons.shopping_cart_rounded),
   supply('비품 신청', Icons.inventory_2_rounded),
-  trip('외근·출장', Icons.flight_rounded),
-  shift('근무 변경', Icons.schedule_rounded),
+  trip('외근·출장', Icons.flight_rounded, needsWhen: true),
+  shift('근무 변경', Icons.schedule_rounded, needsWhen: true),
   etc('기타 품의', Icons.description_rounded);
 
-  const _Kind(this.label, this.icon);
+  const _Kind(this.label, this.icon, {this.needsWhen = false});
 
   final String label;
   final IconData icon;
+
+  /// 언제·어디로 가는지를 받아야 하는 종류인가
+  ///
+  /// 지출결의·구매 요청에는 기간이 없다. 모든 종류에 칸을 세우면
+  /// 안 쓰는 자리가 늘 비어 있게 된다.
+  final bool needsWhen;
 
   static _Kind parse(String? value) =>
       _Kind.values.firstWhere((k) => k.label == value, orElse: () => _Kind.etc);
@@ -1421,12 +1593,20 @@ class _Draft {
     required this.title,
     required this.amount,
     required this.body,
+    this.startDate,
+    this.endDate,
+    this.place,
   });
 
   final _Kind kind;
   final String title;
   final int amount;
   final String body;
+
+  /// 외근·출장, 근무 변경일 때만 채워진다
+  final DateTime? startDate;
+  final DateTime? endDate;
+  final String? place;
 }
 
 /// 결재 문서 한 건
@@ -1443,6 +1623,9 @@ class _Doc {
     required this.approverIds,
     required this.steps,
     this.currentApproverId,
+    this.startDate,
+    this.endDate,
+    this.place,
   });
 
   final String id;
@@ -1450,6 +1633,11 @@ class _Doc {
   final String title;
   final int amount;
   final String body;
+
+  /// 외근·출장, 근무 변경에만 있다 (없으면 상세에서 그 줄을 안 그린다)
+  final DateTime? startDate;
+  final DateTime? endDate;
+  final String? place;
 
   /// 신청자 uuid
   final String writerId;
@@ -1520,6 +1708,9 @@ _Doc _fromServer(Approval row) => _Doc(
   approverIds: row.approverIds,
   steps: row.steps,
   currentApproverId: row.currentApproverId,
+  startDate: row.startDate,
+  endDate: row.endDate,
+  place: row.place,
 );
 
 /// 목록에서 바뀐 한 건만 갈아끼운다
@@ -1559,6 +1750,18 @@ String _decidedBy(_Doc doc) {
 
 /// '7.30' 형태
 String _date(DateTime time) => '${time.month}.${time.day}';
+
+/// 기간 한 줄 — 하루짜리면 날짜 하나만
+String _period(DateTime start, DateTime? end) {
+  final from = '${start.year}. ${start.month}. ${start.day}.';
+  if (end == null ||
+      (end.year == start.year &&
+          end.month == start.month &&
+          end.day == start.day)) {
+    return from;
+  }
+  return '$from ~ ${end.year}. ${end.month}. ${end.day}.';
+}
 
 /// '1,240,000원' 형태
 String _won(int amount) => '${_comma(amount)}원';

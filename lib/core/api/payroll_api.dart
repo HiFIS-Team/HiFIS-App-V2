@@ -80,6 +80,7 @@ class PayslipBasis {
 class Payslip {
   Payslip({
     required this.id,
+    required this.employeeId,
     required this.yearMonth,
     required this.baseSalary,
     required this.incentiveNew,
@@ -91,6 +92,7 @@ class Payslip {
     required this.net,
     required this.basis,
     required this.status,
+    required this.payday,
     this.note,
     this.rejectReason,
     this.submittedAt,
@@ -100,6 +102,7 @@ class Payslip {
 
   factory Payslip.fromJson(Map<String, dynamic> json) => Payslip(
     id: json['id'] as String,
+    employeeId: json['employeeId'] as String? ?? '',
     yearMonth: json['yearMonth'] as String,
     baseSalary: json['baseSalary'] as int,
     incentiveNew: json['incentiveNew'] as int,
@@ -116,6 +119,7 @@ class Payslip {
       (json['basis'] as Map? ?? const {}).cast<String, dynamic>(),
     ),
     status: PayslipStatus.parse(json['status'] as String?),
+    payday: DateTime.parse(json['payday'] as String),
     note: json['note'] as String?,
     rejectReason: json['rejectReason'] as String?,
     submittedAt: _localTime(json['submittedAt'] as String?),
@@ -124,6 +128,9 @@ class Payslip {
   );
 
   final String id;
+
+  /// 이 명세서의 주인 — 결재함에서 누구 건지 가릴 때 쓴다
+  final String employeeId;
 
   /// `2026-07`
   final String yearMonth;
@@ -144,6 +151,9 @@ class Payslip {
 
   final PayslipBasis basis;
   final PayslipStatus status;
+
+  /// 지급 예정일 — 서버가 정한다 (지금은 그 달 말일)
+  final DateTime payday;
 
   /// 본인이 신청할 때 남긴 특이사항 — 대표가 결재할 때 참고한다
   final String? note;
@@ -238,6 +248,53 @@ class PayrollApi {
       '/payslips/me/cancel',
       query: {'yearMonth': yearMonth},
     );
+    return Payslip.fromJson(data!);
+  }
+
+  // ---------------------------------------------------------------------
+  // 결재하는 쪽 — **MASTER · MANAGER 만** 처리할 수 있다
+  //
+  // 조회는 ADMIN 도 된다 (지켜보는 자리라 목록은 보이고 버튼은 없다).
+  // MANAGER 는 서버가 자기 지점으로만 좁혀 준다.
+  // ---------------------------------------------------------------------
+
+  /// 결재함 — [box] 는 `inbox`(대기 중) · `decided`(처리한 것)
+  static Future<List<Payslip>> box(
+    String box, {
+    String? yearMonth,
+    String? branchId,
+  }) async {
+    final rows = await _client.getList(
+      '/payslips',
+      query: {'box': box, 'yearMonth': ?yearMonth, 'branchId': ?branchId},
+    );
+    return [
+      for (final row in rows)
+        Payslip.fromJson((row as Map).cast<String, dynamic>()),
+    ];
+  }
+
+  /// 승인 — 제출된 것만 된다. **본인 명세서는 못 한다** (403 SELF_DECIDE)
+  static Future<Payslip> approve(String id) async {
+    final data = await _client.post('/payslips/$id/approve');
+    return Payslip.fromJson(data!);
+  }
+
+  /// 반려 — 사유가 필수다. 신청자에게 알림으로 그대로 간다
+  static Future<Payslip> reject(String id, String reason) async {
+    final data = await _client.post(
+      '/payslips/$id/reject',
+      body: {'reason': reason},
+    );
+    return Payslip.fromJson(data!);
+  }
+
+  /// 지급 처리 — 승인된 것만 된다 (400 NOT_APPROVED)
+  ///
+  /// 날짜가 됐다고 서버가 자동으로 찍지 않는다. 실제로 입금됐는지는
+  /// 이체를 확인한 사람만 아니까 여기서 눌러야 `paidAt` 이 남는다.
+  static Future<Payslip> pay(String id) async {
+    final data = await _client.post('/payslips/$id/pay');
     return Payslip.fromJson(data!);
   }
 }

@@ -6,10 +6,12 @@ part of 'staff_screen.dart';
 
 /// 인사 정보를 건드릴 수 있는 권한인가
 ///
-/// **서버는 점장(MANAGER)에게도 열려 있다** (`require_role(ADMIN, MANAGER)`).
-/// 앱은 그보다 좁게 MASTER·ADMIN 만 보여준다 — 승진·발령은 대표·관리자가
-/// 판단할 일이라고 정했다 (2026-08-03). 열려면 여기 한 줄만 고치면 된다.
-bool get _canManageStaff => myRole == Role.master || myRole == Role.admin;
+/// **MASTER 만 된다** (2026-08-04 정함).
+///
+/// ADMIN 은 **지켜보는 자리**다 — 명단·현황은 다 보지만 승진·발령·초대처럼
+/// 사람을 바꾸는 일은 대표만 한다. 서버는 점장(MANAGER)에게도 열려 있지만
+/// 앱은 그보다 좁게 잡는다. 열려면 여기 한 줄만 고치면 된다.
+bool get _canManageStaff => myRole == Role.master;
 
 /// 이 사람의 인사 정보를 내가 바꿀 수 있는가
 ///

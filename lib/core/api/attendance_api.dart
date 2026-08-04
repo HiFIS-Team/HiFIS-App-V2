@@ -249,15 +249,36 @@ class AttendanceApi {
     ];
   }
 
-  static Future<List<LeaveRequest>> leaves({String? employeeId}) async {
+  /// 휴가 신청 목록
+  ///
+  /// [status] 를 주면 그 상태만 (`PENDING` 이면 승인 대기함이 된다).
+  static Future<List<LeaveRequest>> leaves({
+    String? employeeId,
+    LeaveStatus? status,
+  }) async {
     final rows = await _client.getList(
       '/leaves',
-      query: {'employeeId': ?employeeId},
+      query: {'employeeId': ?employeeId, 'status': ?status?.wire},
     );
     return [
       for (final row in rows)
         LeaveRequest.fromJson((row as Map).cast<String, dynamic>()),
     ];
+  }
+
+  /// 휴가 승인 — **MASTER · MANAGER 만** 된다 (ADMIN 은 보기만)
+  static Future<LeaveRequest> approveLeave(String id) async {
+    final data = await _client.post('/leaves/$id/approve');
+    return LeaveRequest.fromJson(data!);
+  }
+
+  /// 휴가 반려 — 사유는 신청자에게 알림으로 그대로 간다
+  static Future<LeaveRequest> rejectLeave(String id, String reason) async {
+    final data = await _client.post(
+      '/leaves/$id/reject',
+      body: {'reason': reason},
+    );
+    return LeaveRequest.fromJson(data!);
   }
 
   /// 월 캘린더 — 하루하루 판정된 상태를 그대로 받는다

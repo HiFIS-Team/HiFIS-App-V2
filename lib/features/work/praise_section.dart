@@ -1,6 +1,11 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/api/api_exception.dart';
+import '../../core/api/kindness_api.dart';
+import '../../core/data/current_user.dart';
+import '../../core/data/staff.dart';
+import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -15,7 +20,7 @@ import '../../core/widgets/pressable.dart';
 import '../../core/widgets/progress_bar.dart';
 import '../../core/widgets/see_all_button.dart';
 
-/// 회원 친절도 탭 콘텐츠 (목업)
+/// 회원 친절도 탭 콘텐츠
 ///
 /// 회원들이 남긴 칭찬과 컴플레인을 세그먼트로 나눠 본다.
 /// 카드에는 최근 5건만 보여주고, 전체 보기에서 날짜별로 모아 본다.
@@ -31,6 +36,21 @@ class _PraiseSectionState extends State<PraiseSection> {
   int _tab = 0;
 
   bool get _complaint => _tab == 1;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      await _loadSurveys();
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+    if (mounted) setState(() {});
+  }
 
   void _openHistory() {
     showFullPage<void>(
@@ -366,18 +386,37 @@ enum _Status {
     _Status.working => AppColors.primary,
     _Status.done => AppColors.success,
   };
+
+  ComplaintStatus get wire => switch (this) {
+    _Status.pending => ComplaintStatus.pending,
+    _Status.working => ComplaintStatus.working,
+    _Status.done => ComplaintStatus.done,
+  };
+
+  static _Status of(ComplaintStatus status) => switch (status) {
+    ComplaintStatus.pending => _Status.pending,
+    ComplaintStatus.working => _Status.working,
+    ComplaintStatus.done => _Status.done,
+  };
 }
 
 /// 회원이 남긴 피드백 한 건 (칭찬 또는 컴플레인)
+///
+/// 설문 한 건에서 최대 두 줄이 나온다 — 칭찬 한 줄, 개선 의견 한 줄.
+/// 그래서 [surveyId] 가 둘이 같을 수 있다.
 class _Feedback {
   _Feedback({
     required this.name,
     required this.colorValue,
     required this.text,
     required this.time,
+    this.surveyId,
     this.complaint = false,
     this.status = _Status.pending,
   });
+
+  /// 원본 설문 id — 처리 단계를 서버에 올릴 때 쓴다
+  final String? surveyId;
 
   final String name;
   final int colorValue;
@@ -394,87 +433,60 @@ class _Feedback {
 /// 컴플레인 상태 UI는 모바일에서만 — PC는 기존 화면 그대로 둔다
 bool get _showStatus => !isDesktop;
 
-/// 받은 피드백 목록 (목업). 탭을 오가도 유지되도록 모듈 전역으로 둔다.
-final _feedbacks = <_Feedback>[..._seedFeedbacks()];
+/// 서버에서 받은 설문 — 화면 셋이 같이 쓴다
+///
+/// **한 번만 받아 둘로 나눈다.** '전체' 탭은 설문 원본을 그대로 보고,
+/// '내게 온 칭찬'·'컴플레인' 은 그중 내가 칭찬받은 것만 줄로 편다
+/// (설문 하나에서 칭찬 한 줄 · 개선 의견 한 줄이 나온다).
+final _feedbacks = <_Feedback>[];
+final _surveys = <_Survey>[];
 
-List<_Feedback> _seedFeedbacks() {
-  final now = DateTime.now();
-  // daysAgo일 전의 시각 — DateTime이 월 경계를 알아서 넘겨준다
-  DateTime at(int daysAgo, int hour, int minute) =>
-      DateTime(now.year, now.month, now.day - daysAgo, hour, minute);
-  return [
-    _Feedback(
-      name: '조은별',
-      colorValue: 0xFF7C5CFC,
-      text: '힘들 때 격려해주셔서 감사해요',
-      time: at(0, 17, 36),
-    ),
-    _Feedback(
-      name: '임하늘',
-      colorValue: 0xFFFF9F0A,
-      text: '동기부여를 잘 해주세요',
-      time: at(0, 15, 12),
-    ),
-    _Feedback(
-      name: '서민재',
-      colorValue: 0xFFE0447C,
-      text: '운동 자세를 꼼꼼히 봐주세요',
-      time: at(1, 19, 48),
-    ),
-    _Feedback(
-      name: '강태양',
-      colorValue: 0xFF7C5CFC,
-      text: '항상 웃으면서 응대해주셔서 좋아요',
-      time: at(1, 11, 20),
-    ),
-    _Feedback(
-      name: '윤아름',
-      colorValue: 0xFF00C471,
-      text: '정말 친절하게 알려주세요',
-      time: at(2, 18, 5),
-    ),
-    _Feedback(
-      name: '김우빈',
-      colorValue: 0xFF00A8B5,
-      text: '운동 원리를 쉽게 설명해주셔서 좋았습니다',
-      time: at(2, 14, 35),
-    ),
-    _Feedback(
-      name: '박도윤',
-      colorValue: 0xFF3182F6,
-      text: '스트레칭까지 챙겨주셔서 감동이에요',
-      time: at(4, 20, 10),
-    ),
-    _Feedback(
-      name: '이서아',
-      colorValue: 0xFFE0447C,
-      text: '상담이 부담스럽지 않고 편해요',
-      time: at(5, 9, 40),
-    ),
-    _Feedback(
-      name: '최지훈',
-      colorValue: 0xFF3182F6,
-      text: '수업 시간이 조금씩 밀리는 것 같아요',
-      time: at(0, 13, 25),
-      complaint: true,
-    ),
-    _Feedback(
-      name: '한소미',
-      colorValue: 0xFFFF9F0A,
-      text: '기구 사용 후 정리를 부탁드리고 싶어요',
-      time: at(1, 16, 40),
-      complaint: true,
-      status: _Status.working,
-    ),
-    _Feedback(
-      name: '정예린',
-      colorValue: 0xFF00C471,
-      text: '수업 예약 변경이 어려웠어요',
-      time: at(3, 10, 15),
-      complaint: true,
-      status: _Status.done,
-    ),
-  ];
+Future<void> _loadSurveys() async {
+  final rows = await KindnessApi.list();
+  final me = currentUser?.id;
+
+  _surveys
+    ..clear()
+    ..addAll([
+      for (final row in rows)
+        _Survey(
+          name: row.memberName,
+          phone: row.memberPhone,
+          colorValue: avatarColorFor(row.memberName).toARGB32(),
+          motive: row.motivation,
+          praised:
+              StaffDirectory.instance.byId(row.praisedEmployeeId)?.name ?? '',
+          improve: row.improvement ?? '',
+          consent: row.consent,
+          time: row.submittedAt,
+        ),
+    ]);
+
+  _feedbacks
+    ..clear()
+    ..addAll([
+      for (final row in rows)
+        if (row.praisedEmployeeId == me) ...[
+          if (row.praiseComment.trim().isNotEmpty)
+            _Feedback(
+              surveyId: row.id,
+              name: row.memberName,
+              colorValue: avatarColorFor(row.memberName).toARGB32(),
+              text: row.praiseComment,
+              time: row.submittedAt,
+            ),
+          if (row.isComplaint)
+            _Feedback(
+              surveyId: row.id,
+              name: row.memberName,
+              colorValue: avatarColorFor(row.memberName).toARGB32(),
+              text: row.improvement!,
+              time: row.submittedAt,
+              complaint: true,
+              status: _Status.of(row.improvementStatus),
+            ),
+        ],
+    ]);
 }
 
 /// '7.29 오후 5:36' 형태
@@ -520,6 +532,26 @@ void _showFeedbackDetail(
   );
 }
 
+/// 바뀐 단계를 서버에 올린다 — 실패하면 되돌린다
+///
+/// 창이 이미 닫힌 뒤라 여기서 토스트를 띄울 자리가 없다. 실패하면 목록의
+/// 알약이 원래 색으로 돌아가는 것이 신호다. 그래서 위젯이 아니라 값만
+/// 넘겨받는다 (닫힌 위젯의 `widget` 을 만지면 터진다).
+Future<void> _push(
+  String id,
+  _Feedback feedback,
+  _Status next,
+  _Status before,
+  VoidCallback? onChanged,
+) async {
+  try {
+    await KindnessApi.setStatus(id, next.wire);
+  } catch (_) {
+    feedback.status = before;
+    onChanged?.call();
+  }
+}
+
 /// 피드백 크게 보기 카드 — 컴플레인은 처리 단계를 여기서 바꾼다
 class _FeedbackDetailCard extends StatefulWidget {
   _FeedbackDetailCard({required this.feedback, this.onChanged});
@@ -541,8 +573,15 @@ class _FeedbackDetailCardState extends State<_FeedbackDetailCard> {
   void _pick(_Status status) {
     final feedback = widget.feedback;
     final next = feedback.status == status ? _Status.pending : status;
+    final before = feedback.status;
+
+    // 누르는 순간 바꾸고 서버에 올린다. 실패하면 되돌린다 —
+    // 창을 닫고 나서 결과를 기다리면 목록이 잠깐 거짓말을 한다.
     feedback.status = next;
     widget.onChanged?.call();
+
+    final id = feedback.surveyId;
+    if (id != null) _push(id, feedback, next, before, widget.onChanged);
 
     AppToast.show(
       context,
@@ -1116,116 +1155,7 @@ class _Survey {
   Color get color => Color(colorValue);
 }
 
-/// 들어온 설문 응답 (목업). 탭을 오가도 유지되도록 모듈 전역으로 둔다.
-final _surveys = <_Survey>[..._seedSurveys()];
-
-List<_Survey> _seedSurveys() {
-  final now = DateTime.now();
-  DateTime at(int daysAgo, int hour, int minute) =>
-      DateTime(now.year, now.month, now.day - daysAgo, hour, minute);
-  return [
-    _Survey(
-      name: '조은별',
-      phone: '010-2841-7712',
-      colorValue: 0xFF7C5CFC,
-      motive: '체력이 너무 떨어져서 기초 체력부터 올리고 싶었어요',
-      praised: '김피스',
-      improve: '',
-      time: at(0, 17, 36),
-    ),
-    _Survey(
-      name: '임하늘',
-      phone: '010-9032-1184',
-      colorValue: 0xFFFF9F0A,
-      motive: '건강검진에서 체중 관리가 필요하다고 들었습니다',
-      praised: '김피스',
-      improve: '탈의실에 드라이기가 하나 더 있으면 좋겠어요',
-      time: at(0, 15, 12),
-    ),
-    _Survey(
-      name: '최지훈',
-      phone: '010-3377-2098',
-      colorValue: 0xFF3182F6,
-      motive: '재활 목적으로 시작했어요',
-      praised: '',
-      improve: '수업 시간이 조금씩 밀리는 것 같아요',
-      time: at(0, 13, 25),
-    ),
-    _Survey(
-      name: '서민재',
-      phone: '010-4410-6623',
-      colorValue: 0xFFE0447C,
-      motive: '자세 교정이 필요해서 왔습니다',
-      praised: '김피스',
-      improve: '',
-      time: at(1, 19, 48),
-    ),
-    _Survey(
-      name: '한소미',
-      phone: '010-8825-3391',
-      colorValue: 0xFFFF9F0A,
-      motive: '친구 소개로 등록했어요',
-      praised: '민중기',
-      improve: '기구 사용 후 정리를 부탁드리고 싶어요',
-      time: at(1, 16, 40),
-    ),
-    _Survey(
-      name: '강태양',
-      phone: '010-5518-7734',
-      colorValue: 0xFF7C5CFC,
-      motive: '앉아서 일하다 보니 허리가 아파서요',
-      praised: '김피스',
-      improve: '',
-      time: at(1, 11, 20),
-    ),
-    _Survey(
-      name: '윤아름',
-      phone: '010-6642-0087',
-      colorValue: 0xFF00C471,
-      motive: '결혼 준비로 체형 관리를 시작했습니다',
-      praised: '김피스',
-      improve: '',
-      time: at(2, 18, 5),
-    ),
-    _Survey(
-      name: '김우빈',
-      phone: '010-7719-4406',
-      colorValue: 0xFF00A8B5,
-      motive: '근력을 키우고 싶어서 등록했어요',
-      praised: '박준현',
-      improve: '',
-      time: at(2, 14, 35),
-      consent: false,
-    ),
-    _Survey(
-      name: '정예린',
-      phone: '010-2263-9915',
-      colorValue: 0xFF00C471,
-      motive: '스트레스를 풀 운동을 찾고 있었어요',
-      praised: '',
-      improve: '수업 예약 변경이 어려웠어요',
-      time: at(3, 10, 15),
-    ),
-    _Survey(
-      name: '박도윤',
-      phone: '010-9908-5541',
-      colorValue: 0xFF3182F6,
-      motive: '헬스는 처음이라 배우면서 하려고요',
-      praised: '유찬빈',
-      improve: '',
-      time: at(4, 20, 10),
-    ),
-    _Survey(
-      name: '이서아',
-      phone: '010-3384-2276',
-      colorValue: 0xFFE0447C,
-      motive: '출산 후 체력 회복이 목표예요',
-      praised: '전상현',
-      improve: '',
-      time: at(5, 9, 40),
-    ),
-  ];
-}
+// 설문 목록(_surveys)은 위 _loadSurveys() 가 채운다.
 
 /// '전체' 탭 카드 — 최근 설문 5건과 전체 보기 버튼
 class _SurveyCard extends StatelessWidget {

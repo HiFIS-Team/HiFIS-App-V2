@@ -152,9 +152,14 @@ class _Payslip {
   int get newSessions => source?.basis.newSales.length ?? 0;
   int get renewalSessions => source?.basis.renewalSales.length ?? 0;
 
-  /// 지급일 — 서버가 알려 준다 (없으면 다음 달 10일로 가정)
+  /// 지급일 — 서버가 알려 준다 (명세서에 실려 오고, 없으면 신청 창에서)
+  ///
+  /// 앱이 규칙을 따로 갖고 있으면 서버가 바뀔 때 어긋난다. 예전에 폴백이
+  /// '익월 10일' 로 박혀 있었는데 서버는 **말일**이었다.
   DateTime get payDay =>
-      window?.payday ?? DateTime(month.year, month.month + 1, 10);
+      source?.payday ??
+      window?.payday ??
+      DateTime(month.year, month.month + 1, 0);
 
   /// 오늘 신청할 수 있는지 — 서버는 지급일 당일만 받는다
   bool get canSubmit => window?.isOpen ?? false;
