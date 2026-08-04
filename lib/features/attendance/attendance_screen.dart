@@ -66,8 +66,16 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     if (mounted) setState(() {});
   }
 
-  void _moveMonth(int delta) {
-    setState(() => _month = DateTime(_month.year, _month.month + delta));
+  Future<void> _moveMonth(int delta) async {
+    final month = DateTime(_month.year, _month.month + delta);
+    setState(() => _month = month);
+    // 대표는 달 요약이 전사 집계라 달마다 따로 받아야 한다
+    try {
+      await _loadSummary(_monthKey(month));
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+    if (mounted) setState(() {});
   }
 
   /// 보고 있는 달의 기록만 추린다 (요약도 이 달 기준)
@@ -228,6 +236,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 // ── 달 요약 ──
 
 /// 보고 있는 달의 근무일·근무시간·지각·결근
+///
+/// 대표는 출퇴근을 안 찍어서 자기 기록이 전부 0이다. **칸은 그대로 두고
+/// 값만 전사 집계로 바꾼다** (`/attendance/summary`). 판정 기준이 캘린더와
+/// 같아서 직원 화면과 숫자가 갈리지 않는다.
 class _MonthSummary extends StatelessWidget {
   _MonthSummary({required this.days, required this.month});
 
@@ -236,13 +248,24 @@ class _MonthSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final worked = days.where((d) => d.status.worked).length;
-    final total = days.fold(Duration.zero, (sum, d) => sum + d.worked);
-    final late = days.where((d) => d.status == _DayStatus.late).length;
-    final absent = days.where((d) => d.status == _DayStatus.absent).length;
-    final early = days.where((d) => d.status == _DayStatus.early).length;
-    final leave = days.where((d) => d.status == _DayStatus.leave).length;
-    final off = days.where((d) => d.status == _DayStatus.off).length;
+    final all = myRole == Role.master ? _summaries[_monthKey(month)] : null;
+
+    final worked = all?.workedDays ?? days.where((d) => d.status.worked).length;
+    final total = all != null
+        ? Duration(minutes: all.workMinutes)
+        : days.fold(Duration.zero, (sum, d) => sum + d.worked);
+    final late =
+        all?.late ?? days.where((d) => d.status == _DayStatus.late).length;
+    final absent =
+        all?.absent ?? days.where((d) => d.status == _DayStatus.absent).length;
+    final early =
+        all?.earlyLeave ??
+        days.where((d) => d.status == _DayStatus.early).length;
+    final leave =
+        all?.leaveDays ??
+        days.where((d) => d.status == _DayStatus.leave).length.toDouble();
+    final off =
+        all?.dayOff ?? days.where((d) => d.status == _DayStatus.off).length;
     final average = worked == 0
         ? Duration.zero
         : Duration(minutes: total.inMinutes ~/ worked);
@@ -311,7 +334,7 @@ class _MonthSummary extends StatelessWidget {
                 _divider(),
                 _stat(
                   '월차',
-                  '$leave일',
+                  '${_dayCount(leave)}일',
                   leave > 0 ? AppColors.primary : AppColors.textPrimary,
                 ),
                 _divider(),

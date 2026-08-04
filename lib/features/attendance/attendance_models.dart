@@ -204,9 +204,12 @@ final _days = <_Day>[];
 
 final _leaves = <_Leave>[];
 
-/// 결재를 기다리는 월차 신청 — 승인함을 볼 수 있는 사람에게만 채워진다.
+/// 결재를 기다리는 월차 신청 — 결재함을 볼 수 있는 사람에게만 채워진다.
 /// 승인 화면을 따로 두지 않고 '남은 월차' 카드 안에서 바로 처리한다.
 final _leaveInbox = <LeaveRequest>[];
+
+/// 대표가 보는 전사 달 집계 — 달마다 한 번씩 받아 둔다 (키는 `2026-08`)
+final _summaries = <String, AttendanceSummary>{};
 
 /// 근태·월차를 서버에서 받아 온다
 ///
@@ -241,6 +244,19 @@ Future<void> _loadAttendance() async {
   _days
     ..clear()
     ..addAll(days.map(_Day.from));
+
+  _summaries.clear();
+  await _loadSummary(_monthKey(now));
+}
+
+/// 대표가 보는 전사 달 집계 — 보고 있는 달 것을 받아 둔다
+///
+/// 대표는 자기 출퇴근이 없어서 달 요약이 전부 0이다. 칸은 그대로 두고
+/// 값만 이걸로 바꾼다. 사람마다 캘린더를 부르면 인원수만큼 요청이 나가서
+/// 서버가 한 번에 주는 것([AttendanceApi.summary])을 쓴다.
+Future<void> _loadSummary(String month) async {
+  if (myRole != Role.master || _summaries.containsKey(month)) return;
+  _summaries[month] = await AttendanceApi.summary(month: month);
 }
 
 /// `2026-07`
