@@ -21,6 +21,7 @@ import '../../core/widgets/glass_bottom_button.dart';
 import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/phone_scaffold.dart';
 import '../../core/widgets/pressable.dart';
+import '../../core/widgets/reject_reason_dialog.dart';
 import '../../core/widgets/see_all_button.dart';
 
 part 'salary_models.dart';

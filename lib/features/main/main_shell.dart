@@ -214,6 +214,8 @@ class _MainShellState extends State<MainShell> {
       onOpenProjects: _goProjects,
       onOpenNotices: _goNotices,
       onOpen: _go,
+      // 조직도는 데스크톱 사이드바에만 있다 — 폰은 넘기지 않는다
+      onOpenStaff: () => _paneIndex.value = 7,
     ),
     WorkScreen(),
     ProjectScreen(),

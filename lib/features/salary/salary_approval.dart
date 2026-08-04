@@ -75,7 +75,7 @@ class _ApprovalTabState extends State<_ApprovalTab> {
   }
 
   Future<void> _reject(Payslip payslip) async {
-    final reason = await _askReason(context);
+    final reason = await askRejectReason(context, hint: '예) 추가 근무 시간이 기록과 달라요');
     if (reason == null || !mounted) return;
     await _run(() => PayrollApi.reject(payslip.id, reason), '반려했어요');
   }
@@ -160,74 +160,6 @@ class _ApprovalTabState extends State<_ApprovalTab> {
 }
 
 /// 사유를 받아 온다 — 반려는 이유 없이 보내면 신청자가 뭘 고칠지 모른다
-Future<String?> _askReason(BuildContext context) {
-  final controller = TextEditingController();
-  return showAppDialog<String>(context, (context) {
-    return Container(
-      width: dialogWidth(context, 320),
-      padding: EdgeInsets.fromLTRB(20, 20, 20, 16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text('반려 사유', style: AppTextStyles.title3),
-          SizedBox(height: 4),
-          Text('신청한 사람에게 그대로 전달돼요', style: AppTextStyles.caption),
-          SizedBox(height: 14),
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppColors.gray50,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: TextField(
-              controller: controller,
-              autofocus: true,
-              maxLines: 3,
-              minLines: 3,
-              style: AppTextStyles.body2,
-              decoration: InputDecoration(
-                border: InputBorder.none,
-                hintText: '예) 추가 근무 시간이 기록과 달라요',
-                hintStyle: AppTextStyles.body2.copyWith(
-                  color: AppColors.textTertiary,
-                ),
-              ),
-            ),
-          ),
-          SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: AppButton(
-                  label: '닫기',
-                  onTap: () => Navigator.pop(context),
-                ),
-              ),
-              SizedBox(width: 8),
-              Expanded(
-                child: AppButton(
-                  label: '반려',
-                  color: AppColors.error,
-                  textColor: Colors.white,
-                  onTap: () {
-                    final text = controller.text.trim();
-                    if (text.isEmpty) return;
-                    Navigator.pop(context, text);
-                  },
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  });
-}
 
 /// 함 하나 — 제목 · 건수 · 줄들
 class _ApprovalGroup extends StatelessWidget {

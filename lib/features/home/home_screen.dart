@@ -3,17 +3,23 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../core/api/approval_api.dart';
+import '../../core/api/attendance_api.dart';
 import '../../core/api/home_api.dart';
+import '../../core/api/payroll_api.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
 import '../../core/data/staff.dart';
+import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
 import '../../core/widgets/app_toast.dart';
+import '../../core/widgets/avatar.dart';
 import '../../core/widgets/pressable.dart';
+import '../../core/widgets/reject_reason_dialog.dart';
 import '../../core/widgets/see_all_button.dart';
 import '../notice/notice_screen.dart';
 import '../notifications/notification_screen.dart';
@@ -30,14 +36,23 @@ import '../project/project_screen.dart';
 /// 카드가 비어 보인다.
 /// 요약의 `monthScore` 는 지금 놓을 자리가 없어 안 쓴다 — 화면을 늘리지 않는다.
 class HomeScreen extends StatefulWidget {
-  HomeScreen({super.key, this.onOpenProjects, this.onOpenNotices, this.onOpen});
+  HomeScreen({
+    super.key,
+    this.onOpenProjects,
+    this.onOpenNotices,
+    this.onOpen,
+    this.onOpenStaff,
+  });
 
   /// 카드의 '전체'를 눌렀을 때 해당 탭으로 옮겨달라고 셸에 알린다
   final VoidCallback? onOpenProjects;
   final VoidCallback? onOpenNotices;
 
-  /// 처리할 일 카드가 쓰는 통로 — 갈 곳이 셋이라 하나로 받는다
+  /// 결재 대기 카드가 쓰는 통로 — 갈 곳이 셋이라 하나로 받는다
   final void Function(NotificationTarget)? onOpen;
+
+  /// 조직도로 — **데스크톱에만 있는 화면이라** 폰에서는 안 넘어온다
+  final VoidCallback? onOpenStaff;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -125,16 +140,36 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 _GreetingCard(),
                 SizedBox(height: 16),
                 // 대표·관리자는 출근을 안 해서 근무 카드가 늘 비어 있다.
-                // 그 자리에 '지금 눌러야 할 것'을 놓는다.
-                //
-                // **권한으로 가른다** — 요약이 도착해야 아는 `pending` 으로 가르면
-                // 대표 화면에 근무 카드가 깜빡 떴다 바뀐다.
-                if (myRole == Role.master || myRole == Role.admin)
-                  _PendingCard(
-                    pending: _summary?.pending,
-                    onOpen: widget.onOpen,
-                  )
-                else
+                // 그 자리에 결재 대기와 오늘 출근을 아래 프로젝트·공지와 같은
+                // 두 칸으로 놓는다.
+                if (myRole == Role.master || myRole == Role.admin) ...[
+                  if (desktop)
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: _InboxCard(
+                              fill: true,
+                              onOpen: widget.onOpen,
+                            ),
+                          ),
+                          SizedBox(width: 16),
+                          Expanded(
+                            child: _TodayStaffCard(
+                              fill: true,
+                              onOpenAll: widget.onOpenStaff,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else ...[
+                    _InboxCard(fill: false, onOpen: widget.onOpen),
+                    SizedBox(height: 16),
+                    _TodayStaffCard(fill: false),
+                  ],
+                ] else
                   _HeroStatusCard(attendance: _summary?.attendance),
                 SizedBox(height: 16),
                 if (desktop)
@@ -216,128 +251,427 @@ class _GreetingCard extends StatelessWidget {
   }
 }
 
-/// 처리할 일 — 대표·관리자 홈의 히어로 자리 (근무 카드 대신)
+/// 결재 대기 — 대표·관리자 홈 왼쪽 카드 (근무 카드 자리)
 ///
-/// 셋 다 **전사 기준**이다. ADMIN 은 승인 권한이 없지만 건수는 같이 본다 —
-/// 승인·반려 버튼만 각 화면에서 MASTER 에게 나간다.
-class _PendingCard extends StatelessWidget {
-  _PendingCard({required this.pending, this.onOpen});
+/// 급여·월차·전자결재가 **한 목록으로** 선다. 셋을 따로 받아 합치면 홈에서만
+/// 요청이 세 개 더 나가서 서버(`/me/inbox`)가 합쳐 준다.
+///
+/// **ADMIN 은 버튼이 없다.** 지켜보는 자리라 목록은 같이 보되 승인·반려는
+/// MASTER 만 누른다 (급여·월차 결재 화면과 같은 기준 — 눌러도 403 날 버튼은 안 낸다).
+class _InboxCard extends StatefulWidget {
+  _InboxCard({required this.fill, this.onOpen});
 
-  /// 요약이 아직 안 왔으면 null — 0 으로 그린다
-  final HomePending? pending;
+  /// true 면 카드 높이에 맞춰 줄 간격을 고르게 벌린다 (데스크톱 나란히 배치용)
+  final bool fill;
 
   final void Function(NotificationTarget)? onOpen;
 
   @override
+  State<_InboxCard> createState() => _InboxCardState();
+}
+
+class _InboxCardState extends State<_InboxCard> {
+  List<InboxItem> _items = const [];
+  bool _loading = true;
+
+  /// 데스크톱은 나란히 선 프로젝트 카드와 줄 수를 맞춘다
+  static const _max = 4;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final rows = await HomeApi.inbox();
+      if (!mounted) return;
+      setState(() {
+        _items = rows;
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      AppToast.show(context, messageOf(error));
+    }
+  }
+
+  /// 종류마다 부르는 곳이 다르다 — id 는 그 테이블의 것이다
+  Future<void> _approve(InboxItem item) => _run(item, () async {
+    switch (item.kind) {
+      case InboxKind.payslip:
+        await PayrollApi.approve(item.id);
+      case InboxKind.leave:
+        await AttendanceApi.approveLeave(item.id);
+      case InboxKind.approval:
+        await ApprovalApi.approve(item.id);
+    }
+  }, '승인했어요');
+
+  Future<void> _reject(InboxItem item) async {
+    final reason = await askRejectReason(
+      context,
+      hint: switch (item.kind) {
+        InboxKind.payslip => '예) 추가 근무 시간이 기록과 달라요',
+        InboxKind.leave => '예) 그날은 인원이 모자라요',
+        InboxKind.approval => '예) 금액 근거를 더 적어주세요',
+      },
+    );
+    if (reason == null || !mounted) return;
+    await _run(item, () async {
+      switch (item.kind) {
+        case InboxKind.payslip:
+          await PayrollApi.reject(item.id, reason);
+        case InboxKind.leave:
+          await AttendanceApi.rejectLeave(item.id, reason);
+        case InboxKind.approval:
+          await ApprovalApi.reject(item.id, comment: reason);
+      }
+    }, '반려했어요');
+  }
+
+  /// 처리하고 목록을 다시 받는다 — 한 건만 빼면 다른 기기에서 바뀐 게 안 맞는다
+  Future<void> _run(
+    InboxItem item,
+    Future<void> Function() action,
+    String done,
+  ) async {
+    try {
+      await action();
+      if (!mounted) return;
+      AppToast.show(context, done);
+      await _load();
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+  }
+
+  /// '전체'는 종류가 섞여 있어 한 화면으로 못 보낸다 — 제일 많은 쪽으로 보낸다
+  VoidCallback? get _openAll {
+    if (_items.isEmpty || widget.onOpen == null) return null;
+    final counts = <InboxKind, int>{};
+    for (final item in _items) {
+      counts[item.kind] = (counts[item.kind] ?? 0) + 1;
+    }
+    final top = counts.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
+    final target = switch (top) {
+      InboxKind.payslip => NotificationTarget.salary,
+      InboxKind.leave => NotificationTarget.attendance,
+      InboxKind.approval => NotificationTarget.approval,
+    };
+    // 전자결재는 폰에 탭이 아예 없다
+    if (target == NotificationTarget.approval && !isDesktop) return null;
+    return () => widget.onOpen!.call(target);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final total = pending?.total ?? 0;
-    final color = total > 0 ? AppColors.primary : AppColors.textTertiary;
+    final shown = _items.take(_max).toList();
+    final rows = [
+      for (final item in shown)
+        _InboxRow(
+          item: item,
+          onApprove: myRole.canApprove ? () => _approve(item) : null,
+          onReject: myRole.canApprove ? () => _reject(item) : null,
+        ),
+    ];
 
     return Container(
-      padding: EdgeInsets.all(24),
+      padding: EdgeInsets.all(20),
       decoration: AppDecorations.card(),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('처리할 일', style: AppTextStyles.label),
-          SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                '$total',
-                style: TextStyle(
-                  fontFamily: AppTextStyles.fontFamily,
-                  fontSize: 40,
-                  fontWeight: FontWeight.w700,
-                  height: 1.1,
-                  color: color,
-                  fontFeatures: [FontFeature.tabularFigures()],
+          _CardHeader(
+            title: '결재 대기',
+            count: _items.length,
+            onOpenAll: _openAll,
+          ),
+          SizedBox(height: 14),
+          if (_loading)
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: 22),
+              child: Center(
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.4,
+                  valueColor: AlwaysStoppedAnimation(AppColors.primary),
                 ),
               ),
-              Text('건', style: AppTextStyles.title3.copyWith(color: color)),
+            )
+          else if (rows.isEmpty)
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: 22),
+              child: Center(
+                child: Text(
+                  '결재할 게 없어요',
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.textTertiary,
+                  ),
+                ),
+              ),
+            )
+          else if (widget.fill)
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: rows,
+              ),
+            )
+          else
+            for (var i = 0; i < rows.length; i++) ...[
+              if (i > 0) SizedBox(height: 14),
+              rows[i],
             ],
-          ),
-          SizedBox(height: 4),
-          Text(
-            total > 0 ? '기다리고 있어요' : '다 처리했어요',
-            textAlign: TextAlign.center,
-            style: AppTextStyles.caption,
-          ),
-          SizedBox(height: 20),
-          Container(height: 1, color: AppColors.divider),
-          SizedBox(height: 6),
-          // 폰에는 전자결재 탭이 아예 없다 — 그 줄만 못 누른다(화살표도 안 그린다)
-          _PendingRow(
-            label: '전자결재',
-            count: pending?.approvals ?? 0,
-            onTap: isDesktop
-                ? () => onOpen?.call(NotificationTarget.approval)
-                : null,
-          ),
-          _PendingRow(
-            label: '급여 승인',
-            count: pending?.payslips ?? 0,
-            onTap: () => onOpen?.call(NotificationTarget.salary),
-          ),
-          _PendingRow(
-            label: '월차 승인',
-            count: pending?.leaves ?? 0,
-            onTap: () => onOpen?.call(NotificationTarget.attendance),
-          ),
         ],
       ),
     );
   }
 }
 
-class _PendingRow extends StatelessWidget {
-  _PendingRow({required this.label, required this.count, this.onTap});
+class _InboxRow extends StatelessWidget {
+  _InboxRow({required this.item, this.onApprove, this.onReject});
 
-  final String label;
-  final int count;
-  final VoidCallback? onTap;
+  final InboxItem item;
+
+  /// null 이면 버튼을 안 그린다 (ADMIN)
+  final VoidCallback? onApprove;
+  final VoidCallback? onReject;
+
+  String get _name =>
+      StaffDirectory.instance.byId(item.employeeId)?.name ?? '알 수 없음';
 
   @override
   Widget build(BuildContext context) {
-    // 0 건이면 눌러도 빈 화면이라 회색으로 둔다 (줄은 남긴다 — 자리가 안 흔들리게)
-    final waiting = count > 0;
-    final row = Padding(
-      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 11),
-      child: Row(
-        children: [
-          Expanded(child: Text(label, style: AppTextStyles.body2)),
-          Text(
-            '$count건',
-            style: AppTextStyles.body2.copyWith(
-              fontWeight: FontWeight.w700,
-              color: waiting ? AppColors.primary : AppColors.textTertiary,
-            ),
-          ),
-          SizedBox(width: 6),
-          SizedBox(
-            width: 16,
-            child: onTap == null
-                ? null
-                : Icon(
-                    Icons.chevron_right_rounded,
-                    size: 16,
-                    color: AppColors.gray400,
+    return Row(
+      children: [
+        Avatar(name: _name, size: 34),
+        SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      _name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.body2.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
+                  SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      item.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.caption,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 1),
+              Text(
+                item.detail,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.caption,
+              ),
+            ],
           ),
+        ),
+        if (onApprove != null && onReject != null) ...[
+          SizedBox(width: 8),
+          _MiniButton(label: '승인', onTap: onApprove!, filled: true),
+          SizedBox(width: 6),
+          _MiniButton(label: '반려', onTap: onReject!, filled: false),
+        ],
+      ],
+    );
+  }
+}
+
+/// 줄 안에 들어가는 작은 처리 버튼 — 카드가 좁아서 기본 버튼(높이 56)은 못 쓴다
+class _MiniButton extends StatelessWidget {
+  _MiniButton({required this.label, required this.onTap, required this.filled});
+
+  final String label;
+  final VoidCallback onTap;
+
+  /// 승인은 채우고 반려는 테두리만 — 실수로 반려를 먼저 누르지 않게
+  final bool filled;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      scale: 0.96,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        height: 32,
+        padding: EdgeInsets.symmetric(horizontal: 12),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: filled ? AppColors.primary : AppColors.gray50,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          label,
+          style: AppTextStyles.caption.copyWith(
+            fontWeight: FontWeight.w600,
+            color: filled ? Colors.white : AppColors.textSecondary,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 오늘 출근 — 대표·관리자 홈 오른쪽 카드
+///
+/// **요청을 안 보낸다.** 명단(`StaffDirectory`)에 서버가 판정한 오늘 상태
+/// (`Employee.todayStatus`)가 같이 실려 오므로 그걸 그대로 센다.
+class _TodayStaffCard extends StatelessWidget {
+  _TodayStaffCard({required this.fill, this.onOpenAll});
+
+  final bool fill;
+  final VoidCallback? onOpenAll;
+
+  static const _max = 4;
+
+  /// 재직자만 — 퇴사·비활성은 오늘 나올 사람이 아니다
+  List<Employee> get _staff => [
+    for (final employee in StaffDirectory.instance.employees)
+      if (employee.status == EmployeeStatus.active) employee,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final staff = _staff;
+    // 나와 있는 사람 → 휴가 → 나머지. 카드에 몇 줄만 서므로 순서가 곧 중요도다
+    int rank(Employee e) => switch (e.todayStatus) {
+      final s? when s.working => 0,
+      AttendanceStatus.onLeave => 1,
+      _ => 2,
+    };
+    final sorted = [...staff]
+      ..sort((a, b) {
+        final gap = rank(a).compareTo(rank(b));
+        return gap != 0 ? gap : a.name.compareTo(b.name);
+      });
+    final working = staff.where((e) => e.todayStatus?.working ?? false).length;
+
+    final rows = [for (final e in sorted.take(_max)) _StaffRow(employee: e)];
+
+    return Container(
+      padding: EdgeInsets.all(20),
+      decoration: AppDecorations.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _CardHeader(
+            title: '오늘 출근',
+            count: working,
+            total: staff.length,
+            onOpenAll: onOpenAll,
+          ),
+          SizedBox(height: 14),
+          if (rows.isEmpty)
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: 22),
+              child: Center(
+                child: Text(
+                  '명단을 아직 못 받았어요',
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.textTertiary,
+                  ),
+                ),
+              ),
+            )
+          else if (fill)
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: rows,
+              ),
+            )
+          else
+            for (var i = 0; i < rows.length; i++) ...[
+              if (i > 0) SizedBox(height: 14),
+              rows[i],
+            ],
         ],
       ),
     );
+  }
+}
 
-    final go = onTap;
-    if (go == null) return row;
-    return Pressable(
-      onTap: go,
-      scale: 0.99,
-      borderRadius: BorderRadius.circular(12),
-      child: row,
+class _StaffRow extends StatelessWidget {
+  _StaffRow({required this.employee});
+
+  final Employee employee;
+
+  /// 서버 판정을 화면 말로 — **null 은 아직 출근 전이다** (결근이 아니다)
+  (String, Color) get _badge => switch (employee.todayStatus) {
+    final s? when s.working => ('근무중', AppColors.success),
+    AttendanceStatus.onLeave => ('휴가', AppColors.primary),
+    AttendanceStatus.dayOff => ('휴무', AppColors.gray400),
+    AttendanceStatus.absent => ('결근', AppColors.error),
+    null => ('출근 전', AppColors.gray400),
+    _ => ('퇴근', AppColors.gray400),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, color) = _badge;
+    return Row(
+      children: [
+        Avatar(name: employee.name, size: 34),
+        SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                employee.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.body2.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              SizedBox(height: 1),
+              Text(
+                employee.rank.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.caption,
+              ),
+            ],
+          ),
+        ),
+        SizedBox(width: 8),
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.all(Radius.circular(100)),
+          ),
+          child: Text(
+            label,
+            style: AppTextStyles.caption.copyWith(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -612,10 +946,18 @@ class _WorkGauge extends StatelessWidget {
 }
 
 class _CardHeader extends StatelessWidget {
-  _CardHeader({required this.title, required this.count, this.onOpenAll});
+  _CardHeader({
+    required this.title,
+    required this.count,
+    this.total,
+    this.onOpenAll,
+  });
 
   final String title;
   final int count;
+
+  /// 있으면 `12/23` 으로 — 출근 카드처럼 분모가 있어야 뜻이 생기는 자리
+  final int? total;
 
   /// 눌리면 해당 탭으로 이동한다
   final VoidCallback? onOpenAll;

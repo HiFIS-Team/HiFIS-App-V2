@@ -45,33 +45,60 @@ class HomeAttendance {
   final HalfPeriod? halfPeriod;
 }
 
-/// 결재를 기다리는 것 (서버 `HomePendingOut`)
+/// 결재함 한 줄의 출처 — 승인·반려를 어느 API 로 보낼지 가른다
+enum InboxKind {
+  payslip('PAYSLIP'),
+  leave('LEAVE'),
+  approval('APPROVAL');
+
+  const InboxKind(this.wire);
+
+  final String wire;
+
+  static InboxKind parse(String? value) => InboxKind.values.firstWhere(
+    (k) => k.wire == value,
+    orElse: () => InboxKind.approval,
+  );
+}
+
+/// 결재를 기다리는 것 한 줄 (서버 `InboxItemOut`)
 ///
-/// **MASTER · ADMIN 에게만 온다.** 대표·관리자는 출근을 안 해서 홈의 출퇴근
-/// 카드가 늘 비어 있다. 그 자리에 '지금 눌러야 할 것'을 대신 놓는다.
-class HomePending {
-  HomePending({
-    required this.approvals,
-    required this.payslips,
-    required this.leaves,
+/// **MASTER · ADMIN 에게만 온다.** 급여·월차·전자결재가 테이블은 따로인데
+/// 홈 카드에서는 한 목록으로 서므로 서버가 합쳐서 준다.
+class InboxItem {
+  InboxItem({
+    required this.kind,
+    required this.id,
+    required this.employeeId,
+    required this.title,
+    required this.detail,
+    required this.createdAt,
   });
 
-  factory HomePending.fromJson(Map<String, dynamic> json) => HomePending(
-    approvals: json['approvals'] as int? ?? 0,
-    payslips: json['payslips'] as int? ?? 0,
-    leaves: json['leaves'] as int? ?? 0,
+  factory InboxItem.fromJson(Map<String, dynamic> json) => InboxItem(
+    kind: InboxKind.parse(json['kind'] as String?),
+    id: json['id'] as String,
+    employeeId: json['employeeId'] as String? ?? '',
+    title: json['title'] as String? ?? '',
+    detail: json['detail'] as String? ?? '',
+    createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
   );
 
-  /// 아직 안 끝난 전자결재
-  final int approvals;
+  final InboxKind kind;
 
-  /// 제출된 급여
-  final int payslips;
+  /// 승인·반려 엔드포인트에 넘길 id — 종류마다 다른 테이블의 것이다
+  final String id;
 
-  /// 대기 중인 월차
-  final int leaves;
+  /// 올린 사람
+  final String employeeId;
 
-  int get total => approvals + payslips + leaves;
+  /// `2026년 7월 급여` · `연차` · `외근·출장` — **서버가 만들어 준다**
+  final String title;
+
+  /// `실수령 2,340,000원` · `8.12 ~ 8.14 · 3일`
+  final String detail;
+
+  final DateTime createdAt;
 }
 
 /// 홈 첫 화면 요약 (서버 `HomeSummaryOut`)
@@ -82,7 +109,6 @@ class HomeSummary {
     required this.incompleteProjects,
     required this.unreadNotices,
     required this.monthScore,
-    this.pending,
   });
 
   factory HomeSummary.fromJson(Map<String, dynamic> json) => HomeSummary(
@@ -93,10 +119,6 @@ class HomeSummary {
     incompleteProjects: json['incompleteProjects'] as int? ?? 0,
     unreadNotices: json['unreadNotices'] as int? ?? 0,
     monthScore: json['monthScore'] as int? ?? 0,
-    pending: switch (json['pending']) {
-      final Map row => HomePending.fromJson(row.cast<String, dynamic>()),
-      _ => null,
-    },
   );
 
   /// `2026-07` — 이번 달
@@ -112,9 +134,6 @@ class HomeSummary {
 
   /// 이번 달 내 점수 합 (점수 원장 전 항목)
   final int monthScore;
-
-  /// MASTER·ADMIN 이 아니면 null — 나머지 직원 홈은 모양이 그대로다
-  final HomePending? pending;
 }
 
 /// `/me/home` — 개인 홈 요약
@@ -130,6 +149,16 @@ class HomeApi {
   static Future<HomeSummary> summary() async {
     final data = await _client.get('/me/home');
     return HomeSummary.fromJson(data);
+  }
+
+  /// 결재를 기다리는 것 — **MASTER · ADMIN 만** (그 외는 403).
+  /// 오래 묵은 것부터 온다
+  static Future<List<InboxItem>> inbox() async {
+    final rows = await _client.getList('/me/inbox');
+    return [
+      for (final row in rows)
+        InboxItem.fromJson((row as Map).cast<String, dynamic>()),
+    ];
   }
 }
 
