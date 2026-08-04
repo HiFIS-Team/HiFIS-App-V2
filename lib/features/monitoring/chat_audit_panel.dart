@@ -9,6 +9,7 @@ import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/avatar.dart';
+import '../../core/widgets/delayed_spinner.dart';
 import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/pressable.dart';
 
@@ -111,15 +112,7 @@ class _ChatAuditPanelState extends State<ChatAuditPanel> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return SizedBox(
-        height: widget.height,
-        child: Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 2.4,
-            valueColor: AlwaysStoppedAnimation(AppColors.primary),
-          ),
-        ),
-      );
+      return DelayedSpinner(height: widget.height);
     }
     if (_rooms.isEmpty) {
       return EmptyCard(icon: CupertinoIcons.chat_bubble_2, text: '아직 대화방이 없어요');
@@ -242,12 +235,7 @@ class _ChatAuditPanelState extends State<ChatAuditPanel> {
           Container(height: 1, color: AppColors.divider),
           Expanded(
             child: _loadingMessages
-                ? Center(
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.4,
-                      valueColor: AlwaysStoppedAnimation(AppColors.primary),
-                    ),
-                  )
+                ? DelayedSpinner.bare()
                 : _messages.isEmpty
                 ? Center(
                     child: Text(

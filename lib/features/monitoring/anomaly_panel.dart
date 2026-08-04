@@ -9,9 +9,11 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_toast.dart';
+import '../../core/widgets/delayed_spinner.dart';
 import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/page_numbers.dart';
+import '../../core/widgets/pane_transition.dart';
 import '../../core/widgets/pressable.dart';
 import 'activity_panel.dart' show ago;
 
@@ -76,7 +78,8 @@ class _AnomalyPanelState extends State<AnomalyPanel> {
         _page = 0;
       }
       if (page != null) _page = page;
-      _loading = true;
+      // 내용을 비우지 않는다 — 비우면 탭을 옮길 때마다 깜빡인다
+      // (activity_panel 과 같은 이유)
     });
     _load();
   }
@@ -99,15 +102,7 @@ class _AnomalyPanelState extends State<AnomalyPanel> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return Padding(
-        padding: EdgeInsets.symmetric(vertical: 80),
-        child: Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 2.4,
-            valueColor: AlwaysStoppedAnimation(AppColors.primary),
-          ),
-        ),
-      );
+      return DelayedSpinner();
     }
 
     return Column(
@@ -119,33 +114,39 @@ class _AnomalyPanelState extends State<AnomalyPanel> {
           onSelect: (i) => _go(tab: i),
         ),
         SizedBox(height: 16),
-        if (_rows.isEmpty)
-          EmptyCard(
-            icon: CupertinoIcons.checkmark_shield,
-            text: _tab == 0 ? '확인할 이상 징후가 없어요' : '아직 이상 징후가 없어요',
-          )
-        else
-          Container(
-            padding: EdgeInsets.fromLTRB(12, 8, 12, 8),
-            decoration: AppDecorations.card(radius: 20),
-            child: Column(
-              children: [
-                for (var i = 0; i < _rows.length; i++) ...[
-                  if (i > 0)
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 10),
-                      child: Container(height: 1, color: AppColors.divider),
-                    ),
-                  _Row(
-                    item: _rows[i],
-                    onResolve: _rows[i].open && myRole == Role.master
-                        ? () => _resolve(_rows[i])
-                        : null,
+        // 탭을 옮길 때만 전환이 걸린다 (장을 넘길 때는 안 걸린다)
+        PaneTransition(
+          step: _tab,
+          child: _rows.isEmpty
+              ? EmptyCard(
+                  icon: CupertinoIcons.checkmark_shield,
+                  text: _tab == 0 ? '확인할 이상 징후가 없어요' : '아직 이상 징후가 없어요',
+                )
+              : Container(
+                  padding: EdgeInsets.fromLTRB(12, 8, 12, 8),
+                  decoration: AppDecorations.card(radius: 20),
+                  child: Column(
+                    children: [
+                      for (var i = 0; i < _rows.length; i++) ...[
+                        if (i > 0)
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 10),
+                            child: Container(
+                              height: 1,
+                              color: AppColors.divider,
+                            ),
+                          ),
+                        _Row(
+                          item: _rows[i],
+                          onResolve: _rows[i].open && myRole == Role.master
+                              ? () => _resolve(_rows[i])
+                              : null,
+                        ),
+                      ],
+                    ],
                   ),
-                ],
-              ],
-            ),
-          ),
+                ),
+        ),
         PageNumbers(
           page: _page,
           pages: _pages,

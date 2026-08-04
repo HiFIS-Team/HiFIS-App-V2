@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../core/api/monitoring_api.dart';
@@ -7,8 +6,10 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_toast.dart';
+import '../../core/widgets/delayed_spinner.dart';
 import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/mode_switch.dart';
+import '../../core/widgets/pane_transition.dart';
 
 /// 성능 지표 — 서버가 얼마나 빠른가 (모니터링 넷째 탭)
 ///
@@ -51,25 +52,15 @@ class _PerformancePanelState extends State<PerformancePanel> {
   }
 
   void _pick(int index) {
-    setState(() {
-      _span = index;
-      _loading = true;
-    });
+    // 내용을 비우지 않는다 — 비우면 기간을 옮길 때마다 깜빡인다
+    setState(() => _span = index);
     _load();
   }
 
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return Padding(
-        padding: EdgeInsets.symmetric(vertical: 80),
-        child: Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 2.4,
-            valueColor: AlwaysStoppedAnimation(AppColors.primary),
-          ),
-        ),
-      );
+      return DelayedSpinner();
     }
 
     final data = _data;
@@ -82,15 +73,25 @@ class _PerformancePanelState extends State<PerformancePanel> {
           onSelect: _pick,
         ),
         SizedBox(height: 16),
-        if (data == null || data.requests == 0)
-          EmptyCard(icon: CupertinoIcons.speedometer, text: '아직 측정된 요청이 없어요')
-        else ...[
-          _Numbers(data: data),
-          SizedBox(height: 16),
-          _Timeline(points: data.timeline),
-          SizedBox(height: 16),
-          _Slowest(rows: data.slowest),
-        ],
+        // 기간을 옮길 때 전환이 걸린다
+        PaneTransition(
+          step: _span,
+          child: data == null || data.requests == 0
+              ? EmptyCard(
+                  icon: CupertinoIcons.speedometer,
+                  text: '아직 측정된 요청이 없어요',
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _Numbers(data: data),
+                    SizedBox(height: 16),
+                    _Timeline(points: data.timeline),
+                    SizedBox(height: 16),
+                    _Slowest(rows: data.slowest),
+                  ],
+                ),
+        ),
       ],
     );
   }

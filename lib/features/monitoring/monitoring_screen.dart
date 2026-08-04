@@ -14,10 +14,12 @@ import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/avatar.dart';
+import '../../core/widgets/delayed_spinner.dart';
 import '../../core/widgets/desktop_header.dart';
 import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/page_numbers.dart';
+import '../../core/widgets/pane_transition.dart';
 import '../../core/widgets/pressable.dart';
 import 'activity_panel.dart';
 import 'anomaly_panel.dart';
@@ -272,100 +274,101 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
               onSelect: (i) => setState(() => _page = i),
             ),
             SizedBox(height: 16),
-            if (_page == 3)
-              PerformancePanel(key: ValueKey('perf-$_reload'))
-            else if (_page == 4)
-              AnomalyPanel(key: ValueKey('anomaly-$_reload'))
-            else if (_page == 1)
-              ActivityPanel(key: ValueKey('activity-$_reload'))
-            else if (_page == 2)
-              ChatAuditPanel(
-                key: ValueKey('chat-$_reload'),
-                // 2단이라 스스로 높이를 못 정한다. 창 높이에서 머리말 자리를 뺀다
-                height: (MediaQuery.sizeOf(context).height - 300).clamp(
-                  420.0,
-                  1000.0,
-                ),
-              )
-            else if (_loading)
-              Padding(
-                padding: EdgeInsets.symmetric(vertical: 80),
-                child: Center(
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.4,
-                    valueColor: AlwaysStoppedAnimation(AppColors.primary),
-                  ),
-                ),
-              )
-            else ...[
-              // 첫 줄 — 잔디가 주인공이고 오늘 요약이 옆에 붙는다
-              IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(flex: 5, child: _Grass(grid: _grass)),
-                    SizedBox(width: 16),
-                    Expanded(
-                      flex: 2,
-                      child: _Today(
-                        people: _todayPeople,
-                        staffTotal: _staffTotal,
-                        visits: _today.length,
-                        failed: _today.where((l) => l.event.failed).length,
-                        yesterday: _yesterdayVisits,
-                        last: _logs.isEmpty ? null : _logs.first.createdAt,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(height: 16),
-              // 둘째 줄 — 순위 두 판
-              IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      child: _Ranked(
-                        title: '많이 들어온 사람',
-                        rows: _topPeople,
-                        avatars: true,
-                      ),
-                    ),
-                    SizedBox(width: 16),
-                    Expanded(
-                      child: _Ranked(
-                        title: '접속한 프로그램',
-                        rows: _agents,
-                        avatars: false,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(height: 16),
-              SegmentedTabs(
-                labels: ['전체 $_total', '실패 $_failed'],
-                selected: _tab,
-                onSelect: (i) => _goList(tab: i),
-              ),
-              SizedBox(height: 16),
-              if (_rows.isEmpty)
-                EmptyCard(
-                  icon: CupertinoIcons.checkmark_shield,
-                  text: _tab == 0 ? '아직 접속 기록이 없어요' : '로그인 실패가 없어요',
-                )
-              else
-                _LogList(logs: _rows),
-              PageNumbers(
-                page: _listPage,
-                pages: _listPages,
-                onPick: (i) => _goList(page: i),
-              ),
-            ],
+            // 탭을 옮기면 사이드바로 화면을 바꿀 때와 **같은 전환**이 걸린다
+            PaneTransition(step: _page, child: _pane(context)),
           ],
         ),
       ),
+    );
+  }
+
+  /// 고른 탭의 내용 — 판 하나만 만든다
+  ///
+  /// 다섯을 같이 띄우면 열어 보지도 않은 대화를 조회하게 되고,
+  /// 서버가 그걸 '대화방 목록 열람' 으로 남긴다.
+  Widget _pane(BuildContext context) {
+    if (_page == 3) return PerformancePanel(key: ValueKey('perf-$_reload'));
+    if (_page == 4) return AnomalyPanel(key: ValueKey('anomaly-$_reload'));
+    if (_page == 1) return ActivityPanel(key: ValueKey('activity-$_reload'));
+    if (_page == 2) {
+      return ChatAuditPanel(
+        key: ValueKey('chat-$_reload'),
+        // 2단이라 스스로 높이를 못 정한다. 창 높이에서 머리말 자리를 뺀다
+        height: (MediaQuery.sizeOf(context).height - 300).clamp(420.0, 1000.0),
+      );
+    }
+    if (_loading) return DelayedSpinner();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 첫 줄 — 잔디가 주인공이고 오늘 요약이 옆에 붙는다
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(flex: 5, child: _Grass(grid: _grass)),
+              SizedBox(width: 16),
+              Expanded(
+                flex: 2,
+                child: _Today(
+                  people: _todayPeople,
+                  staffTotal: _staffTotal,
+                  visits: _today.length,
+                  failed: _today.where((l) => l.event.failed).length,
+                  yesterday: _yesterdayVisits,
+                  last: _logs.isEmpty ? null : _logs.first.createdAt,
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 16),
+        // 둘째 줄 — 순위 두 판
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: _Ranked(
+                  title: '많이 들어온 사람',
+                  rows: _topPeople,
+                  avatars: true,
+                ),
+              ),
+              SizedBox(width: 16),
+              Expanded(
+                child: _Ranked(
+                  title: '접속한 프로그램',
+                  rows: _agents,
+                  avatars: false,
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 16),
+        SegmentedTabs(
+          labels: ['전체 $_total', '실패 $_failed'],
+          selected: _tab,
+          onSelect: (i) => _goList(tab: i),
+        ),
+        SizedBox(height: 16),
+        // 전체 ↔ 실패만 옮길 때 전환이 걸린다 (장을 넘길 때는 안 걸린다)
+        PaneTransition(
+          step: _tab,
+          child: _rows.isEmpty
+              ? EmptyCard(
+                  icon: CupertinoIcons.checkmark_shield,
+                  text: _tab == 0 ? '아직 접속 기록이 없어요' : '로그인 실패가 없어요',
+                )
+              : _LogList(logs: _rows),
+        ),
+        PageNumbers(
+          page: _listPage,
+          pages: _listPages,
+          onPick: (i) => _goList(page: i),
+        ),
+      ],
     );
   }
 }

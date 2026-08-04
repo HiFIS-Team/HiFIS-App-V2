@@ -11,9 +11,11 @@ import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/avatar.dart';
+import '../../core/widgets/delayed_spinner.dart';
 import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/page_numbers.dart';
+import '../../core/widgets/pane_transition.dart';
 import '../../core/widgets/pressable.dart';
 
 /// 활동 기록 — 누가 무엇을 등록·수정·삭제했는지 (모니터링 둘째 탭)
@@ -99,7 +101,9 @@ class _ActivityPanelState extends State<ActivityPanel> {
       }
       if (page != null) _page = page;
       _open.clear();
-      _loading = true;
+      // **_loading 을 안 켠다.** 켜면 내용이 통째로 사라졌다가 다시 채워져서
+      // 탭을 옮길 때마다 화면이 깜빡인다 (접속 탭은 원래 안 켜고 있었다).
+      // 값은 5ms 안에 오므로 그동안은 앞 내용을 그대로 두면 된다.
     });
     _load();
   }
@@ -116,15 +120,7 @@ class _ActivityPanelState extends State<ActivityPanel> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return Padding(
-        padding: EdgeInsets.symmetric(vertical: 80),
-        child: Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 2.4,
-            valueColor: AlwaysStoppedAnimation(AppColors.primary),
-          ),
-        ),
-      );
+      return DelayedSpinner();
     }
 
     final rows = _logs;
@@ -137,38 +133,47 @@ class _ActivityPanelState extends State<ActivityPanel> {
           onSelect: (i) => _go(tab: i),
         ),
         SizedBox(height: 16),
-        if (rows.isEmpty)
-          EmptyCard(
-            icon: CupertinoIcons.doc_text_search,
-            text: switch (_tab) {
-              0 => '아직 활동 기록이 없어요',
-              1 => '막힌 시도가 없어요',
-              _ => '열람 기록이 없어요',
-            },
-          )
-        else
-          Container(
-            padding: EdgeInsets.fromLTRB(12, 8, 12, 8),
-            decoration: AppDecorations.card(radius: 20),
-            child: Column(
-              children: [
-                for (var i = 0; i < rows.length; i++) ...[
-                  if (i > 0)
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 10),
-                      child: Container(height: 1, color: AppColors.divider),
-                    ),
-                  _Row(
-                    log: rows[i],
-                    open: _open.contains(rows[i].id),
-                    onTap: () => setState(() {
-                      if (!_open.remove(rows[i].id)) _open.add(rows[i].id);
-                    }),
+        // 탭을 옮길 때만 전환이 걸린다 — 장을 넘길 때는 안 걸린다
+        // (번호를 누를 때마다 페이드가 돌면 굼떠 보인다)
+        PaneTransition(
+          step: _tab,
+          child: rows.isEmpty
+              ? EmptyCard(
+                  icon: CupertinoIcons.doc_text_search,
+                  text: switch (_tab) {
+                    0 => '아직 활동 기록이 없어요',
+                    1 => '막힌 시도가 없어요',
+                    _ => '열람 기록이 없어요',
+                  },
+                )
+              : Container(
+                  padding: EdgeInsets.fromLTRB(12, 8, 12, 8),
+                  decoration: AppDecorations.card(radius: 20),
+                  child: Column(
+                    children: [
+                      for (var i = 0; i < rows.length; i++) ...[
+                        if (i > 0)
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 10),
+                            child: Container(
+                              height: 1,
+                              color: AppColors.divider,
+                            ),
+                          ),
+                        _Row(
+                          log: rows[i],
+                          open: _open.contains(rows[i].id),
+                          onTap: () => setState(() {
+                            if (!_open.remove(rows[i].id)) {
+                              _open.add(rows[i].id);
+                            }
+                          }),
+                        ),
+                      ],
+                    ],
                   ),
-                ],
-              ],
-            ),
-          ),
+                ),
+        ),
         PageNumbers(
           page: _page,
           pages: _pages,

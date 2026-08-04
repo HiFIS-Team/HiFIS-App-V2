@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'pane_transition.dart';
+
 /// 한 번이라도 연 탭만 만들어 두는 [IndexedStack]
 ///
 /// 기본 IndexedStack은 children을 전부 만들고 배치까지 한다. 탭이 8~12개면
@@ -31,20 +33,22 @@ class _LazyIndexedStackState extends State<LazyIndexedStack>
   GlobalKey _keyOf(int index) => _keys.putIfAbsent(index, GlobalKey.new);
 
   /// 탭이 바뀔 때마다 처음부터 다시 재생한다 (1에서 시작해 첫 화면은 그냥 떠 있다)
+  ///
+  /// 값은 [PaneTransition] 이 들고 있다 — 모니터링 탭 전환도 같은 값을 쓴다.
   late final _controller = AnimationController(
     vsync: this,
-    duration: Duration(milliseconds: 240),
+    duration: PaneTransition.duration,
     value: 1,
   );
 
   late final _fade = CurvedAnimation(
     parent: _controller,
-    curve: Curves.easeOut,
+    curve: PaneTransition.curve,
   );
 
   /// 살짝 아래에서 올라오면서 나타난다 (화면 높이의 1.2% ≈ 9px)
   late final _slide = Tween(
-    begin: Offset(0, 0.012),
+    begin: PaneTransition.beginOffset,
     end: Offset.zero,
   ).animate(_fade);
 
