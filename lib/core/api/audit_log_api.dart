@@ -67,6 +67,20 @@ class AuditLog {
 
 /// `/audit-logs` — 활동 기록 (읽기 전용)
 ///
+/// 열람 기록을 목록에서 어떻게 할지 — 서버 `reads` 파라미터
+///
+/// 관리자가 남의 기록·대화를 들여다본 줄이다. 한 일이 아니라 지켜본 일이라
+/// 기본으로 빼고 따로 본다. **남기는 것 자체는 그대로다** (개인정보처리방침 §8-1).
+enum AuditReads {
+  exclude('exclude'),
+  only('only'),
+  include('include');
+
+  const AuditReads(this.wire);
+
+  final String wire;
+}
+
 /// **MASTER · ADMIN 만** 볼 수 있다. 접속 기록과 같은 게이트다.
 class AuditLogApi {
   AuditLogApi._();
@@ -101,8 +115,13 @@ class AuditLogApi {
   /// 두 건수는 막힘 여부 필터와 무관한 전체값이라 탭 라벨에 그대로 쓴다.
   /// [before] 는 장을 넘기는 동안 고정하는 기준선이다 — 안 주면 조회가 만든
   /// 새 로그 때문에 같은 줄이 두 장에 걸쳐 나온다.
-  static Future<({List<AuditLog> items, int total, int failed})> page({
+  ///
+  /// [reads] 는 관리자 열람 기록(`활동 기록 열람` 등)을 어떻게 할지다.
+  /// **기본은 빼는 것** — 안 빼면 목록 맨 위가 본인 열람으로 채워진다.
+  static Future<({List<AuditLog> items, int total, int failed, int read})>
+  page({
     bool failedOnly = false,
+    AuditReads reads = AuditReads.exclude,
     int limit = 100,
     int offset = 0,
     DateTime? before,
@@ -111,6 +130,7 @@ class AuditLogApi {
       '/audit-logs',
       query: {
         if (failedOnly) 'failedOnly': 'true',
+        'reads': reads.wire,
         'limit': '$limit',
         'offset': '$offset',
         'before': ?before?.toUtc().toIso8601String(),
@@ -123,6 +143,7 @@ class AuditLogApi {
       ],
       total: result.total,
       failed: result.failed,
+      read: result.read,
     );
   }
 }

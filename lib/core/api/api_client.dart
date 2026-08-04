@@ -187,7 +187,8 @@ class ApiClient {
   ///
   /// 접속·활동 로그가 쓴다. 90일치가 쌓이면 한 번에 다 받을 수 없어서
   /// 서버가 `offset` 으로 잘라 주고 총 건수를 헤더로 알려 준다.
-  Future<({List<dynamic> items, int total, int failed})> getLogPage(
+  /// [read] 는 활동 로그에만 실려 온다 (관리자 열람 기록 건수)
+  Future<({List<dynamic> items, int total, int failed, int read})> getLogPage(
     String path, {
     Map<String, dynamic>? query,
   }) async {
@@ -198,6 +199,7 @@ class ApiClient {
       items: response.data as List<dynamic>,
       total: head('x-total-count'),
       failed: head('x-failed-count'),
+      read: head('x-read-count'),
     );
   }
 

@@ -34,7 +34,11 @@ class _ActivityPanelState extends State<ActivityPanel> {
   List<AuditLog> _logs = const [];
   bool _loading = true;
 
-  /// 0 전체 · 1 막힌 시도
+  /// 0 활동 · 1 막힌 시도 · 2 열람
+  ///
+  /// **열람은 따로 뺐다.** 관리자가 이 화면을 열 때마다 '활동 기록 열람'이
+  /// 한 줄씩 쌓여서, 섞어 두면 목록 맨 위가 본인 열람으로 채워진다.
+  /// 기록은 그대로 남는다 — 화면에서만 가른다 (개인정보처리방침 §8-1).
   int _tab = 0;
 
   /// 지금 보고 있는 장 (0부터)
@@ -43,6 +47,7 @@ class _ActivityPanelState extends State<ActivityPanel> {
   /// 서버가 헤더로 알려 준 전체 건수 — 장 수와 탭 라벨이 이걸 쓴다
   int _total = 0;
   int _blocked = 0;
+  int _read = 0;
 
   /// 장을 넘기는 동안 고정하는 기준선
   ///
@@ -65,6 +70,7 @@ class _ActivityPanelState extends State<ActivityPanel> {
     try {
       final result = await AuditLogApi.page(
         failedOnly: _tab == 1,
+        reads: _tab == 2 ? AuditReads.only : AuditReads.exclude,
         limit: _perPage,
         offset: _page * _perPage,
         before: _since,
@@ -74,6 +80,7 @@ class _ActivityPanelState extends State<ActivityPanel> {
         _logs = result.items;
         _total = result.total;
         _blocked = result.failed;
+        _read = result.read;
         _loading = false;
       });
     } catch (error) {
@@ -98,7 +105,11 @@ class _ActivityPanelState extends State<ActivityPanel> {
   }
 
   /// 지금 탭에 걸린 건수 — 장 수를 셀 때 쓴다
-  int get _count => _tab == 0 ? _total : _blocked;
+  int get _count => switch (_tab) {
+    0 => _total,
+    1 => _blocked,
+    _ => _read,
+  };
 
   int get _pages => (_count / _perPage).ceil();
 
@@ -121,7 +132,7 @@ class _ActivityPanelState extends State<ActivityPanel> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SegmentedTabs(
-          labels: ['전체 $_total', '막힌 시도 $_blocked'],
+          labels: ['활동 $_total', '막힌 시도 $_blocked', '열람 $_read'],
           selected: _tab,
           onSelect: (i) => _go(tab: i),
         ),
@@ -129,7 +140,11 @@ class _ActivityPanelState extends State<ActivityPanel> {
         if (rows.isEmpty)
           EmptyCard(
             icon: CupertinoIcons.doc_text_search,
-            text: _tab == 0 ? '아직 활동 기록이 없어요' : '막힌 시도가 없어요',
+            text: switch (_tab) {
+              0 => '아직 활동 기록이 없어요',
+              1 => '막힌 시도가 없어요',
+              _ => '열람 기록이 없어요',
+            },
           )
         else
           Container(
