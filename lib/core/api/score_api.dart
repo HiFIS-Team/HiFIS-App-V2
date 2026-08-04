@@ -40,7 +40,6 @@ class RankingRow {
     required this.reSignups,
     required this.kindness,
     required this.reviews,
-    required this.stars,
     required this.projectScore,
     required this.projectDone,
     required this.projectTotal,
@@ -60,7 +59,6 @@ class RankingRow {
     reSignups: json['reSignups'] as int? ?? 0,
     kindness: json['kindness'] as int? ?? 0,
     reviews: json['reviews'] as int? ?? 0,
-    stars: (json['stars'] as num?)?.toDouble() ?? 0,
     projectScore: json['projectScore'] as int? ?? 0,
     projectDone: json['projectDone'] as int? ?? 0,
     projectTotal: json['projectTotal'] as int? ?? 0,
@@ -83,10 +81,9 @@ class RankingRow {
   final int newSignups;
   final int reSignups;
 
-  /// 친절 점수(원장 합)와 리뷰 수·별점 평균
+  /// 친절 점수(원장 합)와 받은 설문 수
   final int kindness;
   final int reviews;
-  final double stars;
 
   /// 프로젝트 점수(원장 합)와 그 달 기한인 프로젝트 중 담당분
   final int projectScore;

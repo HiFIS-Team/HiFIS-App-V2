@@ -36,7 +36,6 @@ class _Ranker {
     required this.reSignups,
     required this.kindness,
     required this.reviews,
-    required this.stars,
     required this.projectScore,
     required this.projectDone,
     required this.projectTotal,
@@ -57,7 +56,6 @@ class _Ranker {
     reSignups: row.reSignups,
     kindness: row.kindness,
     reviews: row.reviews,
-    stars: row.stars,
     projectScore: row.projectScore,
     projectDone: row.projectDone,
     projectTotal: row.projectTotal,
@@ -85,7 +83,6 @@ class _Ranker {
   /// 회원 리뷰로 환산한 친절 점수 (100점 만점)
   final int kindness;
   final int reviews;
-  final double stars;
 
   /// 프로젝트 달성 점수와, 맡은 프로젝트 중 끝낸 개수
   final int projectScore;
@@ -200,7 +197,7 @@ double _overall(_Ranker r, List<_Ranker> pool) {
 /// 값 아래 붙는 근거 한 줄
 String _noteOf(_Ranker r, _Metric metric) => switch (metric) {
   _Metric.revenue => '신규 ${r.newSignups} · 재등록 ${r.reSignups}',
-  _Metric.kindness => '리뷰 ${r.reviews}건 · ★${r.stars}',
+  _Metric.kindness => '리뷰 ${r.reviews}건',
   _Metric.project => '${r.projectDone} / ${r.projectTotal}건',
   _Metric.care => '이번 달 ${r.care}회',
   _Metric.lesson => '${r.lessonScore}점',
