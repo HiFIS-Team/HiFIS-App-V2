@@ -64,7 +64,7 @@ class _LeaveBalanceState extends State<_LeaveBalance> {
     final waiting = inbox.isEmpty ? null : inbox[index];
 
     // 대표는 출퇴근·월차를 쓸 일이 없어서 이 자리를 통째로 결재함으로 쓴다
-    if (myRole == Role.master) {
+    if (_isBoss) {
       return Container(
         width: double.infinity,
         padding: EdgeInsets.all(20),

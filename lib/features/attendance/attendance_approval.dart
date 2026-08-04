@@ -18,6 +18,14 @@ bool get _canSeeLeaveInbox =>
 /// 실제로 승인·반려를 누를 수 있는 사람
 bool get _canDecideLeave => myRole.canApprove;
 
+/// 근태 화면을 **관리 화면으로** 보는 사람 (MASTER · ADMIN)
+///
+/// 이 사람들은 출퇴근을 안 찍어서 본인 기록이 늘 비어 있다. 그래서
+/// 달 요약 자리에 오늘 전 직원 현황, 남은 월차 자리에 월차 결재,
+/// 달력 칸에 그날 전 직원 기록이 들어간다.
+/// MANAGER 는 본인도 현장 근무를 해서 예전 화면 그대로다.
+bool get _isBoss => myRole == Role.master || myRole == Role.admin;
+
 /// 결재 대기 한 건 — 누가 · 언제 · 어떤 휴가 · 사유
 ///
 /// [_LeaveBalance] 카드 안에 들어간다. 여러 건이 밀려 있으면

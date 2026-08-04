@@ -248,7 +248,7 @@ class _MonthSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (myRole == Role.master) return _TodayBoard();
+    if (_isBoss) return _TodayBoard();
 
     final worked = days.where((d) => d.status.worked).length;
     final total = days.fold(Duration.zero, (sum, d) => sum + d.worked);
@@ -509,7 +509,7 @@ class _MonthCalendar extends StatelessWidget {
     final rows = ((lead + lastDay) / 7).ceil();
     // 칸 안에 근무 시간까지 들어가야 해서 넉넉히 잡는다.
     // 대표 칸은 상태마다 한 줄씩 들어가서 더 높다
-    final cellHeight = myRole == Role.master
+    final cellHeight = _isBoss
         ? (isDesktop ? 118.0 : 92.0)
         : (isDesktop ? 84.0 : 62.0);
 
@@ -711,7 +711,7 @@ class _DayCellState extends State<_DayCell> {
                   ),
                 ),
               ),
-              if (myRole == Role.master)
+              if (_isBoss)
                 // 대표는 자기 기록이 아니라 그날 전 직원이 어땠는지를 본다
                 Expanded(child: _roster(date))
               else ...[

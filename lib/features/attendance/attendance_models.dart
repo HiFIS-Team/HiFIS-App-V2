@@ -237,9 +237,7 @@ Future<void> _loadAttendance() async {
       ? await AttendanceApi.leaves(status: LeaveStatus.pending)
       : const <LeaveRequest>[];
   // 대표 화면의 '오늘 근무' 판 — 명단에 오늘 판정이 얹혀 온다
-  final staff = myRole == Role.master
-      ? await StaffApi.list()
-      : const <Employee>[];
+  final staff = _isBoss ? await StaffApi.list() : const <Employee>[];
 
   _balance = balance;
 
@@ -278,7 +276,7 @@ Map<AttendanceStatus, List<String>> _rosterOf(DateTime date) {
 
 /// 대표 달력이 보고 있는 달의 전사 기록을 받아 둔다
 Future<void> _loadRoster(String month) async {
-  if (myRole != Role.master || _roster.containsKey(month)) return;
+  if (!_isBoss || _roster.containsKey(month)) return;
   _roster[month] = await AttendanceApi.roster(month: month);
 }
 
