@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'core/data/current_user.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
+import 'core/util/capture_guard.dart';
 import 'core/util/platform.dart';
 import 'core/widgets/app_loading.dart';
 import 'features/auth/auth_screen.dart';
@@ -14,6 +15,9 @@ import 'features/onboarding/schedule_setup_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // 캡처 방지를 먼저 켠다 — 대표면 아래 restore 가 꺼 준다.
+  // 로그인 전에도 켜 둬야 못 막는 순간이 안 생긴다.
+  unawaited(CaptureGuard.apply());
   // 자동 로그인 여부를 먼저 읽어야 스플래시 뒤에서 맞는 화면을 그릴 수 있다
   await AuthSession.instance.restore();
   runApp(HiFISApp());
@@ -34,12 +38,19 @@ class _HiFISAppState extends State<HiFISApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // iOS 는 스크린샷을 못 막는 대신, 녹화·미러링이 도는 동안 같은 커버로 덮는다
+    CaptureGuard.recording.addListener(_onRecording);
   }
 
   @override
   void dispose() {
+    CaptureGuard.recording.removeListener(_onRecording);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  void _onRecording() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -59,11 +70,13 @@ class _HiFISAppState extends State<HiFISApp> with WidgetsBindingObserver {
       theme: AppTheme.current,
       home: _SplashGate(),
       // 앱 전환 화면(멀티태스킹)에서는 내용 대신 마크만 보이도록
-      // 비활성 상태에 가림막을 덮는다 (토스식 프라이버시 커버)
+      // 비활성 상태에 가림막을 덮는다 (토스식 프라이버시 커버).
+      // 화면 녹화·미러링이 도는 동안에도 **같은 가림막**을 쓴다 — iOS 가
+      // 스크린샷을 못 막으니 녹화만이라도 빈 화면이 찍히게 한다.
       builder: (context, child) => Stack(
         children: [
           child!,
-          if (_obscured && !isDesktop)
+          if ((_obscured || CaptureGuard.recording.value) && !isDesktop)
             Positioned.fill(
               child: Container(
                 color: AppColors.surface,

@@ -21,6 +21,24 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 
+    // 화면 캡처 방지 — MASTER 밑으로는 못 찍게 막는다.
+    // `sharingType = .none` 이면 이 창이 화면 공유·녹화·캡처 API 에서 빠진다.
+    // iOS 와 달리 실제로 막히므로 사후 신고를 할 일이 없다.
+    let captureChannel = FlutterMethodChannel(
+      name: "com.hifis/capture",
+      binaryMessenger: flutterViewController.engine.binaryMessenger
+    )
+    captureChannel.setMethodCallHandler { [weak self] call, result in
+      switch call.method {
+      case "setSecure":
+        let on = (call.arguments as? Bool) ?? true
+        self?.sharingType = on ? .none : .readOnly
+        result(true)  // 실제로 막아 준다
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+
     super.awakeFromNib()
   }
 }

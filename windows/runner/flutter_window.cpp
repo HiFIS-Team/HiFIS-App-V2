@@ -1,5 +1,9 @@
 #include "flutter_window.h"
 
+#include <flutter/method_channel.h>
+#include <flutter/standard_method_codec.h>
+
+#include <memory>
 #include <optional>
 
 #include "flutter/generated_plugin_registrant.h"
@@ -26,6 +30,31 @@ bool FlutterWindow::OnCreate() {
   }
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
+
+  // 화면 캡처 방지 — MASTER 밑으로는 못 찍게 막는다.
+  // WDA_EXCLUDEFROMCAPTURE 는 이 창을 캡처 대상에서 아예 빼 버린다
+  // (WDA_MONITOR 와 달리 검은 사각형도 안 남는다). Windows 10 2004 이상.
+  //
+  // ⚠️ 개발 장비가 맥이라 **이 경로는 아직 실기기에서 안 돌려 봤다**
+  //    (windows/windows.md 참고). 안드로이드·macOS 는 확인했다.
+  capture_channel_ =
+      std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(), "com.hifis/capture",
+          &flutter::StandardMethodCodec::GetInstance());
+  capture_channel_->SetMethodCallHandler(
+      [this](const auto& call, auto result) {
+        if (call.method_name() != "setSecure") {
+          result->NotImplemented();
+          return;
+        }
+        bool on = true;
+        if (const auto* value = std::get_if<bool>(call.arguments())) {
+          on = *value;
+        }
+        SetWindowDisplayAffinity(GetHandle(), on ? WDA_EXCLUDEFROMCAPTURE
+                                                 : WDA_NONE);
+        result->Success(flutter::EncodableValue(true));
+      });
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
     this->Show();

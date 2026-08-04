@@ -229,4 +229,16 @@ class MonitoringApi {
   /// 확인했다 표시 — **MASTER 만** (ADMIN 은 403)
   static Future<void> resolve(String id) =>
       _client.post('/anomalies/$id/resolve');
+
+  /// 화면이 캡처됐다고 알린다 — **권한 없이 전 직원이 부른다**
+  ///
+  /// 서버는 따로 저장하지 않는다. 쓰기 요청이라 활동 로그에 그대로 남고,
+  /// 짧은 시간에 여러 번이면 이상 징후로 올라간다.
+  static Future<void> reportCapture({
+    required String platform,
+    String kind = 'screenshot',
+  }) => _client.post(
+    '/security/capture',
+    body: {'platform': platform, 'kind': kind},
+  );
 }

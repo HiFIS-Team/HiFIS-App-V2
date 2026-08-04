@@ -10,6 +10,7 @@ import '../../core/api/token_store.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
 import '../../core/data/staff_directory.dart';
+import '../../core/util/capture_guard.dart';
 import '../messages/chat_store.dart';
 
 /// 로그인 세션
@@ -57,6 +58,8 @@ class AuthSession extends ValueNotifier<bool> {
       me = await AuthApi.me();
       currentUser = me;
       email = me!.email;
+      // 권한을 알게 됐으니 캡처 방지를 그 사람 기준으로 맞춘다
+      unawaited(CaptureGuard.apply());
       await StaffDirectory.instance.load();
       // 사내톡은 화면을 열 때가 아니라 로그인해 있는 동안 늘 붙어 있다 —
       // 목록 화면에서 안 연 방의 새 메시지도 받아야 한다.
@@ -94,6 +97,7 @@ class AuthSession extends ValueNotifier<bool> {
     this.autoLogin = autoLogin;
     me = result.employee;
     currentUser = me;
+    unawaited(CaptureGuard.apply());
     await StaffDirectory.instance.load();
 
     final prefs = await SharedPreferences.getInstance();
@@ -122,6 +126,8 @@ class AuthSession extends ValueNotifier<bool> {
     await TokenStore.instance.clear();
     me = null;
     currentUser = null;
+    // 로그아웃하면 다시 켠다 — 다음에 로그인하는 사람이 대표가 아닐 수 있다
+    unawaited(CaptureGuard.apply());
     StaffDirectory.instance.clear();
     // 다음 사람에게 앞사람 대화가 보이면 안 된다
     ChatStore.instance.clear();
