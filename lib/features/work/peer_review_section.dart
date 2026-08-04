@@ -281,13 +281,27 @@ class _Submission {
   bool get complete => quota > 0 && done >= quota;
 }
 
+/// 지점 고르개 — `(지점 id, 이름)`. 맨 앞은 전체(id 가 null)
+///
+/// **본사(HQ)는 안 세운다** — 지점이 아니라 전사다 (조직도 필터와 같은 기준).
+List<(String?, String)> _branchChoices() {
+  final directory = StaffDirectory.instance;
+  final sorted = [...directory.branches.where((branch) => !branch.isHq)]
+    ..sort(
+      (a, b) =>
+          directory.branchRank(a.id).compareTo(directory.branchRank(b.id)),
+    );
+  return [(null, '전체'), for (final branch in sorted) (branch.id, branch.name)];
+}
+
 /// 사람별 제출 현황 — 안 낸 사람이 위로 온다
 ///
 /// 이 화면을 여는 이유가 "누가 아직 안 냈나" 이므로 그 순서로 세운다.
-List<_Submission> _submissionsOf(List<PeerReview> reviews) {
+/// [branchId] 를 주면 그 지점 사람만 — **분모는 거르기 전에 센다.**
+/// 지점마다 평가할 사람 수가 달라서 걸러낸 뒤에 세면 값이 달라진다.
+List<_Submission> _submissionsOf(List<PeerReview> reviews, {String? branchId}) {
   final reviewers = _reviewers();
 
-  // 지점마다 평가할 사람 수가 다르다 — 분모를 지점별로 센다
   final quota = <String, int>{};
   for (final employee in reviewers) {
     quota[employee.branchId] = (quota[employee.branchId] ?? 0) + 1;
@@ -299,11 +313,12 @@ List<_Submission> _submissionsOf(List<PeerReview> reviews) {
 
   return [
     for (final employee in reviewers)
-      _Submission(
-        person: employee,
-        done: counts[employee.id] ?? 0,
-        quota: quota[employee.branchId] ?? 0,
-      ),
+      if (branchId == null || employee.branchId == branchId)
+        _Submission(
+          person: employee,
+          done: counts[employee.id] ?? 0,
+          quota: quota[employee.branchId] ?? 0,
+        ),
   ]..sort((a, b) {
     if (a.complete != b.complete) return a.complete ? 1 : -1;
     return a.done.compareTo(b.done);
@@ -311,21 +326,42 @@ List<_Submission> _submissionsOf(List<PeerReview> reviews) {
 }
 
 /// 대표·관리자가 보는 화면 — 이번 달 누가 평가를 냈는지
-class _SubmissionCard extends StatelessWidget {
+///
+/// 지점 바로 갈라서 본다. 전사를 한 목록에 두면 지점이 섞여서
+/// 어느 지점이 덜 냈는지가 안 보인다.
+class _SubmissionCard extends StatefulWidget {
   _SubmissionCard({required this.reviews, required this.period});
 
   final List<PeerReview> reviews;
   final String period;
 
   @override
+  State<_SubmissionCard> createState() => _SubmissionCardState();
+}
+
+class _SubmissionCardState extends State<_SubmissionCard> {
+  /// 고른 지점 (null 이면 전체)
+  String? _branch;
+
+  @override
   Widget build(BuildContext context) {
-    final rows = _submissionsOf(reviews);
+    final choices = _branchChoices();
+    final rows = _submissionsOf(widget.reviews, branchId: _branch);
     final done = rows.where((r) => r.complete).length;
     // 카드에는 다섯 명만 — 나머지는 전체 보기에서
     final head = rows.take(5).toList();
 
     return Column(
       children: [
+        // 지점이 한 곳뿐이면 고를 게 없다 ('전체' + 그 지점 = 2)
+        if (choices.length > 2) ...[
+          SegmentedTabs(
+            labels: [for (final (_, name) in choices) name],
+            selected: choices.indexWhere((c) => c.$1 == _branch).clamp(0, 99),
+            onSelect: (i) => setState(() => _branch = choices[i].$1),
+          ),
+          SizedBox(height: 16),
+        ],
         _ReviewProgress(
           done: done,
           total: rows.length,
