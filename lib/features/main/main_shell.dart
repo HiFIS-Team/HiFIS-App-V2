@@ -25,6 +25,7 @@ import '../../core/api/chat_api.dart';
 import '../../core/data/staff.dart';
 import '../messages/chat_store.dart';
 import '../messages/message_screen.dart';
+import '../monitoring/monitoring_screen.dart';
 import '../notice/notice_screen.dart';
 import '../notifications/notification_screen.dart';
 import '../profile/profile_screen.dart';
@@ -194,6 +195,9 @@ class _MainShellState extends State<MainShell> {
   // ── macOS 데스크톱 셸 ──
 
   /// 데스크톱 전용 페이지 목록 — DesktopSidebar의 섹션 펼친 순서와 일치해야 한다
+  ///
+  /// 맨 뒤 '접속 기록'은 MASTER·ADMIN 에게만 붙는다. 사이드바도 같은 조건으로
+  /// 메뉴를 세우므로 **둘이 같은 판정을 써야** 인덱스가 안 어긋난다.
   List<Widget> get _desktopPages => [
     HomeScreen(onOpenProjects: _goProjects, onOpenNotices: _goNotices),
     WorkScreen(),
@@ -207,6 +211,7 @@ class _MainShellState extends State<MainShell> {
     SalaryScreen(),
     NoticeScreen(),
     RankingScreen(),
+    if (MonitoringScreen.visible) MonitoringScreen(),
   ];
 
   /// 사이드바 선택 인덱스 (_desktopPages 순서 기준)
@@ -247,60 +252,63 @@ class _MainShellState extends State<MainShell> {
                     settings: settings,
                     builder: (context) => ValueListenableBuilder<int>(
                       valueListenable: _paneIndex,
-                      builder: (context, index, child) => Stack(
-                        children: [
-                          LazyIndexedStack(
-                            index: index,
-                            children: _desktopPages,
-                          ),
-                          // 알림 패널 — 헤더 버튼보다 아래 레이어여야 한다.
-                          // 위에 두면 패널 그림자가 네이티브 버튼 위를 덮어
-                          // 오버레이가 생기면서 버튼 클릭이 먹지 않는다.
-                          SafeArea(
-                            bottom: false,
-                            child: Align(
-                              alignment: Alignment.topRight,
-                              child: Padding(
-                                // 종 버튼(오른쪽에서 16+40+10) 오른쪽 끝에 맞춘다
-                                padding: EdgeInsets.only(top: 60, right: 66),
-                                child: ValueListenableBuilder<bool>(
-                                  valueListenable: _notiOpen,
-                                  builder: (context, open, child) =>
-                                      _FloatingPanel(
-                                        open: open,
-                                        alignment: Alignment.topRight,
-                                        reserve: 24,
-                                        // 패널은 닫혀도 트리에 남아서, 열림 상태를
-                                        // 넘겨야 다시 열 때 새로 받는다
-                                        child: NotificationScreen(
-                                          embedded: true,
-                                          active: open,
+                      builder: (context, index, child) {
+                        final pages = _desktopPages;
+                        // 권한에 따라 메뉴 수가 달라진다 — 맨 뒤 '접속 기록'을
+                        // 보던 사람이 로그아웃하면 인덱스가 목록 밖으로 나간다
+                        final at = index < pages.length ? index : 0;
+                        return Stack(
+                          children: [
+                            LazyIndexedStack(index: at, children: pages),
+                            // 알림 패널 — 헤더 버튼보다 아래 레이어여야 한다.
+                            // 위에 두면 패널 그림자가 네이티브 버튼 위를 덮어
+                            // 오버레이가 생기면서 버튼 클릭이 먹지 않는다.
+                            SafeArea(
+                              bottom: false,
+                              child: Align(
+                                alignment: Alignment.topRight,
+                                child: Padding(
+                                  // 종 버튼(오른쪽에서 16+40+10) 오른쪽 끝에 맞춘다
+                                  padding: EdgeInsets.only(top: 60, right: 66),
+                                  child: ValueListenableBuilder<bool>(
+                                    valueListenable: _notiOpen,
+                                    builder: (context, open, child) =>
+                                        _FloatingPanel(
+                                          open: open,
+                                          alignment: Alignment.topRight,
+                                          reserve: 24,
+                                          // 패널은 닫혀도 트리에 남아서, 열림 상태를
+                                          // 넘겨야 다시 열 때 새로 받는다
+                                          child: NotificationScreen(
+                                            embedded: true,
+                                            active: open,
+                                          ),
                                         ),
-                                      ),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                          SafeArea(
-                            bottom: false,
-                            child: Align(
-                              alignment: Alignment.topRight,
-                              child: Padding(
-                                padding: EdgeInsets.only(top: 8, right: 16),
-                                child: _HeaderButtons(notiOpen: _notiOpen),
+                            SafeArea(
+                              bottom: false,
+                              child: Align(
+                                alignment: Alignment.topRight,
+                                child: Padding(
+                                  padding: EdgeInsets.only(top: 8, right: 16),
+                                  child: _HeaderButtons(notiOpen: _notiOpen),
+                                ),
                               ),
                             ),
-                          ),
-                          // 우하단 사내톡 플로팅 필 + 패널 (인스타그램 데스크톱 패턴)
-                          Align(
-                            alignment: Alignment.bottomRight,
-                            child: Padding(
-                              padding: EdgeInsets.only(right: 20, bottom: 20),
-                              child: _ChatDock(),
+                            // 우하단 사내톡 플로팅 필 + 패널 (인스타그램 데스크톱 패턴)
+                            Align(
+                              alignment: Alignment.bottomRight,
+                              child: Padding(
+                                padding: EdgeInsets.only(right: 20, bottom: 20),
+                                child: _ChatDock(),
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ),

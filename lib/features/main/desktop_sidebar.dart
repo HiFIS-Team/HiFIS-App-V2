@@ -4,6 +4,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/pressable.dart';
 import '../auth/logout.dart';
+import '../monitoring/monitoring_screen.dart';
 
 /// macOS 데스크톱용 좌측 사이드바 내비게이션 (인스타그램 데스크톱 패턴)
 ///
@@ -38,7 +39,11 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
 
   /// (섹션 제목, 메뉴 목록) — 제목이 null이면 캡션 없이 그린다.
   /// 아이콘은 장식이 적은 심플한 라운드 세트로 통일한다.
-  static final List<(String?, List<(IconData, String)>)> _sections = [
+  ///
+  /// **static 이 아니라 getter 다.** 맨 아래 '관리'가 MASTER·ADMIN 에게만
+  /// 붙어서 로그인한 사람에 따라 목록이 달라진다.
+  /// [MainShell.desktopPages] 와 **순서가 같아야 한다.**
+  static List<(String?, List<(IconData, String)>)> get sections => [
     (null, [(Icons.home_rounded, '홈')]),
     (
       '업무',
@@ -62,6 +67,8 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
       '소식',
       [(Icons.campaign_rounded, '공지'), (Icons.emoji_events_rounded, '랭킹')],
     ),
+    if (MonitoringScreen.visible)
+      ('관리', [(Icons.monitor_heart_rounded, '접속 기록')]),
   ];
 
   /// 펼쳐질 때만 보이는 요소 (메뉴 제목, 섹션 캡션, 워드마크)
@@ -77,7 +84,7 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
     // 캡션과 항목을 섹션 단위로 묶어야 남는 공간이 섹션 사이에만 분배된다.
     final children = <Widget>[];
     var index = 0;
-    for (final (title, items) in _sections) {
+    for (final (title, items) in _DesktopSidebarState.sections) {
       children.add(
         Column(
           mainAxisSize: MainAxisSize.min,
