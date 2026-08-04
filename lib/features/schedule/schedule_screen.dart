@@ -12,6 +12,7 @@ import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/avatar.dart';
 import '../../core/widgets/placeholder_screen.dart';
 import '../../core/widgets/pressable.dart';
+import '../../core/widgets/scroll_box.dart';
 
 /// 일정 화면
 ///
@@ -960,26 +961,29 @@ class _EventDialogState extends State<_EventDialog> {
                     SizedBox(height: 14),
                     Text('참석자', style: AppTextStyles.label),
                     SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        for (final staff in staffList)
-                          if (!_locked || _members.contains(staff.name))
-                            _PersonChip(
-                              staff: staff,
-                              joined: _members.contains(staff.name),
-                              onTap: _tap(
-                                () => setState(() {
-                                  if (_members.contains(staff.name)) {
-                                    _members.remove(staff.name);
-                                  } else {
-                                    _members.add(staff.name);
-                                  }
-                                }),
+                    ScrollBox(
+                      maxHeight: kChipBoxHeight,
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          for (final staff in staffList)
+                            if (!_locked || _members.contains(staff.name))
+                              _PersonChip(
+                                staff: staff,
+                                joined: _members.contains(staff.name),
+                                onTap: _tap(
+                                  () => setState(() {
+                                    if (_members.contains(staff.name)) {
+                                      _members.remove(staff.name);
+                                    } else {
+                                      _members.add(staff.name);
+                                    }
+                                  }),
+                                ),
                               ),
-                            ),
-                      ],
+                        ],
+                      ),
                     ),
                     SizedBox(height: 14),
                     _Field(

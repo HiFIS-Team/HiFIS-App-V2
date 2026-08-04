@@ -21,6 +21,7 @@ import '../../core/widgets/glass_input_bar.dart';
 import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/mode_switch.dart';
 import '../../core/widgets/pressable.dart';
+import '../../core/widgets/scroll_box.dart';
 
 part 'project_comments.dart';
 part 'project_phone.dart';
@@ -2354,20 +2355,23 @@ class _ProjectComposerState extends State<_ProjectComposer> {
         SizedBox(height: 16),
         Text('참여 멤버', style: AppTextStyles.label),
         SizedBox(height: 8),
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: [
-            for (final staff in staffList)
-              _MemberChip(
-                staff: staff,
-                joined: _members.contains(staff.name),
-                // 나는 담당 기본값이라 빼지 않는다
-                onTap: staff.name == me
-                    ? null
-                    : () => _toggleMember(staff.name),
-              ),
-          ],
+        ScrollBox(
+          maxHeight: kChipBoxHeight,
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final staff in staffList)
+                _MemberChip(
+                  staff: staff,
+                  joined: _members.contains(staff.name),
+                  // 나는 담당 기본값이라 빼지 않는다
+                  onTap: staff.name == me
+                      ? null
+                      : () => _toggleMember(staff.name),
+                ),
+            ],
+          ),
         ),
         SizedBox(height: 18),
         Row(
@@ -2663,27 +2667,37 @@ void _showMemberManager(
               child: Text('참여 멤버', style: AppTextStyles.title3),
             ),
             SizedBox(height: 8),
-            for (final staff in staffList)
-              _MemberToggleRow(
-                staff: staff,
-                joined: project.members.contains(staff.name),
-                onTap: () {
-                  setLocal(() {
-                    if (project.members.contains(staff.name)) {
-                      project.members.remove(staff.name);
-                      // 빠진 사람이 맡고 있던 할 일은 담당자를 비운다
-                      for (final todo in project.todos) {
-                        if (todo.assignee == staff.name) {
-                          todo.assignee = null;
-                        }
-                      }
-                    } else {
-                      project.members.add(staff.name);
-                    }
-                  });
-                  HapticFeedback.selectionClick();
-                },
+            // 직원이 늘면 팝업이 화면 밖으로 나간다 — 높이만 막고 안에서 스크롤
+            ScrollBox(
+              maxHeight: kListBoxHeight,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final staff in staffList)
+                    _MemberToggleRow(
+                      staff: staff,
+                      joined: project.members.contains(staff.name),
+                      onTap: () {
+                        setLocal(() {
+                          if (project.members.contains(staff.name)) {
+                            project.members.remove(staff.name);
+                            // 빠진 사람이 맡고 있던 할 일은 담당자를 비운다
+                            for (final todo in project.todos) {
+                              if (todo.assignee == staff.name) {
+                                todo.assignee = null;
+                              }
+                            }
+                          } else {
+                            project.members.add(staff.name);
+                          }
+                        });
+                        HapticFeedback.selectionClick();
+                      },
+                    ),
+                ],
               ),
+            ),
           ],
         ),
       ),

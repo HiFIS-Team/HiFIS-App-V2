@@ -21,6 +21,7 @@ import '../../core/widgets/glass_icon_button.dart';
 import '../../core/widgets/markdown_view.dart';
 import '../../core/widgets/pressable.dart';
 import '../../core/widgets/reaction_row.dart';
+import '../../core/widgets/scroll_box.dart';
 
 part 'meeting_phone.dart';
 
@@ -683,26 +684,29 @@ class _NoteViewState extends State<_NoteView> {
           ),
           if (_help) ...[SizedBox(height: 10), MarkdownHelpPanel()],
           SizedBox(height: 10),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (final staff in staffList)
-                _PersonChip(
-                  staff: staff,
-                  joined: note.members.contains(staff.name),
-                  onTap: () {
-                    setState(() {
-                      if (note.members.contains(staff.name)) {
-                        note.members.remove(staff.name);
-                      } else {
-                        note.members.add(staff.name);
-                      }
-                    });
-                    widget.onChanged();
-                  },
-                ),
-            ],
+          ScrollBox(
+            maxHeight: kChipBoxHeight,
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final staff in staffList)
+                  _PersonChip(
+                    staff: staff,
+                    joined: note.members.contains(staff.name),
+                    onTap: () {
+                      setState(() {
+                        if (note.members.contains(staff.name)) {
+                          note.members.remove(staff.name);
+                        } else {
+                          note.members.add(staff.name);
+                        }
+                      });
+                      widget.onChanged();
+                    },
+                  ),
+              ],
+            ),
           ),
         ] else
           Row(
