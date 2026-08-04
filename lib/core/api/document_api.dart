@@ -160,22 +160,38 @@ class Document {
 ///
 /// 폴더도 문서도 **만든 사람 또는 관리자(ADMIN·MASTER)만** 이름을 고치고 지운다.
 /// 폴더를 지우면 **그 안의 문서도 같이 지워진다** (서버가 한꺼번에 처리한다).
+/// 문서함 갈래
+///
+/// **`개인` 은 서버가 실제로 막는다** — 올린 사람 말고는 목록에도 안 뜨고
+/// 내려받기·수정·삭제도 403 이다. MASTER 도 남의 개인 문서는 못 본다.
+enum DocScope {
+  company('전사', '전사 문서'),
+  personal('개인', '내 문서');
+
+  const DocScope(this.wire, this.label);
+
+  /// 서버에 그대로 보내는 값
+  final String wire;
+
+  /// 사이드바에 쓰는 이름
+  final String label;
+}
+
 class DocumentApi {
   DocumentApi._();
 
   static final _client = ApiClient.instance;
 
-  /// 앱은 갈래를 안 나눠서 이 한 쌍만 쓴다 (backend-gap.md 53번)
-  static const scope = '전사';
+  /// 자리는 아직 하나뿐이다 — 갈래만 [DocScope] 로 나눈다
   static const space = '문서함';
 
   // ── 폴더 ──
 
   /// 이름순으로 **평평하게** 온다 — 트리는 `parentId` 로 앱이 세운다
-  static Future<List<Folder>> folders() async {
+  static Future<List<Folder>> folders(DocScope scope) async {
     final rows = await _client.getList(
       '/folders',
-      query: {'scope': scope, 'space': space},
+      query: {'scope': scope.wire, 'space': space},
     );
     return [
       for (final row in rows)
@@ -184,6 +200,7 @@ class DocumentApi {
   }
 
   static Future<Folder> createFolder({
+    required DocScope scope,
     required String name,
     String? parentId,
   }) async {
@@ -191,7 +208,7 @@ class DocumentApi {
       '/folders',
       body: {
         'name': name,
-        'scope': scope,
+        'scope': scope.wire,
         'space': space,
         'parentId': ?parentId,
       },
@@ -206,12 +223,13 @@ class DocumentApi {
   /// 반쯤 만들어진 폴더가 남는데, 이 길은 통째로 되돌아간다.
   static Future<List<FolderTreeResult>> createFolderTree(
     List<FolderTreeNode> nodes, {
+    required DocScope scope,
     String? parentId,
   }) async {
     final rows = await _client.postList(
       '/folders/tree',
       body: {
-        'scope': scope,
+        'scope': scope.wire,
         'space': space,
         'parentId': ?parentId,
         'nodes': [for (final node in nodes) node.toJson()],
@@ -247,7 +265,8 @@ class DocumentApi {
   // ── 문서 ──
 
   /// 최신순. [folderId] 를 주면 그 폴더 것만 온다
-  static Future<List<Document>> documents({
+  static Future<List<Document>> documents(
+    DocScope scope, {
     String? folderId,
     String? q,
     bool? favorite,
@@ -255,7 +274,7 @@ class DocumentApi {
     final rows = await _client.getList(
       '/documents',
       query: {
-        'scope': scope,
+        'scope': scope.wire,
         'space': space,
         'folderId': ?folderId,
         'q': ?q,
@@ -271,13 +290,14 @@ class DocumentApi {
   /// 파일 올리기 — 멀티파트. [folderId] 가 null 이면 최상위에 담긴다
   static Future<Document> upload(
     String path, {
+    required DocScope scope,
     required String filename,
     String? folderId,
     String? desc,
   }) async {
     final form = FormData.fromMap({
       'file': await MultipartFile.fromFile(path, filename: filename),
-      'scope': scope,
+      'scope': scope.wire,
       'space': space,
       'name': filename,
       'folderId': ?folderId,

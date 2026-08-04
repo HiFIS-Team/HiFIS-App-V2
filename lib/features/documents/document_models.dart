@@ -161,17 +161,23 @@ class _Item {
 /// 최상위 폴더 — 탭을 오가도 유지되도록 모듈 전역으로 둔다
 final _root = _Item.folder(name: '문서함', id: '', children: []);
 
-bool _treeLoaded = false;
+/// 지금 보고 있는 갈래. 바꾸면 트리를 통째로 다시 받는다
+DocScope _scope = DocScope.company;
+
+/// 지금 [_root] 에 담겨 있는 갈래 — null 이면 아직 아무것도 안 받았다.
+/// 트리는 하나뿐이라 갈래를 바꾸면 통째로 갈아끼운다
+DocScope? _treeScope;
 
 /// 서버에서 받아 트리를 다시 세운다
 ///
 /// 폴더·문서를 한 번에 받아서 `parentId`·`folderId` 로 이어 붙인다.
 /// 폴더마다 문서를 따로 받으면 폴더 수만큼 요청이 나간다.
 Future<void> _loadTree() async {
-  final folders = DocumentApi.folders();
-  final documents = DocumentApi.documents();
+  if (_treeScope == _scope) return;
+  final folders = DocumentApi.folders(_scope);
+  final documents = DocumentApi.documents(_scope);
   _buildTree(await folders, await documents);
-  _treeLoaded = true;
+  _treeScope = _scope;
 }
 
 void _buildTree(List<Folder> folders, List<Document> documents) {

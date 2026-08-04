@@ -67,7 +67,7 @@ class _DocumentScreenState extends State<DocumentScreen> {
     if (--_busy == 0 && mounted) setState(() => _uploading = false);
   }
 
-  bool _loading = !_treeLoaded;
+  bool _loading = _treeScope != _scope;
 
   String _query = '';
 
@@ -119,6 +119,21 @@ class _DocumentScreenState extends State<DocumentScreen> {
     if (_path.length > 1) _goTo(_path.length - 2);
   }
 
+  /// 갈래를 바꾸면 트리를 통째로 다시 받는다 — 전사와 개인은 다른 목록이다
+  Future<void> _pickScope(DocScope scope) async {
+    if (scope == _scope) return;
+    setState(() {
+      _scope = scope;
+      _place = _Place.all;
+      _path.removeRange(1, _path.length);
+      _expanded.clear();
+      _selected = null;
+      _query = '';
+      _loading = true;
+    });
+    await _load();
+  }
+
   /// 좌측 위치를 고르면 경로는 최상위로 되돌린다
   void _pickPlace(_Place place) {
     setState(() {
@@ -151,6 +166,7 @@ class _DocumentScreenState extends State<DocumentScreen> {
     final target = _place == _Place.all ? _current : _root;
     try {
       final created = await DocumentApi.createFolder(
+        scope: _scope,
         name: name,
         // 최상위는 서버에서 부모가 없다
         parentId: target.id.isEmpty ? null : target.id,
@@ -219,9 +235,11 @@ class _DocumentScreenState extends State<DocumentScreen> {
     var added = 0;
     try {
       // 1) 폴더 구조만 먼저 훑어서 한 번에 만든다
-      final created = await DocumentApi.createFolderTree([
-        for (final path in paths) _scanFolder(Directory(path)),
-      ], parentId: target.id.isEmpty ? null : target.id);
+      final created = await DocumentApi.createFolderTree(
+        [for (final path in paths) _scanFolder(Directory(path))],
+        scope: _scope,
+        parentId: target.id.isEmpty ? null : target.id,
+      );
       if (!mounted) return;
 
       // 2) 만들어진 id 를 로컬 경로에 짝지어 트리에 반영한다
@@ -319,6 +337,7 @@ class _DocumentScreenState extends State<DocumentScreen> {
       try {
         final uploaded = await DocumentApi.upload(
           path,
+          scope: _scope,
           filename: name,
           folderId: target.id.isEmpty ? null : target.id,
         );
@@ -576,9 +595,11 @@ class _DocumentScreenState extends State<DocumentScreen> {
             child: ColoredBox(
               color: AppColors.surface,
               child: _Sidebar(
+                scope: _scope,
                 place: _place,
                 current: _current,
                 expanded: _expanded,
+                onPickScope: _pickScope,
                 onPickPlace: _pickPlace,
                 onJump: _jumpTo,
                 onToggleExpand: (folder) => setState(() {
@@ -771,13 +792,19 @@ class _DashedBorderPainter extends CustomPainter {
 /// 파인더의 좌측 사이드바 — 위치 목록과 폴더 트리
 class _Sidebar extends StatelessWidget {
   _Sidebar({
+    required this.scope,
     required this.place,
     required this.current,
     required this.expanded,
+    required this.onPickScope,
     required this.onPickPlace,
     required this.onJump,
     required this.onToggleExpand,
   });
+
+  /// 지금 보고 있는 갈래 (전사 · 개인)
+  final DocScope scope;
+  final ValueChanged<DocScope> onPickScope;
 
   final _Place place;
   final _Item current;
@@ -827,6 +854,14 @@ class _Sidebar extends StatelessWidget {
           child: ListView(
             padding: EdgeInsets.fromLTRB(10, 0, 10, 24),
             children: [
+              _caption('문서함'),
+              for (final value in DocScope.values)
+                _ScopeRow(
+                  scope: value,
+                  selected: scope == value,
+                  onTap: () => onPickScope(value),
+                ),
+              SizedBox(height: 18),
               _caption('위치'),
               for (final value in _Place.values)
                 _PlaceRow(
@@ -887,6 +922,51 @@ class _PlaceRow extends StatelessWidget {
             SizedBox(width: 8),
             Text(
               place.label,
+              style: AppTextStyles.body2.copyWith(
+                fontSize: 13,
+                color: selected ? AppColors.primary : AppColors.textSecondary,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 문서함 갈래 한 줄 (전사 문서 · 내 문서) — 위치 줄과 같은 모양이다
+class _ScopeRow extends StatelessWidget {
+  _ScopeRow({required this.scope, required this.selected, required this.onTap});
+
+  final DocScope scope;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      scale: 0.98,
+      child: Container(
+        margin: EdgeInsets.only(bottom: 2),
+        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primaryLight : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              scope == DocScope.company
+                  ? Icons.apartment_rounded
+                  : Icons.lock_outline_rounded,
+              size: 16,
+              color: selected ? AppColors.primary : AppColors.gray500,
+            ),
+            SizedBox(width: 8),
+            Text(
+              scope.label,
               style: AppTextStyles.body2.copyWith(
                 fontSize: 13,
                 color: selected ? AppColors.primary : AppColors.textSecondary,
