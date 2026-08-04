@@ -544,6 +544,14 @@ bool _canExtendProject(_Project project) =>
 /// 연장 신청을 결재할 수 있는 사람 — 서버가 MASTER 로만 열어 뒀다
 bool get _canDecideRequest => myRole == Role.master;
 
+/// 완료된 프로젝트는 손대지 못한다 — **MASTER 만** 되돌릴 수 있다
+///
+/// 완료가 곧 점수라, 됐다 안 됐다 하면 담당자 점수도 같이 흔들린다.
+/// 서버도 같은 기준으로 막는다 (`_ensure_open` → 403 `PROJECT_DONE`).
+/// 댓글은 잠기지 않는다.
+bool _isLocked(_Project project) =>
+    project.phase == _Phase.done && myRole != Role.master;
+
 class _ProjectDetail extends StatelessWidget {
   _ProjectDetail({
     super.key,
@@ -1115,6 +1123,7 @@ class _TodoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final todos = project.todos;
+    final locked = _isLocked(project);
 
     return Container(
       padding: EdgeInsets.fromLTRB(20, 18, 20, 16),
@@ -1138,9 +1147,10 @@ class _TodoCard extends StatelessWidget {
             for (final todo in todos)
               _TodoRow(
                 todo: todo,
-                onToggle: () => onToggle(todo),
-                onRemove: () => onRemove(todo),
-                onAssign: () => onAssign(todo),
+                // 완료된 프로젝트는 눌러도 서버가 403 을 준다 — 아예 안 먹게 한다
+                onToggle: locked ? null : () => onToggle(todo),
+                onRemove: locked ? null : () => onRemove(todo),
+                onAssign: locked ? null : () => onAssign(todo),
               ),
         ],
       ),
@@ -1158,9 +1168,11 @@ class _TodoRow extends StatefulWidget {
   });
 
   final _Todo todo;
-  final VoidCallback onToggle;
-  final VoidCallback onRemove;
-  final VoidCallback onAssign;
+
+  /// 완료된 프로젝트에서는 셋 다 null 이다 — 자리는 그대로 두고 안 눌리게만 한다
+  final VoidCallback? onToggle;
+  final VoidCallback? onRemove;
+  final VoidCallback? onAssign;
 
   @override
   State<_TodoRow> createState() => _TodoRowState();
@@ -1172,8 +1184,27 @@ class _TodoRowState extends State<_TodoRow> {
   @override
   Widget build(BuildContext context) {
     final todo = widget.todo;
+    final toggle = widget.onToggle;
+    final remove = widget.onRemove;
     // 폰은 커서가 없으니 삭제 버튼을 항상 띄워둔다
-    final showRemove = _hover || !isDesktop;
+    final showRemove = remove != null && (_hover || !isDesktop);
+
+    final box = Container(
+      width: 22,
+      height: 22,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: todo.done ? AppColors.primary : Colors.transparent,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: todo.done ? AppColors.primary : AppColors.gray300,
+          width: 1.5,
+        ),
+      ),
+      child: todo.done
+          ? Icon(Icons.check_rounded, size: 14, color: Colors.white)
+          : null,
+    );
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -1182,26 +1213,10 @@ class _TodoRowState extends State<_TodoRow> {
         padding: EdgeInsets.symmetric(vertical: 9),
         child: Row(
           children: [
-            Pressable(
-              onTap: widget.onToggle,
-              scale: 0.9,
-              child: Container(
-                width: 22,
-                height: 22,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: todo.done ? AppColors.primary : Colors.transparent,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: todo.done ? AppColors.primary : AppColors.gray300,
-                    width: 1.5,
-                  ),
-                ),
-                child: todo.done
-                    ? Icon(Icons.check_rounded, size: 14, color: Colors.white)
-                    : null,
-              ),
-            ),
+            if (toggle == null)
+              box
+            else
+              Pressable(onTap: toggle, scale: 0.9, child: box),
             SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -1224,7 +1239,7 @@ class _TodoRowState extends State<_TodoRow> {
               width: 28,
               child: showRemove
                   ? Pressable(
-                      onTap: widget.onRemove,
+                      onTap: remove,
                       scale: 0.9,
                       child: Icon(
                         Icons.close_rounded,
@@ -1246,32 +1261,39 @@ class _AssigneeChip extends StatelessWidget {
   _AssigneeChip({required this.name, required this.onTap});
 
   final String? name;
-  final VoidCallback onTap;
+
+  /// null 이면 못 고친다 (완료된 프로젝트) — 모양은 그대로 두고 안 눌리게만 한다
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final assigned = name != null;
+    final padding = EdgeInsets.fromLTRB(assigned ? 3 : 8, 3, 8, 3);
+    final chip = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (assigned) ...[Avatar(name: name!, size: 20), SizedBox(width: 5)],
+        Text(
+          assigned ? name! : '담당자',
+          style: AppTextStyles.caption.copyWith(
+            fontSize: 12,
+            color: assigned ? AppColors.textSecondary : AppColors.gray400,
+            fontWeight: assigned ? FontWeight.w600 : FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+
+    final tap = onTap;
+    if (tap == null) return Padding(padding: padding, child: chip);
 
     return Pressable(
-      onTap: onTap,
+      onTap: tap,
       scale: 0.96,
       pressedColor: AppColors.gray100,
       borderRadius: BorderRadius.circular(100),
-      padding: EdgeInsets.fromLTRB(assigned ? 3 : 8, 3, 8, 3),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (assigned) ...[Avatar(name: name!, size: 20), SizedBox(width: 5)],
-          Text(
-            assigned ? name! : '담당자',
-            style: AppTextStyles.caption.copyWith(
-              fontSize: 12,
-              color: assigned ? AppColors.textSecondary : AppColors.gray400,
-              fontWeight: assigned ? FontWeight.w600 : FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
+      padding: padding,
+      child: chip,
     );
   }
 }
