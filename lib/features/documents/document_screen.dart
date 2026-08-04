@@ -120,6 +120,10 @@ class _DocumentScreenState extends State<DocumentScreen> {
   }
 
   /// 갈래를 바꾸면 트리를 통째로 다시 받는다 — 전사와 개인은 다른 목록이다
+  ///
+  /// **여기서는 [_loading] 을 켜지 않는다.** 그러면 사이드바까지 스피너로
+  /// 통째로 갈렸다가 돌아와서 화면이 깜빡인다. 고른 칸은 바로 칠해지고
+  /// 목록만 새 것이 오는 순간 갈린다.
   Future<void> _pickScope(DocScope scope) async {
     if (scope == _scope) return;
     setState(() {
@@ -129,7 +133,6 @@ class _DocumentScreenState extends State<DocumentScreen> {
       _expanded.clear();
       _selected = null;
       _query = '';
-      _loading = true;
     });
     await _load();
   }
