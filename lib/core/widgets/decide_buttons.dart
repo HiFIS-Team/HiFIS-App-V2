@@ -10,8 +10,8 @@ import 'pressable.dart';
 /// 자리라 모양이 갈리면 안 된다. 홈 카드·일정 하루 팝업처럼 줄 안에
 /// 들어가는 작은 자리는 [MiniButton] 을 쓴다.
 ///
-/// **반려가 왼쪽, 승인이 오른쪽이다.** 승인만 채워서 실수로 반려를 먼저
-/// 누르지 않게 한다.
+/// **반려가 왼쪽, 승인이 오른쪽이다.** 승인만 파랗게 채우고 반려는 테두리만
+/// 두르되 글씨는 빨갛게 한다 — 되돌릴 수 없는 쪽이라 눈에 띄어야 한다.
 class DecideButtons extends StatelessWidget {
   DecideButtons({
     super.key,
@@ -43,7 +43,7 @@ class DecideButtons extends StatelessWidget {
           '반려',
           style: AppTextStyles.body2.copyWith(
             fontSize: 14,
-            color: AppColors.textSecondary,
+            color: AppColors.error,
             fontWeight: FontWeight.w700,
           ),
         ),

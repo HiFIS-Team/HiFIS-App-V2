@@ -593,6 +593,75 @@ class _DocDetail extends StatelessWidget {
           ],
         ),
         SizedBox(height: 20),
+        if (doc.state == _State.pending) ...[
+          // 프로젝트 기한 연장 카드와 같은 틀 — 아이콘 + 옅은 색 바탕 + 오른쪽 버튼.
+          // 버튼은 **내 차례일 때만** 나온다 (아니면 서버가 403 을 준다)
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.fromLTRB(16, 14, 14, 14),
+            decoration: BoxDecoration(
+              color: AppColors.warning.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.hourglass_empty_rounded,
+                  size: 18,
+                  color: AppColors.warning,
+                ),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '결재 승인 대기',
+                        style: AppTextStyles.body2.copyWith(
+                          color: AppColors.warning,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        // 승인은 어차피 대표만 한다 — 누구 차례인지는 안 적는다
+                        doc.myTurn ? '의견을 남겨야 처리돼요' : '대표 결재를 기다리고 있어요',
+                        style: AppTextStyles.body2.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // 올린 사람은 아직 아무도 처리하지 않은 결재를 물릴 수 있다
+                if (doc.canWithdraw) ...[
+                  SizedBox(width: 12),
+                  Pressable(
+                    onTap: onWithdraw,
+                    scale: 0.96,
+                    pressedColor: AppColors.gray100,
+                    borderRadius: BorderRadius.circular(10),
+                    padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                    child: Text(
+                      '회수',
+                      style: AppTextStyles.body2.copyWith(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+                if (doc.myTurn) ...[
+                  SizedBox(width: 12),
+                  DecideButtons(onApprove: onApprove, onReject: onReject),
+                ],
+              ],
+            ),
+          ),
+          SizedBox(height: 16),
+        ],
         if (doc.amount > 0) ...[
           Container(
             width: double.infinity,
@@ -737,46 +806,6 @@ class _DocDetail extends StatelessWidget {
                 ),
               ],
             ),
-          ),
-        ],
-        if (doc.state == _State.pending) ...[
-          SizedBox(height: 18),
-          // 안내는 왼쪽, 버튼은 오른쪽에 작게.
-          // 버튼은 **내 차례일 때만** 나온다 — 아니면 서버가 403 을 준다
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  doc.myTurn
-                      ? '내 결재 차례예요 · 의견을 남겨야 처리돼요'
-                      : '${_nameOf(doc.currentApproverId)} '
-                            '${_rankOf(doc.currentApproverId)} 결재 대기',
-                  style: AppTextStyles.caption.copyWith(fontSize: 12),
-                ),
-              ),
-              SizedBox(width: 12),
-              // 올린 사람은 아직 아무도 처리하지 않은 결재를 물릴 수 있다
-              if (doc.canWithdraw)
-                Pressable(
-                  onTap: onWithdraw,
-                  scale: 0.96,
-                  pressedColor: AppColors.gray100,
-                  borderRadius: BorderRadius.circular(11),
-                  padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  child: Text(
-                    '회수',
-                    style: AppTextStyles.body2.copyWith(
-                      fontSize: 14,
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              if (doc.myTurn) ...[
-                SizedBox(width: 6),
-                DecideButtons(onApprove: onApprove, onReject: onReject),
-              ],
-            ],
           ),
         ],
       ],
