@@ -148,12 +148,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Expanded(
-                            child: _InboxCard(
-                              fill: true,
-                              onOpen: widget.onOpen,
-                            ),
-                          ),
+                          Expanded(child: _InboxCard(onOpen: widget.onOpen)),
                           SizedBox(width: 16),
                           Expanded(
                             child: _TodayStaffCard(
@@ -165,7 +160,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       ),
                     )
                   else ...[
-                    _InboxCard(fill: false, onOpen: widget.onOpen),
+                    _InboxCard(onOpen: widget.onOpen),
                     SizedBox(height: 16),
                     _TodayStaffCard(fill: false),
                   ],
@@ -259,10 +254,7 @@ class _GreetingCard extends StatelessWidget {
 /// **ADMIN 은 버튼이 없다.** 지켜보는 자리라 목록은 같이 보되 승인·반려는
 /// MASTER 만 누른다 (급여·월차 결재 화면과 같은 기준 — 눌러도 403 날 버튼은 안 낸다).
 class _InboxCard extends StatefulWidget {
-  _InboxCard({required this.fill, this.onOpen});
-
-  /// true 면 카드 높이에 맞춰 줄 간격을 고르게 벌린다 (데스크톱 나란히 배치용)
-  final bool fill;
+  _InboxCard({this.onOpen});
 
   final void Function(NotificationTarget)? onOpen;
 
@@ -412,14 +404,9 @@ class _InboxCardState extends State<_InboxCard> {
                 ),
               ),
             )
-          else if (widget.fill)
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: rows,
-              ),
-            )
           else
+            // 줄 간격은 늘 14로 둔다. 남는 높이를 나눠 가지면(spaceBetween)
+            // 승인·반려로 줄이 줄었을 때 두 줄이 카드 위아래로 갈라진다.
             for (var i = 0; i < rows.length; i++) ...[
               if (i > 0) SizedBox(height: 14),
               rows[i],
