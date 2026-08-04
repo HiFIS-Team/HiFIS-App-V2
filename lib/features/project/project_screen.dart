@@ -1682,13 +1682,23 @@ Future<String?> _pickMember(
             child: Text('담당자 선택', style: AppTextStyles.title3),
           ),
           SizedBox(height: 8),
-          for (final name in names)
-            _PickRow(
-              name: name,
-              role: staffOf(name).role,
-              selected: name == current,
-              onTap: () => Navigator.pop(context, name),
+          // 명단 전체를 세우면 팝업이 화면 밖으로 나간다 — 높이만 막고 안에서 스크롤
+          ScrollBox(
+            maxHeight: kListBoxHeight,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final name in names)
+                  _PickRow(
+                    name: name,
+                    role: staffOf(name).role,
+                    selected: name == current,
+                    onTap: () => Navigator.pop(context, name),
+                  ),
+              ],
             ),
+          ),
           Divider(height: 12, color: AppColors.divider),
           Pressable(
             onTap: () => Navigator.pop(context, ''),
