@@ -6,6 +6,7 @@ import '../../core/api/api_exception.dart';
 import '../../core/api/approval_api.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
+import '../../core/data/staff.dart';
 import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
@@ -29,6 +30,13 @@ class ApprovalScreen extends StatefulWidget {
   @override
   State<ApprovalScreen> createState() => _ApprovalScreenState();
 }
+
+/// 결재를 올릴 수 있는 사람 — **MASTER·ADMIN 은 못 올린다**
+///
+/// 결재는 대표가 판단해 주는 것이라, 판단하는 쪽이 올리면 자기가 올려
+/// 자기가 결재하는 자리가 된다. 서버도 같은 기준으로 막는다
+/// (`NOT_A_REQUESTER`) — 눌러도 403 날 버튼은 안 낸다.
+bool get _canWrite => myRole != Role.master && myRole != Role.admin;
 
 class _ApprovalScreenState extends State<ApprovalScreen> {
   _State _filter = _State.pending;
@@ -185,14 +193,17 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
                   _selectedId = null;
                 }),
                 onSelect: (doc) => setState(() => _selectedId = doc.id),
-                onCreate: _create,
+                onCreate: _canWrite ? _create : null,
               ),
             ),
           ),
           Container(width: 1, color: AppColors.gray100),
           Expanded(
             child: selected == null
-                ? _EmptyDetail(filter: _filter, onCreate: _create)
+                ? _EmptyDetail(
+                    filter: _filter,
+                    onCreate: _canWrite ? _create : null,
+                  )
                 : _DocDetail(
                     key: ValueKey(selected.id),
                     doc: selected,
@@ -224,7 +235,9 @@ class _DocList extends StatelessWidget {
   final _State filter;
   final ValueChanged<_State> onFilter;
   final ValueChanged<_Doc> onSelect;
-  final VoidCallback onCreate;
+
+  /// null 이면 올리기 버튼을 안 그린다 (MASTER·ADMIN)
+  final VoidCallback? onCreate;
 
   @override
   Widget build(BuildContext context) {
@@ -247,27 +260,32 @@ class _DocList extends StatelessWidget {
                   ),
                 ),
               ),
-              Pressable(
-                onTap: onCreate,
-                scale: 0.94,
-                pressedColor: AppColors.primaryLight,
-                borderRadius: BorderRadius.circular(100),
-                padding: EdgeInsets.fromLTRB(8, 5, 10, 5),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.add_rounded, size: 16, color: AppColors.primary),
-                    SizedBox(width: 2),
-                    Text(
-                      '결재 올리기',
-                      style: AppTextStyles.caption.copyWith(
+              if (onCreate case final create?)
+                Pressable(
+                  onTap: create,
+                  scale: 0.94,
+                  pressedColor: AppColors.primaryLight,
+                  borderRadius: BorderRadius.circular(100),
+                  padding: EdgeInsets.fromLTRB(8, 5, 10, 5),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.add_rounded,
+                        size: 16,
                         color: AppColors.primary,
-                        fontWeight: FontWeight.w700,
                       ),
-                    ),
-                  ],
+                      SizedBox(width: 2),
+                      Text(
+                        '결재 올리기',
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
         ),
@@ -452,7 +470,9 @@ class _EmptyDetail extends StatelessWidget {
   _EmptyDetail({required this.filter, required this.onCreate});
 
   final _State filter;
-  final VoidCallback onCreate;
+
+  /// null 이면 올리기 버튼을 안 그린다 (MASTER·ADMIN)
+  final VoidCallback? onCreate;
 
   @override
   Widget build(BuildContext context) {
@@ -482,25 +502,27 @@ class _EmptyDetail extends StatelessWidget {
             '${filter.label} 결재가 아직 없어요',
             style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
           ),
-          SizedBox(height: 24),
-          Pressable(
-            onTap: onCreate,
-            scale: 0.97,
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '결재 올리기',
-                style: AppTextStyles.body2.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
+          if (onCreate case final create?) ...[
+            SizedBox(height: 24),
+            Pressable(
+              onTap: create,
+              scale: 0.97,
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '결재 올리기',
+                  style: AppTextStyles.body2.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );
