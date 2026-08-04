@@ -11,7 +11,6 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
 import '../../core/util/sf_symbols.dart';
-import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/desktop_header.dart';
@@ -23,17 +22,6 @@ import 'contribution_section.dart';
 import 'lesson_section.dart';
 import 'peer_review_section.dart';
 import 'praise_section.dart';
-
-/// 목록에 없는 일을 직접 적어 남기는 항목
-///
-/// 그냥 '기타' 로만 쌓이면 나중에 무슨 일을 했는지 알 길이 없다.
-/// 적은 내용을 서버가 `기타(창고 정리)` 로 라벨에 접어 넣고,
-/// 점수 원장·랭킹 사유까지 같은 값으로 남긴다.
-const _writeInItemName = '기타';
-
-/// 적을 수 있는 글자 수 — 넘기면 서버가 422 를 준다
-/// (기록의 `itemName` 이 100자라 라벨이 넘치지 않게 막아 둔 것)
-const _writeInMaxLength = 80;
 
 /// 업무 탭 화면
 ///
@@ -49,9 +37,6 @@ class WorkScreen extends StatefulWidget {
 class _WorkScreenState extends State<WorkScreen> {
   int _tab = 0;
 
-  /// 환경정비 항목과 배점 — 지점마다 다르다
-  List<EnvItem> _envItems = const [];
-
   /// 오늘 지점에서 나온 수행 기록 전부 (내 것 + 동료 것)
   List<EnvTaskLog> _logs = const [];
 
@@ -65,21 +50,16 @@ class _WorkScreenState extends State<WorkScreen> {
 
   Future<void> _loadEnv() async {
     // 지점을 반드시 지정한다 — 대표·관리자는 지점 스코프가 안 걸려서
-    // 안 주면 전 지점 항목이 다 온다 (지점 3개면 항목이 3벌씩 나온다)
+    // 안 주면 전 지점 기록이 다 온다
     final branchId = currentUser?.branchId;
     try {
-      final itemRequest = EnvApi.items(branchId: branchId);
-      // 화면이 "오늘 점검"이라 오늘 것만 받는다 — 서버가 한국 시간으로 잘라 준다
-      final logRequest = EnvApi.logs(
+      // 오늘 것만 받는다 — 서버가 한국 시간으로 잘라 준다
+      final logs = await EnvApi.logs(
         branchId: branchId,
         date: dateKey(DateTime.now()),
       );
-      final items = await itemRequest;
-      final logs = await logRequest;
       if (!mounted) return;
       setState(() {
-        // 서버가 sortOrder 순으로 준다 — 앱이 다시 세우지 않는다
-        _envItems = items;
         _logs = logs;
         _envLoading = false;
       });
@@ -90,74 +70,10 @@ class _WorkScreenState extends State<WorkScreen> {
     }
   }
 
-  /// 이름 비교용 열쇠 — 공백·대소문자를 지우고 맞춘다
-  ///
-  /// '기타'는 지점이 이름을 고칠 수 있어서 띄어쓰기 하나로 못 알아보는 일이
-  /// 없게 해 둔다.
-  static String _envKey(String name) => name.replaceAll(' ', '').toLowerCase();
-
   List<EnvTaskLog> get _myLogs => [
     for (final log in _logs)
       if (log.employeeId == currentUser?.id) log,
   ];
-
-  /// 항목 id 별 오늘 내 수행 횟수
-  Map<String, int> get _counts {
-    final counts = <String, int>{};
-    for (final log in _myLogs) {
-      counts[log.envItemId] = (counts[log.envItemId] ?? 0) + 1;
-    }
-    return counts;
-  }
-
-  /// 목록에 없는 걸 적어 남기는 항목인가 ('기타')
-  static bool _isWriteIn(EnvItem item) =>
-      _envKey(item.name) == _envKey(_writeInItemName);
-
-  Future<void> _adjust(EnvItem item, int delta) async {
-    try {
-      if (delta > 0) {
-        // '기타'는 무슨 일을 했는지 먼저 받는다 — 안 적으면 남길 이유가 없다
-        String? note;
-        if (_isWriteIn(item)) {
-          note = await showAppDialog<String>(
-            context,
-            (_) => _WriteInCard(item: item),
-          );
-          if (note == null || !mounted) return;
-        }
-        final log = await EnvApi.createLog(item.id, note: note);
-        if (!mounted) return;
-        setState(() => _logs = [log, ..._logs]);
-        AppToast.show(
-          context,
-          note == null
-              ? '${_withJosa(item.name)} 완료했습니다 · +${item.points}점'
-              : '"$note" 기록했습니다 · +${item.points}점',
-        );
-      } else {
-        // 감소는 그 항목의 내 기록 중 가장 최근 것을 지운다 (점수도 같이 회수된다)
-        EnvTaskLog? target;
-        for (final log in _myLogs) {
-          if (log.envItemId != item.id) continue;
-          if (target == null || log.createdAt.isAfter(target.createdAt)) {
-            target = log;
-          }
-        }
-        if (target == null) return;
-        await EnvApi.deleteLog(target.id);
-        if (!mounted) return;
-        setState(() {
-          _logs = [
-            for (final log in _logs)
-              if (log.id != target!.id) log,
-          ];
-        });
-      }
-    } catch (error) {
-      if (mounted) AppToast.show(context, messageOf(error));
-    }
-  }
 
   /// 오늘 수행 내역 — 폰은 밀려 들어오는 화면, PC는 모달로 열린다
   ///
@@ -172,13 +88,6 @@ class _WorkScreenState extends State<WorkScreen> {
         tabs: tabs,
       ),
     );
-  }
-
-  /// 받침 유무에 따라 을/를을 붙인다 (한글이 아니면 을(를))
-  String _withJosa(String word) {
-    final code = word.codeUnits.last;
-    if (code < 0xAC00 || code > 0xD7A3) return '$word을(를)';
-    return (code - 0xAC00) % 28 != 0 ? '$word을' : '$word를';
   }
 
   /// 항목 목록 — 환경정비의 점검 항목은 서버(지점별)에서 받아 온다
@@ -301,8 +210,24 @@ class _WorkScreenState extends State<WorkScreen> {
   /// 콘텐츠 좌우 여백 — 데스크톱은 페이지 ListView가 이미 24를 준다
   double get _pad => isDesktop ? 0 : 20;
 
+  Widget get _myHistoryCard => _HistoryCard(
+    title: '내 내역',
+    logs: _myLogs,
+    showName: false,
+    emptyText: '오늘 완료한 항목이 없어요',
+    onOpenAll: () => _showHistory(all: false, tabs: false),
+  );
+
+  Widget get _allHistoryCard => _HistoryCard(
+    title: '전체 내역',
+    logs: _logs,
+    showName: true,
+    emptyText: '오늘 완료된 항목이 없어요',
+    onOpenAll: () => _showHistory(all: true, tabs: false),
+  );
+
   /// 고른 항목의 내용 — 탭 전환 시 페이드로 바뀐다.
-  /// 체크리스트 탭(환경정비)은 점수 카드 없이 리스트만 보여준다.
+  /// 체크리스트 탭(환경정비)은 점수 카드 없이 내역만 보여준다.
   Widget _content(_WorkItem item) {
     return AnimatedSwitcher(
       duration: Duration(milliseconds: 200),
@@ -315,7 +240,7 @@ class _WorkScreenState extends State<WorkScreen> {
       child: Column(
         key: ValueKey(_tab),
         children: [
-          if (item.checklist) ...[
+          if (item.checklist)
             Padding(
               padding: EdgeInsets.symmetric(horizontal: _pad),
               child: _envLoading
@@ -328,45 +253,26 @@ class _WorkScreenState extends State<WorkScreen> {
                         ),
                       ),
                     )
-                  : _ChecklistCard(
-                      items: _envItems,
-                      counts: _counts,
-                      onAdjust: _adjust,
-                      onShowHistory: _showHistory,
+                  // 내 내역 / 전체 내역만 — 데스크톱은 나란히, 폰은 위아래로
+                  : isDesktop
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: _myHistoryCard),
+                        SizedBox(width: 16),
+                        Expanded(child: _allHistoryCard),
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _myHistoryCard,
+                        SizedBox(height: 16),
+                        _allHistoryCard,
+                      ],
                     ),
-            ),
-            // 데스크톱: 내 내역 / 전체 내역을 양쪽에 상시 표시
-            if (isDesktop) ...[
-              SizedBox(height: 16),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: _pad),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: _HistoryCard(
-                        title: '내 내역',
-                        logs: _myLogs,
-                        showName: false,
-                        emptyText: '오늘 완료한 항목이 없어요',
-                        onOpenAll: () => _showHistory(all: false, tabs: false),
-                      ),
-                    ),
-                    SizedBox(width: 16),
-                    Expanded(
-                      child: _HistoryCard(
-                        title: '전체 내역',
-                        logs: _logs,
-                        showName: true,
-                        emptyText: '오늘 완료된 항목이 없어요',
-                        onOpenAll: () => _showHistory(all: true, tabs: false),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ] else if (item.label == '동료 평가')
+            )
+          else if (item.label == '동료 평가')
             Padding(
               padding: EdgeInsets.symmetric(horizontal: _pad),
               child: PeerReviewSection(),
@@ -392,124 +298,6 @@ class _WorkScreenState extends State<WorkScreen> {
   }
 }
 
-/// '기타'에 적을 내용을 받는 팝업
-///
-/// 비워 두면 완료할 수 없다. 적은 내용이 그대로 기록에 남는 자리라
-/// 빈 '기타' 는 남겨 봐야 나중에 아무 의미가 없다.
-class _WriteInCard extends StatefulWidget {
-  _WriteInCard({required this.item});
-
-  final EnvItem item;
-
-  @override
-  State<_WriteInCard> createState() => _WriteInCardState();
-}
-
-class _WriteInCardState extends State<_WriteInCard> {
-  final _text = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    // 글자 수와 완료 버튼 상태가 입력 따라 바뀐다
-    _text.addListener(() => setState(() {}));
-  }
-
-  @override
-  void dispose() {
-    _text.dispose();
-    super.dispose();
-  }
-
-  String get _value => _text.text.trim();
-
-  void _submit() {
-    if (_value.isEmpty) return;
-    Navigator.pop(context, _value);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: dialogWidth(context, 320),
-      padding: EdgeInsets.fromLTRB(24, 24, 24, 20),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('무엇을 했나요?', style: AppTextStyles.title3),
-          SizedBox(height: 6),
-          Text(
-            '목록에 없는 일을 적어주세요. 적은 내용이 기록에 그대로 남아요.',
-            style: AppTextStyles.caption.copyWith(height: 1.5),
-          ),
-          SizedBox(height: 14),
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: AppColors.gray50,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: TextField(
-              controller: _text,
-              autofocus: true,
-              maxLength: _writeInMaxLength,
-              style: AppTextStyles.body1,
-              cursorColor: AppColors.primary,
-              onSubmitted: (_) => _submit(),
-              decoration: InputDecoration(
-                hintText: '예) 창고 정리',
-                hintStyle: AppTextStyles.body1.copyWith(
-                  color: AppColors.gray400,
-                ),
-                border: InputBorder.none,
-                isCollapsed: true,
-                // 기본 글자 수 표시는 칸 밖으로 삐져나온다 — 아래에 직접 둔다
-                counterText: '',
-              ),
-            ),
-          ),
-          SizedBox(height: 6),
-          Align(
-            alignment: Alignment.centerRight,
-            child: Text(
-              '${_text.text.characters.length} / $_writeInMaxLength',
-              style: AppTextStyles.caption.copyWith(
-                fontSize: 11,
-                color: AppColors.gray400,
-              ),
-            ),
-          ),
-          SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: AppButton(
-                  label: '취소',
-                  onTap: () => Navigator.pop(context),
-                ),
-              ),
-              SizedBox(width: 8),
-              Expanded(
-                child: AppButton(
-                  label: '완료',
-                  filled: _value.isNotEmpty,
-                  onTap: _submit,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 수행 기록을 누가 남겼는지 — 서버는 직원 id 만 준다
 String _logAuthor(EnvTaskLog log) =>
     StaffDirectory.instance.byId(log.employeeId)?.name ?? '알 수 없음';
 
@@ -640,270 +428,6 @@ class _WorkTab extends StatelessWidget {
   }
 }
 
-/// 환경정비 점검 카드 — 항목이 2열로 내려가며 배치되고,
-/// 각 항목의 좌우 −/+ 버튼으로 오늘 수행 횟수를 조절한다.
-class _ChecklistCard extends StatelessWidget {
-  _ChecklistCard({
-    required this.items,
-    required this.counts,
-    required this.onAdjust,
-    required this.onShowHistory,
-  });
-
-  final List<EnvItem> items;
-
-  /// 항목 id 별 오늘 수행 횟수
-  final Map<String, int> counts;
-
-  /// (항목, 증감량) — +1 또는 -1
-  final void Function(EnvItem item, int delta) onAdjust;
-
-  /// 오늘 내역 시트 열기 (폰 전용)
-  final VoidCallback onShowHistory;
-
-  @override
-  Widget build(BuildContext context) {
-    final total = counts.values.fold(0, (sum, c) => sum + c);
-
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(20),
-      decoration: AppDecorations.card(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 4),
-            child: Row(
-              children: [
-                Expanded(child: Text('오늘 점검 항목', style: AppTextStyles.label)),
-                // 데스크톱은 아래에 내역 카드가 있어 총 횟수만 적고,
-                // 폰은 누르면 오늘 수행 내역이 열린다
-                if (isDesktop)
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    child: Text(
-                      '총 $total회',
-                      style: AppTextStyles.caption.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  )
-                else
-                  SeeAllButton(onTap: onShowHistory, label: '총 $total회'),
-              ],
-            ),
-          ),
-          SizedBox(height: 14),
-          // 데스크톱은 폭이 넓어 한 줄에 여러 개를 넣는다.
-          // 칩이 찌그러지지 않게 남는 폭에 맞춰 개수를 정한다(최대 4개).
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final columns = isDesktop
-                  ? (constraints.maxWidth / 220).floor().clamp(2, 4)
-                  : 2;
-              // 칩마다 글자를 알아서 줄이면 긴 라벨('화장실청소')만 작아 보인다.
-              // 제일 긴 라벨이 들어가는 크기를 구해 모든 칩이 같이 쓴다 —
-              // 폰은 칸이 좁아 애플·안드로이드 모두 필요하다.
-              final chipWidth =
-                  (constraints.maxWidth - 10 * (columns - 1)) / columns;
-              final fontSize = _chipFontSize([
-                for (final item in items) item.name,
-              ], chipWidth);
-              return Column(
-                children: [
-                  for (var i = 0; i < items.length; i += columns) ...[
-                    if (i > 0) SizedBox(height: 10),
-                    Row(
-                      children: [
-                        for (var col = 0; col < columns; col++) ...[
-                          if (col > 0) SizedBox(width: 10),
-                          Expanded(
-                            child: i + col < items.length
-                                ? _CountChip(
-                                    label: items[i + col].name,
-                                    count: counts[items[i + col].id] ?? 0,
-                                    fontSize: fontSize,
-                                    onAdjust: (delta) =>
-                                        onAdjust(items[i + col], delta),
-                                  )
-                                : SizedBox(),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
-                ],
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 좌 − / 우 + 버튼이 달린 횟수 칩
-/// 칩 안에서 글자가 쓸 수 있는 폭에 맞춰, 모든 라벨이 함께 쓸 글자 크기를 구한다.
-///
-/// 제일 긴 라벨이 들어가는 크기를 찾아 전부에 같은 값을 준다.
-/// 굵은 글씨(수행한 칩)를 기준으로 재서, 눌렀을 때 글자 크기가 흔들리지 않는다.
-double _chipFontSize(List<String> items, double chipWidth) {
-  const base = 14.0;
-  final available = chipWidth - _CountChip.buttonWidth * 2 - 6;
-  if (available <= 0) return base;
-
-  var size = base;
-  for (final label in items) {
-    final painter = TextPainter(
-      text: TextSpan(
-        text: label,
-        style: AppTextStyles.body2.copyWith(
-          fontSize: base,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-      maxLines: 1,
-      textDirection: TextDirection.ltr,
-    )..layout();
-    if (painter.width > available) {
-      final fit = base * available / painter.width;
-      if (fit < size) size = fit;
-    }
-  }
-  return size.clamp(10.0, base);
-}
-
-class _CountChip extends StatelessWidget {
-  _CountChip({
-    required this.label,
-    required this.count,
-    required this.onAdjust,
-    required this.fontSize,
-  });
-
-  final String label;
-  final int count;
-  final ValueChanged<int> onAdjust;
-
-  /// 모든 칩이 함께 쓰는 글자 크기 — 길이와 상관없이 같아 보이게 한다
-  final double fontSize;
-
-  /// 좌우 −/+ 버튼 한 개의 폭
-  static const double buttonWidth = 42;
-
-  @override
-  Widget build(BuildContext context) {
-    final active = count > 0;
-
-    return AnimatedContainer(
-      duration: Duration(milliseconds: 180),
-      curve: Curves.easeOut,
-      height: 48,
-      decoration: BoxDecoration(
-        color: active ? AppColors.primaryLight : AppColors.gray50,
-        borderRadius: BorderRadius.circular(14),
-        // 활성 칩에만 은은한 파란 테두리
-        border: Border.all(
-          color: active
-              ? AppColors.primary.withValues(alpha: 0.25)
-              : Colors.transparent,
-        ),
-      ),
-      child: Row(
-        children: [
-          _AdjustButton(
-            // 감소는 빨강, 횟수가 없으면 비활성 회색
-            icon: CupertinoIcons.minus,
-            color: active ? AppColors.error : AppColors.gray300,
-            onTap: () => onAdjust(-1),
-          ),
-          // 글자 크기는 [_chipFontSize]가 모든 칩에 같은 값을 주므로
-          // 여기서 줄어들 일은 없다. 계산이 한 픽셀 모자랄 때를 대비한
-          // 안전망으로만 둔다 — 잘라내는(…) 것보다는 줄이는 게 낫다.
-          Expanded(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                label,
-                maxLines: 1,
-                style: AppTextStyles.body2.copyWith(
-                  fontSize: fontSize,
-                  color: active ? AppColors.primary : AppColors.textPrimary,
-                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                ),
-              ),
-            ),
-          ),
-          _AdjustButton(
-            icon: CupertinoIcons.plus,
-            color: AppColors.primary,
-            onTap: () => onAdjust(1),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 스테퍼 버튼 — 누르는 동안 원이 줄어들며 버튼 색으로 물든다
-class _AdjustButton extends StatefulWidget {
-  _AdjustButton({required this.icon, required this.color, required this.onTap});
-
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  State<_AdjustButton> createState() => _AdjustButtonState();
-}
-
-class _AdjustButtonState extends State<_AdjustButton> {
-  bool _pressed = false;
-
-  void _setPressed(bool value) {
-    if (_pressed != value) setState(() => _pressed = value);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => _setPressed(true),
-      onTapUp: (_) => _setPressed(false),
-      onTapCancel: () => _setPressed(false),
-      onTap: widget.onTap,
-      child: SizedBox(
-        width: _CountChip.buttonWidth,
-        height: 48,
-        child: Center(
-          child: AnimatedScale(
-            scale: _pressed ? 0.82 : 1.0,
-            duration: Duration(milliseconds: 110),
-            curve: Curves.easeOut,
-            child: AnimatedContainer(
-              duration: Duration(milliseconds: 110),
-              width: 26,
-              height: 26,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: _pressed
-                    ? widget.color.withValues(alpha: 0.18)
-                    : AppColors.surface,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(widget.icon, size: 13, color: widget.color),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// 수행 기록 한 줄 — 시각 · (이름) · 항목 · 완료 체크.
-/// 내역 화면과 데스크톱 인라인 내역 카드가 함께 쓴다.
 class _LogRow extends StatelessWidget {
   _LogRow({required this.log, required this.showName});
 
