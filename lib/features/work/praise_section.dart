@@ -66,7 +66,7 @@ class _PraiseSectionState extends State<PraiseSection> {
   /// 세그먼트 — '전체'는 누구에게 온 건지 가리지 않고 설문 원본을 그대로 본다
   Widget _tabs() {
     return SegmentedTabs(
-      labels: ['내게 온 칭찬', '컴플레인', '전체'],
+      labels: [_viewOnly ? '칭찬' : '내게 온 칭찬', '컴플레인', '전체'],
       selected: _tab,
       onSelect: (i) => setState(() => _tab = i),
     );
@@ -143,7 +143,7 @@ class _PraiseSectionState extends State<PraiseSection> {
       ..sort((a, b) => b.time.compareTo(a.time));
     // 카드에는 최근 5건만 — 나머지는 전체 보기 화면에서
     final recent = items.take(5).toList();
-    final title = _complaint ? '컴플레인' : '내게 온 칭찬';
+    final title = _complaint ? '컴플레인' : (_viewOnly ? '칭찬' : '내게 온 칭찬');
     final unresolved = _complaint && _showStatus
         ? items.where((f) => f.status == _Status.pending).length
         : 0;
@@ -413,6 +413,7 @@ class _Feedback {
     this.surveyId,
     this.complaint = false,
     this.status = _Status.pending,
+    this.about,
   });
 
   /// 원본 설문 id — 처리 단계를 서버에 올릴 때 쓴다
@@ -427,11 +428,23 @@ class _Feedback {
   /// 컴플레인 처리 단계 — 상세 화면에서 바꾼다
   _Status status;
 
+  /// 누구에게 온 것인지 — **전사로 볼 때만** 채운다 (본인 것만 볼 때는 뻔하다)
+  final String? about;
+
   Color get color => Color(colorValue);
 }
 
-/// 컴플레인 상태 UI는 모바일에서만 — PC는 기존 화면 그대로 둔다
-bool get _showStatus => !isDesktop;
+/// 현장 업무를 안 하는 사람 — 대표·관리자
+///
+/// 설문은 트레이너를 칭찬하는 것이라 대표·관리자는 받을 일이 없다.
+/// 본인 것으로 거르면 늘 비어서, 대신 **전사 칭찬·컴플레인**을 조회로 본다.
+bool get _viewOnly => !(currentUser?.role.doesFieldWork ?? true);
+
+/// 컴플레인 처리 단계 UI를 그릴지
+///
+/// 예전에는 폰에서만 그렸는데, 컴플레인을 챙기는 대표·관리자가 PC 를 쓴다.
+/// PC 에서 버튼이 없으면 아무도 해결을 못 찍는다.
+bool get _showStatus => true;
 
 /// 서버에서 받은 설문 — 화면 셋이 같이 쓴다
 ///
@@ -466,7 +479,8 @@ Future<void> _loadSurveys() async {
     ..clear()
     ..addAll([
       for (final row in rows)
-        if (row.praisedEmployeeId == me) ...[
+        // 직원·점장은 본인에게 온 것만, 대표·관리자는 전사를 본다
+        if (_viewOnly || row.praisedEmployeeId == me) ...[
           if (row.praiseComment.trim().isNotEmpty)
             _Feedback(
               surveyId: row.id,
@@ -474,6 +488,7 @@ Future<void> _loadSurveys() async {
               colorValue: avatarColorFor(row.memberName).toARGB32(),
               text: row.praiseComment,
               time: row.submittedAt,
+              about: _viewOnly ? _employeeName(row.praisedEmployeeId) : null,
             ),
           if (row.isComplaint)
             _Feedback(
@@ -484,9 +499,16 @@ Future<void> _loadSurveys() async {
               time: row.submittedAt,
               complaint: true,
               status: _Status.of(row.improvementStatus),
+              about: _viewOnly ? _employeeName(row.praisedEmployeeId) : null,
             ),
         ],
     ]);
+}
+
+/// 설문이 가리키는 직원 이름 — 명단에 없으면 빈 값
+String? _employeeName(String id) {
+  final name = StaffDirectory.instance.byId(id)?.name;
+  return name == null || name.isEmpty ? null : name;
 }
 
 /// '7.29 오후 5:36' 형태
@@ -566,13 +588,18 @@ class _FeedbackDetailCard extends StatefulWidget {
 class _FeedbackDetailCardState extends State<_FeedbackDetailCard> {
   /// 처리 단계를 바꾸고 창을 닫는다
   ///
-  /// 같은 버튼을 다시 누르면 미처리로 되돌린다 (잘못 누른 걸 취소할 방법).
+  /// 해결중은 같은 버튼을 다시 누르면 미처리로 되돌린다 (잘못 누른 걸 취소할 방법).
+  /// **해결 완료는 못 되돌린다** — 찍는 순간 환경정비 '클레임해결' 점수가 붙어서
+  /// 되돌렸다 다시 찍으면 점수가 두 번 쌓인다. 서버도 400 으로 막는다.
   ///
   /// **고르면 바로 닫고 토스트로 알린다.** 창을 열어둔 채 색만 바꾸면
   /// 처리가 됐는지 안 됐는지 알 수가 없다.
   void _pick(_Status status) {
     final feedback = widget.feedback;
-    final next = feedback.status == status ? _Status.pending : status;
+    // 완료는 되돌리는 길이 없으므로 같은 버튼을 다시 눌러도 완료다
+    final next = status != _Status.done && feedback.status == status
+        ? _Status.pending
+        : status;
     final before = feedback.status;
 
     // 누르는 순간 바꾸고 서버에 올린다. 실패하면 되돌린다 —
@@ -644,25 +671,33 @@ class _FeedbackDetailCardState extends State<_FeedbackDetailCard> {
           Text(_formatStamp(feedback.time), style: AppTextStyles.caption),
           if (withStatus) ...[
             SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(
-                  child: _StatusButton(
-                    status: _Status.working,
-                    selected: feedback.status == _Status.working,
-                    onTap: () => _pick(_Status.working),
+            if (feedback.status == _Status.done)
+              // 이미 끝난 건은 손댈 수 없다 — 버튼 대신 안내만 둔다
+              Text(
+                '해결 완료된 컴플레인은 되돌릴 수 없어요',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.caption,
+              )
+            else
+              Row(
+                children: [
+                  Expanded(
+                    child: _StatusButton(
+                      status: _Status.working,
+                      selected: feedback.status == _Status.working,
+                      onTap: () => _pick(_Status.working),
+                    ),
                   ),
-                ),
-                SizedBox(width: 8),
-                Expanded(
-                  child: _StatusButton(
-                    status: _Status.done,
-                    selected: feedback.status == _Status.done,
-                    onTap: () => _pick(_Status.done),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: _StatusButton(
+                      status: _Status.done,
+                      selected: false,
+                      onTap: () => _pick(_Status.done),
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
           ],
         ],
       ),
@@ -815,7 +850,13 @@ class _FeedbackCard extends StatelessWidget {
                       ),
                       SizedBox(height: 2),
                       Text(
-                        _formatStamp(feedback.time),
+                        // 전사로 볼 때는 누구에게 온 것인지가 먼저다
+                        feedback.about == null
+                            ? _formatStamp(feedback.time)
+                            : '${feedback.about} · '
+                                  '${_formatStamp(feedback.time)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: AppTextStyles.caption.copyWith(fontSize: 12),
                       ),
                     ],
@@ -909,7 +950,11 @@ class _FeedbackRow extends StatelessWidget {
                 ),
                 SizedBox(height: 3),
                 Text(
-                  _formatStamp(feedback.time),
+                  feedback.about == null
+                      ? _formatStamp(feedback.time)
+                      : '${feedback.about} · ${_formatStamp(feedback.time)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: AppTextStyles.caption.copyWith(fontSize: 11),
                 ),
               ],

@@ -8,6 +8,7 @@ import '../../core/api/api_exception.dart';
 import '../../core/api/lesson_api.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/staff.dart';
+import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -46,6 +47,17 @@ class LessonSection extends StatefulWidget {
 ///
 /// 화면을 열 때마다 새로 받는다 — 서명 URL 이 7일이면 만료돼서
 /// 오래 들고 있으면 이미지가 403 으로 떨어진다.
+/// 현장 업무를 안 하는 사람 — 대표·관리자
+///
+/// 서버가 세션 싸인·회원 등록을 MEMBER·MANAGER 로만 열어 뒀다
+/// (backend-gap 24번). 눌러도 403 이 나므로 버튼을 아예 안 보여주고
+/// 대신 **지점 전체 기록**을 조회로 보여준다.
+bool get _viewOnly => !(currentUser?.role.doesFieldWork ?? true);
+
+/// 싸인을 받은 트레이너 이름 — 전사 기록에서 누구 건지 가르는 값
+String _trainerName(SessionSign sign) =>
+    StaffDirectory.instance.byId(sign.performedByTrainerId)?.name ?? '알 수 없음';
+
 class _LessonStore {
   _LessonStore._();
 
@@ -66,7 +78,8 @@ class _LessonStore {
     final memberRequest = MemberApi.list();
     final registrationRequest = RegistrationApi.list();
     final signRequest = SessionSignApi.list(
-      trainerId: currentUser?.id,
+      // 대표·관리자는 자기 싸인이 없다 — 안 주면 서버가 지점 전체를 준다
+      trainerId: _viewOnly ? null : currentUser?.id,
       period: periodKey(now),
     );
 
@@ -113,8 +126,10 @@ class _LessonStore {
         ),
   ];
 
-  /// 이번 달 내 싸인 (최신순)
-  List<SessionSign> get mySigns => sorted(signs);
+  /// 화면에 세우는 이번 달 싸인 (최신순)
+  ///
+  /// 직원·점장은 본인 것, 대표·관리자는 지점 전체다 — 받아올 때 갈린다.
+  List<SessionSign> get shownSigns => sorted(signs);
 }
 
 /// 화면이 다루는 회원 한 명 — 서버 회원에 지금 쓰는 등록권을 붙인 것
@@ -344,32 +359,34 @@ class _LessonSectionState extends State<LessonSection> {
       );
     }
 
-    // 상단 액션 버튼 두 개 — 폰·PC 공통
-    final actions = Row(
-      children: [
-        Expanded(
-          child: _ActionButton(
-            icon: CupertinoIcons.person_add,
-            label: '회원 등록',
-            onTap: _register,
-          ),
-        ),
-        SizedBox(width: 10),
-        Expanded(
-          child: _ActionButton(
-            icon: CupertinoIcons.signature,
-            label: '세션 싸인 받기',
-            highlighted: true,
-            onTap: _pickAndSign,
-          ),
-        ),
-      ],
-    );
+    // 상단 액션 버튼 두 개 — 폰·PC 공통. 대표·관리자는 수행자가 아니라 안 그린다
+    final actions = _viewOnly
+        ? SizedBox.shrink()
+        : Row(
+            children: [
+              Expanded(
+                child: _ActionButton(
+                  icon: CupertinoIcons.person_add,
+                  label: '회원 등록',
+                  onTap: _register,
+                ),
+              ),
+              SizedBox(width: 10),
+              Expanded(
+                child: _ActionButton(
+                  icon: CupertinoIcons.signature,
+                  label: '세션 싸인 받기',
+                  highlighted: true,
+                  onTap: _pickAndSign,
+                ),
+              ),
+            ],
+          );
 
     // 폰은 싸인마다 카드 하나 (회원 친절도 목록과 같은 결).
     // 데스크톱은 2단 화면이라 카드가 과해서 기존 줄 목록을 그대로 쓴다.
     if (!isDesktop) {
-      final sorted = _LessonStore.instance.mySigns;
+      final sorted = _LessonStore.instance.shownSigns;
       // 목록에는 최근 5건만 — 나머지는 전체 보기 화면에서
       final recent = sorted.take(5).toList();
 
@@ -377,7 +394,7 @@ class _LessonSectionState extends State<LessonSection> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           actions,
-          SizedBox(height: 20),
+          if (!_viewOnly) SizedBox(height: 20),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 4),
             child: Row(
@@ -412,17 +429,20 @@ class _LessonSectionState extends State<LessonSection> {
 
     return Column(
       children: [
-        _SessionGoalCard(),
-        SizedBox(height: 16),
-        actions,
-        SizedBox(height: 16),
+        // 월 목표·담당 회원은 본인 기준이라 대표·관리자에게는 뜻이 없다
+        if (!_viewOnly) ...[
+          _SessionGoalCard(),
+          SizedBox(height: 16),
+          actions,
+          SizedBox(height: 16),
+        ],
         _buildRecordCard(),
       ],
     );
   }
 
   Widget _buildRecordCard() {
-    final sorted = _LessonStore.instance.mySigns;
+    final sorted = _LessonStore.instance.shownSigns;
     // 카드에는 최근 5건만 — 나머지는 전체 보기 화면에서
     final recent = sorted.take(5).toList();
 
@@ -677,7 +697,13 @@ class _SignCard extends StatelessWidget {
                       ),
                       SizedBox(height: 2),
                       Text(
-                        _formatStamp(sign.signedAt),
+                        // 전사 기록에서는 누가 받았는지가 먼저다
+                        _viewOnly
+                            ? '${_trainerName(sign)} · '
+                                  '${_formatStamp(sign.signedAt)}'
+                            : _formatStamp(sign.signedAt),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: AppTextStyles.caption.copyWith(fontSize: 12),
                       ),
                     ],
@@ -775,7 +801,13 @@ class _SignRow extends StatelessWidget {
                 ),
                 SizedBox(height: 2),
                 Text(
-                  '${sign.roundLabel} · ${_formatStamp(sign.signedAt)}',
+                  // 전사 기록에서는 누가 받았는지가 먼저다
+                  _viewOnly
+                      ? '${_trainerName(sign)} · ${sign.roundLabel}'
+                            ' · ${_formatStamp(sign.signedAt)}'
+                      : '${sign.roundLabel} · ${_formatStamp(sign.signedAt)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: AppTextStyles.caption.copyWith(fontSize: 11),
                 ),
               ],
