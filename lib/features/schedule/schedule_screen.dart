@@ -665,54 +665,66 @@ class _EventRow extends StatelessWidget {
       pressedColor: AppColors.gray50,
       borderRadius: BorderRadius.circular(12),
       padding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 4,
-            height: 34,
-            decoration: BoxDecoration(
-              color: event.kind.color,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  event.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.body2.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+          Row(
+            children: [
+              Container(
+                width: 4,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: event.kind.color,
+                  borderRadius: BorderRadius.circular(2),
                 ),
-                SizedBox(height: 2),
-                Text(
-                  [
-                    if (event.pending) '승인 대기',
-                    event.timeLabel,
-                    event.kind.label,
-                    if (event.place.isNotEmpty) event.place,
-                  ].join(' · '),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.caption.copyWith(fontSize: 12),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      event.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.body2.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      [
+                        if (event.pending) '승인 대기',
+                        event.timeLabel,
+                        event.kind.label,
+                        if (event.place.isNotEmpty) event.place,
+                      ].join(' · '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.caption.copyWith(fontSize: 12),
+                    ),
+                  ],
                 ),
+              ),
+              if (event.members.isNotEmpty) ...[
+                SizedBox(width: 8),
+                AvatarStack(names: event.members, size: 22),
               ],
-            ),
+            ],
           ),
-          if (event.members.isNotEmpty) ...[
-            SizedBox(width: 8),
-            AvatarStack(names: event.members, size: 22),
-          ],
-          if (onApprove != null && onReject != null) ...[
-            SizedBox(width: 8),
-            MiniButton(label: '승인', onTap: onApprove!, filled: true),
-            SizedBox(width: 6),
-            MiniButton(label: '반려', onTap: onReject!, filled: false),
-          ],
+          // 옆이 아니라 아래에 둔다 — 장소가 길면 제목·시각이 눌린다
+          if (onApprove != null && onReject != null)
+            Padding(
+              // 왼쪽 16 = 색 띠 4 + 사이 12 → 제목과 줄이 맞는다
+              padding: EdgeInsets.only(left: 16, top: 8),
+              child: Row(
+                children: [
+                  MiniButton(label: '승인', onTap: onApprove!, filled: true),
+                  SizedBox(width: 6),
+                  MiniButton(label: '반려', onTap: onReject!, filled: false),
+                ],
+              ),
+            ),
         ],
       ),
     );
