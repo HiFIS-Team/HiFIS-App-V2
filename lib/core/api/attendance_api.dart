@@ -84,6 +84,31 @@ class AttendanceDay {
   final HalfPeriod? halfPeriod;
 }
 
+/// 전사 캘린더 하루 (서버 `AttendanceRosterDayOut`)
+///
+/// 하루마다 **누가 어떤 상태였는지**를 상태별로 묶어 준다. 사람별 캘린더를
+/// 인원수만큼 부르지 않으려고 서버가 한 번에 준다.
+class AttendanceRosterDay {
+  AttendanceRosterDay({required this.date, required this.groups});
+
+  factory AttendanceRosterDay.fromJson(Map<String, dynamic> json) =>
+      AttendanceRosterDay(
+        date: DateTime.parse(json['date'] as String),
+        groups: {
+          for (final group in (json['groups'] as List<dynamic>? ?? const []))
+            AttendanceStatus.parse((group as Map)['status'] as String?): [
+              for (final name in (group['names'] as List<dynamic>? ?? const []))
+                name as String,
+            ],
+        },
+      );
+
+  final DateTime date;
+
+  /// 상태 → 그 상태였던 사람 이름들. 휴무·판정불가는 서버가 안 담는다.
+  final Map<AttendanceStatus, List<String>> groups;
+}
+
 /// 연차 부여·사용·잔여 (서버 `LeaveBalanceOut`)
 class LeaveBalance {
   LeaveBalance({
@@ -263,6 +288,22 @@ class AttendanceApi {
     return [
       for (final row in rows)
         LeaveRequest.fromJson((row as Map).cast<String, dynamic>()),
+    ];
+  }
+
+  /// 전사 월 캘린더 — **MASTER · ADMIN · MANAGER 만** (MANAGER 는 자기 지점)
+  ///
+  /// [month]는 `2026-08` 꼴. 하루마다 상태별로 누가 그랬는지 이름이 온다.
+  static Future<List<AttendanceRosterDay>> roster({
+    required String month,
+  }) async {
+    final rows = await _client.getList(
+      '/attendance/calendar/all',
+      query: {'month': month},
+    );
+    return [
+      for (final row in rows)
+        AttendanceRosterDay.fromJson((row as Map).cast<String, dynamic>()),
     ];
   }
 

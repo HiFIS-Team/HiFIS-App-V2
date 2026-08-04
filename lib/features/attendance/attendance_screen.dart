@@ -67,8 +67,16 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     if (mounted) setState(() {});
   }
 
-  void _moveMonth(int delta) {
-    setState(() => _month = DateTime(_month.year, _month.month + delta));
+  Future<void> _moveMonth(int delta) async {
+    final month = DateTime(_month.year, _month.month + delta);
+    setState(() => _month = month);
+    // 대표 달력은 전사 기록이라 달마다 따로 받아야 한다
+    try {
+      await _loadRoster(_monthKey(month));
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+    if (mounted) setState(() {});
   }
 
   /// 보고 있는 달의 기록만 추린다 (요약도 이 달 기준)
@@ -499,8 +507,11 @@ class _MonthCalendar extends StatelessWidget {
     // 1일이 무슨 요일인지에 따라 앞을 비운다 (일요일 시작)
     final lead = month.weekday % 7;
     final rows = ((lead + lastDay) / 7).ceil();
-    // 칸 안에 근무 시간까지 들어가야 해서 넉넉히 잡는다
-    final cellHeight = isDesktop ? 84.0 : 62.0;
+    // 칸 안에 근무 시간까지 들어가야 해서 넉넉히 잡는다.
+    // 대표 칸은 상태마다 한 줄씩 들어가서 더 높다
+    final cellHeight = myRole == Role.master
+        ? (isDesktop ? 118.0 : 92.0)
+        : (isDesktop ? 84.0 : 62.0);
 
     return Container(
       width: double.infinity,
@@ -700,29 +711,99 @@ class _DayCellState extends State<_DayCell> {
                   ),
                 ),
               ),
-              Spacer(),
-              if (leave != null)
-                _tag(
-                  leave.kind == _LeaveKind.full ? '월차' : '반차',
-                  AppColors.primary,
-                  faded: leave.status == _LeaveStatus.pending,
-                )
-              else if (day != null)
-                switch (day.status) {
-                  // 정상 근무는 배지 대신 근무 시간만 담백하게 보여준다
-                  _DayStatus.normal => _hours(day),
-                  _DayStatus.late => _tag('지각', AppColors.warning),
-                  _DayStatus.early => _tag('조퇴', AppColors.warning),
-                  _DayStatus.absent => _tag('결근', AppColors.error),
-                  _DayStatus.leave => _tag('월차', AppColors.primary),
-                  _DayStatus.off => SizedBox(),
-                },
+              if (myRole == Role.master)
+                // 대표는 자기 기록이 아니라 그날 전 직원이 어땠는지를 본다
+                Expanded(child: _roster(date))
+              else ...[
+                Spacer(),
+                if (leave != null)
+                  _tag(
+                    leave.kind == _LeaveKind.full ? '월차' : '반차',
+                    AppColors.primary,
+                    faded: leave.status == _LeaveStatus.pending,
+                  )
+                else if (day != null)
+                  switch (day.status) {
+                    // 정상 근무는 배지 대신 근무 시간만 담백하게 보여준다
+                    _DayStatus.normal => _hours(day),
+                    _DayStatus.late => _tag('지각', AppColors.warning),
+                    _DayStatus.early => _tag('조퇴', AppColors.warning),
+                    _DayStatus.absent => _tag('결근', AppColors.error),
+                    _DayStatus.leave => _tag('월차', AppColors.primary),
+                    _DayStatus.off => SizedBox(),
+                  },
+              ],
             ],
           ),
         ),
       ),
     );
   }
+
+  /// 대표 칸 — 상태마다 `이름 외 N명 상태` 한 줄
+  ///
+  /// 다들 출근·퇴근뿐이면 줄을 늘어놓지 않고 `전원 출근` 한 줄로 끝낸다.
+  Widget _roster(DateTime date) {
+    final groups = _rosterOf(date);
+    if (groups.isEmpty) return SizedBox();
+
+    // 카드와 같은 차례다 — 출근·퇴근 먼저, 챙길 것 나중
+    const order = [
+      (AttendanceStatus.inProgress, '출근', 0),
+      (AttendanceStatus.normal, '퇴근', 1),
+      (AttendanceStatus.overtime, '야근', 2),
+      (AttendanceStatus.earlyLeave, '조기퇴근', 3),
+      (AttendanceStatus.lateAndEarly, '지각·조퇴', 3),
+      (AttendanceStatus.late, '지각', 3),
+      (AttendanceStatus.noCheckout, '퇴근누락', 4),
+      (AttendanceStatus.absent, '결근', 4),
+      (AttendanceStatus.onLeave, '월차', 5),
+    ];
+    final colors = [
+      AppColors.success,
+      AppColors.textSecondary,
+      AppColors.primary,
+      AppColors.warning,
+      AppColors.error,
+      AppColors.primary,
+    ];
+
+    final lines = <Widget>[];
+    var onlyPlain = true;
+    for (final (status, label, tone) in order) {
+      final names = groups[status];
+      if (names == null || names.isEmpty) continue;
+      if (tone > 1) onlyPlain = false;
+      lines.add(_line('${_who(names)} $label', colors[tone]));
+    }
+    if (lines.isEmpty) return SizedBox();
+    if (onlyPlain) return _line('전원 출근', AppColors.success);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: lines,
+    );
+  }
+
+  /// `김트레이너` · `김트레이너 외 3명`
+  String _who(List<String> names) =>
+      names.length == 1 ? names.first : '${names.first} 외 ${names.length - 1}명';
+
+  Widget _line(String text, Color color) => SizedBox(
+    width: double.infinity,
+    child: Text(
+      text,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: AppTextStyles.caption.copyWith(
+        fontSize: 10,
+        height: 1.45,
+        color: color,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+  );
 
   Widget _hours(_Day day) => Row(
     children: [

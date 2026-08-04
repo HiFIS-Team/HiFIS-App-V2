@@ -258,6 +258,28 @@ Future<void> _loadAttendance() async {
   _todayStaff
     ..clear()
     ..addAll(staff);
+
+  _roster.clear();
+  await _loadRoster(_monthKey(now));
+}
+
+/// 대표 달력이 쓰는 전사 기록 — 달마다 한 번씩 받아 둔다 (키는 `2026-08`)
+///
+/// 카드는 오늘만 보여주고, 지난 기록은 달력 칸에 남는다.
+final _roster = <String, List<AttendanceRosterDay>>{};
+
+/// 그날 상태별로 누가 그랬는지 — 없는 날은 빈 map
+Map<AttendanceStatus, List<String>> _rosterOf(DateTime date) {
+  for (final day in _roster[_monthKey(date)] ?? const <AttendanceRosterDay>[]) {
+    if (_sameDay(day.date, date)) return day.groups;
+  }
+  return const {};
+}
+
+/// 대표 달력이 보고 있는 달의 전사 기록을 받아 둔다
+Future<void> _loadRoster(String month) async {
+  if (myRole != Role.master || _roster.containsKey(month)) return;
+  _roster[month] = await AttendanceApi.roster(month: month);
 }
 
 /// 오늘 이 상태인 사람들 — 대표 화면의 '오늘 근무' 판이 쓴다
