@@ -93,10 +93,11 @@ class _ReactionRowState extends State<ReactionRow> {
           onTap: _pick,
           scale: 0.94,
           borderRadius: BorderRadius.circular(100),
+          // `alignment` 를 주면 Container 가 부모가 주는 최대 폭까지 늘어나
+          // 버튼 하나가 한 줄을 다 먹는다 (Wrap 을 쓴 뜻이 없어진다)
           child: Container(
             height: 32,
             padding: EdgeInsets.symmetric(horizontal: 12),
-            alignment: Alignment.center,
             decoration: BoxDecoration(
               color: AppColors.gray50,
               borderRadius: BorderRadius.circular(100),
