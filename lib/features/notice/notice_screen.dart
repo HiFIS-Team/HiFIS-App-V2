@@ -23,6 +23,7 @@ import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/nav/phone_scaffold.dart';
 import '../../core/util/when.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
+import '../../core/widgets/feedback/failed_card.dart';
 
 part 'notice_phone.dart';
 part 'notice_list.dart';
@@ -66,13 +67,26 @@ class _NoticeScreenState extends State<NoticeScreen> {
     _load();
   }
 
+  /// 못 받았다 — **목록이 비어 있을 때만** 실패 카드를 낸다
+  ///
+  /// 받아 둔 목록이 있으면 그걸 그대로 보여주는 게 낫다. 새로고침 한 번
+  /// 실패했다고 이미 읽던 화면을 지우면 잃는 게 더 크다.
+  bool _failed = false;
+
   Future<void> _load() async {
     try {
       await _loadNotices();
+      _failed = false;
     } catch (error) {
+      _failed = true;
       if (mounted) AppToast.show(context, messageOf(error));
     }
     if (mounted) setState(() => _loading = false);
+  }
+
+  void _retry() {
+    setState(() => _loading = true);
+    _load();
   }
 
   @override
@@ -206,6 +220,8 @@ class _NoticeScreenState extends State<NoticeScreen> {
     if (!isDesktop) {
       return _NoticePhone(
         notices: list,
+        // 못 받았고 보여줄 것도 없을 때만 다시 받기를 낸다
+        onRetry: _failed && list.isEmpty ? _retry : null,
         unreadOnly: _unreadOnly,
         unread: unread,
         onFilter: (v) => setState(() => _unreadOnly = v),
@@ -230,6 +246,7 @@ class _NoticeScreenState extends State<NoticeScreen> {
               color: AppColors.surface,
               child: _NoticeList(
                 notices: list,
+                onRetry: _failed && list.isEmpty ? _retry : null,
                 selected: selected,
                 unreadOnly: _unreadOnly,
                 unread: unread,

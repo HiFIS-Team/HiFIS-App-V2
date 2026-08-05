@@ -25,6 +25,7 @@ import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/nav/phone_scaffold.dart';
 import '../../core/util/when.dart';
+import '../../core/widgets/feedback/failed_card.dart';
 
 part 'project_comments.dart';
 part 'project_phone.dart';
@@ -67,13 +68,24 @@ class _ProjectScreenState extends State<ProjectScreen> {
     _load();
   }
 
+  /// 못 받았다 — **목록이 비어 있을 때만** 실패 카드를 낸다.
+  /// 받아 둔 목록이 있으면 그대로 보여준다 (공지와 같은 규칙).
+  bool _failed = false;
+
   Future<void> _load() async {
     try {
       await _loadProjects();
+      _failed = false;
     } catch (error) {
+      _failed = true;
       if (mounted) AppToast.show(context, messageOf(error));
     }
     if (mounted) setState(() => _loading = false);
+  }
+
+  void _retry() {
+    setState(() => _loading = true);
+    _load();
   }
 
   /// 상세를 열 때 체크리스트와 타임라인을 받아 온다 (둘을 같이 띄운다)
@@ -159,6 +171,8 @@ class _ProjectScreenState extends State<ProjectScreen> {
     if (!isDesktop) {
       return _ProjectPhone(
         projects: list,
+        // 못 받았고 보여줄 것도 없을 때만 다시 받기를 낸다
+        onRetry: _failed && list.isEmpty ? _retry : null,
         phase: _phase,
         onFilter: (v) => setState(() => _phase = v),
         onCreate: _create,
@@ -186,6 +200,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
               color: AppColors.surface,
               child: _ProjectList(
                 projects: list,
+                onRetry: _failed && list.isEmpty ? _retry : null,
                 selected: selected,
                 phase: _phase,
                 onFilter: (v) => setState(() {
@@ -219,6 +234,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
 class _ProjectList extends StatelessWidget {
   _ProjectList({
     required this.projects,
+    required this.onRetry,
     required this.selected,
     required this.phase,
     required this.onFilter,
@@ -227,6 +243,9 @@ class _ProjectList extends StatelessWidget {
   });
 
   final List<_Project> projects;
+
+  /// 못 받았을 때 다시 받는 길 — null 이면 잘 받아온 것이라 빈 카드를 낸다
+  final VoidCallback? onRetry;
   final _Project? selected;
   final _Phase phase;
   final ValueChanged<_Phase> onFilter;
@@ -289,10 +308,12 @@ class _ProjectList extends StatelessWidget {
                   alignment: Alignment.topCenter,
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(20, 4, 20, 0),
-                    child: EmptyCard(
-                      icon: Icons.folder_rounded,
-                      text: '${phase.label} 프로젝트가 없어요',
-                    ),
+                    child: onRetry != null
+                        ? FailedCard(onRetry: onRetry!)
+                        : EmptyCard(
+                            icon: Icons.folder_rounded,
+                            text: '${phase.label} 프로젝트가 없어요',
+                          ),
                   ),
                 )
               : ListView.separated(

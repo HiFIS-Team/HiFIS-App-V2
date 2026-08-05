@@ -24,6 +24,7 @@ import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/nav/phone_scaffold.dart';
 import '../../core/util/when.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
+import '../../core/widgets/feedback/failed_card.dart';
 
 part 'meeting_phone.dart';
 
@@ -56,13 +57,24 @@ class _MeetingScreenState extends State<MeetingScreen> {
     _load();
   }
 
+  /// 못 받았다 — **목록이 비어 있을 때만** 실패 카드를 낸다.
+  /// 받아 둔 목록이 있으면 그대로 보여준다 (공지와 같은 규칙).
+  bool _failed = false;
+
   Future<void> _load() async {
     try {
       await _loadNotes();
+      _failed = false;
     } catch (error) {
+      _failed = true;
       if (mounted) AppToast.show(context, messageOf(error));
     }
     if (mounted) setState(() => _loading = false);
+  }
+
+  void _retry() {
+    setState(() => _loading = true);
+    _load();
   }
 
   List<_Note> get _sorted =>
@@ -152,7 +164,12 @@ class _MeetingScreenState extends State<MeetingScreen> {
     final list = _sorted;
 
     if (!isDesktop) {
-      return _MeetingPhone(notes: list, onChanged: () => setState(() {}));
+      return _MeetingPhone(
+        notes: list,
+        onChanged: () => setState(() {}),
+        // 못 받았고 보여줄 것도 없을 때만 다시 받기를 낸다
+        onRetry: _failed && list.isEmpty ? _retry : null,
+      );
     }
 
     final selected = _syncSelection(list);
@@ -166,6 +183,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
               color: AppColors.surface,
               child: _NoteList(
                 notes: list,
+                onRetry: _failed && list.isEmpty ? _retry : null,
                 selected: selected,
                 onSelect: (note) => setState(() {
                   _selected = note;
@@ -202,12 +220,16 @@ class _MeetingScreenState extends State<MeetingScreen> {
 class _NoteList extends StatelessWidget {
   _NoteList({
     required this.notes,
+    required this.onRetry,
     required this.selected,
     required this.onSelect,
     required this.onCreate,
   });
 
   final List<_Note> notes;
+
+  /// 못 받았을 때 다시 받는 길 — null 이면 잘 받아온 것이라 빈 카드를 낸다
+  final VoidCallback? onRetry;
   final _Note? selected;
   final ValueChanged<_Note> onSelect;
   final VoidCallback onCreate;
@@ -264,10 +286,12 @@ class _NoteList extends StatelessWidget {
                   alignment: Alignment.topCenter,
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(20, 4, 20, 0),
-                    child: EmptyCard(
-                      icon: Icons.description_outlined,
-                      text: '작성된 회의록이 없어요',
-                    ),
+                    child: onRetry != null
+                        ? FailedCard(onRetry: onRetry!)
+                        : EmptyCard(
+                            icon: Icons.description_outlined,
+                            text: '작성된 회의록이 없어요',
+                          ),
                   ),
                 )
               : ListView.separated(

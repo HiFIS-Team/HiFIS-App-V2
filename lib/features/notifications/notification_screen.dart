@@ -11,6 +11,7 @@ import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/glass/top_frost.dart';
 import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/input/pressable.dart';
+import '../../core/widgets/feedback/failed_card.dart';
 
 /// 알림 화면
 ///
@@ -63,13 +64,24 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
   /// 열 때마다 새로 받는다 — 알림은 안 보는 사이에도 계속 쌓인다.
   /// 다른 화면이 먼저 받아 뒀어도 그건 그때 값이라 다시 받는 게 맞다
+  /// 못 받았다 — **목록이 비어 있을 때만** 실패 카드를 낸다.
+  /// 받아 둔 목록이 있으면 그대로 보여준다 (공지와 같은 규칙).
+  bool _failed = false;
+
   Future<void> _load() async {
     try {
       await _loadNotifications();
+      _failed = false;
     } catch (error) {
+      _failed = true;
       if (mounted) AppToast.show(context, messageOf(error));
     }
     if (mounted) setState(() => _loading = false);
+  }
+
+  void _retry() {
+    setState(() => _loading = true);
+    _load();
   }
 
   void _onScroll() => _collapse.update(_scrollController.offset);
@@ -160,10 +172,13 @@ class _NotificationScreenState extends State<NotificationScreen> {
                     ),
                   )
                 else if (shown.isEmpty)
-                  EmptyCard(
-                    icon: Icons.notifications_none_rounded,
-                    text: _unreadOnly ? '안 읽은 알림이 없어요' : '알림이 없어요',
-                  )
+                  if (_failed)
+                    FailedCard(onRetry: _retry)
+                  else
+                    EmptyCard(
+                      icon: Icons.notifications_none_rounded,
+                      text: _unreadOnly ? '안 읽은 알림이 없어요' : '알림이 없어요',
+                    )
                 else ...[
                   if (today.isNotEmpty) ...[
                     _SectionLabel('오늘'),

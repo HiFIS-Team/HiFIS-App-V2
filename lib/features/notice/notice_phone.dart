@@ -7,6 +7,7 @@ part of 'notice_screen.dart';
 class _NoticePhone extends StatelessWidget {
   _NoticePhone({
     required this.notices,
+    required this.onRetry,
     required this.unreadOnly,
     required this.unread,
     required this.onFilter,
@@ -14,6 +15,9 @@ class _NoticePhone extends StatelessWidget {
   });
 
   final List<_Notice> notices;
+
+  /// 못 받았을 때 다시 받는 길 — null 이면 잘 받아온 것이라 빈 카드를 낸다
+  final VoidCallback? onRetry;
   final bool unreadOnly;
 
   /// 안 읽은 공지 수 (필터 라벨에 쓴다)
@@ -79,10 +83,13 @@ class _NoticePhone extends StatelessWidget {
       onCreate: () => _create(context),
       children: [
         if (notices.isEmpty)
-          EmptyCard(
-            icon: Icons.campaign_rounded,
-            text: unreadOnly ? '안 읽은 공지가 없어요' : '올라온 공지가 없어요',
-          )
+          if (onRetry case final retry?)
+            FailedCard(onRetry: retry)
+          else
+            EmptyCard(
+              icon: Icons.campaign_rounded,
+              text: unreadOnly ? '안 읽은 공지가 없어요' : '올라온 공지가 없어요',
+            )
         else
           for (var i = 0; i < notices.length; i++) ...[
             if (i > 0) SizedBox(height: 12),

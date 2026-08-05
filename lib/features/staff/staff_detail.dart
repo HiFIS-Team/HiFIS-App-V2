@@ -175,7 +175,16 @@ class _ProfileCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(member.name, style: AppTextStyles.title2),
+                    // 옆에 '나' 배지가 붙어서, 안 감싸면 긴 이름이 줄을 넘친다
+                    // (다른 목록도 전부 이렇게 쓴다)
+                    Flexible(
+                      child: Text(
+                        member.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.title2,
+                      ),
+                    ),
                     if (member.isMe) ...[SizedBox(width: 6), _MeTag()],
                   ],
                 ),

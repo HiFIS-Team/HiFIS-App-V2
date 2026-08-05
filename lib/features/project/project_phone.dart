@@ -7,6 +7,7 @@ part of 'project_screen.dart';
 class _ProjectPhone extends StatelessWidget {
   _ProjectPhone({
     required this.projects,
+    required this.onRetry,
     required this.phase,
     required this.onFilter,
     required this.onCreate,
@@ -15,6 +16,9 @@ class _ProjectPhone extends StatelessWidget {
   });
 
   final List<_Project> projects;
+
+  /// 못 받았을 때 다시 받는 길 — null 이면 잘 받아온 것이라 빈 카드를 낸다
+  final VoidCallback? onRetry;
   final _Phase phase;
   final ValueChanged<_Phase> onFilter;
   final VoidCallback onCreate;
@@ -46,10 +50,13 @@ class _ProjectPhone extends StatelessWidget {
       onCreate: onCreate,
       children: [
         if (projects.isEmpty)
-          EmptyCard(
-            icon: Icons.folder_rounded,
-            text: '${phase.label} 프로젝트가 없어요',
-          )
+          if (onRetry case final retry?)
+            FailedCard(onRetry: retry)
+          else
+            EmptyCard(
+              icon: Icons.folder_rounded,
+              text: '${phase.label} 프로젝트가 없어요',
+            )
         else
           for (var i = 0; i < projects.length; i++) ...[
             if (i > 0) SizedBox(height: 12),

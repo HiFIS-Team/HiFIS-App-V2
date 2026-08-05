@@ -5,6 +5,7 @@ part of 'notice_screen.dart';
 class _NoticeList extends StatelessWidget {
   _NoticeList({
     required this.notices,
+    required this.onRetry,
     required this.selected,
     required this.unreadOnly,
     required this.unread,
@@ -14,6 +15,9 @@ class _NoticeList extends StatelessWidget {
   });
 
   final List<_Notice> notices;
+
+  /// 못 받았을 때 다시 받는 길 — null 이면 잘 받아온 것이라 빈 카드를 낸다
+  final VoidCallback? onRetry;
   final _Notice? selected;
   final bool unreadOnly;
 
@@ -84,10 +88,12 @@ class _NoticeList extends StatelessWidget {
                   alignment: Alignment.topCenter,
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(20, 4, 20, 0),
-                    child: EmptyCard(
-                      icon: Icons.campaign_rounded,
-                      text: unreadOnly ? '안 읽은 공지가 없어요' : '올라온 공지가 없어요',
-                    ),
+                    child: onRetry != null
+                        ? FailedCard(onRetry: onRetry!)
+                        : EmptyCard(
+                            icon: Icons.campaign_rounded,
+                            text: unreadOnly ? '안 읽은 공지가 없어요' : '올라온 공지가 없어요',
+                          ),
                   ),
                 )
               : ListView.separated(

@@ -29,6 +29,7 @@ import '../messages/chat_screen.dart';
 import '../messages/chat_store.dart';
 import '../../core/util/when.dart';
 import '../../core/widgets/nav/pane_transition.dart';
+import '../../core/widgets/feedback/failed_card.dart';
 
 part 'staff_manage.dart';
 part 'staff_models.dart';
@@ -79,13 +80,24 @@ class _StaffScreenState extends State<StaffScreen> {
     _load();
   }
 
+  /// 못 받았다 — **목록이 비어 있을 때만** 실패 카드를 낸다.
+  /// 받아 둔 목록이 있으면 그대로 보여준다 (공지와 같은 규칙).
+  bool _failed = false;
+
   Future<void> _load() async {
     try {
       await _loadStaff();
+      _failed = false;
     } catch (error) {
+      _failed = true;
       if (mounted) AppToast.show(context, messageOf(error));
     }
     if (mounted) setState(() => _loading = false);
+  }
+
+  void _retry() {
+    setState(() => _loading = true);
+    _load();
   }
 
   _Employment get _employment => _Employment.values[_tab];
@@ -273,14 +285,16 @@ class _StaffScreenState extends State<StaffScreen> {
             PaneTransition(
               step: _tab,
               child: list.isEmpty
-                  ? EmptyCard(
-                      icon: CupertinoIcons.person_2,
-                      text: switch (_employment) {
-                        _Employment.partTime => '알바가 없어요',
-                        _Employment.left => '퇴사한 사람이 없어요',
-                        _ => '찾는 직원이 없어요',
-                      },
-                    )
+                  ? (_failed
+                        ? FailedCard(onRetry: _retry)
+                        : EmptyCard(
+                            icon: CupertinoIcons.person_2,
+                            text: switch (_employment) {
+                              _Employment.partTime => '알바가 없어요',
+                              _Employment.left => '퇴사한 사람이 없어요',
+                              _ => '찾는 직원이 없어요',
+                            },
+                          ))
                   : Column(children: _body(list)),
             ),
           ],

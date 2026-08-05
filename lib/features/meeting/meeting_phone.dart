@@ -4,9 +4,16 @@ part of 'meeting_screen.dart';
 
 /// 폰: 회의록 카드 목록. 카드를 누르면 본문이 옆에서 밀려 들어온다.
 class _MeetingPhone extends StatelessWidget {
-  _MeetingPhone({required this.notes, required this.onChanged});
+  _MeetingPhone({
+    required this.notes,
+    required this.onChanged,
+    required this.onRetry,
+  });
 
   final List<_Note> notes;
+
+  /// 못 받았을 때 다시 받는 길 — null 이면 잘 받아온 것이라 빈 카드를 낸다
+  final VoidCallback? onRetry;
 
   /// 본문에서 바꾼 내용이 목록에도 반영되도록 알린다
   final VoidCallback onChanged;
@@ -59,7 +66,10 @@ class _MeetingPhone extends StatelessWidget {
       onCreate: () => _create(context),
       children: [
         if (notes.isEmpty)
-          EmptyCard(icon: Icons.description_outlined, text: '작성된 회의록이 없어요')
+          if (onRetry case final retry?)
+            FailedCard(onRetry: retry)
+          else
+            EmptyCard(icon: Icons.description_outlined, text: '작성된 회의록이 없어요')
         else
           for (var i = 0; i < notes.length; i++) ...[
             if (i > 0) SizedBox(height: 12),
