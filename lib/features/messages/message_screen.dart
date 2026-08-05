@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:cupertino_native/cupertino_native.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -8,6 +9,7 @@ import '../../core/api/client/api_exception.dart';
 import '../../core/data/staff.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/util/sf_symbols.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/glass/top_frost.dart';
@@ -109,13 +111,74 @@ class _MessageScreenState extends State<MessageScreen> {
   /// 안 읽은 대화만 볼지 — 헤더 필터 메뉴에서 켠다
   bool _unreadOnly = false;
 
-  /// 필터 버튼 위치를 알아야 메뉴를 그 아래에 띄울 수 있다
+  /// 고른 항목 처리 — 네이티브 메뉴와 폴백 메뉴가 같이 쓴다
+  void _pick(String? value) {
+    switch (value) {
+      case 'unread':
+        setState(() => _unreadOnly = !_unreadOnly);
+      case 'left':
+        _openArchive('최근 나간 항목', '최근 나간 대화방이 없어요', load: _store.leftRooms);
+    }
+  }
+
+  /// 헤더 필터 버튼 — 애플은 네이티브 메뉴(리퀴드 글래스), 그 외는 폴백
+  ///
+  /// 애플에서는 `CNPopupMenuButton` 이 버튼과 메뉴를 한 몸으로 들고 있어서
+  /// 위치 계산·중복 방지가 필요 없다 (OS 가 띄운다). 버튼 자체는 [GlassIconButton]
+  /// 과 같은 네이티브 글래스라 모양이 안 바뀐다.
+  Widget _filterButton() {
+    if (!isApple) {
+      return GlassIconButton(
+        key: _filterKey,
+        symbol: 'line.3.horizontal.decrease',
+        onPressed: _openFilterMenu,
+      );
+    }
+
+    return CNPopupMenuButton.icon(
+      // 테마가 바뀌면 새로 만든다 — 패키지의 setBrightness 가 아이콘 설정을
+      // 유실하는 버그가 있다 (GlassIconButton 과 같은 이유).
+      //
+      // **`_unreadOnly` 는 키에 넣지 않는다.** 넣으면 필터를 켤 때마다 네이티브
+      // 뷰를 새로 만든다. 키가 그대로면 `didUpdateWidget` 이 돌아서 패키지가
+      // `setItems` 로 바뀐 아이콘만 밀어 넣는다.
+      key: ValueKey('chat-filter-${AppColors.isDark}'),
+      buttonIcon: CNSymbol(
+        'line.3.horizontal.decrease',
+        size: 16.8,
+        color: AppColors.gray700,
+      ),
+      size: 40,
+      items: [
+        CNPopupMenuItem(
+          label: '최근 나간 항목',
+          icon: CNSymbol('arrow.turn.up.left'),
+        ),
+        CNPopupMenuDivider(),
+        CNPopupMenuItem(label: '필터 기준', enabled: false),
+        // 네이티브 메뉴에는 체크마크를 못 단다 — 패키지가 `UIAction.state` 를
+        // 안 넘긴다. 그래서 켜지면 **아이콘 자리**가 체크로 바뀐다.
+        CNPopupMenuItem(
+          label: '읽지 않음',
+          icon: CNSymbol(_unreadOnly ? 'checkmark' : 'bubble.left'),
+        ),
+      ],
+      // 구분선도 한 칸을 차지한다 — 위 목록에서의 자리가 그대로 온다
+      onSelected: (index) => _pick(switch (index) {
+        0 => 'left',
+        3 => 'unread',
+        _ => null,
+      }),
+    );
+  }
+
+  /// 필터 버튼 위치를 알아야 메뉴를 그 아래에 띄울 수 있다 (폴백 전용)
   final _filterKey = GlobalKey();
 
   /// 메뉴가 이미 떠 있는지 — 없으면 누를 때마다 하나씩 더 쌓인다 (실제 발생)
   bool _filterOpen = false;
 
-  /// 헤더 필터 메뉴 — 아이폰 메시지의 그 메뉴와 같은 구성
+  /// 헤더 필터 메뉴 (폴백) — 아이폰 메시지의 그 메뉴와 같은 구성
   Future<void> _openFilterMenu() async {
     if (_filterOpen) return;
     final button = _filterKey.currentContext?.findRenderObject() as RenderBox?;
@@ -164,13 +227,7 @@ class _MessageScreenState extends State<MessageScreen> {
     );
     _filterOpen = false;
     if (!mounted) return;
-
-    switch (picked) {
-      case 'unread':
-        setState(() => _unreadOnly = !_unreadOnly);
-      case 'left':
-        _openArchive('최근 나간 항목', '최근 나간 대화방이 없어요', load: _store.leftRooms);
-    }
+    _pick(picked);
   }
 
   PopupMenuItem<String> _menuItem(
@@ -298,11 +355,7 @@ class _MessageScreenState extends State<MessageScreen> {
                       onPressed: () => Navigator.pop(context),
                     ),
                   Spacer(),
-                  GlassIconButton(
-                    key: _filterKey,
-                    symbol: 'line.3.horizontal.decrease',
-                    onPressed: _openFilterMenu,
-                  ),
+                  _filterButton(),
                 ],
               ),
             ),
