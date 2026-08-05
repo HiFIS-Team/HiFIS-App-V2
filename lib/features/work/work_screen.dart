@@ -25,6 +25,7 @@ import 'contribution_section.dart';
 import 'lesson_section.dart';
 import 'peer_review_section.dart';
 import 'praise_section.dart';
+import '../../core/widgets/nav/pane_transition.dart';
 part 'work_tabs.dart';
 part 'work_checklist.dart';
 part 'work_history.dart';
@@ -202,10 +203,12 @@ class _WorkScreenState extends State<WorkScreen> {
     if (isDesktop) {
       return Align(
         alignment: Alignment.centerLeft,
-        child: _WorkSegmentedTabs(
+        child: SegmentedTabs(
           labels: [for (final item in _items) item.label],
           selected: _tab,
           onSelect: (i) => setState(() => _tab = i),
+          // 왼쪽에 붙는 탭이라 글자 폭만큼만 차지한다
+          expand: false,
         ),
       );
     }
@@ -332,16 +335,11 @@ class _WorkScreenState extends State<WorkScreen> {
   /// 고른 항목의 내용 — 탭 전환 시 페이드로 바뀐다.
   /// 체크리스트 탭(환경정비)은 점수 카드 없이 리스트만 보여준다.
   Widget _content(_WorkItem item) {
-    return AnimatedSwitcher(
-      duration: Duration(milliseconds: 200),
-      // 기본 정렬(가운데)은 높이가 다른 콘텐츠가 아래로 밀렸다
-      // 올라와 보이므로 위쪽 기준으로 겹친다
-      layoutBuilder: (currentChild, previousChildren) => Stack(
-        alignment: Alignment.topCenter,
-        children: [...previousChildren, ?currentChild],
-      ),
+    // 사이드바 화면 전환·모니터링 패널과 **같은 모션**을 쓴다.
+    // 예전에는 여기만 자체 AnimatedSwitcher(200ms 페이드)였다.
+    return PaneTransition(
+      step: _tab,
       child: Column(
-        key: ValueKey(_tab),
         children: [
           if (item.checklist)
             Padding(

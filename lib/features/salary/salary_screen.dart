@@ -25,6 +25,7 @@ import '../../core/widgets/input/see_all_button.dart';
 import '../../core/widgets/nav/desktop_header.dart';
 import '../../core/widgets/nav/phone_scaffold.dart';
 import '../../core/util/when.dart';
+import '../../core/widgets/nav/pane_transition.dart';
 
 part 'salary_models.dart';
 part 'salary_form.dart';
@@ -228,7 +229,16 @@ class _SalaryScreenState extends State<SalaryScreen> {
       return PhoneListScaffold(
         title: '급여',
         filter: tabs,
-        children: tabs != null && _tab == 1 ? [_ApprovalTab()] : content,
+        children: [
+          // 탭이 있는 화면에서만 갈린다 — 탭이 없으면 step 이 안 바뀐다
+          PaneTransition(
+            step: _tab,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: tabs != null && _tab == 1 ? [_ApprovalTab()] : content,
+            ),
+          ),
+        ],
       );
     }
 

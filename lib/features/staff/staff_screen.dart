@@ -28,6 +28,7 @@ import '../../core/widgets/nav/phone_scaffold.dart';
 import '../messages/chat_screen.dart';
 import '../messages/chat_store.dart';
 import '../../core/util/when.dart';
+import '../../core/widgets/nav/pane_transition.dart';
 
 part 'staff_manage.dart';
 part 'staff_models.dart';
@@ -268,17 +269,20 @@ class _StaffScreenState extends State<StaffScreen> {
               ],
             ),
             SizedBox(height: 22),
-            if (list.isEmpty)
-              EmptyCard(
-                icon: CupertinoIcons.person_2,
-                text: switch (_employment) {
-                  _Employment.partTime => '알바가 없어요',
-                  _Employment.left => '퇴사한 사람이 없어요',
-                  _ => '찾는 직원이 없어요',
-                },
-              )
-            else
-              ..._body(list),
+            // 재직 상태 탭을 옮길 때 명단이 같이 갈린다
+            PaneTransition(
+              step: _tab,
+              child: list.isEmpty
+                  ? EmptyCard(
+                      icon: CupertinoIcons.person_2,
+                      text: switch (_employment) {
+                        _Employment.partTime => '알바가 없어요',
+                        _Employment.left => '퇴사한 사람이 없어요',
+                        _ => '찾는 직원이 없어요',
+                      },
+                    )
+                  : Column(children: _body(list)),
+            ),
           ],
         ),
       ),

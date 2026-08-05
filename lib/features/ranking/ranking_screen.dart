@@ -20,6 +20,7 @@ import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/nav/desktop_header.dart';
 import '../../core/widgets/nav/phone_scaffold.dart';
 import '../../core/util/when.dart';
+import '../../core/widgets/nav/pane_transition.dart';
 
 part 'ranking_models.dart';
 part 'ranking_pickers.dart';
@@ -158,9 +159,14 @@ class _RankingScreenState extends State<RankingScreen> {
           selected: _tab,
           onSelect: (i) => setState(() => _tab = i),
         ),
-        children: entries.isEmpty
-            ? [EmptyCard(icon: CupertinoIcons.rosette, text: '집계된 실적이 없어요')]
-            : _body(entries),
+        children: [
+          PaneTransition(
+            step: _tab,
+            child: entries.isEmpty
+                ? EmptyCard(icon: CupertinoIcons.rosette, text: '집계된 실적이 없어요')
+                : Column(children: _body(entries)),
+          ),
+        ],
       );
     }
 
@@ -181,10 +187,13 @@ class _RankingScreenState extends State<RankingScreen> {
             SizedBox(height: 22),
             _tabs(),
             SizedBox(height: 16),
-            if (entries.isEmpty)
-              EmptyCard(icon: CupertinoIcons.rosette, text: '집계된 실적이 없어요')
-            else
-              ..._body(entries),
+            // 탭을 옮길 때 내용이 같이 갈린다 (업무·모니터링과 같은 모션)
+            PaneTransition(
+              step: _tab,
+              child: entries.isEmpty
+                  ? EmptyCard(icon: CupertinoIcons.rosette, text: '집계된 실적이 없어요')
+                  : Column(children: _body(entries)),
+            ),
           ],
         ),
       ),

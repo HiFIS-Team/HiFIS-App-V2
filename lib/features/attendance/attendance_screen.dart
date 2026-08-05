@@ -24,6 +24,7 @@ import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/input/see_all_button.dart';
 import '../../core/widgets/nav/desktop_header.dart';
 import '../../core/widgets/nav/phone_scaffold.dart';
+import '../../core/widgets/nav/pane_transition.dart';
 
 part 'attendance_models.dart';
 part 'attendance_leave.dart';

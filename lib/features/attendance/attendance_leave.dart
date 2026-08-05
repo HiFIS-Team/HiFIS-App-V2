@@ -353,24 +353,27 @@ class _LeaveHistoryScreenState extends State<_LeaveHistoryScreen> {
             onSelect: (i) => setState(() => _filter = i),
           ),
           SizedBox(height: 16),
-          if (children.isEmpty)
-            Padding(
-              padding: EdgeInsets.only(top: 40),
-              child: Center(
-                child: Text(
-                  '해당하는 신청이 없어요',
-                  style: AppTextStyles.body2.copyWith(
-                    color: AppColors.textTertiary,
+          // 필터를 옮길 때 목록이 같이 갈린다
+          PaneTransition(
+            step: _filter,
+            child: children.isEmpty
+                ? Padding(
+                    padding: EdgeInsets.only(top: 40),
+                    child: Center(
+                      child: Text(
+                        '해당하는 신청이 없어요',
+                        style: AppTextStyles.body2.copyWith(
+                          color: AppColors.textTertiary,
+                        ),
+                      ),
+                    ),
+                  )
+                : Container(
+                    padding: EdgeInsets.fromLTRB(16, 12, 16, 12),
+                    decoration: AppDecorations.card(),
+                    child: Column(children: children),
                   ),
-                ),
-              ),
-            )
-          else
-            Container(
-              padding: EdgeInsets.fromLTRB(16, 12, 16, 12),
-              decoration: AppDecorations.card(),
-              child: Column(children: children),
-            ),
+          ),
         ],
       ),
     );
