@@ -126,6 +126,12 @@ enum WorkStatus {
   final String label;
   final String emoji;
 
+  /// 좁은 자리용 짧은 이름 — `자동 (출근 기준)` 의 괄호 설명을 뗀다
+  ///
+  /// 고르개에서는 무슨 뜻인지 알려줘야 해서 긴 [label] 이 맞지만,
+  /// 프로필 요약처럼 반쪽 폭인 칸에서는 그대로 두면 줄이 넘어간다.
+  String get short => label.split(' (').first;
+
   static WorkStatus parse(String? value) => WorkStatus.values.firstWhere(
     (s) => s.wire == value,
     orElse: () => WorkStatus.auto,

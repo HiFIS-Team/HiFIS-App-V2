@@ -70,10 +70,12 @@ class _ProfileSummaryCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                // 팀은 관리자가 넣어 주는 값이라 비어 있을 수 있다
+                // 팀 대신 업무 상태를 띄운다 — 팀은 안 쓰기로 해서 (조직도도
+                // 직급으로 가른다) 이 칸이 늘 '-' 로 비어 있었다.
+                // 상태는 본인이 아래 고르개에서 바꾸는 값이라 여기서 바로 확인된다.
                 child: _SummaryField(
-                  label: '팀',
-                  value: currentUser?.team ?? '-',
+                  label: '상태',
+                  value: currentUser?.workStatus.short ?? '-',
                 ),
               ),
               Expanded(
