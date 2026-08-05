@@ -565,65 +565,74 @@ class _RankChips extends StatelessWidget {
   Widget build(BuildContext context) {
     // 탭을 옮길 때마다 칩이 늘었다 줄었다 하면 자리를 못 외운다.
     // 직급은 항상 같은 자리에 두고, 아무도 없으면 0으로 알린다.
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        for (final rank in _ranks)
-          Builder(
-            builder: (context) {
-              final count = _countOf(rank);
-              final on = rank == selected;
-              // 비어 있는 직급은 눌러도 볼 게 없어 한 톤 흐리게 둔다
-              final empty = count == 0 && !on;
+    //
+    // **접지 않고 가로로 민다.** 사이드바에 마우스를 올리면 폭이 160 줄어드는데,
+    // 접히게 두면 마지막 칩만 아랫줄로 내려가고 옆 검색창 밑에 구멍이 남는다.
+    // 폭이 넉넉하면 지금과 똑같이 한 줄로 보이고, 좁을 때만 밀어서 본다.
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      // 칩이 눌릴 때 살짝 커지는데(Pressable) 잘리지 않게 위아래를 조금 띄운다
+      padding: EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          for (final rank in _ranks) ...[
+            if (rank != _ranks.first) SizedBox(width: 8),
+            Builder(
+              builder: (context) {
+                final count = _countOf(rank);
+                final on = rank == selected;
+                // 비어 있는 직급은 눌러도 볼 게 없어 한 톤 흐리게 둔다
+                final empty = count == 0 && !on;
 
-              return Pressable(
-                onTap: () => onSelect(rank),
-                scale: 0.96,
-                child: AnimatedContainer(
-                  duration: Duration(milliseconds: 140),
-                  height: 38,
-                  padding: EdgeInsets.symmetric(horizontal: 14),
-                  decoration: BoxDecoration(
-                    color: on ? AppColors.primary : AppColors.gray100,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  // 칸이 남는 폭을 다 먹지 않게 내용만큼만 잡는다
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        rank,
-                        style: AppTextStyles.label.copyWith(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: on
-                              ? Colors.white
-                              : empty
-                              ? AppColors.gray400
-                              : AppColors.gray600,
+                return Pressable(
+                  onTap: () => onSelect(rank),
+                  scale: 0.96,
+                  child: AnimatedContainer(
+                    duration: Duration(milliseconds: 140),
+                    height: 38,
+                    padding: EdgeInsets.symmetric(horizontal: 14),
+                    decoration: BoxDecoration(
+                      color: on ? AppColors.primary : AppColors.gray100,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    // 칸이 남는 폭을 다 먹지 않게 내용만큼만 잡는다
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          rank,
+                          style: AppTextStyles.label.copyWith(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: on
+                                ? Colors.white
+                                : empty
+                                ? AppColors.gray400
+                                : AppColors.gray600,
+                          ),
                         ),
-                      ),
-                      SizedBox(width: 6),
-                      Text(
-                        '$count',
-                        style: AppTextStyles.caption.copyWith(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: on
-                              ? Colors.white.withValues(alpha: 0.8)
-                              : empty
-                              ? AppColors.gray300
-                              : AppColors.gray400,
+                        SizedBox(width: 6),
+                        Text(
+                          '$count',
+                          style: AppTextStyles.caption.copyWith(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: on
+                                ? Colors.white.withValues(alpha: 0.8)
+                                : empty
+                                ? AppColors.gray300
+                                : AppColors.gray400,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
-          ),
-      ],
+                );
+              },
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
