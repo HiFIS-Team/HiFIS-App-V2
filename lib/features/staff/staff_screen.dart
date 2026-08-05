@@ -58,7 +58,7 @@ class _StaffScreenState extends State<StaffScreen> {
   /// 지점은 전체로 시작한다 (내 지점만 보려면 직접 고른다)
   String _branch = _allBranches;
 
-  /// 0 재직자 · 1 비활성 · 2 퇴사자
+  /// 0 재직자 · 1 알바 · 2 퇴사자
   int _tab = 0;
 
   /// 카드 보기(true) · 목록 보기(false)
@@ -111,56 +111,6 @@ class _StaffScreenState extends State<StaffScreen> {
     showFullPage<void>(context, (_) => _InviteKeyScreen());
   }
 
-  /// 잠가 둔 계정을 다시 연다
-  ///
-  /// 예전에는 '가입 승인'이었는데 **서버가 승인 대기를 폐지**해서
-  /// 비활성 계정을 여는 일이 됐다 (backend-gap.md 58번).
-  Future<void> _activate(_Member member) => _setStatus(
-    member,
-    EmployeeStatus.active,
-    done: '${member.name}님을 재직자로 되돌렸어요',
-  );
-
-  /// 퇴사 처리 — 명단에서 지우지 않고 퇴사자 탭으로 옮긴다
-  ///
-  /// 서버에 `DELETE /employees/{id}` 도 있지만 **되돌릴 수 없는 완전 삭제**라
-  /// 조직도에 버튼으로 두지 않는다 (근태·급여 기록이 딸려 있다).
-  Future<void> _resign(_Member member) async {
-    final ok = await showConfirmDialog(
-      context,
-      title: '${member.name}님을 퇴사 처리할까요?',
-      message: '퇴사자 탭으로 옮겨져요. 기록은 그대로 남아요.',
-      confirmLabel: '퇴사 처리',
-      destructive: true,
-    );
-    if (!ok || !mounted) return;
-    await _setStatus(
-      member,
-      EmployeeStatus.resigned,
-      done: '${member.name}님을 퇴사 처리했어요',
-    );
-  }
-
-  /// 재직 상태 바꾸기 — **점장 이상만** 된다 (서버가 MEMBER 를 403 으로 막는다)
-  Future<void> _setStatus(
-    _Member member,
-    EmployeeStatus status, {
-    required String done,
-  }) async {
-    if (!myRole.strong) {
-      AppToast.show(context, '점장 이상만 바꿀 수 있어요');
-      return;
-    }
-    try {
-      final saved = await StaffApi.updateEmployee(member.id, status: status);
-      if (!mounted) return;
-      setState(() => _replaceMember(saved));
-      AppToast.show(context, done);
-    } catch (error) {
-      if (mounted) AppToast.show(context, messageOf(error));
-    }
-  }
-
   void _copy(String label, String value) {
     Clipboard.setData(ClipboardData(text: value));
     AppToast.show(context, '$label을 복사했어요');
@@ -197,8 +147,6 @@ class _StaffScreenState extends State<StaffScreen> {
                 onTap: () => _open(member),
                 onChat: () => _openChat(context, member),
                 onCopy: () => _copy('이메일', member.email),
-                onApprove: () => _activate(member),
-                onReject: () => _resign(member),
               ),
             ),
         ],
@@ -217,8 +165,6 @@ class _StaffScreenState extends State<StaffScreen> {
             onTap: () => _open(member),
             onChat: () => _openChat(context, member),
             onCopy: () => _copy('이메일', member.email),
-            onApprove: () => _activate(member),
-            onReject: () => _resign(member),
           ),
         ),
     ],
@@ -318,7 +264,7 @@ class _StaffScreenState extends State<StaffScreen> {
               EmptyCard(
                 icon: CupertinoIcons.person_2,
                 text: switch (_employment) {
-                  _Employment.inactive => '잠긴 계정이 없어요',
+                  _Employment.partTime => '알바가 없어요',
                   _Employment.left => '퇴사한 사람이 없어요',
                   _ => '찾는 직원이 없어요',
                 },
@@ -794,8 +740,6 @@ class _MemberCard extends StatefulWidget {
     required this.onTap,
     required this.onChat,
     required this.onCopy,
-    required this.onApprove,
-    required this.onReject,
   });
 
   /// 전체 지점을 보고 있을 때만 어느 지점 사람인지 같이 보여준다
@@ -805,8 +749,6 @@ class _MemberCard extends StatefulWidget {
   final VoidCallback onTap;
   final VoidCallback onChat;
   final VoidCallback onCopy;
-  final VoidCallback onApprove;
-  final VoidCallback onReject;
 
   @override
   State<_MemberCard> createState() => _MemberCardState();
@@ -815,8 +757,10 @@ class _MemberCard extends StatefulWidget {
 class _MemberCardState extends State<_MemberCard> {
   bool _hovered = false;
 
-  /// 상태마다 할 수 있는 일이 다르다.
-  /// 비활성은 활성화·퇴사 처리(점장 이상), 퇴사자는 연락처 복사만.
+  /// 상태마다 할 수 있는 일이 다르다 — 퇴사자는 연락처만, 나머지는 대화.
+  ///
+  /// **알바도 재직자와 같다.** 일하는 사람이라 대화를 걸 수 있어야 한다.
+  /// 퇴사 처리는 인사 정보 변경 화면에 있다 (staff_manage.dart).
   List<Widget> _actions() {
     final member = widget.member;
     final copy = _IconAction(
@@ -824,24 +768,7 @@ class _MemberCardState extends State<_MemberCard> {
       onTap: widget.onCopy,
     );
 
-    // 잠긴 계정을 여닫는 건 점장 이상만 된다 — 아니면 눌러도 서버가 막는다
-    if (member.employment == _Employment.inactive && myRole.strong) {
-      return [
-        Expanded(
-          child: _SmallButton(
-            label: '활성화',
-            onTap: widget.onApprove,
-            filled: true,
-          ),
-        ),
-        SizedBox(width: 8),
-        Expanded(
-          child: _SmallButton(label: '퇴사 처리', onTap: widget.onReject),
-        ),
-      ];
-    }
-
-    if (member.employment != _Employment.active) {
+    if (member.employment == _Employment.left) {
       return [
         Expanded(
           child: _SmallButton(label: '연락처 보기', onTap: widget.onTap),
@@ -948,8 +875,6 @@ class _MemberRow extends StatefulWidget {
     required this.onTap,
     required this.onChat,
     required this.onCopy,
-    required this.onApprove,
-    required this.onReject,
   });
 
   /// 전체 지점을 보고 있을 때만 어느 지점 사람인지 같이 보여준다
@@ -959,8 +884,6 @@ class _MemberRow extends StatefulWidget {
   final VoidCallback onTap;
   final VoidCallback onChat;
   final VoidCallback onCopy;
-  final VoidCallback onApprove;
-  final VoidCallback onReject;
 
   @override
   State<_MemberRow> createState() => _MemberRowState();
@@ -1092,13 +1015,12 @@ class _ChatButton extends StatelessWidget {
   }
 }
 
-/// 글자만 있는 작은 버튼 (승인·반려 등)
+/// 글자만 있는 작은 버튼
 class _SmallButton extends StatelessWidget {
-  _SmallButton({required this.label, required this.onTap, this.filled = false});
+  _SmallButton({required this.label, required this.onTap});
 
   final String label;
   final VoidCallback onTap;
-  final bool filled;
 
   @override
   Widget build(BuildContext context) {
@@ -1110,7 +1032,7 @@ class _SmallButton extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: 14),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: filled ? AppColors.primary : AppColors.gray100,
+          color: AppColors.gray100,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Center(
@@ -1120,7 +1042,7 @@ class _SmallButton extends StatelessWidget {
             maxLines: 1,
             style: AppTextStyles.label.copyWith(
               fontWeight: FontWeight.w600,
-              color: filled ? Colors.white : AppColors.gray700,
+              color: AppColors.gray700,
             ),
           ),
         ),
@@ -1229,10 +1151,6 @@ class _StatusLine extends StatelessWidget {
         '퇴사',
         at == null ? '기록은 남아 있어요' : '${_date(at)}에 나갔어요',
       );
-    }
-    // 비활성으로 바꾼 날짜는 서버가 안 준다 (backend-gap.md 58번)
-    if (member.employment == _Employment.inactive) {
-      return _line(AppColors.warning, '비활성', '계정이 잠겨 있어요');
     }
     return _StatusBadge(member: member);
   }

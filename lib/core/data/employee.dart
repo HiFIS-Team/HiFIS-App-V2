@@ -87,6 +87,28 @@ enum EmployeeStatus {
       .firstWhere((s) => s.wire == value, orElse: () => EmployeeStatus.active);
 }
 
+/// 고용 형태 — 서버 `EmploymentType` 과 같은 값
+///
+/// **재직 상태와 다른 축이다.** 알바가 그만두면 `status` 가 퇴사자로 가고
+/// 고용 형태는 그대로 남는다. 알바로 시작해 정규직이 되는 경우도 이 값만 바뀐다.
+///
+/// 급여가 갈린다 — 정규직은 직급별 기본급 + 인센티브, 알바는 **시급만**이다.
+enum EmploymentType {
+  fullTime('FULL_TIME', '정규직'),
+  partTime('PART_TIME', '알바');
+
+  const EmploymentType(this.wire, this.label);
+
+  final String wire;
+  final String label;
+
+  static EmploymentType parse(String? value) =>
+      EmploymentType.values.firstWhere(
+        (t) => t.wire == value,
+        orElse: () => EmploymentType.fullTime,
+      );
+}
+
 /// 스스로 바꾸는 업무 상태 — 서버 `WorkStatus` 와 같은 값
 ///
 /// '근무중'·'오프라인'은 출퇴근 기록에서 서버가 정하는 값이라 여기 없다.
@@ -127,6 +149,7 @@ class Employee {
     this.statusMessage,
     this.workStatus = WorkStatus.auto,
     this.status = EmployeeStatus.active,
+    this.employmentType = EmploymentType.fullTime,
     this.joinedAt,
     this.resignedAt,
     this.lastActiveAt,
@@ -151,6 +174,7 @@ class Employee {
     statusMessage: json['statusMessage'] as String?,
     workStatus: WorkStatus.parse(json['workStatus'] as String?),
     status: EmployeeStatus.parse(json['status'] as String?),
+    employmentType: EmploymentType.parse(json['employmentType'] as String?),
     joinedAt: _date(json['joinedAt']),
     resignedAt: _date(json['resignedAt']),
     lastActiveAt: _date(json['lastActiveAt']),
@@ -190,8 +214,11 @@ class Employee {
   /// 스스로 고른 업무 상태 (조직도·사내톡에 보인다)
   final WorkStatus workStatus;
 
-  /// 재직 상태 — 조직도가 재직자·비활성·퇴사자 탭으로 가른다
+  /// 재직 상태 — 조직도가 재직자·퇴사자로 가른다
   final EmployeeStatus status;
+
+  /// 정규직인가 알바인가 — 조직도 가운데 탭과 급여 계산이 이 값을 본다
+  final EmploymentType employmentType;
 
   /// 입사일 — 근속 계산에 쓴다
   final DateTime? joinedAt;

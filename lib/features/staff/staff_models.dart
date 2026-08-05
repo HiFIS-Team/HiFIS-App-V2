@@ -31,23 +31,33 @@ enum _Status {
       this == _Status.meal || this == _Status.out || this == _Status.away;
 }
 
-/// 재직 상태 — 서로 겹치지 않아 탭으로 나눈다
+/// 조직도 탭 — 서로 겹치지 않아 탭으로 나눈다
 ///
-/// 서버 `EmployeeStatus` 와 1:1 이다. 가운데 칸은 예전에 '대기자'(가입 승인
-/// 대기)였는데, **서버가 승인 대기를 폐지**해서 지금은 잠가 둔 계정을 뜻한다
-/// (backend-gap.md 11·58번).
+/// **재직 상태 하나로 갈리지 않는다.** 앞 두 칸은 둘 다 재직 중이고
+/// 고용 형태(정규직·알바)로 나뉜다. 알바가 그만두면 퇴사자로 간다.
+///
+/// 가운데 칸은 예전에 '대기자'(가입 승인 대기) → '비활성'(잠긴 계정)이었는데,
+/// 승인 대기는 서버가 폐지했고(backend-gap.md 11번) 비활성은 쓰는 사람이
+/// 아무도 없어서(실제로 0명) 알바 자리로 넘겼다.
 enum _Employment {
-  active('재직자', EmployeeStatus.active),
-  inactive('비활성', EmployeeStatus.inactive),
-  left('퇴사자', EmployeeStatus.resigned);
+  active('재직자'),
+  partTime('알바'),
+  left('퇴사자');
 
-  const _Employment(this.label, this.wire);
+  const _Employment(this.label);
 
   final String label;
-  final EmployeeStatus wire;
 
-  static _Employment of(EmployeeStatus status) =>
-      _Employment.values.firstWhere((e) => e.wire == status);
+  /// 재직 상태와 고용 형태를 **같이** 봐서 정한다
+  ///
+  /// 퇴사가 먼저다 — 알바로 일하다 그만둬도 퇴사자 탭에 서야 한다.
+  /// 남아 있는 `INACTIVE` 는 재직으로 본다 (쓰지 않는 값이라 갈 자리가 없다).
+  static _Employment of(Employee source) {
+    if (source.status == EmployeeStatus.resigned) return _Employment.left;
+    return source.employmentType == EmploymentType.partTime
+        ? _Employment.partTime
+        : _Employment.active;
+  }
 }
 
 /// 직원 한 명 — 서버 `EmployeeOut` 을 화면 말로 옮긴 것
@@ -81,7 +91,7 @@ class _Member {
 
   Role get permission => source.role;
 
-  _Employment get employment => _Employment.of(source.status);
+  _Employment get employment => _Employment.of(source);
 
   /// 사번
   String get code => source.empNo ?? '미발급';
@@ -100,7 +110,10 @@ class _Member {
 
   bool get isMe => source.id == currentUser?.id;
 
-  bool get active => employment == _Employment.active;
+  /// 재직 중인가 — **알바도 포함**이다
+  ///
+  /// 탭만 갈릴 뿐 일하는 사람이라, 근무중 인원수·근태 요약·근속에 다 들어간다.
+  bool get active => employment != _Employment.left;
 
   /// 지금 상태 — 스스로 고른 값이 먼저고, 없으면 서버의 오늘 판정을 따른다
   ///

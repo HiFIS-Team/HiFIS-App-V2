@@ -82,6 +82,8 @@ class _ManageSheetState extends State<_ManageSheet> {
   late String _branchId = widget.member.source.branchId;
   late Rank _rank = widget.member.rank;
   late Role _role = widget.member.permission;
+  late EmploymentType _employment = widget.member.source.employmentType;
+  late EmployeeStatus _status = widget.member.source.status;
 
   bool _saving = false;
 
@@ -91,7 +93,9 @@ class _ManageSheetState extends State<_ManageSheet> {
   bool get _dirty =>
       _branchId != member.source.branchId ||
       _rank != member.rank ||
-      _role != member.permission;
+      _role != member.permission ||
+      _employment != member.source.employmentType ||
+      _status != member.source.status;
 
   Future<void> _save() async {
     setState(() => _saving = true);
@@ -101,6 +105,8 @@ class _ManageSheetState extends State<_ManageSheet> {
         branchId: _branchId,
         rank: _rank,
         role: _role,
+        employmentType: _employment,
+        status: _status,
       );
       if (!mounted) return;
       Navigator.pop(context, saved);
@@ -159,6 +165,30 @@ class _ManageSheetState extends State<_ManageSheet> {
             options: [for (final r in _grantableRoles) (r.wire, r.label)],
             selected: _role.wire,
             onSelect: (wire) => setState(() => _role = Role.parse(wire)),
+          ),
+          SizedBox(height: 12),
+          _PickerCard(
+            title: '고용 형태',
+            note: '알바는 직급과 상관없이 시급으로만 받아요',
+            options: [for (final t in EmploymentType.values) (t.wire, t.label)],
+            selected: _employment.wire,
+            onSelect: (wire) =>
+                setState(() => _employment = EmploymentType.parse(wire)),
+          ),
+          SizedBox(height: 12),
+          _PickerCard(
+            title: '재직 상태',
+            note: '퇴사로 바꾸면 조직도 퇴사자 칸으로 옮겨져요',
+            // 비활성은 쓰지 않는다 — 조직도에서 가운데 칸을 알바에 내줬다
+            options: [
+              (EmployeeStatus.active.wire, '재직'),
+              (EmployeeStatus.resigned.wire, '퇴사'),
+            ],
+            selected: _status == EmployeeStatus.resigned
+                ? EmployeeStatus.resigned.wire
+                : EmployeeStatus.active.wire,
+            onSelect: (wire) =>
+                setState(() => _status = EmployeeStatus.parse(wire)),
           ),
           SizedBox(height: 20),
           // 바꾼 게 없으면 눌러도 할 일이 없다 — 흐리게 두고 신호만 준다
