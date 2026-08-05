@@ -228,6 +228,13 @@ Future<void> _loadSurveys() async {
             ),
         ],
     ]);
+
+  // **여기서 한 번만 정렬한다.** 최신순은 이 두 목록의 성질이지 화면마다
+  // 다시 정하는 값이 아니다. 예전에는 읽는 자리 다섯 곳이 저마다 정렬해서,
+  // 같은 목록을 한 화면에서 여러 번 줄 세웠다.
+  // 걸러 낸 목록도 순서를 물려받으므로 읽는 쪽은 그냥 쓰면 된다.
+  _surveys.sort((a, b) => b.time.compareTo(a.time));
+  _feedbacks.sort((a, b) => b.time.compareTo(a.time));
 }
 
 /// 설문이 가리키는 직원 이름 — 명단에 없으면 빈 값

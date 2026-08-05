@@ -439,16 +439,12 @@ class _FeedbackHistoryScreenState extends State<_FeedbackHistoryScreen> {
   Widget build(BuildContext context) {
     final query = _search.text.trim();
     final base = _feedbacks.where((f) => f.complaint == widget.complaint);
-    final sorted =
-        base
-            .where(
-              (f) =>
-                  query.isEmpty ||
-                  f.name.contains(query) ||
-                  f.text.contains(query),
-            )
-            .toList()
-          ..sort((a, b) => b.time.compareTo(a.time));
+    final sorted = base
+        .where(
+          (f) =>
+              query.isEmpty || f.name.contains(query) || f.text.contains(query),
+        )
+        .toList();
     final title = widget.complaint ? '컴플레인' : '내게 온 칭찬';
     final unresolved = widget.complaint && _showStatus
         ? sorted.where((f) => f.status == _Status.pending).length

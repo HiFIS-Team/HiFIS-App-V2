@@ -1,0 +1,378 @@
+part of 'attendance_screen.dart';
+
+// ── 달력 ──
+
+/// 화면의 주인공 — 칸마다 그날의 근무나 월차가 바로 보인다
+class _MonthCalendar extends StatelessWidget {
+  _MonthCalendar({
+    required this.month,
+    required this.days,
+    required this.leaves,
+    required this.onMove,
+    required this.onPick,
+  });
+
+  final DateTime month;
+  final List<_Day> days;
+  final List<_Leave> leaves;
+  final ValueChanged<int> onMove;
+  final ValueChanged<DateTime> onPick;
+
+  _Day? _dayOf(DateTime date) {
+    for (final day in days) {
+      if (_sameDay(day.date, date)) return day;
+    }
+    return null;
+  }
+
+  _Leave? _leaveOf(DateTime date) {
+    for (final leave in leaves) {
+      if (leave.covers(date) && leave.status.counted) {
+        return leave;
+      }
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final lastDay = DateTime(month.year, month.month + 1, 0).day;
+    // 1일이 무슨 요일인지에 따라 앞을 비운다 (일요일 시작)
+    final lead = month.weekday % 7;
+    final rows = ((lead + lastDay) / 7).ceil();
+    // 칸 안에 근무 시간까지 들어가야 해서 넉넉히 잡는다.
+    // 대표 칸은 상태마다 한 줄씩 들어가서 더 높다
+    final cellHeight = _isBoss
+        ? (isDesktop ? 132.0 : 104.0)
+        : (isDesktop ? 84.0 : 62.0);
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(14, 18, 14, 14),
+      decoration: AppDecorations.card(),
+      child: Column(
+        children: [
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 6),
+            child: Row(
+              children: [
+                _arrow(CupertinoIcons.chevron_left, () => onMove(-1)),
+                SizedBox(width: 10),
+                Text(
+                  '${month.year}년 ${month.month}월',
+                  style: AppTextStyles.title3,
+                ),
+                SizedBox(width: 10),
+                _arrow(CupertinoIcons.chevron_right, () => onMove(1)),
+                Spacer(),
+                // 폰은 자리가 좁아 범례를 뺀다
+                if (isDesktop)
+                  for (final status in [
+                    _DayStatus.normal,
+                    _DayStatus.late,
+                    _DayStatus.absent,
+                    _DayStatus.leave,
+                  ]) ...[_legend(status), SizedBox(width: 9)],
+              ],
+            ),
+          ),
+          SizedBox(height: 16),
+          Row(
+            children: [
+              for (var i = 0; i < 7; i++)
+                Expanded(
+                  child: Center(
+                    child: Text(
+                      _weekdayLabels[i],
+                      style: AppTextStyles.caption.copyWith(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: i == 0
+                            ? AppColors.error
+                            : AppColors.textTertiary,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          SizedBox(height: 8),
+          for (var row = 0; row < rows; row++)
+            // 칸이 스스로 높이를 정하므로 stretch를 쓰면 안 된다
+            // (세로가 무한대인 스크롤 안에서는 높이를 못 정해 터진다)
+            Row(
+              children: [
+                for (var col = 0; col < 7; col++)
+                  Expanded(
+                    child: Builder(
+                      builder: (context) {
+                        final dayNumber = row * 7 + col - lead + 1;
+                        if (dayNumber < 1 || dayNumber > lastDay) {
+                          return SizedBox(height: cellHeight);
+                        }
+                        final date = DateTime(
+                          month.year,
+                          month.month,
+                          dayNumber,
+                        );
+                        return _DayCell(
+                          date: date,
+                          day: _dayOf(date),
+                          leave: _leaveOf(date),
+                          today: _sameDay(date, now),
+                          height: cellHeight,
+                          onTap: () => onPick(date),
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _arrow(IconData icon, VoidCallback onTap) => Pressable(
+    onTap: onTap,
+    scale: 0.9,
+    child: Container(
+      width: 30,
+      height: 30,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppColors.gray50,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Icon(icon, size: 13, color: AppColors.textSecondary),
+    ),
+  );
+
+  Widget _legend(_DayStatus status) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: 6,
+        height: 6,
+        decoration: BoxDecoration(color: status.color, shape: BoxShape.circle),
+      ),
+      SizedBox(width: 3),
+      Text(status.label, style: AppTextStyles.caption.copyWith(fontSize: 10)),
+    ],
+  );
+}
+
+/// 달력 칸 하나 — 날짜 + 그날의 한 줄 요약
+class _DayCell extends StatefulWidget {
+  _DayCell({
+    required this.date,
+    required this.day,
+    required this.leave,
+    required this.today,
+    required this.height,
+    required this.onTap,
+  });
+
+  final DateTime date;
+  final _Day? day;
+  final _Leave? leave;
+  final bool today;
+  final double height;
+  final VoidCallback onTap;
+
+  @override
+  State<_DayCell> createState() => _DayCellState();
+}
+
+class _DayCellState extends State<_DayCell> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final date = widget.date;
+    final day = widget.day;
+    final leave = widget.leave;
+    final sunday = date.weekday == DateTime.sunday;
+    // 기록도 월차도 없는 앞날
+    final empty = day == null && leave == null;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: Pressable(
+        onTap: widget.onTap,
+        scale: 0.96,
+        child: Container(
+          height: widget.height,
+          margin: EdgeInsets.all(2),
+          padding: EdgeInsets.fromLTRB(6, 6, 6, 5),
+          decoration: BoxDecoration(
+            // 잡아둔 월차는 칸 전체를 옅게 물들여 앞으로의 일정이 눈에 띈다
+            color: leave != null
+                ? AppColors.primary.withValues(alpha: 0.08)
+                : _hover
+                ? AppColors.gray50
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 22,
+                height: 22,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: widget.today ? AppColors.primary : Colors.transparent,
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  '${date.day}',
+                  style: AppTextStyles.body2.copyWith(
+                    fontSize: 12,
+                    fontWeight: widget.today
+                        ? FontWeight.w700
+                        : FontWeight.w500,
+                    color: widget.today
+                        ? Colors.white
+                        : empty
+                        ? AppColors.gray300
+                        : sunday
+                        ? AppColors.error
+                        : AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              if (_isBoss)
+                // 대표는 자기 기록이 아니라 그날 전 직원이 어땠는지를 본다
+                Expanded(child: _roster(date))
+              else ...[
+                Spacer(),
+                if (leave != null)
+                  _tag(
+                    leave.kind == _LeaveKind.full ? '월차' : '반차',
+                    AppColors.primary,
+                    faded: leave.status == _LeaveStatus.pending,
+                  )
+                else if (day != null)
+                  switch (day.status) {
+                    // 정상 근무는 배지 대신 근무 시간만 담백하게 보여준다
+                    _DayStatus.normal => _hours(day),
+                    _DayStatus.late => _tag('지각', AppColors.warning),
+                    _DayStatus.early => _tag('조퇴', AppColors.warning),
+                    _DayStatus.absent => _tag('결근', AppColors.error),
+                    _DayStatus.leave => _tag('월차', AppColors.primary),
+                    _DayStatus.off => SizedBox(),
+                  },
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 대표 칸 — 상태마다 `이름 외 N명 상태` 한 줄
+  ///
+  /// 다들 출근·퇴근뿐이면 줄을 늘어놓지 않고 `전원 출근` 한 줄로 끝낸다.
+  Widget _roster(DateTime date) {
+    final groups = _rosterOf(date);
+    if (groups.isEmpty) return SizedBox();
+
+    final lines = <Widget>[];
+    var onlyPlain = true;
+    for (final (status, label, color, plain) in _workStatusOrder) {
+      final names = groups[status];
+      if (names == null || names.isEmpty) continue;
+      if (!plain) onlyPlain = false;
+      lines.add(_line('${_who(names)} $label', color));
+    }
+    if (lines.isEmpty) return SizedBox();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      // 줄이 하나든 넷이든 칸 가운데에 모인다 — 위나 아래로 붙으면 날짜와 떨어져 보인다
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: onlyPlain ? [_line('전원 출근', AppColors.workIn)] : lines,
+    );
+  }
+
+  /// `김트레이너` · `김트레이너 외 3명`
+  String _who(List<String> names) =>
+      names.length == 1 ? names.first : '${names.first} 외 ${names.length - 1}명';
+
+  /// 상태 한 줄 — 옅은 바탕에 같은 색 글씨 (앱의 알약과 같은 방식)
+  Widget _line(String text, Color color) => Container(
+    width: double.infinity,
+    margin: EdgeInsets.only(top: 2),
+    padding: EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(5),
+    ),
+    child: Text(
+      text,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: AppTextStyles.caption.copyWith(
+        fontSize: 10,
+        height: 1.3,
+        color: color,
+        fontWeight: FontWeight.w700,
+      ),
+    ),
+  );
+
+  Widget _hours(_Day day) => Row(
+    children: [
+      Container(
+        width: 5,
+        height: 5,
+        margin: EdgeInsets.only(right: 4),
+        decoration: BoxDecoration(
+          color: AppColors.success,
+          shape: BoxShape.circle,
+        ),
+      ),
+      Flexible(
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            _shortDuration(day.worked),
+            style: AppTextStyles.caption.copyWith(
+              fontSize: 11,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+
+  /// 지각·결근·월차처럼 눈에 띄어야 하는 것만 알약으로
+  Widget _tag(String label, Color color, {bool faded = false}) => Container(
+    width: double.infinity,
+    padding: EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: faded ? 0.1 : 0.16),
+      borderRadius: BorderRadius.circular(6),
+      // 아직 결재 전인 월차는 테두리만 둘러 예정임을 알린다
+      border: faded ? Border.all(color: color.withValues(alpha: 0.4)) : null,
+    ),
+    child: FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerLeft,
+      child: Text(
+        label,
+        style: AppTextStyles.caption.copyWith(
+          fontSize: 10,
+          color: color,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    ),
+  );
+}

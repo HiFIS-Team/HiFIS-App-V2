@@ -53,7 +53,7 @@ class _SurveyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sorted = [..._surveys]..sort((a, b) => b.time.compareTo(a.time));
+    final sorted = _surveys;
     final recent = sorted.take(5).toList();
 
     return Container(
@@ -537,8 +537,7 @@ class _SurveyHistoryScreenState extends State<_SurveyHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     final query = _search.text.trim();
-    final sorted = _surveys.where((s) => _matches(s, query)).toList()
-      ..sort((a, b) => b.time.compareTo(a.time));
+    final sorted = _surveys.where((s) => _matches(s, query)).toList();
 
     // 날짜가 바뀌는 지점마다 그룹 헤더를 끼워 넣는다
     final children = <Widget>[];

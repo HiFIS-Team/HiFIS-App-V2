@@ -245,8 +245,7 @@ class _LeaveList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sorted = [...leaves]..sort((a, b) => b.date.compareTo(a.date));
-    final recent = sorted.take(_preview).toList();
+    final recent = leaves.take(_preview).toList();
 
     return Container(
       width: double.infinity,
@@ -263,7 +262,7 @@ class _LeaveList extends StatelessWidget {
                 SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    '${sorted.length}',
+                    '${leaves.length}',
                     style: AppTextStyles.label.copyWith(
                       color: AppColors.textTertiary,
                     ),
@@ -330,8 +329,7 @@ class _LeaveHistoryScreenState extends State<_LeaveHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final sorted = _leaves.where(_matches).toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
+    final sorted = _leaves.where(_matches).toList();
 
     // 달이 바뀌는 지점마다 머리말을 끼워 넣는다
     final children = <Widget>[];

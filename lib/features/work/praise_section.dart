@@ -103,7 +103,7 @@ class _PraiseSectionState extends State<PraiseSection> {
   @override
   Widget build(BuildContext context) {
     if (_tab == 2) {
-      final sorted = [..._surveys]..sort((a, b) => b.time.compareTo(a.time));
+      final sorted = _surveys;
       // 카드에는 최근 5건만 — 나머지는 전체 보기 화면에서
       final recent = sorted.take(5).toList();
 
@@ -142,8 +142,7 @@ class _PraiseSectionState extends State<PraiseSection> {
       );
     }
 
-    final items = _feedbacks.where((f) => f.complaint == _complaint).toList()
-      ..sort((a, b) => b.time.compareTo(a.time));
+    final items = _feedbacks.where((f) => f.complaint == _complaint).toList();
     // 카드에는 최근 5건만 — 나머지는 전체 보기 화면에서
     final recent = items.take(5).toList();
     final title = _complaint ? '컴플레인' : (_viewOnly ? '칭찬' : '내게 온 칭찬');

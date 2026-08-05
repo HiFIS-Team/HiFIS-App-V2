@@ -241,9 +241,12 @@ Future<void> _loadAttendance() async {
 
   _balance = balance;
 
+  // 최신순은 이 목록의 성질이라 **여기서 한 번만** 세운다.
+  // 새 신청을 `insert(0, ...)` 로 앞에 꽂는 것도 같은 약속이다.
   _leaves
     ..clear()
-    ..addAll(leaves.map(_Leave.from));
+    ..addAll(leaves.map(_Leave.from))
+    ..sort((a, b) => b.date.compareTo(a.date));
 
   _leaveInbox
     ..clear()
