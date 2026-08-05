@@ -805,18 +805,24 @@ class _HeaderButtonsState extends State<_HeaderButtons> {
 
   @override
   Widget build(BuildContext context) {
-    // 출퇴근 바코드는 폰을 직원 리더기에 찍는 용도라 데스크톱에서는 뺀다
+    // 출퇴근 바코드는 폰을 매장 리더기에 찍는 용도라 데스크톱에서는 뺀다.
+    //
+    // **MASTER·ADMIN 에게도 안 보인다.** 출퇴근을 찍는 건 현장에서 일하는
+    // 사람(MANAGER·MEMBER)이고, 대표·관리자는 운영 전담이라 스캔할 일이 없다.
+    // 데스크톱이 원래 그랬는데 폰만 전원에게 떠 있었다.
     final desktop = isDesktop;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (!desktop) ...[
-          GlassIconButton(
-            symbol: 'barcode.viewfinder',
-            enabled: !_overlayOpen,
-            onPressed: _openBarcode,
-          ),
-          SizedBox(width: 10),
+          if (myRole.doesFieldWork) ...[
+            GlassIconButton(
+              symbol: 'barcode.viewfinder',
+              enabled: !_overlayOpen,
+              onPressed: _openBarcode,
+            ),
+            SizedBox(width: 10),
+          ],
           // 데스크톱은 우하단 사내톡 필이 있어 헤더 메시지 버튼을 뺀다.
           // 빨간 점은 알림 종과 같은 규칙 — 안 읽은 방이 있을 때만 뜬다
           ValueListenableBuilder<int>(
