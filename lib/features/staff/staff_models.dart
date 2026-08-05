@@ -251,13 +251,45 @@ bool _inBranch(_Member member, String branch) =>
     member.permission == Role.admin ||
     member.branch == branch;
 
-/// 필터에 쓸 직급 목록 — 서버 `Rank` 를 그대로 쓴다
-///
-/// 명단에 있는 것만 세우지 않고 **여섯 개를 늘 다 세운다.** 지점·재직 상태 탭을
-/// 옮길 때마다 칩이 늘었다 줄었다 하면 자리를 못 외운다.
 const _allRanks = '전체';
 
-List<String> get _ranks => [_allRanks, for (final r in Rank.values) r.label];
+/// 조직도 필터 칩 한 칸 — 이름과 거기 묶이는 직급들
+///
+/// 대부분 직급 하나가 한 칸인데 **점장·팀장은 '관리자' 한 칸으로 묶는다.**
+/// 둘을 갈라 봐야 조직도에서 사람을 찾는 데 도움이 안 된다.
+///
+/// **직급 자체는 안 건드린다** — 초대키·인사 정보 변경에서는 여전히 점장·팀장을
+/// 따로 고르고, 카드와 상세에도 각자 이름 그대로 적힌다. 여기 한 칸으로 묶이는
+/// 것은 **찾을 때뿐**이다.
+class _RankGroup {
+  const _RankGroup(this.label, this.ranks);
+
+  final String label;
+  final List<Rank> ranks;
+
+  bool has(Rank rank) => ranks.contains(rank);
+}
+
+/// 필터에 쓸 칩 — 명단에 있는 것만 세우지 않고 **늘 다 세운다.**
+/// 지점·재직 상태 탭을 옮길 때마다 칩이 늘었다 줄었다 하면 자리를 못 외운다.
+const _rankGroups = <_RankGroup>[
+  _RankGroup('대표', [Rank.ceo]),
+  _RankGroup('개발자', [Rank.developer]),
+  _RankGroup('마케터', [Rank.marketer]),
+  _RankGroup('관리자', [Rank.storeManager, Rank.teamLead]),
+  _RankGroup('트레이너', [Rank.trainer]),
+  _RankGroup('FC', [Rank.fc]),
+];
+
+List<String> get _ranks => [_allRanks, for (final g in _rankGroups) g.label];
+
+/// 칩 이름으로 묶음을 찾는다 — '전체'면 null
+_RankGroup? _rankGroupOf(String label) {
+  for (final group in _rankGroups) {
+    if (group.label == label) return group;
+  }
+  return null;
+}
 
 /// 명단에서 나를 찾는다 — 못 찾으면 로그인 정보로 만든다
 ///

@@ -91,7 +91,9 @@ class _StaffScreenState extends State<StaffScreen> {
   List<_Member> get _visible {
     final query = _query.trim();
     return _scoped.where((m) {
-      if (_rank != _allRanks && m.role != _rank) return false;
+      // 칩이 '관리자'면 점장·팀장이 같이 걸린다
+      final group = _rankGroupOf(_rank);
+      if (group != null && !group.has(m.rank)) return false;
       if (query.isEmpty) return true;
       // 이름·직급·이메일 아무 데나 걸리면 보여준다
       return m.name.contains(query) ||
@@ -553,9 +555,11 @@ class _RankChips extends StatelessWidget {
   final String selected;
   final ValueChanged<String> onSelect;
 
-  int _countOf(String rank) => rank == _allRanks
-      ? scope.length
-      : scope.where((m) => m.role == rank).length;
+  int _countOf(String rank) {
+    final group = _rankGroupOf(rank);
+    if (group == null) return scope.length; // '전체'
+    return scope.where((m) => group.has(m.rank)).length;
+  }
 
   @override
   Widget build(BuildContext context) {
