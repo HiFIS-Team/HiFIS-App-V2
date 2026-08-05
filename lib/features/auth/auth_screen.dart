@@ -4,17 +4,17 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../core/api/api_exception.dart';
-import '../../core/api/auth_api.dart';
-import '../../core/api/consent_api.dart';
-import '../../core/api/token_store.dart';
+import '../../core/api/client/api_exception.dart';
+import '../../core/api/auth/auth_api.dart';
+import '../../core/api/auth/consent_api.dart';
+import '../../core/api/client/token_store.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
-import '../../core/widgets/app_toast.dart';
-import '../../core/widgets/mode_switch.dart';
-import '../../core/widgets/pressable.dart';
+import '../../core/widgets/feedback/app_toast.dart';
+import '../../core/widgets/input/mode_switch.dart';
+import '../../core/widgets/input/pressable.dart';
 import '../legal/legal_screen.dart';
 import 'auth_session.dart';
 

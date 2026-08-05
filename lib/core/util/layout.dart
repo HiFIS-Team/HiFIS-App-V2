@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 
-import '../widgets/android_tab_bar.dart';
+import '../widgets/nav/android_tab_bar.dart';
 import 'platform.dart';
 import 'sf_symbols.dart';
 

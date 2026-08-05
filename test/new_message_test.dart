@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:hifis_app/core/api/staff_api.dart';
+import 'package:hifis_app/core/api/staff/staff_api.dart';
 import 'package:hifis_app/core/data/current_user.dart';
 import 'package:hifis_app/core/data/employee.dart';
 import 'package:hifis_app/core/data/staff_directory.dart';

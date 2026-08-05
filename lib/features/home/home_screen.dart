@@ -2,12 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../core/api/api_exception.dart';
-import '../../core/api/approval_api.dart';
-import '../../core/api/attendance_api.dart';
-import '../../core/api/event_api.dart';
-import '../../core/api/home_api.dart';
-import '../../core/api/payroll_api.dart';
+import '../../core/api/client/api_exception.dart';
+import '../../core/api/docs/approval_api.dart';
+import '../../core/api/staff/attendance_api.dart';
+import '../../core/api/project/event_api.dart';
+import '../../core/api/home/home_api.dart';
+import '../../core/api/staff/payroll_api.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
 import '../../core/data/staff.dart';
@@ -17,12 +17,12 @@ import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
-import '../../core/widgets/app_toast.dart';
-import '../../core/widgets/mini_button.dart';
-import '../../core/widgets/avatar.dart';
-import '../../core/widgets/pressable.dart';
-import '../../core/widgets/reject_reason_dialog.dart';
-import '../../core/widgets/see_all_button.dart';
+import '../../core/widgets/feedback/app_toast.dart';
+import '../../core/widgets/input/mini_button.dart';
+import '../../core/widgets/display/avatar.dart';
+import '../../core/widgets/input/pressable.dart';
+import '../../core/widgets/feedback/reject_reason_dialog.dart';
+import '../../core/widgets/input/see_all_button.dart';
 import '../notice/notice_screen.dart';
 import '../notifications/notification_screen.dart';
 import '../project/project_screen.dart';
@@ -661,11 +661,21 @@ class _HeroStatusCard extends StatefulWidget {
 class _HeroStatusCardState extends State<_HeroStatusCard> {
   late final Timer _timer;
 
+  /// 홈 탭이 지금 보이는가 ([LazyIndexedStack] 이 알려준다)
+  ///
+  /// **안 보이면 시계를 멈춘다.** IndexedStack 이 탭을 살려 두기 때문에,
+  /// 이 가드가 없으면 홈을 한 번 연 뒤로 다른 탭에 있어도 앱을 끌 때까지
+  /// 매초 이 카드가 다시 그려진다. 다시 보이면 그 순간 리빌드가 걸려
+  /// 시각이 바로 맞춰지므로 화면에는 차이가 없다.
+  bool _visible = true;
+
   @override
   void initState() {
     super.initState();
     // 실시간 시계 갱신
-    _timer = Timer.periodic(Duration(seconds: 1), (_) => setState(() {}));
+    _timer = Timer.periodic(Duration(seconds: 1), (_) {
+      if (_visible) setState(() {});
+    });
   }
 
   @override
@@ -693,6 +703,9 @@ class _HeroStatusCardState extends State<_HeroStatusCard> {
 
   @override
   Widget build(BuildContext context) {
+    // 탭이 바뀌면 이 값이 뒤집히면서 리빌드가 걸린다 (InheritedWidget)
+    _visible = TickerMode.valuesOf(context).enabled;
+
     final now = DateTime.now();
     final timeText =
         '${_pad(now.hour)}:${_pad(now.minute)}:${_pad(now.second)}';

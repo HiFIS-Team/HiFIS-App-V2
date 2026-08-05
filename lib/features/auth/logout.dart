@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../core/widgets/app_dialog.dart';
+import '../../core/widgets/feedback/app_dialog.dart';
 import 'auth_session.dart';
 
 /// 로그아웃 — 한 번 확인받고 로그인 화면으로 돌아간다

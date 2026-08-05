@@ -7,7 +7,7 @@ import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'core/util/capture_guard.dart';
 import 'core/util/platform.dart';
-import 'core/widgets/app_loading.dart';
+import 'core/widgets/feedback/app_loading.dart';
 import 'features/auth/auth_screen.dart';
 import 'features/auth/auth_session.dart';
 import 'features/main/main_shell.dart';

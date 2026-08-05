@@ -1,11 +1,11 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
-import '../../core/api/chat_api.dart';
+import '../../core/api/chat/chat_api.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/glass_icon_button.dart';
-import '../../core/widgets/pressable.dart';
+import '../../core/widgets/glass/glass_icon_button.dart';
+import '../../core/widgets/input/pressable.dart';
 import 'chat_screen.dart';
 import 'message_screen.dart';
 import 'new_message_screen.dart';

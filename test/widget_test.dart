@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:hifis_app/core/widgets/app_loading.dart';
+import 'package:hifis_app/core/widgets/feedback/app_loading.dart';
 import 'package:hifis_app/main.dart';
 
 /// 앱이 뜨는지만 본다.

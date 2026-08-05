@@ -3,10 +3,10 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../core/api/api_client.dart';
-import '../../core/api/auth_api.dart';
-import '../../core/api/chat_socket.dart';
-import '../../core/api/token_store.dart';
+import '../../core/api/client/api_client.dart';
+import '../../core/api/auth/auth_api.dart';
+import '../../core/api/chat/chat_socket.dart';
+import '../../core/api/client/token_store.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
 import '../../core/data/staff_directory.dart';

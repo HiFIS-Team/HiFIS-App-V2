@@ -4,23 +4,23 @@ import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
-import '../../core/api/access_log_api.dart';
-import '../../core/api/api_exception.dart';
+import '../../core/api/monitoring/access_log_api.dart';
+import '../../core/api/client/api_exception.dart';
 import '../../core/data/employee.dart';
 import '../../core/data/staff.dart';
 import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/app_toast.dart';
-import '../../core/widgets/avatar.dart';
-import '../../core/widgets/delayed_spinner.dart';
-import '../../core/widgets/desktop_header.dart';
-import '../../core/widgets/empty_card.dart';
-import '../../core/widgets/mode_switch.dart';
-import '../../core/widgets/page_numbers.dart';
-import '../../core/widgets/pane_transition.dart';
-import '../../core/widgets/pressable.dart';
+import '../../core/widgets/feedback/app_toast.dart';
+import '../../core/widgets/display/avatar.dart';
+import '../../core/widgets/feedback/delayed_spinner.dart';
+import '../../core/widgets/nav/desktop_header.dart';
+import '../../core/widgets/feedback/empty_card.dart';
+import '../../core/widgets/input/mode_switch.dart';
+import '../../core/widgets/display/page_numbers.dart';
+import '../../core/widgets/nav/pane_transition.dart';
+import '../../core/widgets/input/pressable.dart';
 import 'activity_panel.dart';
 import 'anomaly_panel.dart';
 import 'chat_audit_panel.dart';
@@ -95,12 +95,16 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
   /// **다시 받아오지는 않는다** — 화면만 새로 그린다.
   Timer? _tick;
 
+  /// 모니터링 탭이 지금 보이는가 — 안 보이면 다시 그리지 않는다
+  /// ([LazyIndexedStack] 이 탭을 살려 둬서 가드가 없으면 계속 돈다)
+  bool _visible = true;
+
   @override
   void initState() {
     super.initState();
     _load();
     _tick = Timer.periodic(Duration(minutes: 1), (_) {
-      if (mounted) setState(() {});
+      if (mounted && _visible) setState(() {});
     });
   }
 
@@ -256,6 +260,9 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 탭이 바뀌면 이 값이 뒤집히면서 리빌드가 걸린다 (InheritedWidget)
+    _visible = TickerMode.valuesOf(context).enabled;
+
     return Scaffold(
       body: SafeArea(
         bottom: false,

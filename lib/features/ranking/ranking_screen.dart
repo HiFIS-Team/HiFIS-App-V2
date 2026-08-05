@@ -1,8 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
-import '../../core/api/api_exception.dart';
-import '../../core/api/score_api.dart';
+import '../../core/api/client/api_exception.dart';
+import '../../core/api/work/score_api.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
 import '../../core/data/staff.dart';
@@ -11,14 +11,14 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
-import '../../core/widgets/avatar.dart';
-import '../../core/widgets/delayed_spinner.dart';
-import '../../core/widgets/desktop_header.dart';
-import '../../core/widgets/app_toast.dart';
-import '../../core/widgets/empty_card.dart';
-import '../../core/widgets/mode_switch.dart';
-import '../../core/widgets/phone_scaffold.dart';
-import '../../core/widgets/pressable.dart';
+import '../../core/widgets/display/avatar.dart';
+import '../../core/widgets/feedback/delayed_spinner.dart';
+import '../../core/widgets/nav/desktop_header.dart';
+import '../../core/widgets/feedback/app_toast.dart';
+import '../../core/widgets/feedback/empty_card.dart';
+import '../../core/widgets/input/mode_switch.dart';
+import '../../core/widgets/nav/phone_scaffold.dart';
+import '../../core/widgets/input/pressable.dart';
 
 part 'ranking_models.dart';
 

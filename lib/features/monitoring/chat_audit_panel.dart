@@ -1,17 +1,17 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
-import '../../core/api/api_exception.dart';
-import '../../core/api/chat_audit_api.dart';
+import '../../core/api/client/api_exception.dart';
+import '../../core/api/monitoring/chat_audit_api.dart';
 import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/app_toast.dart';
-import '../../core/widgets/avatar.dart';
-import '../../core/widgets/delayed_spinner.dart';
-import '../../core/widgets/empty_card.dart';
-import '../../core/widgets/pressable.dart';
+import '../../core/widgets/feedback/app_toast.dart';
+import '../../core/widgets/display/avatar.dart';
+import '../../core/widgets/feedback/delayed_spinner.dart';
+import '../../core/widgets/feedback/empty_card.dart';
+import '../../core/widgets/input/pressable.dart';
 
 /// 사내톡 열람 — 방 목록(왼쪽) + 그 방 대화(오른쪽) (모니터링 셋째 탭)
 ///

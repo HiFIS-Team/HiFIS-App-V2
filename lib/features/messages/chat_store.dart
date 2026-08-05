@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import '../../core/api/chat_api.dart';
-import '../../core/api/chat_socket.dart';
-import '../../core/api/reaction_api.dart';
+import '../../core/api/chat/chat_api.dart';
+import '../../core/api/chat/chat_socket.dart';
+import '../../core/api/notice/reaction_api.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
 import '../../core/data/staff_directory.dart';

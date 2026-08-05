@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../core/api/api_exception.dart';
-import '../../core/api/event_api.dart';
+import '../../core/api/client/api_exception.dart';
+import '../../core/api/project/event_api.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
 import '../../core/data/staff.dart';
@@ -9,13 +9,13 @@ import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
-import '../../core/widgets/app_toast.dart';
-import '../../core/widgets/avatar.dart';
-import '../../core/widgets/mini_button.dart';
-import '../../core/widgets/placeholder_screen.dart';
-import '../../core/widgets/pressable.dart';
-import '../../core/widgets/reject_reason_dialog.dart';
-import '../../core/widgets/scroll_box.dart';
+import '../../core/widgets/feedback/app_toast.dart';
+import '../../core/widgets/display/avatar.dart';
+import '../../core/widgets/input/mini_button.dart';
+import '../../core/widgets/display/placeholder_screen.dart';
+import '../../core/widgets/input/pressable.dart';
+import '../../core/widgets/feedback/reject_reason_dialog.dart';
+import '../../core/widgets/display/scroll_box.dart';
 
 /// 일정 화면
 ///

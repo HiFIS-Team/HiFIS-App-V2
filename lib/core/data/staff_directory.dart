@@ -1,4 +1,4 @@
-import '../api/staff_api.dart';
+import '../api/staff/staff_api.dart';
 import 'employee.dart';
 
 /// 전사 인원 명단

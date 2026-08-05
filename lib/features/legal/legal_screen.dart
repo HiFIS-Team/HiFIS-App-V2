@@ -4,10 +4,10 @@ import 'package:flutter/services.dart' show rootBundle;
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
-import '../../core/widgets/app_dialog.dart';
-import '../../core/widgets/markdown_view.dart';
-import '../../core/widgets/phone_scaffold.dart';
-import '../../core/widgets/pressable.dart';
+import '../../core/widgets/feedback/app_dialog.dart';
+import '../../core/widgets/editor/markdown_view.dart';
+import '../../core/widgets/nav/phone_scaffold.dart';
+import '../../core/widgets/input/pressable.dart';
 
 /// 앱이 보여주는 법적 고지 문서
 ///

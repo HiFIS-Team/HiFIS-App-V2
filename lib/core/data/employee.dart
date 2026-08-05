@@ -1,6 +1,6 @@
 import 'dart:ui' show Color;
 
-import '../api/api_client.dart' show apiBaseUrl;
+import '../api/client/api_client.dart' show apiBaseUrl;
 import 'attendance_status.dart';
 
 /// 권한 — 서버 `Role` 과 같은 값. MASTER > ADMIN > MANAGER > MEMBER

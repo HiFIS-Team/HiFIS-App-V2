@@ -5,20 +5,20 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
-import '../../core/api/api_client.dart' show fileUrl;
-import '../../core/api/api_exception.dart';
-import '../../core/api/chat_api.dart';
+import '../../core/api/client/api_client.dart' show fileUrl;
+import '../../core/api/client/api_exception.dart';
+import '../../core/api/chat/chat_api.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/staff.dart';
 import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
-import '../../core/widgets/app_toast.dart';
-import '../../core/widgets/glass_icon_button.dart';
-import '../../core/widgets/glass_input_bar.dart';
-import '../../core/widgets/pressable.dart';
-import '../../core/widgets/top_frost.dart';
+import '../../core/widgets/feedback/app_toast.dart';
+import '../../core/widgets/glass/glass_icon_button.dart';
+import '../../core/widgets/glass/glass_input_bar.dart';
+import '../../core/widgets/input/pressable.dart';
+import '../../core/widgets/glass/top_frost.dart';
 import 'chat_detail_screen.dart';
 import 'chat_store.dart';
 
