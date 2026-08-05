@@ -326,11 +326,16 @@ class BlockEditorState extends State<BlockEditor> {
               },
               onTap: () => setState(() => _menuBlock = null),
             ),
-          // 아래 빈 곳을 눌러도 마지막 줄에 커서가 간다
+          // 아래 빈 곳을 눌러도 마지막 줄에 커서가 간다.
+          //
+          // **얇게 둔다.** 예전엔 120 이었는데, 그러면 두어 줄만 적어도
+          // 상자가 화면 아래까지 내려가 있어서 "쓰기도 전에 커 보인다".
+          // 줄을 더할수록 상자가 자라는 게 보이는 편이 낫다.
+          // 마지막 줄 바로 아래를 누르려는 것이라 이 정도면 닿는다.
           GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () => _focus(_blocks.last),
-            child: SizedBox(height: 120, width: double.infinity),
+            child: SizedBox(height: 28, width: double.infinity),
           ),
           if (menuOpen)
             CompositedTransformFollower(
