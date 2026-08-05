@@ -1,4 +1,4 @@
-package com.hifis.hifis_app
+package app.hifis.hifisApp
 
 import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
