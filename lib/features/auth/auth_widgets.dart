@@ -139,7 +139,6 @@ class _AuthScaffold extends StatelessWidget {
 /// 로그인 계열 입력 칸 — 라벨 + 회색 상자 + (틀렸을 때) 빨간 안내
 class _AuthField extends StatefulWidget {
   _AuthField({
-    super.key,
     required this.controller,
     required this.label,
     this.hint,

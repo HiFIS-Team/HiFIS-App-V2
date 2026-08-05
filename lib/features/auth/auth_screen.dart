@@ -13,7 +13,6 @@ import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
 import '../../core/widgets/feedback/app_toast.dart';
-import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../legal/legal_screen.dart';
 import 'auth_session.dart';

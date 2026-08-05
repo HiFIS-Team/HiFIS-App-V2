@@ -3,9 +3,13 @@ part of 'auth_screen.dart';
 /// 비밀번호 찾기 — 인증번호를 받아 새 비밀번호로 바꾼다
 ///
 /// 세 단계를 한 화면에서 갈아 끼운다.
-/// 0 이메일·전화번호 입력 → 1 인증번호 확인 → 2 새 비밀번호 설정.
-/// 문자·메일 발송이 없어 인증번호는 6자리면 통과시킨다. 실제 연동 때는
-/// [_send]에서 발송 API를, [_verify]에서 확인 API를 부르면 된다.
+/// 0 전화번호 입력 → 1 인증번호 확인 → 2 새 비밀번호 설정.
+///
+/// **전화번호로만 받는다 (2026-08-05).** 예전에는 이메일·전화번호를 골랐는데,
+/// 메일이 스팸함으로 가거나 아예 도착하지 않아 **인증번호를 못 받는 사람이
+/// 생겼다.** 안 오는 게 서버에서는 발송 성공으로 보여서 원인도 안 잡힌다.
+/// 이메일은 로그인 ID 로 계속 쓰고, 인증만 문자로 통일한다.
+/// 회원가입에 전화번호가 필수라 못 받는 사람은 생기지 않는다.
 class _PasswordResetScreen extends StatefulWidget {
   _PasswordResetScreen();
 
@@ -14,11 +18,8 @@ class _PasswordResetScreen extends StatefulWidget {
 }
 
 class _PasswordResetScreenState extends State<_PasswordResetScreen> {
-  /// 0 연락처 입력 · 1 인증번호 · 2 새 비밀번호
+  /// 0 전화번호 입력 · 1 인증번호 · 2 새 비밀번호
   int _step = 0;
-
-  /// 0 이메일 · 1 전화번호
-  int _method = 0;
 
   final _contact = TextEditingController();
   final _code = TextEditingController();
@@ -49,8 +50,6 @@ class _PasswordResetScreenState extends State<_PasswordResetScreen> {
     super.dispose();
   }
 
-  bool get _email => _method == 0;
-
   String get _timeLeft {
     final m = (_left ~/ 60).toString();
     final s = (_left % 60).toString().padLeft(2, '0');
@@ -70,14 +69,14 @@ class _PasswordResetScreenState extends State<_PasswordResetScreen> {
   /// 인증번호 보내기 — 1단계 통과이자 재전송
   Future<void> _send() async {
     final value = _contact.text.trim();
-    final error = _email ? _checkEmail(value) : _checkPhone(value);
+    final error = _checkPhone(value);
     setState(() => _contactError = error);
     if (error != null) return;
 
     setState(() => _busy = true);
     try {
       // 계정이 없어도 서버는 성공으로 답한다 (가입 여부가 새어 나가지 않게)
-      await AuthApi.requestPasswordReset(byEmail: _email, contact: value);
+      await AuthApi.requestPasswordReset(byEmail: false, contact: value);
     } catch (error) {
       if (!mounted) return;
       return setState(() {
@@ -178,7 +177,7 @@ class _PasswordResetScreenState extends State<_PasswordResetScreen> {
         _ => '새 비밀번호',
       },
       caption: switch (_step) {
-        0 => '가입할 때 등록한 이메일이나 전화번호를 알려 주세요.',
+        0 => '가입할 때 등록한 전화번호를 알려 주세요.',
         1 => '${_contact.text.trim()} 으로 6자리 번호를 보냈어요.',
         _ => '앞으로 사용할 비밀번호를 입력해 주세요.',
       },
@@ -205,7 +204,7 @@ class _PasswordResetScreenState extends State<_PasswordResetScreen> {
   Widget _backLink() {
     final (prompt, action) = switch (_step) {
       0 => ('비밀번호가 기억났나요?', '로그인'),
-      1 => ('주소를 잘못 입력했나요?', '다시 입력'),
+      1 => ('번호를 잘못 입력했나요?', '다시 입력'),
       _ => ('인증을 다시 할까요?', '이전 단계'),
     };
 
@@ -223,24 +222,12 @@ class _PasswordResetScreenState extends State<_PasswordResetScreen> {
   }
 
   List<Widget> _contactStep() => [
-    SegmentedTabs(
-      labels: ['이메일', '전화번호'],
-      selected: _method,
-      onSelect: (i) => setState(() {
-        _method = i;
-        _contact.clear();
-        _contactError = null;
-      }),
-    ),
-    SizedBox(height: 20),
     _AuthField(
-      // 방식을 바꾸면 입력 칸도 새로 시작하게 키를 나눈다
-      key: ValueKey(_method),
       controller: _contact,
-      label: _email ? '이메일' : '전화번호',
-      hint: _email ? 'name@hifis.app' : '010-1234-5678',
-      keyboardType: _email ? TextInputType.emailAddress : TextInputType.phone,
-      formatters: _email ? null : [_PhoneFormatter()],
+      label: '전화번호',
+      hint: '010-1234-5678',
+      keyboardType: TextInputType.phone,
+      formatters: [_PhoneFormatter()],
       textInputAction: TextInputAction.done,
       onSubmitted: _send,
       error: _contactError,
