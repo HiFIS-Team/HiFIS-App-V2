@@ -63,12 +63,12 @@ Color avatarColorFor(String name) {
 
 const _avatarPalette = [
   AppColors.primary,
-  Color(0xFF7C5CFC),
-  Color(0xFF00A8B5),
+  AppColors.violet,
+  AppColors.teal,
   AppColors.success,
   AppColors.warning,
   Color(0xFF5C7CFA),
-  Color(0xFFE0447C),
+  AppColors.pink,
   Color(0xFFB44BD9),
   Color(0xFF0F9BD7),
   Color(0xFFD9822B),
@@ -77,12 +77,12 @@ const _avatarPalette = [
 /// 서버 명단이 없을 때 쓰는 화면 확인용 명단
 List<Staff> get _mockStaffList => [
   Staff(me, '트레이너', AppColors.primary),
-  Staff('이준승', '대표', Color(0xFF7C5CFC)),
-  Staff('이준경', '개발', Color(0xFF00A8B5)),
+  Staff('이준승', '대표', AppColors.violet),
+  Staff('이준경', '개발', AppColors.teal),
   Staff('민중기', '점장', AppColors.success),
   Staff('박준현', '트레이너', AppColors.warning),
   Staff('유찬빈', '트레이너', Color(0xFF5C7CFA)),
-  Staff('전상현', 'FC', Color(0xFFE0447C)),
+  Staff('전상현', 'FC', AppColors.pink),
   Staff('문명진', '마케터', Color(0xFFB44BD9)),
   Staff('이지영', '트레이너', Color(0xFF0F9BD7)),
   Staff('김재훈', 'FC', Color(0xFFD9822B)),

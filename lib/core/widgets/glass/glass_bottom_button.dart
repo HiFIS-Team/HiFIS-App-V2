@@ -7,6 +7,7 @@ import '../../util/platform.dart';
 import '../../util/sf_symbols.dart';
 import '../input/app_button.dart';
 import '../input/pressable.dart';
+import '../../theme/app_shadows.dart';
 
 /// 화면 아래 고정 버튼 — 바깥 여백 없이 버튼만 그린다
 ///
@@ -112,7 +113,7 @@ class BottomActionButton extends StatelessWidget {
           boxShadow: [
             // 스크롤되는 콘텐츠 위에 떠 있어서 경계가 필요하다
             BoxShadow(
-              color: Colors.black.withValues(alpha: filled ? 0.16 : 0.08),
+              color: AppShadows.ink.withValues(alpha: filled ? 0.16 : 0.08),
               blurRadius: 16,
               offset: Offset(0, 6),
             ),

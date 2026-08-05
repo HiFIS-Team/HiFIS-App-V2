@@ -5,6 +5,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../util/platform.dart';
 import '../input/app_button.dart';
+import '../../theme/app_shadows.dart';
 
 /// '전체 보기'처럼 목록을 통째로 여는 화면 띄우기
 ///
@@ -44,7 +45,7 @@ class _ModalFrame extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.24),
+            color: AppShadows.ink.withValues(alpha: 0.24),
             blurRadius: 40,
             offset: Offset(0, 16),
           ),

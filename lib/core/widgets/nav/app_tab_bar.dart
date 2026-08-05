@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../util/sf_symbols.dart';
 import '../input/pressable.dart';
+import '../../theme/app_shadows.dart';
 
 /// 하단 탭바 (iOS 26 리퀴드 글래스)
 ///
@@ -73,7 +74,7 @@ class _FallbackTabBar extends StatelessWidget {
               borderRadius: BorderRadius.circular(28),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.08),
+                  color: AppShadows.ink.withValues(alpha: 0.08),
                   blurRadius: 24,
                   offset: Offset(0, 8),
                 ),

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../util/sf_symbols.dart';
 import '../input/pressable.dart';
+import '../../theme/app_shadows.dart';
 
 /// 리퀴드 글래스 원형 아이콘 버튼 (헤더 아이콘, 뒤로가기 등 공통)
 ///
@@ -91,7 +92,7 @@ class GlassIconButton extends StatelessWidget {
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
+              color: AppShadows.ink.withValues(alpha: 0.06),
               blurRadius: 12,
               offset: Offset(0, 4),
             ),

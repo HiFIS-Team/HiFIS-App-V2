@@ -675,47 +675,22 @@ class _LeaveComposerState extends State<_LeaveComposer> {
           SizedBox(height: 20),
           Row(
             children: [
+              // 급여 신청서와 같은 자리 — 공용 버튼을 쓴다
               Expanded(
-                child: Pressable(
+                child: AppButton(
+                  label: '취소',
                   onTap: () => Navigator.pop(context),
-                  scale: 0.97,
-                  child: Container(
-                    height: 46,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: AppColors.gray50,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '취소',
-                      style: AppTextStyles.body2.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ),
                 ),
               ),
               SizedBox(width: 8),
               Expanded(
-                child: Pressable(
+                child: AppButton(
+                  label: '신청하기',
+                  filled: _ready,
+                  // 아직 못 낼 상태면 회색 — 눌러도 안내만 뜬다
+                  color: _ready ? null : AppColors.gray200,
+                  textColor: _ready ? null : AppColors.gray500,
                   onTap: _submit,
-                  scale: 0.97,
-                  child: Container(
-                    height: 46,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: _ready ? AppColors.primary : AppColors.gray200,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '신청하기',
-                      style: AppTextStyles.body2.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: _ready ? Colors.white : AppColors.gray500,
-                      ),
-                    ),
-                  ),
                 ),
               ),
             ],
@@ -835,46 +810,17 @@ class _DatePickerState extends State<_DatePicker> {
           Row(
             children: [
               Expanded(
-                child: Pressable(
+                child: AppButton(
+                  label: '취소',
                   onTap: () => Navigator.pop(context),
-                  scale: 0.97,
-                  child: Container(
-                    height: 46,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: AppColors.gray50,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '취소',
-                      style: AppTextStyles.body2.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ),
                 ),
               ),
               SizedBox(width: 8),
               Expanded(
-                child: Pressable(
+                child: AppButton(
+                  label: '선택',
+                  filled: true,
                   onTap: () => Navigator.pop(context, _picked),
-                  scale: 0.97,
-                  child: Container(
-                    height: 46,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '선택',
-                      style: AppTextStyles.body2.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
                 ),
               ),
             ],

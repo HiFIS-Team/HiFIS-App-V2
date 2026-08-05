@@ -245,7 +245,8 @@ Future<(int, String)?> _askAward(
                 scale: 0.97,
                 pressedColor: AppColors.gray100,
                 borderRadius: BorderRadius.circular(12),
-                padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                // 다른 팝업의 취소와 같은 여백 (전자결재·프로젝트·일정)
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 11),
                 child: Text(
                   '취소',
                   style: AppTextStyles.body2.copyWith(

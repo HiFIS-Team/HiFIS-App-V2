@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
+import '../../theme/app_shadows.dart';
 part 'block_editor_row.dart';
 part 'block_editor_slash.dart';
 

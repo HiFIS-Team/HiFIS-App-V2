@@ -37,9 +37,9 @@ enum _Kind {
     _Kind.doc => AppColors.primary,
     _Kind.sheet => AppColors.success,
     _Kind.slide => AppColors.warning,
-    _Kind.image => Color(0xFF7C5CFC),
-    _Kind.video => Color(0xFFE0447C),
-    _Kind.audio => Color(0xFF00A8B5),
+    _Kind.image => AppColors.violet,
+    _Kind.video => AppColors.pink,
+    _Kind.audio => AppColors.teal,
     _Kind.archive => AppColors.gray500,
     _Kind.other => AppColors.gray500,
   };
@@ -260,7 +260,7 @@ class _UploadingChip extends StatelessWidget {
         border: Border.all(color: AppColors.gray100),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
+            color: AppShadows.ink.withValues(alpha: 0.12),
             blurRadius: 24,
             offset: Offset(0, 6),
           ),

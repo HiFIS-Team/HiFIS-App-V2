@@ -25,7 +25,7 @@ enum Kind {
     Kind.lesson => AppColors.success,
     Kind.event => AppColors.warning,
     Kind.off => AppColors.gray400,
-    Kind.etc => const Color(0xFF7C5CFC),
+    Kind.etc => AppColors.violet,
   };
 }
 

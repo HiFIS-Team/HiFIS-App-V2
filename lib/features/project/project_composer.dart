@@ -47,8 +47,8 @@ class _ProjectComposerState extends State<_ProjectComposer> {
   /// 프로젝트를 구분하는 색 — 빨강은 D-day 배지와 헷갈려서 뺐다
   static const _palette = [
     AppColors.primary,
-    Color(0xFF7C5CFC),
-    Color(0xFF00A8B5),
+    AppColors.violet,
+    AppColors.teal,
     AppColors.success,
     AppColors.warning,
     Color(0xFF8B95A1),

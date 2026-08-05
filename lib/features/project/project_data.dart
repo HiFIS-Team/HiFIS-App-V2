@@ -228,9 +228,9 @@ const _projectColors = [
   AppColors.error,
   AppColors.warning,
   AppColors.success,
-  Color(0xFF7C5CFC),
-  Color(0xFF00A8B5),
-  Color(0xFFE0447C),
+  AppColors.violet,
+  AppColors.teal,
+  AppColors.pink,
 ];
 
 Color _projectColor(String key) =>

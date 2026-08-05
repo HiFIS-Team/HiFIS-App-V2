@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../input/pressable.dart';
+import '../../theme/app_shadows.dart';
 
 /// 안드로이드 전용 하단바
 ///
@@ -125,7 +126,7 @@ class _AndroidTabBarState extends State<AndroidTabBar>
         border: Border(top: BorderSide(color: AppColors.gray100)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: AppShadows.ink.withValues(alpha: 0.05),
             blurRadius: 16,
             offset: Offset(0, -4),
           ),
@@ -271,7 +272,7 @@ class _AndroidTabBarState extends State<AndroidTabBar>
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.18),
+                            color: AppShadows.ink.withValues(alpha: 0.18),
                             blurRadius: 16,
                             offset: Offset(0, 6),
                           ),

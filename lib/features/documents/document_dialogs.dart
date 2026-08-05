@@ -92,46 +92,20 @@ class _NameDialogState extends State<_NameDialog> {
           Row(
             children: [
               Expanded(
-                child: Pressable(
+                child: AppButton(
+                  label: '취소',
                   onTap: () => Navigator.pop(context),
-                  scale: 0.97,
-                  child: Container(
-                    height: 46,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: AppColors.gray50,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '취소',
-                      style: AppTextStyles.body2.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ),
                 ),
               ),
               SizedBox(width: 8),
               Expanded(
-                child: Pressable(
+                child: AppButton(
+                  label: widget.confirm,
+                  filled: ready,
+                  // 아직 못 낼 상태면 회색
+                  color: ready ? null : AppColors.gray200,
+                  textColor: ready ? null : AppColors.gray500,
                   onTap: _submit,
-                  scale: 0.97,
-                  child: Container(
-                    height: 46,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: ready ? AppColors.primary : AppColors.gray200,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      widget.confirm,
-                      style: AppTextStyles.body2.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: ready ? Colors.white : AppColors.gray500,
-                      ),
-                    ),
-                  ),
                 ),
               ),
             ],
@@ -234,7 +208,7 @@ class _ContextMenu extends StatelessWidget {
           border: Border.all(color: AppColors.gray100),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.16),
+              color: AppShadows.ink.withValues(alpha: 0.16),
               blurRadius: 28,
               offset: Offset(0, 10),
             ),

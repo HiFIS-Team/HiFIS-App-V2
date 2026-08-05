@@ -236,7 +236,7 @@ extension _KindStyle on ContribType {
     ContribType.idea => AppColors.warning,
     ContribType.goal => AppColors.primary,
     ContribType.extraWork => AppColors.success,
-    ContribType.sales => Color(0xFF7C5CFC),
+    ContribType.sales => AppColors.violet,
   };
 
   /// 앱에서 사람이 직접 주는 항목인지

@@ -22,6 +22,19 @@ abstract final class AppColors {
   static const warning = Color(0xFFFF9F0A);
   static const error = Color(0xFFF04452);
 
+  // 분류 색 (테마 공통)
+  //
+  // 무채색 베이스 + 포인트 하나가 원칙이지만, **여러 항목을 서로 갈라야 하는
+  // 자리**는 그것만으로 안 된다 — 프로젝트 색, 일정 종류, 파일 종류,
+  // 아바타가 그렇다. 상태색(success·warning·error)을 그 자리에 쓰면
+  // 좋고 나쁨을 뜻하는 것처럼 읽혀서 따로 둔다.
+  //
+  // **여기 없는 색을 화면에서 새로 만들지 않는다.** 예전에는 이 셋이
+  // 파일 3~7군데에 따로 박혀 있어서, 한 곳만 고치면 나머지가 어긋났다.
+  static const violet = Color(0xFF7C5CFC);
+  static const teal = Color(0xFF00A8B5);
+  static const pink = Color(0xFFE0447C);
+
   // 근태 상태 (테마 공통)
   //
   // **무채색 + 포인트 1개 원칙의 예외다.** 대표 화면은 한 칸·한 카드 안에

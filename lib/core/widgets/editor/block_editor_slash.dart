@@ -34,7 +34,7 @@ class _SlashMenu extends StatelessWidget {
           border: Border.all(color: AppColors.gray100),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
+              color: AppShadows.ink.withValues(alpha: 0.12),
               blurRadius: 24,
               offset: Offset(0, 8),
             ),

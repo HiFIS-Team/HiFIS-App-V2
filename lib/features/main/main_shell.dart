@@ -34,6 +34,7 @@ import '../schedule/schedule_screen.dart';
 import '../staff/staff_screen.dart';
 import '../work/work_screen.dart';
 import 'desktop_sidebar.dart';
+import '../../core/theme/app_shadows.dart';
 
 /// 하단 탭바와 탭별 화면을 관리하는 루트 셸
 ///
@@ -472,7 +473,7 @@ class _FloatingPanel extends StatelessWidget {
                   border: Border.all(color: AppColors.gray100),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.14),
+                      color: AppShadows.ink.withValues(alpha: 0.14),
                       blurRadius: 40,
                       offset: Offset(0, 12),
                     ),
@@ -589,7 +590,7 @@ class _ChatDockState extends State<_ChatDock> {
           borderRadius: BorderRadius.circular(22),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.10),
+              color: AppShadows.ink.withValues(alpha: 0.10),
               blurRadius: 24,
               offset: Offset(0, 8),
             ),

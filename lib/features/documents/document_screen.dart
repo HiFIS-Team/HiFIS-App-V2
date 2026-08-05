@@ -16,6 +16,8 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/input/pressable.dart';
+import '../../core/widgets/input/app_button.dart';
+import '../../core/theme/app_shadows.dart';
 
 part 'document_models.dart';
 part 'document_sidebar.dart';
