@@ -289,9 +289,10 @@ class _EventRow extends StatelessWidget {
               padding: EdgeInsets.only(left: 16, top: 8),
               child: Row(
                 children: [
-                  MiniButton(label: '승인', onTap: onApprove!, filled: true),
-                  SizedBox(width: 6),
+                  // 반려가 왼쪽 — 프로젝트·전자결재·급여와 같은 차례다
                   MiniButton(label: '반려', onTap: onReject!, filled: false),
+                  SizedBox(width: 6),
+                  MiniButton(label: '승인', onTap: onApprove!, filled: true),
                 ],
               ),
             ),

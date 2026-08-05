@@ -420,18 +420,17 @@ class _ApprovalGroup extends StatelessWidget {
 }
 
 /// 승인·반려·지급 버튼 — 전자결재 화면과 같은 모양으로 맞춘다
-class _DecideButton extends StatelessWidget {
-  _DecideButton({
-    required this.label,
-    required this.onTap,
-    this.filled = false,
-    this.color,
-  });
+/// 줄 안에 들어가는 '지급 처리' — [DecideButtons] 의 승인 쪽과 같은 모양
+///
+/// 지급은 승인·반려처럼 짝이 없는 한 개짜리라 공용 위젯에 안 든다.
+/// 대신 채움·모서리·여백을 그쪽 승인 버튼에 맞춘다.
+///
+/// **글자는 `지급 처리` 다** (`지급 완료` 가 아니다). 완료는 그 일이 끝난
+/// **상태**를 부르는 말이라 알약이 쓰고, 버튼은 지금부터 할 일을 적는다.
+class _PayInlineButton extends StatelessWidget {
+  _PayInlineButton({required this.onTap});
 
-  final String label;
   final VoidCallback onTap;
-  final bool filled;
-  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -439,20 +438,17 @@ class _DecideButton extends StatelessWidget {
       onTap: onTap,
       scale: 0.96,
       child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: filled ? 22 : 18,
-          vertical: 10,
-        ),
+        padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: filled ? AppColors.primary : AppColors.surface,
-          borderRadius: BorderRadius.circular(11),
-          border: filled ? null : Border.all(color: AppColors.gray200),
+          color: AppColors.primary,
+          borderRadius: BorderRadius.circular(10),
         ),
         child: Text(
-          label,
+          '지급 처리',
           style: AppTextStyles.body2.copyWith(
             fontSize: 14,
-            color: filled ? Colors.white : (color ?? AppColors.textSecondary),
+            color: Colors.white,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -551,22 +547,15 @@ class _ApprovalRow extends StatelessWidget {
           ],
           if (onApprove != null || onReject != null || onPay != null) ...[
             SizedBox(height: 12),
-            // 전자결재 화면과 같은 모양 — 반려는 테두리만, 승인은 채운다
+            // 프로젝트·전자결재와 **같은 위젯**을 쓴다. 예전에는 이 파일 안에
+            // 똑같이 생긴 `_DecideButton` 을 따로 두고 있어서, 위 목록 카드
+            // (`DecideButtons`)와 모서리·여백이 미묘하게 갈렸다.
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                if (onReject != null) ...[
-                  _DecideButton(
-                    label: '반려',
-                    color: AppColors.error,
-                    onTap: onReject!,
-                  ),
-                  SizedBox(width: 8),
-                ],
-                if (onApprove != null)
-                  _DecideButton(label: '승인', filled: true, onTap: onApprove!),
-                if (onPay != null)
-                  _DecideButton(label: '지급 완료', filled: true, onTap: onPay!),
+                if (onApprove != null && onReject != null)
+                  DecideButtons(onApprove: onApprove!, onReject: onReject!),
+                if (onPay != null) _PayInlineButton(onTap: onPay!),
               ],
             ),
           ],

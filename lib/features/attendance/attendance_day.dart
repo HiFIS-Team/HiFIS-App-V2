@@ -156,7 +156,8 @@ class _DayDialog extends StatelessWidget {
               padding: EdgeInsets.symmetric(horizontal: 9, vertical: 4),
               decoration: BoxDecoration(
                 color: color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(8),
+                // 상태 알약은 전부 완전한 알약이다 — 바로 위 _StatusChip 도 같다
+                borderRadius: BorderRadius.circular(100),
               ),
               child: Text(
                 label,

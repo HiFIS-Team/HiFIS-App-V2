@@ -135,7 +135,7 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
           : await ApprovalApi.reject(doc.id, comment: comment);
       if (!mounted) return;
       setState(() => _replace(_fromServer(saved)));
-      AppToast.show(context, approve ? '결재를 승인했어요' : '결재를 반려했어요');
+      AppToast.show(context, approve ? '승인했어요' : '반려했어요');
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
     }

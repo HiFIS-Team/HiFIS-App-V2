@@ -220,7 +220,8 @@ class _ProjectDetail extends StatelessWidget {
     project.request = null;
     onChanged();
     if (context.mounted) {
-      AppToast.show(context, approve ? '기한 연장을 승인했어요' : '기한 연장을 반려했어요');
+      // 다른 결재 자리와 같은 문구 — 방금 누른 버튼 옆이라 뭘 처리했는지는 분명하다
+      AppToast.show(context, approve ? '승인했어요' : '반려했어요');
     }
   }
 
