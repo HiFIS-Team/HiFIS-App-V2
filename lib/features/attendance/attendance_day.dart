@@ -4,14 +4,26 @@ part of 'attendance_screen.dart';
 
 /// 달력에서 날짜를 누르면 뜨는 창 — 그날의 출퇴근과 월차
 ///
-/// 대표는 자기 기록이 아니라 **그날 누가 어땠는지**를 본다. 달력 칸은 좁아서
-/// `외 N명` 으로 줄이는데, 여기서는 이름을 다 편다.
+/// 대표는 자기 기록이 아니라 **그날 누가 어땠는지**를 본다.
+/// 달력 칸은 한 명만 적고(`이름 외 N명`), 여기서는 세 명까지 편다.
 class _DayDialog extends StatelessWidget {
   _DayDialog({required this.date, required this.day, required this.leave});
+
+  /// 이름을 몇 명까지 펴 놓을지 — 나머지는 `외 N명` 으로 접는다
+  ///
+  /// 전원이 같은 상태인 날은 23명이 한 줄에 늘어서서 창이 아래로 길어진다.
+  static const _namesShown = 3;
 
   final DateTime date;
   final _Day? day;
   final _Leave? leave;
+
+  /// `강태윤 · 권나연 · 김도현 외 5명`
+  String _names(List<String> names) {
+    if (names.length <= _namesShown) return names.join(' · ');
+    final shown = names.take(_namesShown).join(' · ');
+    return '$shown 외 ${names.length - _namesShown}명';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -160,7 +172,7 @@ class _DayDialog extends StatelessWidget {
               child: Padding(
                 padding: EdgeInsets.only(top: 3),
                 child: Text(
-                  names.join(' · '),
+                  _names(names),
                   style: AppTextStyles.body2.copyWith(fontSize: 13),
                 ),
               ),
