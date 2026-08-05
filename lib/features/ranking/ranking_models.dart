@@ -6,16 +6,19 @@ part of 'ranking_screen.dart';
 /// 친절·프로젝트·환경정비는 **점수 원장 합**이다. 종합은 나머지 다섯을
 /// 100점으로 환산해 평균 낸 값이라 항상 맨 뒤에 둔다.
 enum _Metric {
-  revenue('매출', '매출'),
-  kindness('친절 점수', '친절'),
-  project('프로젝트 달성', '프로젝트'),
-  care('환경정비', '환경정비'),
-  lesson('수업 개수', '수업'),
-  overall('종합', '종합');
+  revenue('매출', '매출', 'revenue'),
+  kindness('친절 점수', '친절', 'kindness'),
+  project('프로젝트 달성', '프로젝트', 'project'),
+  care('환경정비', '환경정비', 'care'),
+  lesson('수업 개수', '수업', 'lesson'),
+  overall('종합', '종합', 'overall');
 
-  const _Metric(this.label, this.short);
+  const _Metric(this.label, this.short, this.wire);
 
   final String label;
+
+  /// 서버 `ranking_board.METRICS` 의 이름 — 추월 기록을 항목별로 받을 때 쓴다
+  final String wire;
 
   /// 폰 탭처럼 칸이 좁을 때 쓰는 짧은 이름
   final String short;

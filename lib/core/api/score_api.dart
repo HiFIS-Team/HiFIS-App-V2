@@ -186,10 +186,74 @@ class ScoreSummary {
 }
 
 /// `/scores` — 점수 원장
+/// 랭킹판에서 자리가 바뀐 한 건 (서버 `RankOvertakeOut`)
+///
+/// [gap] 은 **항목마다 단위가 다르다** — 매출이면 원, 수업이면 개수,
+/// 나머지는 점이다. 서버가 단위를 안 붙이는 건 화면이 이미 어느 탭인지
+/// 알기 때문이다.
+class RankOvertake {
+  RankOvertake({
+    required this.id,
+    required this.metric,
+    required this.moverName,
+    required this.moverBranchId,
+    required this.passedName,
+    required this.gap,
+    required this.rank,
+    required this.createdAt,
+  });
+
+  factory RankOvertake.fromJson(Map<String, dynamic> json) => RankOvertake(
+    id: json['id'] as String,
+    metric: json['metric'] as String,
+    moverName: json['moverName'] as String,
+    moverBranchId: json['moverBranchId'] as String?,
+    passedName: json['passedName'] as String,
+    gap: (json['gap'] as num).toDouble(),
+    rank: json['rank'] as int,
+    createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
+  );
+
+  final String id;
+  final String metric;
+
+  /// 앞지른 사람
+  final String moverName;
+  final String? moverBranchId;
+
+  /// 밀려난 사람
+  final String passedName;
+
+  final double gap;
+
+  /// 앞지른 사람의 새 등수
+  final int rank;
+
+  final DateTime createdAt;
+}
+
 class ScoreApi {
   ScoreApi._();
 
   static final _client = ApiClient.instance;
+
+  /// 누가 누구를 앞질렀나 — **MASTER · ADMIN 만** (그 밖에는 403)
+  ///
+  /// 5분마다 도는 서버 잡이 채운다. 랭킹은 볼 때마다 다시 계산하는 값이라
+  /// 서버가 찍어 두지 않으면 '언제 바뀌었나'를 알 수 없다.
+  static Future<List<RankOvertake>> overtakes({
+    String? metric,
+    int limit = 20,
+  }) async {
+    final rows = await _client.getList(
+      '/scores/overtakes',
+      query: {'metric': ?metric, 'limit': '$limit'},
+    );
+    return [
+      for (final row in rows)
+        RankOvertake.fromJson((row as Map).cast<String, dynamic>()),
+    ];
+  }
 
   /// 랭킹판 — 사람마다 항목별 값과 지난달 순위
   ///
