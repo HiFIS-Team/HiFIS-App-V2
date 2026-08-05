@@ -384,8 +384,11 @@ class _SummaryCard extends StatelessWidget {
               SizedBox(width: 5),
               Expanded(
                 child: Text(
-                  // 실제 입금액과 다르다는 걸 금액 바로 아래에서 알린다
-                  '세금·보험 공제 전 금액이에요',
+                  // 실제 입금액과 다르다는 걸 금액 바로 아래에서 알린다.
+                  // 알바는 주휴수당이 아직 안 들어간 금액이라 같이 알린다.
+                  payslip.hourly
+                      ? '세금·보험 공제 전, 주휴수당 전 금액이에요'
+                      : '세금·보험 공제 전 금액이에요',
                   style: AppTextStyles.caption.copyWith(
                     fontSize: 12,
                     color: AppColors.error,
@@ -549,6 +552,7 @@ class _PayCard extends StatelessWidget {
     total: payslip.total,
     totalLabel: '총 지급액',
     footnote: payslip.payNote,
+    showFootnote: payslip.hasPayNote,
   );
 }
 
@@ -559,7 +563,8 @@ class _AmountCard extends StatelessWidget {
     required this.items,
     required this.total,
     required this.totalLabel,
-    this.footnote,
+    required this.footnote,
+    required this.showFootnote,
   });
 
   final String title;
@@ -568,7 +573,11 @@ class _AmountCard extends StatelessWidget {
   final String totalLabel;
 
   /// 합계 아래 한 줄 설명 — 금액이 왜 이렇게 나왔는지
-  final String? footnote;
+  final String footnote;
+
+  /// 안 보일 때도 **자리는 그대로 잡는다** — 결재 화면에서 사람을 넘길 때마다
+  /// 카드가 커졌다 작아졌다 하면 화면 전체가 위아래로 튄다
+  final bool showFootnote;
 
   @override
   Widget build(BuildContext context) {
@@ -641,9 +650,12 @@ class _AmountCard extends StatelessWidget {
               Text(_won(total), style: AppTextStyles.title3),
             ],
           ),
-          if (footnote != null) ...[
-            SizedBox(height: 12),
-            Row(
+          // 없을 때도 **같은 문장**으로 자리를 잡는다 — 짧은 빈칸으로 채우면
+          // 두 줄로 접히는 문장과 높이가 어긋나서 결국 또 튄다
+          SizedBox(height: 12),
+          Opacity(
+            opacity: showFootnote ? 1 : 0,
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(
@@ -654,7 +666,7 @@ class _AmountCard extends StatelessWidget {
                 SizedBox(width: 5),
                 Expanded(
                   child: Text(
-                    footnote!,
+                    footnote,
                     style: AppTextStyles.caption.copyWith(
                       fontSize: 12,
                       height: 1.5,
@@ -663,7 +675,7 @@ class _AmountCard extends StatelessWidget {
                 ),
               ],
             ),
-          ],
+          ),
         ],
       ),
     );

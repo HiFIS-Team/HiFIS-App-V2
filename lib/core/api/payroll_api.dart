@@ -54,6 +54,7 @@ class PayslipBasis {
     required this.newSales,
     required this.renewalSales,
     required this.sessionSigns,
+    this.hourly = false,
   });
 
   factory PayslipBasis.fromJson(Map<String, dynamic> json) => PayslipBasis(
@@ -66,11 +67,18 @@ class PayslipBasis {
         SaleItem.fromJson((row as Map).cast<String, dynamic>()),
     ],
     sessionSigns: json['sessionSigns'] as int? ?? 0,
+    hourly: json['hourly'] != null,
   );
 
   final List<SaleItem> newSales;
   final List<SaleItem> renewalSales;
   final int sessionSigns;
+
+  /// 시급으로 계산된 명세서인가 — **알바(PART_TIME) 것만** 이 자리가 채워진다
+  ///
+  /// 사람의 지금 고용 형태가 아니라 **그 명세서를 뽑을 때** 무엇이었는지다.
+  /// 알바로 일하다 정규직이 돼도 지난 달 명세서는 시급 그대로 남아야 한다.
+  final bool hourly;
 }
 
 /// 한 달치 급여 명세서 (서버 `PayslipOut`)

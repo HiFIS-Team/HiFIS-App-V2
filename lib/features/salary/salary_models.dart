@@ -127,8 +127,14 @@ class _Payslip {
   }
 
   /// 커미션이 왜 이 금액인지 — 카드 맨 아래 한 줄
-  String? get payNote =>
-      source == null ? null : '이번 달 세션 $sessions회 · 회차마다 등록 단가가 달라 합계로 보여드려요';
+  ///
+  /// **늘 문장을 돌려준다.** 산출 안 된 달은 [hasPayNote] 가 false 라 안 보이는데,
+  /// 안 보일 때도 같은 문장으로 자리를 잡아야 카드 높이가 안 흔들린다
+  /// (짧은 빈칸으로 채우면 두 줄로 접히는 문장과 높이가 어긋난다).
+  String get payNote => '이번 달 세션 $sessions회 · 회차마다 등록 단가가 달라 합계로 보여드려요';
+
+  /// 각주를 보여줄 달인가 — 산출된 달만
+  bool get hasPayNote => source != null;
 
   /// 공제 항목 (4대 보험·세금) — 서버가 직급·공제 방식에 따라 계산한다
   List<_PayItem> get deductions => [
@@ -146,6 +152,11 @@ class _Payslip {
 
   /// 이번 달 세션 싸인 수 — 금액이 아니라 참고용 숫자다
   int get sessions => source?.basis.sessionSigns ?? 0;
+
+  /// 시급으로 계산된 달인가 (알바)
+  ///
+  /// 사람의 지금 고용 형태가 아니라 **그 명세서를 뽑을 때** 무엇이었는지를 본다.
+  bool get hourly => source?.basis.hourly ?? false;
 
   /// 커미션이 붙은 세션 수 — `newSales`·`renewalSales` 는 등록 건이 아니라
   /// **세션 한 건씩**이다 (서버가 `{회차} · {워크인|재등록|지인소개}` 로 담는다).
