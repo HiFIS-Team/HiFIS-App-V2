@@ -238,7 +238,15 @@ List<String> get _branches {
       (a, b) =>
           directory.branchRank(a.id).compareTo(directory.branchRank(b.id)),
     );
-  return [_allBranches, for (final branch in sorted) branch.name];
+  // **이름으로 한 번 더 거른다.** 서버가 HQ 를 `전체` 라고 부르는데 맨 앞의 필터
+  // 항목도 `전체` 라, `type` 판별이 한 번 새면 곧바로 `전체` 가 두 줄로 선다
+  // (실제 발생 — 고르개에 `전체 23명` 이 두 개 떴다).
+  final seen = <String>{_allBranches};
+  return [
+    _allBranches,
+    for (final branch in sorted)
+      if (seen.add(branch.name)) branch.name,
+  ];
 }
 
 /// 이 사람이 고른 지점에 드는가
