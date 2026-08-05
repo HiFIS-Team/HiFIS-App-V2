@@ -5,14 +5,49 @@ part of 'staff_screen.dart';
 // ---------------------------------------------------------------------------
 
 /// 지점 고르기 — 지점이 하나뿐이면 글자만 보여준다
-class _BranchPicker extends StatelessWidget {
+class _BranchPicker extends StatefulWidget {
   _BranchPicker({required this.selected, required this.onSelect});
 
   final String selected;
   final ValueChanged<String> onSelect;
 
   @override
+  State<_BranchPicker> createState() => _BranchPickerState();
+}
+
+class _BranchPickerState extends State<_BranchPicker> {
+  /// 메뉴를 알약 아래에 띄우려면 알약 자리를 알아야 한다
+  ///
+  /// **build 안에서 만들면 안 된다** — 새 GlobalKey 는 매번 하위 트리를 새로
+  /// 만들게 한다. State 에 한 번만 둔다.
+  final _key = GlobalKey();
+
+  Future<void> _open() async {
+    final selected = widget.selected;
+    final picked = await showGlassMenu<String>(
+      context: context,
+      anchorKey: _key,
+      width: 230,
+      items: [
+        for (final branch in _branches)
+          GlassMenuItem(
+            value: branch,
+            label: branch,
+            icon: CupertinoIcons.location_solid,
+            selected: branch == selected,
+            trailing: Text(
+              '${_members.where((m) => _inBranch(m, branch) && m.active).length}명',
+              style: AppTextStyles.caption.copyWith(fontSize: 12),
+            ),
+          ),
+      ],
+    );
+    if (picked != null) widget.onSelect(picked);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final selected = widget.selected;
     final label = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -37,6 +72,7 @@ class _BranchPicker extends StatelessWidget {
     );
 
     final box = Container(
+      key: _key,
       height: 38,
       padding: EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
@@ -48,45 +84,7 @@ class _BranchPicker extends StatelessWidget {
 
     if (_branches.length < 2) return box;
 
-    return PopupMenuButton<String>(
-      onSelected: onSelect,
-      tooltip: '',
-      position: PopupMenuPosition.under,
-      color: AppColors.surface,
-      elevation: 8,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: AppColors.gray100),
-      ),
-      itemBuilder: (context) => [
-        for (final branch in _branches)
-          PopupMenuItem(
-            value: branch,
-            height: 42,
-            child: Row(
-              children: [
-                Text(
-                  branch,
-                  style: AppTextStyles.body2.copyWith(
-                    fontWeight: branch == selected
-                        ? FontWeight.w700
-                        : FontWeight.w400,
-                    color: branch == selected
-                        ? AppColors.primary
-                        : AppColors.textPrimary,
-                  ),
-                ),
-                Spacer(),
-                Text(
-                  '${_members.where((m) => _inBranch(m, branch) && m.active).length}명',
-                  style: AppTextStyles.caption.copyWith(fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-      ],
-      child: box,
-    );
+    return Pressable(onTap: _open, scale: 0.96, child: box);
   }
 }
 

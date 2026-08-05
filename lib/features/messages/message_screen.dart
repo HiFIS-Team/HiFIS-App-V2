@@ -9,9 +9,11 @@ import '../../core/api/client/api_exception.dart';
 import '../../core/data/staff.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/util/platform.dart';
 import '../../core/util/sf_symbols.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
+import '../../core/widgets/glass/glass_menu.dart';
 import '../../core/widgets/glass/top_frost.dart';
 import 'chat_screen.dart';
 import 'chat_store.dart';
@@ -121,13 +123,17 @@ class _MessageScreenState extends State<MessageScreen> {
     }
   }
 
-  /// 헤더 필터 버튼 — 애플은 네이티브 메뉴(리퀴드 글래스), 그 외는 폴백
+  /// 헤더 필터 버튼 — 아이폰은 네이티브 메뉴, 그 외는 [showGlassMenu]
   ///
-  /// 애플에서는 `CNPopupMenuButton` 이 버튼과 메뉴를 한 몸으로 들고 있어서
-  /// 위치 계산·중복 방지가 필요 없다 (OS 가 띄운다). 버튼 자체는 [GlassIconButton]
-  /// 과 같은 네이티브 글래스라 모양이 안 바뀐다.
+  /// 아이폰에서는 `CNPopupMenuButton` 이 버튼과 메뉴를 한 몸으로 들고 있어서
+  /// 위치 계산이 필요 없다 (OS 가 띄운다). 버튼 자체는 [GlassIconButton] 과 같은
+  /// 네이티브 글래스라 모양이 안 바뀐다.
+  ///
+  /// **macOS 는 뺐다.** 같은 패키지의 macOS 구현이 메뉴 위치를 버튼 **왼쪽**에
+  /// 고정해서 (`NSPoint(x: 0, ...)`), 오른쪽 끝에 있는 이 버튼에서는 메뉴가
+  /// 오른쪽으로 자라 패널 밖으로 새어 나갔다. Dart 에서 못 고친다.
   Widget _filterButton() {
-    if (!isApple) {
+    if (!isApple || isDesktop) {
       return GlassIconButton(
         key: _filterKey,
         symbol: 'line.3.horizontal.decrease',
@@ -172,83 +178,38 @@ class _MessageScreenState extends State<MessageScreen> {
     );
   }
 
-  /// 필터 버튼 위치를 알아야 메뉴를 그 아래에 띄울 수 있다 (폴백 전용)
+  /// 필터 버튼 위치를 알아야 메뉴를 그 아래에 띄울 수 있다 (아이폰 외 전용)
   final _filterKey = GlobalKey();
 
   /// 메뉴가 이미 떠 있는지 — 없으면 누를 때마다 하나씩 더 쌓인다 (실제 발생)
   bool _filterOpen = false;
 
-  /// 헤더 필터 메뉴 (폴백) — 아이폰 메시지의 그 메뉴와 같은 구성
+  /// 헤더 필터 메뉴 (아이폰 외) — 아이폰 메시지의 그 메뉴와 같은 구성
   Future<void> _openFilterMenu() async {
     if (_filterOpen) return;
-    final button = _filterKey.currentContext?.findRenderObject() as RenderBox?;
-    // **최상위 오버레이 기준으로 띄운다.** 사내톡 패널 안의 오버레이를 쓰면
-    // 메뉴가 그 상자에 갇히고, 바깥을 눌러도 안 닫혀서 누를 때마다 쌓인다.
-    final overlay =
-        Overlay.of(context, rootOverlay: true).context.findRenderObject()
-            as RenderBox?;
-    if (button == null || overlay == null) return;
     _filterOpen = true;
-
-    final origin = button.localToGlobal(Offset.zero, ancestor: overlay);
-    final picked = await showMenu<String>(
+    final picked = await showGlassMenu<String>(
       context: context,
-      color: AppColors.surface,
-      elevation: 8,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: AppColors.gray100),
-      ),
-      position: RelativeRect.fromLTRB(
-        origin.dx,
-        origin.dy + button.size.height + 6,
-        overlay.size.width - origin.dx - button.size.width,
-        0,
-      ),
+      anchorKey: _filterKey,
       items: [
-        _menuItem('left', CupertinoIcons.arrow_turn_up_left, '최근 나간 항목'),
-        PopupMenuDivider(),
-        PopupMenuItem<String>(
-          enabled: false,
-          height: 30,
-          child: Text(
-            '필터 기준',
-            style: AppTextStyles.caption.copyWith(fontSize: 12),
-          ),
+        GlassMenuItem(
+          value: 'left',
+          label: '최근 나간 항목',
+          icon: CupertinoIcons.arrow_turn_up_left,
         ),
-        _menuItem(
-          'unread',
-          CupertinoIcons.chat_bubble,
-          '읽지 않음',
-          checked: _unreadOnly,
+        GlassMenuDivider(),
+        GlassMenuHeader('필터 기준'),
+        GlassMenuItem(
+          value: 'unread',
+          label: '읽지 않음',
+          icon: CupertinoIcons.chat_bubble,
+          selected: _unreadOnly,
         ),
       ],
-      useRootNavigator: true,
     );
     _filterOpen = false;
     if (!mounted) return;
     _pick(picked);
-  }
-
-  PopupMenuItem<String> _menuItem(
-    String value,
-    IconData icon,
-    String label, {
-    bool checked = false,
-  }) {
-    return PopupMenuItem<String>(
-      value: value,
-      height: 44,
-      child: Row(
-        children: [
-          Icon(icon, size: 17, color: AppColors.textSecondary),
-          SizedBox(width: 10),
-          Expanded(child: Text(label, style: AppTextStyles.body2)),
-          if (checked)
-            Icon(CupertinoIcons.checkmark, size: 15, color: AppColors.primary),
-        ],
-      ),
-    );
   }
 
   /// 나간 대화 보관함 — 새 채팅과 같은 자리에서 열린다
