@@ -17,11 +17,19 @@ class DecideButtons extends StatelessWidget {
     super.key,
     required this.onApprove,
     required this.onReject,
+    this.busy = false,
     this.fill = false,
   });
 
   final VoidCallback onApprove;
   final VoidCallback onReject;
+
+  /// 서버에 보내는 중 — **둘 다 안 눌린다**
+  ///
+  /// 목록을 다시 받아 줄이 사라질 때까지 버튼이 그대로 남아 있어서,
+  /// 안 잠그면 승인을 두 번 보내고 두 번째가 400 으로 떨어진다
+  /// (성공 토스트 뒤에 에러 토스트가 따라 뜬다).
+  final bool busy;
 
   /// true면 가로를 꽉 채운다 (폰에서 버튼을 아래로 내릴 때)
   final bool fill;
@@ -29,7 +37,7 @@ class DecideButtons extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final reject = Pressable(
-      onTap: onReject,
+      onTap: busy ? () {} : onReject,
       scale: 0.96,
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
@@ -50,7 +58,7 @@ class DecideButtons extends StatelessWidget {
       ),
     );
     final approve = Pressable(
-      onTap: onApprove,
+      onTap: busy ? () {} : onApprove,
       scale: 0.96,
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
@@ -70,6 +78,14 @@ class DecideButtons extends StatelessWidget {
       ),
     );
 
+    // 도는 동안 둘 다 옅어진다 — 하나만 흐리면 다른 쪽은 눌릴 것처럼 보인다
+    if (busy) {
+      return Opacity(opacity: 0.5, child: _row(reject, approve));
+    }
+    return _row(reject, approve);
+  }
+
+  Widget _row(Widget reject, Widget approve) {
     return Row(
       mainAxisSize: fill ? MainAxisSize.max : MainAxisSize.min,
       children: fill

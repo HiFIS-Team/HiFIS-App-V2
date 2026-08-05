@@ -19,10 +19,14 @@ class MiniButton extends StatelessWidget {
     required this.label,
     required this.onTap,
     required this.filled,
+    this.busy = false,
   });
 
   final String label;
   final VoidCallback onTap;
+
+  /// 서버에 보내는 중 — 안 눌린다 ([DecideButtons.busy] 와 같은 이유)
+  final bool busy;
 
   /// 승인은 채우고 반려는 테두리만 — 실수로 반려를 먼저 누르지 않게
   final bool filled;
@@ -30,13 +34,20 @@ class MiniButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Pressable(
-      onTap: onTap,
+      onTap: busy ? () {} : onTap,
       scale: 0.96,
       borderRadius: BorderRadius.circular(10),
       child: Container(
         height: 32,
         padding: EdgeInsets.symmetric(horizontal: 12),
         alignment: Alignment.center,
+        // 도는 동안 옅어져서 지금은 못 누른다는 걸 보여준다
+        foregroundDecoration: busy
+            ? BoxDecoration(
+                color: AppColors.surface.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(10),
+              )
+            : null,
         decoration: BoxDecoration(
           color: filled ? AppColors.primary : AppColors.surface,
           borderRadius: BorderRadius.circular(10),

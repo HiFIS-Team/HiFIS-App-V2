@@ -15,6 +15,7 @@ class AppButton extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.filled = false,
+    this.busy = false,
     this.color,
     this.textColor,
     this.shrinkWrap = false,
@@ -22,6 +23,15 @@ class AppButton extends StatelessWidget {
 
   final String label;
   final VoidCallback onTap;
+
+  /// 서버에 쓰는 중 — 스피너로 바뀌고 **더 눌리지 않는다**
+  ///
+  /// **글자를 `'제출 중...'` 으로 바꾸지 않는다.** 그러면 버튼 폭이 글자 길이만큼
+  /// 흔들려서 옆 버튼까지 밀린다. 스피너는 자리를 그대로 쓴다.
+  ///
+  /// 네트워크가 느릴 때 두 번 눌리면 서버에 같은 요청이 두 번 간다 —
+  /// 두 번째는 400 이라 **성공 토스트 뒤에 에러 토스트가 따라 뜬다.**
+  final bool busy;
 
   /// 주요 동작이면 true — 포인트 컬러로 채운다
   final bool filled;
@@ -43,24 +53,34 @@ class AppButton extends StatelessWidget {
         textColor ?? (filled ? Colors.white : AppColors.textSecondary);
 
     final button = Pressable(
-      onTap: onTap,
+      onTap: busy ? () {} : onTap,
       scale: 0.96,
       child: Container(
         height: height,
         alignment: Alignment.center,
         padding: shrinkWrap ? EdgeInsets.symmetric(horizontal: 24) : null,
         decoration: BoxDecoration(
-          color: background,
+          // 도는 동안 옅어져서 지금은 못 누른다는 걸 보여준다
+          color: busy ? background.withValues(alpha: 0.6) : background,
           borderRadius: BorderRadius.circular(14),
         ),
-        child: Text(
-          label,
-          maxLines: 1,
-          style: AppTextStyles.body2.copyWith(
-            fontWeight: FontWeight.w700,
-            color: foreground,
-          ),
-        ),
+        child: busy
+            ? SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.2,
+                  valueColor: AlwaysStoppedAnimation(foreground),
+                ),
+              )
+            : Text(
+                label,
+                maxLines: 1,
+                style: AppTextStyles.body2.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: foreground,
+                ),
+              ),
       ),
     );
 

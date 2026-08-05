@@ -55,6 +55,12 @@ class _InboxCardState extends State<_InboxCard> {
   List<InboxItem> _items = const [];
   bool _loading = true;
 
+  /// 처리 중인 항목 id — 그 줄의 버튼만 잠근다
+  ///
+  /// 목록을 다시 받을 때까지 줄이 그대로 남아 있어서, 안 잠그면 같은 결재를
+  /// 두 번 보내고 두 번째가 400 으로 떨어진다.
+  String? _busyId;
+
   /// 데스크톱은 나란히 선 프로젝트 카드와 줄 수를 맞춘다
   static const _max = 4;
 
@@ -137,6 +143,8 @@ class _InboxCardState extends State<_InboxCard> {
     Future<void> Function() action,
     String done,
   ) async {
+    if (_busyId != null) return;
+    setState(() => _busyId = item.id);
     try {
       await action();
       if (!mounted) return;
@@ -144,6 +152,8 @@ class _InboxCardState extends State<_InboxCard> {
       await _load();
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
+    } finally {
+      if (mounted) setState(() => _busyId = null);
     }
   }
 
@@ -177,6 +187,7 @@ class _InboxCardState extends State<_InboxCard> {
       for (final item in shown)
         _InboxRow(
           item: item,
+          busy: _busyId == item.id,
           onApprove: _canDecide ? () => _approve(item) : null,
           onReject: _canDecide ? () => _reject(item) : null,
         ),
@@ -230,9 +241,17 @@ class _InboxCardState extends State<_InboxCard> {
 }
 
 class _InboxRow extends StatelessWidget {
-  _InboxRow({required this.item, this.onApprove, this.onReject});
+  _InboxRow({
+    required this.item,
+    this.busy = false,
+    this.onApprove,
+    this.onReject,
+  });
 
   final InboxItem item;
+
+  /// 이 줄을 처리하는 중 — 버튼이 안 눌린다
+  final bool busy;
 
   /// null 이면 버튼을 안 그린다 (ADMIN)
   final VoidCallback? onApprove;
@@ -287,9 +306,9 @@ class _InboxRow extends StatelessWidget {
         // 반려가 왼쪽 — 프로젝트·전자결재·급여와 같은 차례다
         if (onApprove != null && onReject != null) ...[
           SizedBox(width: 8),
-          MiniButton(label: '반려', onTap: onReject!, filled: false),
+          MiniButton(label: '반려', onTap: onReject!, filled: false, busy: busy),
           SizedBox(width: 6),
-          MiniButton(label: '승인', onTap: onApprove!, filled: true),
+          MiniButton(label: '승인', onTap: onApprove!, filled: true, busy: busy),
         ],
       ],
     );

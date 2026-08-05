@@ -48,7 +48,13 @@ class _LeaveBalanceState extends State<_LeaveBalance> {
     await _run(() => AttendanceApi.rejectLeave(leave.id, reason), '반려했어요');
   }
 
+  /// 서버에 보내는 중 — 목록을 다시 받을 때까지 버튼이 남아 있어서
+  /// 안 잠그면 같은 결재가 두 번 나간다
+  bool _busy = false;
+
   Future<void> _run(Future<LeaveRequest> Function() action, String done) async {
+    if (_busy) return;
+    setState(() => _busy = true);
     try {
       await action();
       if (!mounted) return;
@@ -56,6 +62,8 @@ class _LeaveBalanceState extends State<_LeaveBalance> {
       await widget.onDecided();
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -104,6 +112,7 @@ class _LeaveBalanceState extends State<_LeaveBalance> {
               SizedBox(height: 18),
               DecideButtons(
                 fill: true,
+                busy: _busy,
                 onApprove: () => _approve(waiting),
                 onReject: () => _reject(waiting),
               ),

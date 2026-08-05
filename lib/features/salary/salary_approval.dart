@@ -301,8 +301,14 @@ class _ApprovalTabState extends State<_ApprovalTab> {
     await _run(() => PayrollApi.pay(payslip.id), '지급 처리했어요');
   }
 
+  /// 서버에 보내는 중 — 목록을 다시 받을 때까지 버튼이 남아 있어서
+  /// 안 잠그면 같은 결재가 두 번 나간다
+  bool _busy = false;
+
   /// 처리하고 목록을 다시 받는다 — 함이 셋이라 한 건만 옮기면 어긋나기 쉽다
   Future<void> _run(Future<Payslip> Function() action, String done) async {
+    if (_busy) return;
+    setState(() => _busy = true);
     try {
       await action();
       if (!mounted) return;
@@ -310,6 +316,8 @@ class _ApprovalTabState extends State<_ApprovalTab> {
       await _load();
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -342,6 +350,7 @@ class _ApprovalTabState extends State<_ApprovalTab> {
               for (final payslip in _waiting)
                 _ApprovalRow(
                   payslip: payslip,
+                  busy: _busy,
                   onApprove: _canDecide ? () => _approve(payslip) : null,
                   onReject: _canDecide ? () => _reject(payslip) : null,
                 ),
@@ -357,6 +366,7 @@ class _ApprovalTabState extends State<_ApprovalTab> {
               for (final payslip in _toPay)
                 _ApprovalRow(
                   payslip: payslip,
+                  busy: _busy,
                   onPay: _canDecide ? () => _pay(payslip) : null,
                 ),
             ],
@@ -461,6 +471,7 @@ class _PayInlineButton extends StatelessWidget {
 class _ApprovalRow extends StatelessWidget {
   _ApprovalRow({
     required this.payslip,
+    this.busy = false,
     this.onApprove,
     this.onReject,
     this.onPay,
@@ -472,6 +483,9 @@ class _ApprovalRow extends StatelessWidget {
   final VoidCallback? onApprove;
   final VoidCallback? onReject;
   final VoidCallback? onPay;
+
+  /// 이 화면이 서버에 보내는 중 — 버튼이 안 눌린다
+  final bool busy;
 
   String get _name =>
       StaffDirectory.instance.byId(payslip.employeeId)?.name ?? '알 수 없음';
@@ -554,7 +568,11 @@ class _ApprovalRow extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 if (onApprove != null && onReject != null)
-                  DecideButtons(onApprove: onApprove!, onReject: onReject!),
+                  DecideButtons(
+                    busy: busy,
+                    onApprove: onApprove!,
+                    onReject: onReject!,
+                  ),
                 if (onPay != null) _PayInlineButton(onTap: onPay!),
               ],
             ),
