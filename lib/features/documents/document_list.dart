@@ -13,6 +13,8 @@ class _ListBody extends StatelessWidget {
     required this.onRename,
     required this.onDelete,
     required this.onMenu,
+    required this.onMove,
+    required this.canDrag,
   });
 
   final List<_Item> items;
@@ -23,6 +25,12 @@ class _ListBody extends StatelessWidget {
   final ValueChanged<_Item> onDownload;
   final ValueChanged<_Item> onRename;
   final ValueChanged<_Item> onDelete;
+
+  /// 끌어다 놓아 옮기기
+  final void Function(_Item item, _Item folder) onMove;
+
+  /// 즐겨찾기·최근 항목은 폴더 구조와 상관없는 목록이라 끌지 않는다
+  final bool canDrag;
 
   /// 우클릭한 항목과 커서 위치
   final void Function(_Item item, Offset position) onMenu;
@@ -49,17 +57,31 @@ class _ListBody extends StatelessWidget {
           child: ListView.builder(
             padding: EdgeInsets.fromLTRB(12, 6, 12, 24),
             itemCount: items.length,
-            itemBuilder: (context, index) => _ListRow(
-              item: items[index],
-              selected: items[index] == selected,
-              onSelect: () => onSelect(items[index]),
-              onOpen: () => onOpen(items[index]),
-              onStar: () => onStar(items[index]),
-              onDownload: () => onDownload(items[index]),
-              onRename: () => onRename(items[index]),
-              onDelete: () => onDelete(items[index]),
-              onMenu: (position) => onMenu(items[index], position),
-            ),
+            itemBuilder: (context, index) {
+              final item = items[index];
+              final row = _ListRow(
+                item: item,
+                selected: item == selected,
+                onSelect: () => onSelect(item),
+                onOpen: () => onOpen(item),
+                onStar: () => onStar(item),
+                onDownload: () => onDownload(item),
+                onRename: () => onRename(item),
+                onDelete: () => onDelete(item),
+                onMenu: (position) => onMenu(item, position),
+              );
+              if (!canDrag) return row;
+              // 폴더는 놓을 자리이면서 자기도 옮겨진다
+              final draggable = _DragItem(item: item, child: row);
+              return item.isFolder
+                  ? _DropFolder(
+                      folder: item,
+                      onMove: onMove,
+                      radius: 10,
+                      child: draggable,
+                    )
+                  : draggable;
+            },
           ),
         ),
       ],

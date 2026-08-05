@@ -288,12 +288,15 @@ class DocumentApi {
   }
 
   /// 파일 올리기 — 멀티파트. [folderId] 가 null 이면 최상위에 담긴다
+  ///
+  /// [tags] 는 서버가 **쉼표로 끊어진 한 줄**로 받는다 (멀티파트라 배열이 안 온다).
   static Future<Document> upload(
     String path, {
     required DocScope scope,
     required String filename,
     String? folderId,
     String? desc,
+    List<String>? tags,
   }) async {
     final form = FormData.fromMap({
       'file': await MultipartFile.fromFile(path, filename: filename),
@@ -302,18 +305,21 @@ class DocumentApi {
       'name': filename,
       'folderId': ?folderId,
       'desc': ?desc,
+      'tags': ?tags?.join(','),
     });
     final data = await _client.post('/documents', body: form);
     return Document.fromJson(data!);
   }
 
-  /// 이름·설명 고치기 · 다른 폴더로 옮기기
+  /// 이름·설명·태그 고치기 · 다른 폴더로 옮기기
   ///
   /// [folderId] 에 빈 문자열을 주면 최상위로 뺀다 (null 은 "안 건드림").
+  /// [tags] 는 **통째로 갈아끼운다** — 빈 배열을 주면 태그가 없어진다.
   static Future<Document> updateDocument(
     String id, {
     String? name,
     String? desc,
+    List<String>? tags,
     String? folderId,
   }) async {
     final data = await _client.patch(
@@ -321,6 +327,7 @@ class DocumentApi {
       body: {
         'name': ?name,
         'desc': ?desc,
+        'tags': ?tags,
         if (folderId != null) 'folderId': folderId.isEmpty ? null : folderId,
       },
     );

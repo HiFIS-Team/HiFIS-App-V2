@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/api/client/api_exception.dart';
 import '../../core/api/project/meeting_api.dart';
+import '../../core/api/project/project_api.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/staff.dart';
 import '../../core/data/staff_directory.dart';
@@ -20,6 +21,7 @@ import '../../core/widgets/editor/reaction_row.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/feedback/empty_card.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
+import '../../core/widgets/glass/glass_menu.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/nav/phone_scaffold.dart';
 import '../../core/util/when.dart';
@@ -471,6 +473,9 @@ class _NoteViewState extends State<_NoteView> {
   late final _title = TextEditingController(text: widget.note.title);
   final _titleFocus = FocusNode();
 
+  /// 프로젝트 고르개가 뜰 자리 — 그 칩 아래에 붙는다
+  final _projectKey = GlobalKey();
+
   bool get _editing => widget.editing;
 
   /// 마크다운 문법 도움말 펼침 상태
@@ -537,6 +542,43 @@ class _NoteViewState extends State<_NoteView> {
     widget.onChanged();
   }
 
+  /// 이 회의록을 프로젝트에 건다 — 빼려면 맨 위 '전사 회의'를 고른다
+  ///
+  /// **공개 범위가 같이 간다.** 서버에서 `scope=PROJECT` 는 `projectId` 와 한 쌍이라
+  /// 걸면 그 프로젝트 담당자·참석자·작성자·MASTER·ADMIN 만 보게 된다
+  /// (backend-gap.md 44번). 따로 고르는 자리를 두면 둘이 어긋난다.
+  Future<void> _pickProject() async {
+    final note = widget.note;
+    final picked = await showGlassMenu<String>(
+      context: context,
+      anchorKey: _projectKey,
+      alignRight: false,
+      width: 240,
+      items: [
+        GlassMenuItem(
+          value: '',
+          label: '전사 회의',
+          icon: Icons.groups_rounded,
+          selected: note.projectId == null,
+        ),
+        if (_projects.isNotEmpty) GlassMenuDivider<String>(),
+        for (final project in _projects)
+          GlassMenuItem(
+            value: project.id,
+            label: project.title,
+            icon: Icons.folder_rounded,
+            selected: note.projectId == project.id,
+          ),
+      ],
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      note.projectId = picked.isEmpty ? null : picked;
+      note.scope = picked.isEmpty ? MeetingScope.company : MeetingScope.project;
+    });
+    widget.onChanged();
+  }
+
   /// 본문의 체크박스를 눌렀을 때 그 줄만 바꿔 쓴다
   void _toggleCheckbox(int line, bool checked) {
     final lines = widget.note.body.split('\n');
@@ -552,6 +594,9 @@ class _NoteViewState extends State<_NoteView> {
   Widget build(BuildContext context) {
     final note = widget.note;
     final phone = widget.phone;
+
+    /// 걸린 프로젝트 — 안 걸었으면 null 이라 읽을 때 그 칩이 안 나온다
+    final linked = _projectOf(note.projectId);
 
     final title = _editing
         ? TextField(
@@ -653,7 +698,10 @@ class _NoteViewState extends State<_NoteView> {
         SizedBox(height: 10),
         // 날짜·참석자 — 편집 중에는 바로 고칠 수 있다
         if (_editing) ...[
-          Row(
+          // 폰에서는 칩 셋이 한 줄에 안 들어가 다음 줄로 흐른다
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
             children: [
               Pressable(
                 onTap: _pickDate,
@@ -680,7 +728,6 @@ class _NoteViewState extends State<_NoteView> {
                   ],
                 ),
               ),
-              SizedBox(width: 6),
               // 달력 옆 마크다운 문법 도움말 (펼침)
               Pressable(
                 onTap: () => setState(() => _help = !_help),
@@ -709,6 +756,41 @@ class _NoteViewState extends State<_NoteView> {
                       _help
                           ? Icons.keyboard_arrow_up_rounded
                           : Icons.keyboard_arrow_down_rounded,
+                      size: 16,
+                      color: AppColors.textSecondary,
+                    ),
+                  ],
+                ),
+              ),
+              // 어느 프로젝트 회의인지 — 안 걸면 전사 회의다
+              Pressable(
+                key: _projectKey,
+                onTap: _pickProject,
+                scale: 0.97,
+                pressedColor: AppColors.gray100,
+                borderRadius: BorderRadius.circular(10),
+                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      linked == null
+                          ? Icons.groups_rounded
+                          : Icons.folder_rounded,
+                      size: 13,
+                      color: AppColors.textSecondary,
+                    ),
+                    SizedBox(width: 6),
+                    Text(
+                      linked?.title ?? '전사 회의',
+                      style: AppTextStyles.body2.copyWith(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(width: 2),
+                    Icon(
+                      Icons.keyboard_arrow_down_rounded,
                       size: 16,
                       color: AppColors.textSecondary,
                     ),
@@ -752,6 +834,31 @@ class _NoteViewState extends State<_NoteView> {
               ),
               SizedBox(width: 10),
               AvatarStack(names: note.members, size: 24),
+              // 프로젝트에 건 회의만 나온다 — 전사 회의에는 이 자리가 없다
+              if (linked != null) ...[
+                SizedBox(width: 10),
+                Flexible(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.folder_rounded,
+                        size: 13,
+                        color: AppColors.textTertiary,
+                      ),
+                      SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          linked.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.caption,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         SizedBox(height: 14),
@@ -870,8 +977,12 @@ class _Note {
   String body;
   DateTime updated;
 
-  final MeetingScope scope;
-  final String? projectId;
+  /// 공개 범위 — **프로젝트를 걸면 [MeetingScope.project] 로 간다.**
+  /// 짝이라 따로 고르지 않는다 (서버 `scope=PROJECT` 는 `projectId` 와 한 쌍이다)
+  MeetingScope scope;
+
+  /// 묶인 프로젝트 — null 이면 전사 회의다
+  String? projectId;
 
   List<ReactionAgg> reactions;
 
@@ -904,12 +1015,30 @@ final _notes = <_Note>[];
 /// 한 번이라도 받아왔는지 — 탭을 다시 열 때 빈 목록을 깜빡이지 않게 한다
 bool _notesLoaded = false;
 
+/// 회의록을 걸 수 있는 프로젝트 — 고르개와 걸린 이름 표시에 같이 쓴다
+final _projects = <Project>[];
+
 Future<void> _loadNotes() async {
+  // 회의록과 같이 받는다 — 걸린 프로젝트 **이름**을 읽을 때도 써서
+  // 고르개를 열 때 받으면 안 고치는 사람에게는 이름이 안 뜬다
   final rows = await MeetingApi.list();
+  final projects = await ProjectApi.list();
   _notes
     ..clear()
     ..addAll([for (final row in rows) _fromServer(row)]);
+  _projects
+    ..clear()
+    ..addAll(projects);
   _notesLoaded = true;
+}
+
+/// 걸린 프로젝트 — 지워졌으면 null 이라 화면에서 그 칩이 빠진다
+Project? _projectOf(String? id) {
+  if (id == null) return null;
+  for (final project in _projects) {
+    if (project.id == id) return project;
+  }
+  return null;
 }
 
 /// 서버 회의록 → 화면 모델
@@ -965,6 +1094,9 @@ Future<void> _saveNote(_Note note) async {
     blocks: blocks,
     meetingAt: note.date,
     attendeeIds: attendeeIds,
+    scope: note.scope,
+    // 뺐으면 빈 문자열로 보내야 서버가 푼다 (null 은 "안 건드림")
+    projectId: note.projectId ?? '',
   );
   note.memberIds = saved.attendeeIds;
 }

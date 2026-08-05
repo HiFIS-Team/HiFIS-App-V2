@@ -22,6 +22,7 @@ import '../../core/widgets/input/pressable.dart';
 import '../../core/util/when.dart';
 part 'approval_list.dart';
 part 'approval_detail.dart';
+part 'approval_comments.dart';
 part 'approval_composer.dart';
 part 'approval_decide.dart';
 part 'approval_fields.dart';
@@ -142,6 +143,19 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
     }
   }
 
+  /// 댓글 — 처리 전에 되묻는 자리다 (승인·반려 의견과 다르다)
+  ///
+  /// 서버가 문서를 통째로 돌려줘서 그대로 갈아끼운다.
+  Future<void> _comment(_Doc doc, String body) async {
+    try {
+      final saved = await ApprovalApi.comment(doc.id, body: body);
+      if (!mounted) return;
+      setState(() => _replace(_fromServer(saved)));
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+  }
+
   /// 회수 — 올린 사람이 진행 중인 결재를 물린다
   Future<void> _withdraw(_Doc doc) async {
     final ok = await showConfirmDialog(
@@ -218,6 +232,7 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
                     onApprove: () => _decide(selected, approve: true),
                     onReject: () => _decide(selected, approve: false),
                     onWithdraw: () => _withdraw(selected),
+                    onComment: (body) => _comment(selected, body),
                   ),
           ),
         ],

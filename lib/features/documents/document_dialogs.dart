@@ -116,6 +116,157 @@ class _NameDialogState extends State<_NameDialog> {
   }
 }
 
+// ── 설명·태그 팝업 ──
+
+/// 서버에 보낼 설명과 태그
+typedef _Info = ({String desc, List<String> tags});
+
+/// 문서의 설명·태그를 고친다. 취소하면 null 이다
+///
+/// **올릴 때 묻지 않는다.** 파일을 여러 개 끌어다 놓는 게 흔한데 그때마다
+/// 팝업이 뜨면 담는 일이 안 끝난다. 올린 뒤 필요한 것에만 붙인다.
+Future<_Info?> _askInfo(BuildContext context, _Item item) {
+  return showAppDialog<_Info>(context, (context) => _InfoDialog(item: item));
+}
+
+class _InfoDialog extends StatefulWidget {
+  _InfoDialog({required this.item});
+
+  final _Item item;
+
+  @override
+  State<_InfoDialog> createState() => _InfoDialogState();
+}
+
+class _InfoDialogState extends State<_InfoDialog> {
+  late final _desc = TextEditingController(text: widget.item.desc ?? '');
+  late final _tags = TextEditingController(text: widget.item.tags.join(', '));
+
+  @override
+  void dispose() {
+    _desc.dispose();
+    _tags.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    Navigator.pop(context, (
+      desc: _desc.text.trim(),
+      // 쉼표로 끊고 빈 칸은 버린다 — `계약서, , 2026` 이 태그 셋이 되면 안 된다
+      tags: [
+        for (final tag in _tags.text.split(','))
+          if (tag.trim().isNotEmpty) tag.trim(),
+      ],
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: dialogWidth(context, 380),
+      padding: EdgeInsets.fromLTRB(24, 24, 24, 20),
+      decoration: AppDecorations.card(radius: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('설명·태그', style: AppTextStyles.title3),
+          SizedBox(height: 4),
+          Text(
+            widget.item.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.caption,
+          ),
+          SizedBox(height: 16),
+          Text('설명', style: AppTextStyles.label),
+          SizedBox(height: 8),
+          _InfoField(
+            controller: _desc,
+            hint: '무슨 파일인지 한 줄로 적어주세요',
+            lines: 3,
+            autofocus: true,
+          ),
+          SizedBox(height: 14),
+          Row(
+            children: [
+              Text('태그', style: AppTextStyles.label),
+              SizedBox(width: 6),
+              Text('쉼표로 나눠요', style: AppTextStyles.caption),
+            ],
+          ),
+          SizedBox(height: 8),
+          _InfoField(
+            controller: _tags,
+            hint: '계약서, 2026',
+            onSubmitted: _submit,
+          ),
+          SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: AppButton(
+                  label: '취소',
+                  onTap: () => Navigator.pop(context),
+                ),
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                child: AppButton(label: '저장', filled: true, onTap: _submit),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 설명·태그 입력칸 — 이름 팝업과 같은 면·높이다
+class _InfoField extends StatelessWidget {
+  _InfoField({
+    required this.controller,
+    required this.hint,
+    this.lines = 1,
+    this.autofocus = false,
+    this.onSubmitted,
+  });
+
+  final TextEditingController controller;
+  final String hint;
+  final int lines;
+  final bool autofocus;
+  final VoidCallback? onSubmitted;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: lines > 1
+          ? AppDecorations.fieldPaddingMultiline
+          : AppDecorations.fieldPadding,
+      decoration: AppDecorations.field(),
+      child: TextField(
+        controller: controller,
+        autofocus: autofocus,
+        style: AppTextStyles.body2,
+        cursorColor: AppColors.primary,
+        minLines: lines,
+        maxLines: lines,
+        textInputAction: lines > 1
+            ? TextInputAction.newline
+            : TextInputAction.done,
+        onSubmitted: (_) => onSubmitted?.call(),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: AppTextStyles.body2.copyWith(color: AppColors.gray400),
+          border: InputBorder.none,
+          isCollapsed: true,
+        ),
+      ),
+    );
+  }
+}
+
 // ── 우클릭 메뉴 ──
 
 /// 메뉴 한 줄 (label이 null이면 구분선)

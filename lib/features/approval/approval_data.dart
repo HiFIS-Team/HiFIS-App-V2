@@ -62,8 +62,9 @@ enum _State {
 
 /// 결재선 기본값 — 대표에게 올린다
 ///
-/// 서버는 여러 명을 순서대로 세울 수 있지만 앱에는 아직 결재선을 짜는 자리가
-/// 없다 (backend-gap.md 48번). 명단에 대표가 없으면 못 올린다.
+/// **결재는 대표 한 사람이 한다.** 서버도 승인·반려를 MASTER 로 못 박아서
+/// (`MASTER_ONLY`), 결재선에 다른 사람을 세우면 그 칸에서 아무도 못 움직인다.
+/// 명단에 대표가 없으면 못 올린다.
 Employee? get _defaultApprover {
   final people = StaffDirectory.instance.employees;
   for (final person in people) {
@@ -108,6 +109,7 @@ class _Doc {
     required this.state,
     required this.approverIds,
     required this.steps,
+    required this.comments,
     this.currentApproverId,
     this.startDate,
     this.endDate,
@@ -136,6 +138,9 @@ class _Doc {
   final List<String> approverIds;
   final List<ApprovalStep> steps;
   final String? currentApproverId;
+
+  /// 당사자끼리 주고받은 말 — 오래된 것부터다 (서버가 뒤에 붙인다)
+  final List<ApprovalComment> comments;
 
   String get writer => _nameOf(writerId);
 
@@ -193,6 +198,7 @@ _Doc _fromServer(Approval row) => _Doc(
   state: _State.of(row.status),
   approverIds: row.approverIds,
   steps: row.steps,
+  comments: row.comments,
   currentApproverId: row.currentApproverId,
   startDate: row.startDate,
   endDate: row.endDate,

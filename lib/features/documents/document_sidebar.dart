@@ -13,6 +13,7 @@ class _Sidebar extends StatelessWidget {
     required this.onPickPlace,
     required this.onJump,
     required this.onToggleExpand,
+    required this.onMove,
   });
 
   /// 지금 보고 있는 갈래 (전사 · 개인)
@@ -28,6 +29,9 @@ class _Sidebar extends StatelessWidget {
   final ValueChanged<List<_Item>> onJump;
   final ValueChanged<_Item> onToggleExpand;
 
+  /// 트리 폴더에 끌어다 놓았을 때 — 멀리 있는 폴더로 옮기는 길이다
+  final void Function(_Item item, _Item folder) onMove;
+
   /// 폴더를 재귀로 펼쳐 트리 줄을 만든다
   List<Widget> _tree(List<_Item> parents, _Item folder, int depth) {
     final rows = <Widget>[];
@@ -35,14 +39,19 @@ class _Sidebar extends StatelessWidget {
       final path = [...parents, child];
       final hasFolders = child.children!.any((i) => i.isFolder);
       rows.add(
-        _TreeRow(
+        _DropFolder(
           folder: child,
-          depth: depth,
-          selected: place == _Place.all && current == child,
-          expandable: hasFolders,
-          expanded: expanded.contains(child),
-          onTap: () => onJump(path),
-          onToggle: () => onToggleExpand(child),
+          onMove: onMove,
+          radius: 10,
+          child: _TreeRow(
+            folder: child,
+            depth: depth,
+            selected: place == _Place.all && current == child,
+            expandable: hasFolders,
+            expanded: expanded.contains(child),
+            onTap: () => onJump(path),
+            onToggle: () => onToggleExpand(child),
+          ),
         ),
       );
       if (hasFolders && expanded.contains(child)) {

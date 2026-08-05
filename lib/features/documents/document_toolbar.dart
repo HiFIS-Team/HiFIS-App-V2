@@ -13,6 +13,7 @@ class _Toolbar extends StatelessWidget {
     required this.canGoUp,
     required this.onGoUp,
     required this.onCrumb,
+    required this.onMove,
     required this.onQuery,
     required this.onToggleView,
     required this.onNewFolder,
@@ -29,6 +30,10 @@ class _Toolbar extends StatelessWidget {
   final bool canGoUp;
   final VoidCallback onGoUp;
   final ValueChanged<int> onCrumb;
+
+  /// 경로 줄에 끌어다 놓았을 때 — 그 폴더로 옮긴다
+  final void Function(_Item item, _Item folder) onMove;
+
   final ValueChanged<String> onQuery;
   final VoidCallback onToggleView;
   final VoidCallback onNewFolder;
@@ -51,7 +56,7 @@ class _Toolbar extends StatelessWidget {
           SizedBox(width: 10),
           Expanded(
             child: place == _Place.all
-                ? _Breadcrumb(path: path, onTap: onCrumb)
+                ? _Breadcrumb(path: path, onTap: onCrumb, onMove: onMove)
                 : Text(place.label, style: AppTextStyles.title3),
           ),
           SizedBox(width: 12),
@@ -120,11 +125,15 @@ class _Toolbar extends StatelessWidget {
 }
 
 /// 현재 경로 — 칸을 누르면 그 폴더로 되돌아간다
+///
+/// 항목을 **끌어다 놓으면 그 폴더로 옮겨진다.** 폴더 안에서 밖으로 꺼내는
+/// 길이 여기뿐이다 — 지금 보고 있는 목록에는 상위 폴더가 안 나온다.
 class _Breadcrumb extends StatelessWidget {
-  _Breadcrumb({required this.path, required this.onTap});
+  _Breadcrumb({required this.path, required this.onTap, required this.onMove});
 
   final List<_Item> path;
   final ValueChanged<int> onTap;
+  final void Function(_Item item, _Item folder) onMove;
 
   @override
   Widget build(BuildContext context) {
@@ -150,18 +159,23 @@ class _Breadcrumb extends StatelessWidget {
                       color: AppColors.gray300,
                     ),
                   ),
-                Pressable(
-                  onTap: () => onTap(i),
-                  scale: 0.96,
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                    child: Text(
-                      path[i].name,
-                      style: i == path.length - 1
-                          ? AppTextStyles.title3
-                          : AppTextStyles.body2.copyWith(
-                              color: AppColors.textTertiary,
-                            ),
+                _DropFolder(
+                  folder: path[i],
+                  onMove: onMove,
+                  radius: 8,
+                  child: Pressable(
+                    onTap: () => onTap(i),
+                    scale: 0.96,
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      child: Text(
+                        path[i].name,
+                        style: i == path.length - 1
+                            ? AppTextStyles.title3
+                            : AppTextStyles.body2.copyWith(
+                                color: AppColors.textTertiary,
+                              ),
+                      ),
                     ),
                   ),
                 ),

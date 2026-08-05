@@ -26,6 +26,7 @@ part 'document_grid.dart';
 part 'document_list.dart';
 part 'document_dialogs.dart';
 part 'document_preview.dart';
+part 'document_move.dart';
 
 /// 문서함 화면
 ///
@@ -402,6 +403,79 @@ class _DocumentScreenState extends State<DocumentScreen> {
     }
   }
 
+  /// 설명·태그 고치기 — 서버가 문서에만 준다
+  ///
+  /// 검색이 이름뿐 아니라 이 둘도 훑어서, 파일 이름이 `scan_0421.pdf` 여도
+  /// `계약서` 로 찾아진다.
+  Future<void> _editInfo(_Item item) async {
+    if (item.isFolder) return;
+    if (!item.canEdit) {
+      AppToast.show(context, '올린 사람만 고칠 수 있어요');
+      return;
+    }
+    final info = await _askInfo(context, item);
+    if (info == null || !mounted) return;
+
+    final beforeDesc = item.desc;
+    final beforeTags = item.tags;
+    setState(() {
+      item.desc = info.desc.isEmpty ? null : info.desc;
+      item.tags = info.tags;
+    });
+    try {
+      await DocumentApi.updateDocument(
+        item.id,
+        desc: info.desc,
+        tags: info.tags,
+      );
+      if (mounted) setState(() => item.updated = DateTime.now());
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        item.desc = beforeDesc;
+        item.tags = beforeTags;
+      });
+      AppToast.show(context, messageOf(error));
+    }
+  }
+
+  /// 끌어다 놓은 항목을 그 폴더로 옮긴다
+  ///
+  /// **화면을 먼저 옮기고 서버에 보낸다** — 놓자마자 자리가 바뀌어야 옮긴 것처럼
+  /// 보인다. 실패하면 원래 자리로 되돌린다 (즐겨찾기 별과 같은 방식).
+  Future<void> _move(_Item item, _Item folder) async {
+    if (!item.canEdit) {
+      AppToast.show(context, '올린 사람만 옮길 수 있어요');
+      return;
+    }
+    final from = _parentOf(_root, item);
+    if (from == null || !_canDropInto(item, folder)) return;
+
+    setState(() {
+      from.children!.remove(item);
+      folder.children!.add(item);
+      _selected = item;
+    });
+
+    try {
+      // 최상위로 뺄 때는 빈 문자열이다 (null 은 "안 건드림")
+      final parentId = folder.id.isEmpty ? '' : folder.id;
+      if (item.isFolder) {
+        await DocumentApi.updateFolder(item.id, parentId: parentId);
+      } else {
+        await DocumentApi.updateDocument(item.id, folderId: parentId);
+      }
+      if (mounted) setState(() => item.updated = DateTime.now());
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        folder.children!.remove(item);
+        from.children!.add(item);
+      });
+      AppToast.show(context, messageOf(error));
+    }
+  }
+
   Future<void> _delete(_Item item) async {
     if (!item.canEdit) {
       AppToast.show(context, '올린 사람만 지울 수 있어요');
@@ -525,6 +599,12 @@ class _DocumentScreenState extends State<DocumentScreen> {
       ),
       if (!item.isFolder)
         _MenuEntry(
+          label: '설명·태그',
+          icon: Icons.label_outline_rounded,
+          onTap: () => _editInfo(item),
+        ),
+      if (!item.isFolder)
+        _MenuEntry(
           label: item.starred ? '즐겨찾기 해제' : '즐겨찾기에 추가',
           icon: item.starred ? Icons.star_rounded : Icons.star_border_rounded,
           onTap: () => _toggleStar(item),
@@ -578,9 +658,10 @@ class _DocumentScreenState extends State<DocumentScreen> {
     };
 
     final query = _query.trim();
+    // 이름뿐 아니라 설명·태그도 훑는다 — `scan_0421.pdf` 를 `계약서` 로 찾는 자리다
     final filtered = query.isEmpty
         ? list
-        : list.where((i) => i.name.contains(query)).toList();
+        : list.where((i) => i.matches(query)).toList();
 
     if (_place == _Place.recent) return filtered.take(30).toList();
 
@@ -625,6 +706,7 @@ class _DocumentScreenState extends State<DocumentScreen> {
                 onToggleExpand: (folder) => setState(() {
                   if (!_expanded.remove(folder)) _expanded.add(folder);
                 }),
+                onMove: _move,
               ),
             ),
           ),
@@ -673,6 +755,7 @@ class _DocumentScreenState extends State<DocumentScreen> {
           canGoUp: _place == _Place.all && _path.length > 1,
           onGoUp: _goUp,
           onCrumb: _goTo,
+          onMove: _move,
           onQuery: (v) => setState(() => _query = v),
           onToggleView: () => setState(() => _listView = !_listView),
           onNewFolder: _newFolder,
@@ -694,6 +777,8 @@ class _DocumentScreenState extends State<DocumentScreen> {
                 ? _ListBody(
                     items: items,
                     selected: _selected,
+                    onMove: _move,
+                    canDrag: _place == _Place.all,
                     onSelect: (i) => setState(() => _selected = i),
                     onOpen: _open,
                     onStar: _toggleStar,
@@ -705,6 +790,8 @@ class _DocumentScreenState extends State<DocumentScreen> {
                 : _GridBody(
                     items: items,
                     selected: _selected,
+                    onMove: _move,
+                    canDrag: _place == _Place.all,
                     onSelect: (i) => setState(() => _selected = i),
                     onOpen: _open,
                     onStar: _toggleStar,

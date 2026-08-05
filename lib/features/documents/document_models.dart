@@ -85,6 +85,9 @@ class _Item {
        url = null,
        // 서버가 폴더에는 즐겨찾기를 안 준다
        starred = false,
+       // 설명·태그도 문서에만 있다
+       desc = null,
+       tags = const [],
        children = children ?? [];
 
   _Item.file({
@@ -97,6 +100,8 @@ class _Item {
     this.path,
     this.updated,
     this.starred = false,
+    this.desc,
+    this.tags = const [],
   }) : children = null;
 
   /// 서버 uuid
@@ -118,6 +123,12 @@ class _Item {
   /// 폴더에는 없다 — 서버가 문서에만 준다
   bool starred;
 
+  /// 무슨 파일인지 적어 두는 한 줄. 폴더에는 없다
+  String? desc;
+
+  /// 분류 꼬리표 — 검색이 이름·설명과 같이 훑는다. 폴더에는 없다
+  List<String> tags;
+
   /// 서버에 올라간 파일 주소 (서명 포함). 폴더는 null
   final String? url;
 
@@ -135,6 +146,17 @@ class _Item {
 
   /// 화면에 띄울 수 있는 이미지인지
   bool get canPreview => kind == _Kind.image && (path != null || url != null);
+
+  /// 검색어에 걸리는가 — 이름 · 설명 · 태그를 같이 훑는다
+  ///
+  /// 대소문자를 안 가린다. 파일 이름이 영문일 때 `PDF` 로 찾으나 `pdf` 로
+  /// 찾으나 같아야 한다.
+  bool matches(String query) {
+    final needle = query.toLowerCase();
+    if (name.toLowerCase().contains(needle)) return true;
+    if ((desc ?? '').toLowerCase().contains(needle)) return true;
+    return tags.any((tag) => tag.toLowerCase().contains(needle));
+  }
 
   /// 'KB · MB' 표기 — 파인더처럼 1000 단위로 끊는다
   String get sizeLabel {
@@ -217,6 +239,8 @@ _Item _itemOf(Document document, {String? path}) => _Item.file(
   url: document.fileUrl,
   updated: document.updatedAt ?? document.createdAt,
   starred: document.favoritedByMe,
+  desc: document.desc,
+  tags: document.tags,
   path: path,
 );
 

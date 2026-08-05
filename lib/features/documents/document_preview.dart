@@ -80,6 +80,10 @@ class _FilePreviewCard extends StatelessWidget {
           else
             _placeholder('${item.kind.label}은 아직 미리보기를 지원하지 않아요'),
           SizedBox(height: 16),
+          // 적어 둔 것이 있을 때만 — 안 적으면 이 두 줄이 아예 없다
+          if (item.desc case final desc? when desc.isNotEmpty)
+            _info('설명', desc),
+          if (item.tags.isNotEmpty) _info('태그', item.tags.join(' · ')),
           _info('종류', item.kind.label),
           _info('크기', item.sizeLabel),
           if (item.updated != null) _info('수정한 날짜', item.updatedLabel),

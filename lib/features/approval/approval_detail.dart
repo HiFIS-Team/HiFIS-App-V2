@@ -9,12 +9,16 @@ class _DocDetail extends StatelessWidget {
     required this.onApprove,
     required this.onReject,
     required this.onWithdraw,
+    required this.onComment,
   });
 
   final _Doc doc;
   final VoidCallback onApprove;
   final VoidCallback onReject;
   final VoidCallback onWithdraw;
+
+  /// 댓글 달기 — 서버에 올리고 오는 동안 기다린다
+  final Future<void> Function(String) onComment;
 
   @override
   Widget build(BuildContext context) {
@@ -278,6 +282,9 @@ class _DocDetail extends StatelessWidget {
             ),
           ),
         ],
+        SizedBox(height: 16),
+        // 처리 뒤에도 오간 말은 남는다 — 그래서 결과 카드 아래다
+        _CommentCard(doc: doc, onComment: onComment),
       ],
     );
   }

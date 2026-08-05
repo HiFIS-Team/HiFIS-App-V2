@@ -126,6 +126,10 @@ class MeetingApi {
   }
 
   /// 고치기 — 넘긴 값만 바뀐다
+  ///
+  /// [projectId] 에 빈 문자열을 주면 **묶인 프로젝트를 푼다** (null 은 "안 건드림").
+  /// 문서함 이동([DocumentApi.updateDocument])과 같은 규칙이다 — 서버가
+  /// `exclude_unset` 으로 갈라서, 빼는 것과 안 건드리는 것을 이렇게 구분한다.
   static Future<Meeting> update(
     String id, {
     String? title,
@@ -142,7 +146,8 @@ class MeetingApi {
         'blocks': ?blocks,
         'scope': ?scope?.wire,
         'attendeeIds': ?attendeeIds,
-        'projectId': ?projectId,
+        if (projectId != null)
+          'projectId': projectId.isEmpty ? null : projectId,
         'meetingAt': ?meetingAt?.toUtc().toIso8601String(),
       },
     );
