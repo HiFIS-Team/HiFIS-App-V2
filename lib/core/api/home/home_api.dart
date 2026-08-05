@@ -1,7 +1,8 @@
 import '../client/api_client.dart';
 import '../staff/attendance_api.dart';
 
-export '../staff/attendance_api.dart' show AttendanceStatus, HalfPeriod, LeaveType;
+export '../staff/attendance_api.dart'
+    show AttendanceStatus, HalfPeriod, LeaveType;
 export '../client/period.dart' show periodKey;
 
 /// 홈의 오늘 근태 (서버 `HomeAttendanceOut`)

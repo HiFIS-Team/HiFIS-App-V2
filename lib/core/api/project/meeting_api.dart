@@ -1,7 +1,8 @@
 import '../client/api_client.dart';
 import '../notice/reaction_api.dart';
 
-export '../notice/reaction_api.dart' show ReactionAgg, ReactionApi, ReactionTarget;
+export '../notice/reaction_api.dart'
+    show ReactionAgg, ReactionApi, ReactionTarget;
 
 /// 회의록 공개 범위 (서버 `MeetingScope`)
 enum MeetingScope {

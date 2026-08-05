@@ -5,8 +5,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import '../client/api_client.dart';
-import 'chat_api.dart';
 import '../client/token_store.dart';
+import 'chat_api.dart';
 
 /// 서버가 보내오는 실시간 사건
 sealed class ChatEvent {

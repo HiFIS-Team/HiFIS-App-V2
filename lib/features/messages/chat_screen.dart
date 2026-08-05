@@ -5,9 +5,9 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/api/chat/chat_api.dart';
 import '../../core/api/client/api_client.dart' show fileUrl;
 import '../../core/api/client/api_exception.dart';
-import '../../core/api/chat/chat_api.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/staff.dart';
 import '../../core/data/staff_directory.dart';
@@ -17,8 +17,8 @@ import '../../core/util/platform.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/glass/glass_input_bar.dart';
-import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/glass/top_frost.dart';
+import '../../core/widgets/input/pressable.dart';
 import 'chat_detail_screen.dart';
 import 'chat_store.dart';
 

@@ -1,5 +1,5 @@
-import '../client/api_client.dart';
 import '../chat/chat_api.dart' show MessageKind;
+import '../client/api_client.dart';
 
 /// 열람용 대화방 (서버 `ChatAuditRoomOut`)
 ///

@@ -3,27 +3,25 @@ import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/api/chat/chat_api.dart';
+import '../../core/data/staff.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
 import '../../core/util/sf_symbols.dart';
+import '../../core/widgets/glass/glass_icon_button.dart';
+import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/nav/android_tab_bar.dart';
 import '../../core/widgets/nav/app_tab_bar.dart';
-import '../../core/widgets/input/pressable.dart';
-import 'desktop_sidebar.dart';
-import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/nav/lazy_indexed_stack.dart';
 import '../approval/approval_screen.dart';
-import '../documents/document_screen.dart';
 import '../attendance/attendance_barcode_overlay.dart';
 import '../attendance/attendance_screen.dart';
+import '../documents/document_screen.dart';
 import '../home/home_screen.dart';
 import '../meeting/meeting_screen.dart';
-import '../messages/desktop_chat_screen.dart';
-import '../work/work_screen.dart';
-import '../../core/api/chat/chat_api.dart';
-import '../../core/data/staff.dart';
 import '../messages/chat_store.dart';
+import '../messages/desktop_chat_screen.dart';
 import '../messages/message_screen.dart';
 import '../monitoring/monitoring_screen.dart';
 import '../notice/notice_screen.dart';
@@ -31,9 +29,11 @@ import '../notifications/notification_screen.dart';
 import '../profile/profile_screen.dart';
 import '../project/project_screen.dart';
 import '../ranking/ranking_screen.dart';
-import '../schedule/schedule_screen.dart';
 import '../salary/salary_screen.dart';
+import '../schedule/schedule_screen.dart';
 import '../staff/staff_screen.dart';
+import '../work/work_screen.dart';
+import 'desktop_sidebar.dart';
 
 /// 하단 탭바와 탭별 화면을 관리하는 루트 셸
 ///
