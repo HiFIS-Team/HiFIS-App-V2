@@ -2,10 +2,13 @@ part of 'attendance_screen.dart';
 
 // ── 월차 ──
 
-/// 남은 월차 카드 — 큰 숫자와 사용량 막대, 그리고 신청 버튼
+/// 쓴 월차 카드 — 큰 숫자와 신청 버튼
 ///
 /// 결재할 신청이 밀려 있으면 신청 버튼 자리를 반려·승인이 대신 차지한다
 /// ([_LeaveDecideRow]). 승인 화면을 따로 나누지 않기로 했다.
+///
+/// **남은 월차가 아니라 쓴 월차를 띄운다** — 부여 일수를 믿을 수 없어서다
+/// ([_balance] 주석 참고).
 class _LeaveBalance extends StatefulWidget {
   _LeaveBalance({required this.onRequest, required this.onDecided});
 
@@ -59,8 +62,6 @@ class _LeaveBalanceState extends State<_LeaveBalance> {
   @override
   Widget build(BuildContext context) {
     final used = _usedLeave;
-    final remaining = _remainingLeave;
-    final rate = (used / _grantedLeave).clamp(0.0, 1.0);
     final pending = _leaves
         .where((l) => l.status == _LeaveStatus.pending)
         .length;
@@ -121,7 +122,7 @@ class _LeaveBalanceState extends State<_LeaveBalance> {
         children: [
           Row(
             children: [
-              Expanded(child: Text('남은 월차', style: AppTextStyles.label)),
+              Expanded(child: Text('쓴 월차', style: AppTextStyles.label)),
               // 결재를 기다리는 신청이 있으면 여기서 바로 알려준다
               if (pending > 0)
                 Text(
@@ -138,7 +139,7 @@ class _LeaveBalanceState extends State<_LeaveBalance> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                _dayCount(remaining),
+                _dayCount(used),
                 style: TextStyle(
                   fontFamily: AppTextStyles.fontFamily,
                   fontSize: 40,
@@ -153,27 +154,7 @@ class _LeaveBalanceState extends State<_LeaveBalance> {
                 child: Text('일', style: AppTextStyles.title3),
               ),
               Spacer(),
-              Padding(
-                padding: EdgeInsets.only(bottom: 8),
-                child: Text(
-                  '${_dayCount(used)} / ${_dayCount(_grantedLeave)}일 사용',
-                  style: AppTextStyles.caption.copyWith(fontSize: 12),
-                ),
-              ),
             ],
-          ),
-          SizedBox(height: 14),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: Stack(
-              children: [
-                Container(height: 8, color: AppColors.gray100),
-                FractionallySizedBox(
-                  widthFactor: rate,
-                  child: Container(height: 8, color: AppColors.primary),
-                ),
-              ],
-            ),
           ),
           if (waiting != null) ...[
             SizedBox(height: 18),
@@ -561,10 +542,6 @@ class _LeaveComposerState extends State<_LeaveComposer> {
       AppToast.show(context, '그 날짜에는 이미 신청한 월차가 있어요');
       return;
     }
-    if (_kind.days > _remainingLeave) {
-      AppToast.show(context, '남은 월차가 모자라요');
-      return;
-    }
     // 아직 서버에 안 보낸 초안 — 부르는 쪽이 이걸로 신청 요청을 만든다
     Navigator.pop(
       context,
@@ -622,8 +599,7 @@ class _LeaveComposerState extends State<_LeaveComposer> {
         ),
         SizedBox(height: 8),
         Text(
-          '${_dayCount(_kind.days)}일이 차감돼요 · 남은 월차 '
-          '${_dayCount(_remainingLeave)}일',
+          '${_dayCount(_kind.days)}일이 차감돼요',
           style: AppTextStyles.caption.copyWith(fontSize: 12),
         ),
         SizedBox(height: 20),
