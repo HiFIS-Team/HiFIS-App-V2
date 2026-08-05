@@ -79,13 +79,18 @@ class _InboxCardState extends State<_InboxCard> {
     }
   }
 
-  /// 버튼을 낼지 — 눌러도 403 날 버튼은 안 낸다
+  /// 버튼을 낼지 — **MASTER 만 낸다.**
   ///
-  /// **일정만 ADMIN 도 누른다.** 승인 없이 일정을 올릴 수 있는 사람이
-  /// 남의 신청도 결재한다 (서버 `_DECIDERS`). 나머지는 MASTER 뿐이다.
-  bool _canDecideOn(InboxItem item) => item.kind == InboxKind.event
-      ? myRole == Role.master || myRole == Role.admin
-      : myRole.canApprove;
+  /// 예전에는 일정만 ADMIN 에게도 냈다. 서버가 일정 결재를
+  /// `_DECIDERS = (MASTER, ADMIN)` 으로 열어 둬서 눌리기는 했다.
+  /// 그런데 같은 카드 안에서 급여·월차 줄에는 버튼이 없고 일정 줄에만 있어
+  /// **왜 어떤 건 되고 어떤 건 안 되는지 알 수 없었다.**
+  /// 결재는 대표가 판단하는 자리라 ADMIN 은 지켜보기만 한다
+  /// (`/me/inbox` docstring 에 서버도 그렇게 적어 뒀다).
+  ///
+  /// MANAGER 는 애초에 이 카드를 못 본다 — `/me/inbox` 가 ADMIN 게이트라
+  /// 403 이고, 홈도 MASTER·ADMIN 에게만 카드를 그린다.
+  bool get _canDecide => myRole == Role.master;
 
   /// 종류마다 부르는 곳이 다르다 — id 는 그 테이블의 것이다
   Future<void> _approve(InboxItem item) => _run(item, () async {
@@ -172,8 +177,8 @@ class _InboxCardState extends State<_InboxCard> {
       for (final item in shown)
         _InboxRow(
           item: item,
-          onApprove: _canDecideOn(item) ? () => _approve(item) : null,
-          onReject: _canDecideOn(item) ? () => _reject(item) : null,
+          onApprove: _canDecide ? () => _approve(item) : null,
+          onReject: _canDecide ? () => _reject(item) : null,
         ),
     ];
 
