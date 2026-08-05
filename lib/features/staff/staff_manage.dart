@@ -296,6 +296,9 @@ class _PickerCard extends StatelessWidget {
                 Pressable(
                   onTap: () => onSelect(value),
                   scale: 0.96,
+                  // `alignment` 를 주면 안 된다 — Container 가 부모가 주는
+                  // 최대 폭까지 늘어나서 칩이 한 줄에 하나씩 쌓인다
+                  // (`Wrap` 을 쓴 뜻이 없어진다). 글자는 padding 이 가운데로 잡는다.
                   child: AnimatedContainer(
                     duration: Duration(milliseconds: 140),
                     height: 38,
@@ -306,16 +309,18 @@ class _PickerCard extends StatelessWidget {
                           : AppColors.gray100,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      label,
-                      style: AppTextStyles.label.copyWith(
-                        fontWeight: value == selected
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                        color: value == selected
-                            ? AppColors.surface
-                            : AppColors.textSecondary,
+                    child: Center(
+                      widthFactor: 1,
+                      child: Text(
+                        label,
+                        style: AppTextStyles.label.copyWith(
+                          fontWeight: value == selected
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: value == selected
+                              ? AppColors.surface
+                              : AppColors.textSecondary,
+                        ),
                       ),
                     ),
                   ),
