@@ -2,6 +2,37 @@ part of 'attendance_screen.dart';
 
 // ── 달력 ──
 
+/// 상태 한 줄이 잡아먹는 높이 — 위 여백 2 + 안쪽 위아래 4 + 글자 13(10 × 1.3)
+const _rosterLineHeight = 19.0;
+
+/// 줄이 서기 전에 이미 나간 높이 — 칸 위아래 여백 11 + 날짜 동그라미 22
+const _rosterChrome = 33.0;
+
+/// 그날 칸에 설 상태 줄 — `이름 외 N명 상태`
+///
+/// 다들 출근·퇴근뿐이면 줄을 늘어놓지 않고 `전원 출근` 한 줄로 접는다.
+/// **칸 높이를 재는 쪽과 그리는 쪽이 같은 걸 봐야** 해서 밖으로 빼 뒀다 —
+/// 따로 세면 한쪽이 틀려서 칸이 넘친다.
+List<(String, Color)> _rosterLines(DateTime date) {
+  final groups = _rosterOf(date);
+  if (groups.isEmpty) return const [];
+
+  final lines = <(String, Color)>[];
+  var onlyPlain = true;
+  for (final (status, label, color, plain) in _workStatusOrder) {
+    final names = groups[status];
+    if (names == null || names.isEmpty) continue;
+    if (!plain) onlyPlain = false;
+    lines.add(('${_whoIn(names)} $label', color));
+  }
+  if (lines.isEmpty) return const [];
+  return onlyPlain ? [('전원 출근', AppColors.workIn)] : lines;
+}
+
+/// `김트레이너` · `김트레이너 외 3명`
+String _whoIn(List<String> names) =>
+    names.length == 1 ? names.first : '${names.first} 외 ${names.length - 1}명';
+
 /// 화면의 주인공 — 칸마다 그날의 근무나 월차가 바로 보인다
 class _MonthCalendar extends StatelessWidget {
   _MonthCalendar({
@@ -44,7 +75,7 @@ class _MonthCalendar extends StatelessWidget {
     // 칸 안에 근무 시간까지 들어가야 해서 넉넉히 잡는다.
     // 대표 칸은 상태마다 한 줄씩 들어가서 더 높다
     final cellHeight = _isBoss
-        ? (isDesktop ? 132.0 : 104.0)
+        ? _bossCellHeight(month, lastDay)
         : (isDesktop ? 84.0 : 62.0);
 
     return Container(
@@ -132,6 +163,26 @@ class _MonthCalendar extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// 대표 칸 높이 — **그 달에서 제일 바쁜 날**에 맞춘다
+  ///
+  /// 상태가 여러 가지 나온 날은 줄이 그만큼 늘어나는데 칸이 고정이면 넘친다
+  /// (폰은 4줄부터 5px, PC 는 6줄부터 15px — 실제로 났다).
+  ///
+  /// 줄을 잘라서 맞추지 않는다. 이 화면은 **그날 누가 어땠는지**를 보는 자리라
+  /// 잘린 상태는 아예 없던 일처럼 보인다. 칸이 자라는 쪽이 낫다.
+  ///
+  /// 조용한 달은 지금까지의 높이 그대로다 — 폰 3줄·PC 5줄까지는 안 자란다.
+  double _bossCellHeight(DateTime month, int lastDay) {
+    var most = 0;
+    for (var day = 1; day <= lastDay; day++) {
+      final count = _rosterLines(DateTime(month.year, month.month, day)).length;
+      if (count > most) most = count;
+    }
+    final base = isDesktop ? 132.0 : 104.0;
+    final needed = _rosterChrome + most * _rosterLineHeight;
+    return needed > base ? needed : base;
   }
 
   Widget _arrow(IconData icon, VoidCallback onTap) => Pressable(
@@ -276,32 +327,18 @@ class _DayCellState extends State<_DayCell> {
 
   /// 대표 칸 — 상태마다 `이름 외 N명 상태` 한 줄
   ///
-  /// 다들 출근·퇴근뿐이면 줄을 늘어놓지 않고 `전원 출근` 한 줄로 끝낸다.
+  /// 줄을 세는 건 [_rosterLines] 가 한다 — 칸 높이도 그걸 보고 잡는다.
   Widget _roster(DateTime date) {
-    final groups = _rosterOf(date);
-    if (groups.isEmpty) return SizedBox();
-
-    final lines = <Widget>[];
-    var onlyPlain = true;
-    for (final (status, label, color, plain) in _workStatusOrder) {
-      final names = groups[status];
-      if (names == null || names.isEmpty) continue;
-      if (!plain) onlyPlain = false;
-      lines.add(_line('${_who(names)} $label', color));
-    }
+    final lines = _rosterLines(date);
     if (lines.isEmpty) return SizedBox();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       // 줄이 하나든 넷이든 칸 가운데에 모인다 — 위나 아래로 붙으면 날짜와 떨어져 보인다
       mainAxisAlignment: MainAxisAlignment.center,
-      children: onlyPlain ? [_line('전원 출근', AppColors.workIn)] : lines,
+      children: [for (final (text, color) in lines) _line(text, color)],
     );
   }
-
-  /// `김트레이너` · `김트레이너 외 3명`
-  String _who(List<String> names) =>
-      names.length == 1 ? names.first : '${names.first} 외 ${names.length - 1}명';
 
   /// 상태 한 줄 — 옅은 바탕에 같은 색 글씨 (앱의 알약과 같은 방식)
   Widget _line(String text, Color color) => Container(
