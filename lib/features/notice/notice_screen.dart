@@ -21,6 +21,8 @@ import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/nav/phone_scaffold.dart';
+import '../../core/util/when.dart';
+import '../../core/widgets/feedback/app_dialog.dart';
 
 part 'notice_phone.dart';
 part 'notice_list.dart';
@@ -165,6 +167,15 @@ class _NoticeScreenState extends State<NoticeScreen> {
   }
 
   Future<void> _delete(_Notice notice) async {
+    // 전 직원이 보는 글이라 한 번 더 묻는다 — 문서함 폴더와 같은 기준이다
+    final ok = await showConfirmDialog(
+      context,
+      title: '이 공지를 지울까요?',
+      message: '지우면 되돌릴 수 없어요.',
+      confirmLabel: '삭제',
+      destructive: true,
+    );
+    if (!ok || !mounted) return;
     try {
       await _deleteNotice(notice);
       if (!mounted) return;
@@ -274,19 +285,11 @@ class NoticeBrief {
   bool get pinned => _notice.pinned;
   bool get unread => !_notice.read;
 
-  /// '오늘' · '어제' · '3일 전' · '7.12'
-  String get time {
-    final now = DateTime.now();
-    final days = DateTime(now.year, now.month, now.day)
-        .difference(
-          DateTime(_notice.date.year, _notice.date.month, _notice.date.day),
-        )
-        .inDays;
-    if (days <= 0) return '오늘';
-    if (days == 1) return '어제';
-    if (days < 7) return '$days일 전';
-    return _date(_notice.date);
-  }
+  /// '오늘' · '어제' · '7.12'
+  ///
+  /// 칭찬·설문·수업 기록과 같은 규칙이다. 예전에는 여기만 2~6일을
+  /// `3일 전` 으로 적었다.
+  String get time => dayLabel(_notice.date);
 
   /// 폰: 읽음 처리하고 본문을 옆에서 밀어 연다
   Future<void> open(BuildContext context) {

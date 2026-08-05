@@ -62,15 +62,7 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen> {
   }
 
   /// 오늘/어제/그 외 날짜 라벨
-  String _dayLabel(DateTime time) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final day = DateTime(time.year, time.month, time.day);
-    final diff = today.difference(day).inDays;
-    if (diff == 0) return '오늘';
-    if (diff == 1) return '어제';
-    return '${time.month}.${time.day}';
-  }
+  String _dayLabel(DateTime time) => dayLabel(time);
 
   @override
   Widget build(BuildContext context) {

@@ -160,4 +160,4 @@ bool _canEdit(_Notice notice) =>
 // ── 표시용 계산 ──
 
 /// '7.30' 형태
-String _date(DateTime time) => '${time.month}.${time.day}';
+String _date(DateTime time) => dateLabel(time);

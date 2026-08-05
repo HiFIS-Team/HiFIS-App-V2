@@ -405,18 +405,25 @@ class _DocumentScreenState extends State<DocumentScreen> {
       AppToast.show(context, '올린 사람만 지울 수 있어요');
       return;
     }
-    // 폴더를 지우면 **하위 폴더와 그 안의 문서까지** 서버에서 같이 지워진다
-    if (item.isFolder) {
-      final nested = item.children!.any((child) => child.isFolder);
-      final ok = await showConfirmDialog(
-        context,
-        title: "'${item.name}' 폴더를 지울까요?",
-        message: nested ? '안에 든 하위 폴더와 문서까지 모두 지워져요.' : '폴더 안에 든 문서도 같이 지워져요.',
-        confirmLabel: '삭제',
-        destructive: true,
-      );
-      if (!ok || !mounted) return;
-    }
+    // **파일도 똑같이 묻는다.** 예전에는 폴더만 물어서, 같은 메뉴의 같은 '삭제'
+    // 인데 폴더는 확인이 뜨고 파일은 그냥 사라졌다.
+    //
+    // 폴더는 지우면 **하위 폴더와 그 안의 문서까지** 서버에서 같이 지워져서
+    // 무엇이 딸려 가는지를 따로 알려 준다.
+    final nested =
+        item.isFolder && item.children!.any((child) => child.isFolder);
+    final ok = await showConfirmDialog(
+      context,
+      title: item.isFolder
+          ? "'${item.name}' 폴더를 지울까요?"
+          : "'${item.name}' 을 지울까요?",
+      message: item.isFolder
+          ? (nested ? '안에 든 하위 폴더와 문서까지 모두 지워져요.' : '폴더 안에 든 문서도 같이 지워져요.')
+          : '지우면 되돌릴 수 없어요.',
+      confirmLabel: '삭제',
+      destructive: true,
+    );
+    if (!ok || !mounted) return;
 
     try {
       if (item.isFolder) {

@@ -450,7 +450,7 @@ class _MonthCard extends StatelessWidget {
 }
 
 /// '2023년 3월 2일'
-String _date(DateTime value) => '${value.year}년 ${value.month}월 ${value.day}일';
+String _date(DateTime value) => fullDateLabel(value);
 
 /// 소수점이 있을 때만 .5를 보여준다
 String _count(double value) =>

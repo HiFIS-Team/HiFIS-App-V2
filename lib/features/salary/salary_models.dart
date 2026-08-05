@@ -260,4 +260,4 @@ String _won(int value) => '${_amount(value)}원';
 String _monthLabel(DateTime value) => '${value.year}년 ${value.month}월';
 
 /// '8월 10일'
-String _dayLabel(DateTime value) => '${value.month}월 ${value.day}일';
+String _dayLabel(DateTime value) => monthDayLabel(value);

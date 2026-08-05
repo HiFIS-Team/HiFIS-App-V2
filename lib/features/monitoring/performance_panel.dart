@@ -10,6 +10,7 @@ import '../../core/widgets/feedback/delayed_spinner.dart';
 import '../../core/widgets/feedback/empty_card.dart';
 import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/nav/pane_transition.dart';
+import '../../core/util/when.dart';
 
 /// 성능 지표 — 서버가 얼마나 빠른가 (모니터링 넷째 탭)
 ///
@@ -253,9 +254,7 @@ class _Timeline extends StatelessWidget {
     );
   }
 
-  String _clock(DateTime time) =>
-      '${time.hour.toString().padLeft(2, '0')}:'
-      '${time.minute.toString().padLeft(2, '0')}';
+  String _clock(DateTime time) => clockLabel(time);
 }
 
 /// 느린 주소 — 손볼 곳이 어디인지

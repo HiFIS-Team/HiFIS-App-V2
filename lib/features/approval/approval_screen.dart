@@ -19,6 +19,7 @@ import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/input/decide_buttons.dart';
 import '../../core/widgets/input/pressable.dart';
+import '../../core/util/when.dart';
 part 'approval_list.dart';
 part 'approval_detail.dart';
 part 'approval_composer.dart';

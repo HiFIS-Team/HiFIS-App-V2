@@ -131,14 +131,10 @@ class _OvertakeLine extends StatelessWidget {
   final RankOvertake row;
   final _Metric metric;
 
-  /// '방금' · '12분 전' · '3시간 전' · '2일 전'
-  String get _ago {
-    final gap = DateTime.now().difference(row.createdAt);
-    if (gap.inMinutes < 1) return '방금';
-    if (gap.inMinutes < 60) return '${gap.inMinutes}분 전';
-    if (gap.inHours < 24) return '${gap.inHours}시간 전';
-    return '${gap.inDays}일 전';
-  }
+  /// '방금' · '12분 전' · '3시간 전' · '2일 전' · '8.5'
+  ///
+  /// 예전에는 일 수에 상한이 없어서 오래된 기록이 `120일 전` 으로 떴다.
+  String get _ago => agoLabel(row.createdAt);
 
   @override
   Widget build(BuildContext context) {

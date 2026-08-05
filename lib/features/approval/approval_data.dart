@@ -235,7 +235,7 @@ String _decidedBy(_Doc doc) {
 // ── 표시용 계산 ──
 
 /// '7.30' 형태
-String _date(DateTime time) => '${time.month}.${time.day}';
+String _date(DateTime time) => dateLabel(time);
 
 /// 기간 한 줄 — 하루짜리면 날짜 하나만
 String _period(DateTime start, DateTime? end) {

@@ -206,7 +206,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
                       child: Text(
                         '검색 결과가 없어요',
                         style: AppTextStyles.body2.copyWith(
-                          color: AppColors.gray400,
+                          color: AppColors.textTertiary,
                         ),
                       ),
                     ),

@@ -376,14 +376,7 @@ int _dday(DateTime due) {
 }
 
 /// '7.30' 형태
-String _date(DateTime time) => '${time.month}.${time.day}';
+String _date(DateTime time) => dateLabel(time);
 
 /// '방금 · 12분 전 · 3시간 전 · 7.28' 형태
-String _relative(DateTime time) {
-  final diff = DateTime.now().difference(time);
-  if (diff.inMinutes < 1) return '방금';
-  if (diff.inMinutes < 60) return '${diff.inMinutes}분 전';
-  if (diff.inHours < 24) return '${diff.inHours}시간 전';
-  if (diff.inDays < 7) return '${diff.inDays}일 전';
-  return _date(time);
-}
+String _relative(DateTime time) => agoLabel(time);

@@ -191,16 +191,7 @@ class _RefreshButton extends StatelessWidget {
 }
 
 /// '방금' · '12분 전' · '3시간 전' · '8.2.'
-String _ago(DateTime time) {
-  final gap = DateTime.now().difference(time);
-  if (gap.inMinutes < 1) return '방금';
-  if (gap.inMinutes < 60) return '${gap.inMinutes}분 전';
-  if (gap.inHours < 24) return '${gap.inHours}시간 전';
-  if (gap.inDays < 7) return '${gap.inDays}일 전';
-  return '${time.month}.${time.day}.';
-}
+String _ago(DateTime time) => agoLabel(time);
 
 /// '09:14'
-String _clock(DateTime time) =>
-    '${time.hour.toString().padLeft(2, '0')}:'
-    '${time.minute.toString().padLeft(2, '0')}';
+String _clock(DateTime time) => clockLabel(time);

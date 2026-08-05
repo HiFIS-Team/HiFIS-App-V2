@@ -22,6 +22,8 @@ import '../../core/widgets/feedback/empty_card.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/nav/phone_scaffold.dart';
+import '../../core/util/when.dart';
+import '../../core/widgets/feedback/app_dialog.dart';
 
 part 'meeting_phone.dart';
 
@@ -114,6 +116,15 @@ class _MeetingScreenState extends State<MeetingScreen> {
   }
 
   Future<void> _delete(_Note note) async {
+    // 여럿이 같이 보는 기록이라 한 번 더 묻는다 (공지·문서함과 같은 기준)
+    final ok = await showConfirmDialog(
+      context,
+      title: '이 회의록을 지울까요?',
+      message: '지우면 되돌릴 수 없어요.',
+      confirmLabel: '삭제',
+      destructive: true,
+    );
+    if (!ok || !mounted) return;
     try {
       await _deleteNote(note);
       if (!mounted) return;
@@ -948,4 +959,4 @@ const _weekdays = ['일', '월', '화', '수', '목', '금', '토'];
 String _weekday(DateTime time) => _weekdays[time.weekday % 7];
 
 /// '7.30' 형태
-String _date(DateTime time) => '${time.month}.${time.day}';
+String _date(DateTime time) => dateLabel(time);

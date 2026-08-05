@@ -19,6 +19,7 @@ import '../../core/widgets/glass/glass_search_bar.dart';
 import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/input/see_all_button.dart';
+import '../../core/util/when.dart';
 part 'praise_data.dart';
 part 'praise_feedback.dart';
 part 'praise_survey.dart';

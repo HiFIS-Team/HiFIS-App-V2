@@ -21,6 +21,7 @@ import '../../core/widgets/glass/glass_bottom_button.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/input/see_all_button.dart';
+import '../../core/util/when.dart';
 part 'contribution_summary.dart';
 part 'contribution_history.dart';
 part 'contribution_grant.dart';
@@ -273,4 +274,4 @@ int _sum(List<_Contribution> items) =>
     items.fold(0, (total, c) => total + c.points);
 
 /// '7월 4일'
-String _dayLabel(DateTime date) => '${date.month}월 ${date.day}일';
+String _dayLabel(DateTime date) => monthDayLabel(date);

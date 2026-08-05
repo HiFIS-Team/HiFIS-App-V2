@@ -218,7 +218,16 @@ class _EventDialogState extends State<_EventDialog> {
     );
   }
 
-  void _delete() {
+  Future<void> _delete() async {
+    // 전사 달력에서 사라지는 일이라 한 번 더 묻는다 (공지·회의록·문서함과 같다)
+    final ok = await showConfirmDialog(
+      context,
+      title: '이 일정을 지울까요?',
+      message: '지우면 되돌릴 수 없어요.',
+      confirmLabel: '삭제',
+      destructive: true,
+    );
+    if (!ok || !mounted) return;
     Navigator.pop(context, widget.origin!..deleted = true);
   }
 
