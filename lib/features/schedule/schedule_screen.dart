@@ -17,6 +17,7 @@ import '../../core/widgets/feedback/reject_reason_dialog.dart';
 import '../../core/widgets/input/mini_button.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
+import '../../core/theme/app_decorations.dart';
 part 'schedule_day.dart';
 part 'schedule_form.dart';
 part 'schedule_data.dart';

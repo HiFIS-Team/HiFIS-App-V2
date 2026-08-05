@@ -258,7 +258,7 @@ class _CommentTeaser extends StatelessWidget {
             if (latest == null)
               Row(
                 children: [
-                  Avatar(name: me, size: 30),
+                  Avatar(name: me, size: 32),
                   SizedBox(width: 10),
                   Text(
                     '첫 댓글을 남겨보세요',
@@ -271,7 +271,7 @@ class _CommentTeaser extends StatelessWidget {
             else
               Row(
                 children: [
-                  Avatar(name: latest.author, size: 30),
+                  Avatar(name: latest.author, size: 32),
                   SizedBox(width: 10),
                   Expanded(
                     child: Column(

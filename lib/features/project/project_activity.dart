@@ -71,7 +71,9 @@ class _ActivityCardState extends State<_ActivityCard> {
             // 댓글 입력
             Row(
               children: [
-                Avatar(name: me, size: 34),
+                // 댓글 줄(project_comments)과 같은 크기 — 같은 카드 안에서
+                // 쓰는 줄과 읽는 줄의 아바타가 다르면 눈에 걸린다
+                Avatar(name: me, size: 32),
                 SizedBox(width: 10),
                 Expanded(
                   child: Container(

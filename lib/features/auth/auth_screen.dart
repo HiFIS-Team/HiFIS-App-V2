@@ -92,7 +92,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _email.text = email;
       _emailError = null;
     });
-    AppToast.show(context, '가입이 완료됐어요. 로그인해 주세요');
+    AppToast.show(context, '가입이 완료됐어요. 로그인해주세요');
   }
 
   Future<void> _openReset() async {
@@ -121,7 +121,7 @@ class _LoginScreenState extends State<LoginScreen> {
         SizedBox(height: 8),
         Center(
           child: Text(
-            '피트니스스타 직원 계정으로 로그인해 주세요.',
+            '피트니스스타 직원 계정으로 로그인해주세요.',
             style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
           ),
         ),

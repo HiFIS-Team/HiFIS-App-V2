@@ -68,11 +68,8 @@ class _Field extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-      decoration: BoxDecoration(
-        color: AppColors.gray50,
-        borderRadius: BorderRadius.circular(12),
-      ),
+      padding: AppDecorations.fieldPadding,
+      decoration: AppDecorations.field(),
       child: Row(
         children: [
           Expanded(

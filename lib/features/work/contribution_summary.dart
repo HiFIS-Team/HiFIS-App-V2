@@ -242,7 +242,7 @@ class _GrantBanner extends StatelessWidget {
                   ),
                   SizedBox(height: 2),
                   Text(
-                    '창의적 아이디어 · 자발적 목표 업무를 직접 챙겨 주세요',
+                    '창의적 아이디어 · 자발적 목표 업무를 직접 챙겨주세요',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: AppTextStyles.caption.copyWith(

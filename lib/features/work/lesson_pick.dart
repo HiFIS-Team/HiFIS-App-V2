@@ -41,7 +41,7 @@ class _PickMemberScreenState extends State<_PickMemberScreen> {
       AppToast.show(
         context,
         member.registration == null
-            ? '${member.name}님은 등록권이 없어요. 먼저 등록해 주세요'
+            ? '${member.name}님은 등록권이 없어요. 먼저 등록해주세요'
             : '${member.name}님은 남은 회차가 없어요. 재등록이 필요해요',
       );
       return;

@@ -198,6 +198,9 @@ Future<(int, String)?> _askAward(
     text: '${current?.points ?? _autoPoints}',
   );
   final reason = TextEditingController(text: current?.comment ?? '');
+  // 검증에 걸린 칸으로 커서를 옮긴다 (다른 폼들과 같은 방식)
+  final pointsFocus = FocusNode();
+  final reasonFocus = FocusNode();
 
   return showAppDialog<(int, String)>(
     context,
@@ -221,9 +224,18 @@ Future<(int, String)?> _askAward(
             ),
           ),
           SizedBox(height: 14),
-          _AwardField(controller: points, hint: '점수', number: true),
+          _AwardField(
+            controller: points,
+            focusNode: pointsFocus,
+            hint: '점수',
+            number: true,
+          ),
           SizedBox(height: 8),
-          _AwardField(controller: reason, hint: '사유 (필수)'),
+          _AwardField(
+            controller: reason,
+            focusNode: reasonFocus,
+            hint: '사유 (필수)',
+          ),
           SizedBox(height: 16),
           Row(
             children: [
@@ -248,11 +260,13 @@ Future<(int, String)?> _askAward(
                   final value = int.tryParse(points.text.trim());
                   if (value == null || value < -100 || value > 100) {
                     AppToast.show(context, '-100 부터 100 까지 적어주세요');
+                    pointsFocus.requestFocus();
                     return;
                   }
                   final text = reason.text.trim();
                   if (text.isEmpty) {
                     AppToast.show(context, '점수 사유를 적어주세요');
+                    reasonFocus.requestFocus();
                     return;
                   }
                   Navigator.pop(context, (value, text));
@@ -286,11 +300,15 @@ class _AwardField extends StatelessWidget {
   _AwardField({
     required this.controller,
     required this.hint,
+    this.focusNode,
     this.number = false,
   });
 
   final TextEditingController controller;
   final String hint;
+
+  /// 검증에 걸렸을 때 이 칸으로 커서를 옮기려고 받는다
+  final FocusNode? focusNode;
   final bool number;
 
   @override
@@ -303,6 +321,7 @@ class _AwardField extends StatelessWidget {
       ),
       child: TextField(
         controller: controller,
+        focusNode: focusNode,
         keyboardType: number
             ? TextInputType.numberWithOptions(signed: true)
             : null,

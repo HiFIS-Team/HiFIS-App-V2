@@ -14,6 +14,7 @@ import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/glass/top_frost.dart';
 import 'chat_screen.dart';
 import 'chat_store.dart';
+import '../../core/theme/app_decorations.dart';
 
 /// 새 사내톡 만들기 화면 (아래에서 올라오는 모달)
 ///
@@ -334,10 +335,7 @@ class _InputBox extends StatelessWidget {
       height: 52,
       alignment: Alignment.centerLeft,
       padding: EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: AppColors.gray50,
-        borderRadius: BorderRadius.circular(14),
-      ),
+      decoration: AppDecorations.field(),
       child: child,
     );
   }

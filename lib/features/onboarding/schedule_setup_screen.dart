@@ -72,7 +72,7 @@ class _ScheduleSetupScreenState extends State<ScheduleSetupScreen> {
 
   Future<void> _save() async {
     if (_days.isEmpty) {
-      return AppToast.show(context, '근무 요일을 하나 이상 골라 주세요');
+      return AppToast.show(context, '근무 요일을 하나 이상 골라주세요');
     }
     final startMinutes = _start.hour * 60 + _start.minute;
     final endMinutes = _end.hour * 60 + _end.minute;

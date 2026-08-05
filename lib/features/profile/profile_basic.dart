@@ -64,10 +64,17 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
     return index == null ? null : _avatarColors[index];
   }
 
+  /// 검증에 걸린 칸으로 커서를 옮기려면 필요하다 — 어느 칸인지 알려 주는 게
+  /// 토스트 문구만으로는 부족하다 (다른 폼들과 같은 방식)
+  final _nameFocus = FocusNode();
+  final _phoneFocus = FocusNode();
+
   @override
   void dispose() {
     _name.dispose();
     _phone.dispose();
+    _nameFocus.dispose();
+    _phoneFocus.dispose();
     super.dispose();
   }
 
@@ -75,12 +82,14 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
     final name = _name.text.trim();
     if (name.isEmpty) {
       AppToast.show(context, '이름을 입력해주세요');
+      _nameFocus.requestFocus();
       return;
     }
     // 비워 두는 건 괜찮다 — 적었으면 제대로 적어야 한다
     final phone = _phone.text.replaceAll(RegExp(r'\D'), '');
     if (phone.isNotEmpty && (phone.length != 11 || !phone.startsWith('01'))) {
       AppToast.show(context, '휴대폰 번호 11자리를 입력해주세요');
+      _phoneFocus.requestFocus();
       return;
     }
     setState(() => _saving = true);
@@ -138,12 +147,13 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
           SizedBox(height: 20),
           _FieldLabel('이름'),
           SizedBox(height: 8),
-          _InputBox(controller: _name),
+          _InputBox(controller: _name, focusNode: _nameFocus),
           SizedBox(height: 20),
           _FieldLabel('전화번호'),
           SizedBox(height: 8),
           _InputBox(
             controller: _phone,
+            focusNode: _phoneFocus,
             hint: '01012345678',
             keyboardType: TextInputType.phone,
             helper: '조직도에서 서로 연락할 때 쓰여요.',

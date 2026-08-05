@@ -75,12 +75,26 @@ class _RegisterScreenState extends State<_RegisterScreen> {
     if (picked != null && mounted) setState(() => _referrer = picked);
   }
 
+  /// 아직 안 채운 것 중 **맨 앞의 하나** — 다 채웠으면 null
+  ///
+  /// 예전에는 `성함·연락처와 등록권 정보를 입력해주세요` 하나로 뭉쳐 있어서
+  /// 넷 중 무엇이 빈지 알 수 없었다. 다른 폼들은 빠진 칸을 집어 말한다.
+  String? get _missing {
+    if (_renew) {
+      if (_selected == null) return '재등록할 회원을 골라주세요';
+    } else {
+      if (_name.text.trim().isEmpty) return '성함을 입력해주세요';
+      if (_phone.text.trim().isEmpty) return '연락처를 입력해주세요';
+    }
+    if (_roundCount <= 0) return '회차를 입력해주세요';
+    if (_paymentWon <= 0) return '결제액을 입력해주세요';
+    return null;
+  }
+
   Future<void> _submit() async {
-    if (!_complete) {
-      AppToast.show(
-        context,
-        _renew ? '재등록할 회원과 등록권 정보를 입력해주세요' : '성함·연락처와 등록권 정보를 입력해주세요',
-      );
+    final missing = _missing;
+    if (missing != null) {
+      AppToast.show(context, missing);
       return;
     }
     if (_saving) return;
@@ -609,11 +623,8 @@ class _FormField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: AppColors.gray50,
-        borderRadius: BorderRadius.circular(12),
-      ),
+      padding: AppDecorations.fieldPaddingMultiline,
+      decoration: AppDecorations.field(),
       child: TextField(
         controller: controller,
         style: AppTextStyles.body1,

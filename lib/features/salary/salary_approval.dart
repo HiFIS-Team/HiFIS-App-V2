@@ -487,7 +487,7 @@ class _ApprovalRow extends StatelessWidget {
         children: [
           Row(
             children: [
-              Avatar(name: _name, size: 36),
+              Avatar(name: _name, size: 34),
               SizedBox(width: 10),
               Expanded(
                 child: Column(

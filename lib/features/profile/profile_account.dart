@@ -16,6 +16,11 @@ class _PasswordCardState extends State<_PasswordCard> {
   final _next = TextEditingController();
   final _confirm = TextEditingController();
 
+  /// 검증에 걸린 칸으로 커서를 옮긴다 (다른 폼들과 같은 방식)
+  final _currentFocus = FocusNode();
+  final _nextFocus = FocusNode();
+  final _confirmFocus = FocusNode();
+
   bool _saving = false;
 
   @override
@@ -23,6 +28,9 @@ class _PasswordCardState extends State<_PasswordCard> {
     _current.dispose();
     _next.dispose();
     _confirm.dispose();
+    _currentFocus.dispose();
+    _nextFocus.dispose();
+    _confirmFocus.dispose();
     super.dispose();
   }
 
@@ -31,15 +39,19 @@ class _PasswordCardState extends State<_PasswordCard> {
     final next = _next.text;
     if (current.isEmpty || next.isEmpty) {
       AppToast.show(context, '비밀번호를 모두 입력해주세요');
+      // 셋 중 **비어 있는 첫 칸**으로 — '모두'라고만 하면 어디가 빈지 모른다
+      (current.isEmpty ? _currentFocus : _nextFocus).requestFocus();
       return;
     }
     // 서버도 8자 미만이면 422 를 주지만, 안내가 여기서 나는 게 낫다
     if (next.length < 8) {
       AppToast.show(context, '새 비밀번호는 8자 이상이어야 해요');
+      _nextFocus.requestFocus();
       return;
     }
     if (next != _confirm.text) {
       AppToast.show(context, '새 비밀번호가 서로 달라요');
+      _confirmFocus.requestFocus();
       return;
     }
 
@@ -84,16 +96,21 @@ class _PasswordCardState extends State<_PasswordCard> {
           SizedBox(height: 20),
           _FieldLabel('현재 비밀번호'),
           SizedBox(height: 8),
-          _InputBox(controller: _current, obscure: true),
+          _InputBox(
+            controller: _current,
+            focusNode: _currentFocus,
+            obscure: true,
+          ),
           SizedBox(height: 20),
           _FieldLabel('새 비밀번호 (8자 이상)'),
           SizedBox(height: 8),
-          _InputBox(controller: _next, obscure: true),
+          _InputBox(controller: _next, focusNode: _nextFocus, obscure: true),
           SizedBox(height: 20),
           _FieldLabel('새 비밀번호 확인'),
           SizedBox(height: 8),
           _InputBox(
             controller: _confirm,
+            focusNode: _confirmFocus,
             obscure: true,
             helper: '바꾸면 이 기기만 남고 다른 기기는 로그아웃돼요.',
           ),

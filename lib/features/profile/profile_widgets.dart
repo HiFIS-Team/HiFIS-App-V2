@@ -24,6 +24,7 @@ class _FieldLabel extends StatelessWidget {
 class _InputBox extends StatelessWidget {
   _InputBox({
     this.controller,
+    this.focusNode,
     this.value,
     this.hint,
     this.enabled = true,
@@ -31,6 +32,9 @@ class _InputBox extends StatelessWidget {
     this.helper,
     this.keyboardType,
   });
+
+  /// 검증에 걸렸을 때 이 칸으로 커서를 옮기려고 받는다
+  final FocusNode? focusNode;
 
   /// 고칠 수 있는 칸은 컨트롤러를 받는다.
   /// 예전에는 `initialValue` 만 넘겼는데 그러면 **적은 값을 꺼낼 수가 없다**
@@ -54,13 +58,11 @@ class _InputBox extends StatelessWidget {
           height: 52,
           padding: EdgeInsets.symmetric(horizontal: 16),
           alignment: Alignment.centerLeft,
-          decoration: BoxDecoration(
-            color: AppColors.gray50,
-            borderRadius: BorderRadius.circular(12),
-          ),
+          decoration: AppDecorations.field(),
           child: enabled
               ? TextField(
                   controller: controller,
+                  focusNode: focusNode,
                   obscureText: obscure,
                   keyboardType: keyboardType,
                   style: AppTextStyles.body2,
