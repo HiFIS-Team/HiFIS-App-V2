@@ -15,6 +15,7 @@ import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_dialog.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/avatar.dart';
+import '../../core/widgets/decide_buttons.dart';
 import '../../core/widgets/desktop_header.dart';
 import '../../core/widgets/empty_card.dart';
 import '../../core/widgets/glass_bottom_button.dart';
@@ -44,7 +45,18 @@ class _SalaryScreenState extends State<SalaryScreen> {
   bool _loading = true;
 
   /// 0 = 내 급여, 1 = 결재. 결재함을 볼 수 없는 사람에게는 탭 자체가 없다
+  ///
+  /// **MASTER·ADMIN 에게는 이 탭이 없다** — 화면 전체가 이미 결재 화면이다.
   int _tab = 0;
+
+  /// 결재를 기다리는 것 + 지급을 기다리는 것 (MASTER·ADMIN 화면이 이걸 따라간다)
+  List<Payslip> _inbox = const [];
+
+  /// 지금 보고 있는 신청 순번
+  int _inboxIndex = 0;
+
+  Payslip? get _target =>
+      _inbox.isEmpty ? null : _inbox[_inboxIndex.clamp(0, _inbox.length - 1)];
 
   @override
   void initState() {
@@ -54,12 +66,64 @@ class _SalaryScreenState extends State<SalaryScreen> {
 
   Future<void> _load() async {
     try {
-      await _loadPayslips();
+      if (_isPayBoss) {
+        // 결재 대기(제출됨)가 먼저, 그다음 지급 대기(승인됨).
+        // 대표·관리자는 자기 급여를 낼 일이 없어서 화면 전체가 이 사람들 것이다.
+        final waiting = await PayrollApi.box('inbox');
+        final handled = await PayrollApi.box('decided');
+        _inbox = [
+          ...waiting,
+          for (final p in handled)
+            if (p.status == PayslipStatus.approved) p,
+        ];
+        if (_inboxIndex >= _inbox.length) _inboxIndex = 0;
+        await _loadPayslips(employeeId: _target?.employeeId);
+      } else {
+        await _loadPayslips();
+      }
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
     }
     if (mounted) setState(() => _loading = false);
   }
+
+  /// 신청을 하나 넘긴다 — 화면 전체가 그 사람 것으로 바뀐다
+  Future<void> _moveInbox(int step) async {
+    if (_inbox.length < 2) return;
+    var next = (_inboxIndex + step) % _inbox.length;
+    if (next < 0) next += _inbox.length;
+    setState(() => _inboxIndex = next);
+    try {
+      await _loadPayslips(employeeId: _target?.employeeId);
+      if (mounted) setState(() {});
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+  }
+
+  Future<void> _decide(Future<Payslip> Function() action, String done) async {
+    try {
+      await action();
+      if (!mounted) return;
+      AppToast.show(context, done);
+      await _load();
+      if (mounted) setState(() {});
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+  }
+
+  Future<void> _approveTarget(Payslip payslip) =>
+      _decide(() => PayrollApi.approve(payslip.id), '승인했어요');
+
+  Future<void> _rejectTarget(Payslip payslip) async {
+    final reason = await askRejectReason(context, hint: '예) 추가 근무 시간이 기록과 달라요');
+    if (reason == null || !mounted) return;
+    await _decide(() => PayrollApi.reject(payslip.id, reason), '반려했어요');
+  }
+
+  Future<void> _payTarget(Payslip payslip) =>
+      _decide(() => PayrollApi.pay(payslip.id), '지급 처리했어요');
 
   void _openHistory(BuildContext context) {
     showFullPage<void>(context, (_) => _HistoryScreen());
@@ -120,7 +184,9 @@ class _SalaryScreenState extends State<SalaryScreen> {
 
     // 결재를 볼 수 있는 사람에게만 탭이 생긴다.
     // 나머지 사람 화면은 예전 그대로다 (탭 줄 자체가 없다).
-    final tabs = _canSeeApproval
+    // MASTER·ADMIN 은 화면 전체가 결재 화면이라 탭이 필요 없다.
+    // 점장은 본인 급여도 신청해서 예전처럼 탭으로 갈라 본다.
+    final tabs = _canSeeApproval && !_isPayBoss
         ? SegmentedTabs(
             labels: const ['내 급여', '결재'],
             selected: _tab,
@@ -133,11 +199,22 @@ class _SalaryScreenState extends State<SalaryScreen> {
     final content = [
       _SummaryCard(payslip: current),
       SizedBox(height: 12),
-      _StatusNotice(
-        payslip: current,
-        onSubmit: () => _submit(current),
-        onCancel: () => _cancel(current),
-      ),
+      // 대표·관리자는 자기 신청서를 낼 일이 없어서 이 자리를 결재함으로 쓴다
+      if (_isPayBoss)
+        _PayrollDecideCard(
+          inbox: _inbox,
+          index: _inboxIndex,
+          onMove: _moveInbox,
+          onApprove: _approveTarget,
+          onReject: _rejectTarget,
+          onPay: _payTarget,
+        )
+      else
+        _StatusNotice(
+          payslip: current,
+          onSubmit: () => _submit(current),
+          onCancel: () => _cancel(current),
+        ),
       SizedBox(height: 12),
       _TrendCard(),
       SizedBox(height: 12),
@@ -203,11 +280,20 @@ class _SalaryScreenState extends State<SalaryScreen> {
                   Expanded(child: _PayCard(payslip: current)),
                   SizedBox(width: 16),
                   Expanded(
-                    child: _StatusNotice(
-                      payslip: current,
-                      onSubmit: () => _submit(current),
-                      onCancel: () => _cancel(current),
-                    ),
+                    child: _isPayBoss
+                        ? _PayrollDecideCard(
+                            inbox: _inbox,
+                            index: _inboxIndex,
+                            onMove: _moveInbox,
+                            onApprove: _approveTarget,
+                            onReject: _rejectTarget,
+                            onPay: _payTarget,
+                          )
+                        : _StatusNotice(
+                            payslip: current,
+                            onSubmit: () => _submit(current),
+                            onCancel: () => _cancel(current),
+                          ),
                   ),
                 ],
               ),

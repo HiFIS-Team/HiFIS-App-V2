@@ -222,6 +222,25 @@ class PayrollApi {
     ];
   }
 
+  /// **남의** 명세서 범위 — 결재하는 사람이 신청자 화면을 그대로 볼 때 쓴다
+  ///
+  /// 본인 것은 [list] 를 쓴다 (권한 없이 되는 길이라 그쪽이 싸다).
+  /// 이 길은 `GET /payslips` 라 **ADMIN·MANAGER 이상**만 된다.
+  static Future<List<Payslip>> listOf(
+    String employeeId, {
+    String? from,
+    String? to,
+  }) async {
+    final rows = await _client.getList(
+      '/payslips',
+      query: {'employeeId': employeeId, 'from': ?from, 'to': ?to},
+    );
+    return [
+      for (final row in rows)
+        Payslip.fromJson((row as Map).cast<String, dynamic>()),
+    ];
+  }
+
   /// 신청 가능 여부와 지급일
   static Future<PaydayWindow> window(String yearMonth) async {
     final data = await _client.get(

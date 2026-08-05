@@ -16,6 +16,223 @@ bool get _canSeeApproval =>
 /// 실제로 승인·반려·지급을 누를 수 있는 사람
 bool get _canDecide => myRole.canApprove;
 
+/// 급여 화면을 **관리 화면으로** 보는 사람 (MASTER · ADMIN)
+///
+/// 이 사람들 자리에서는 '급여 신청서 작성' 칸이 결재함으로 바뀐다.
+/// MANAGER 는 본인도 급여를 신청해서 예전 화면 그대로다 (근태와 같은 기준).
+bool get _isPayBoss => myRole == Role.master || myRole == Role.admin;
+
+/// 급여 결재 카드 — '급여 신청서 작성' 자리를 대신한다
+///
+/// **금액은 여기 안 적는다.** 화면 전체(8월 급여·최근 6개월·지급)가 이미
+/// 이 사람 것을 그리고 있어서, 카드에 또 적으면 같은 값이 두 벌이 된다.
+/// 여기서는 **누구 것을 보고 있는지**와 **처리 버튼**만 맡는다.
+///
+/// 여러 건이 밀려 있으면 오른쪽 끝 `1/2` 로 넘긴다 — 넘기면 화면 전체가
+/// 그 사람 것으로 바뀐다.
+class _PayrollDecideCard extends StatelessWidget {
+  _PayrollDecideCard({
+    required this.inbox,
+    required this.index,
+    required this.onMove,
+    required this.onApprove,
+    required this.onReject,
+    required this.onPay,
+  });
+
+  final List<Payslip> inbox;
+  final int index;
+
+  /// -1 이면 앞 건, 1 이면 뒷 건
+  final ValueChanged<int> onMove;
+
+  final ValueChanged<Payslip> onApprove;
+  final ValueChanged<Payslip> onReject;
+  final ValueChanged<Payslip> onPay;
+
+  /// 신청이 있을 때의 높이 — 다 처리하고 나면 카드가 쪼그라들어
+  /// 옆 지급 카드와 어긋난다 (월차 결재에서 겪은 것과 같다)
+  static const _emptyHeight = 150.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final target = inbox.isEmpty
+        ? null
+        : inbox[index.clamp(0, inbox.length - 1)];
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(20),
+      decoration: AppDecorations.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('급여 결재', style: AppTextStyles.label),
+          SizedBox(height: 16),
+          if (target == null)
+            SizedBox(
+              height: _emptyHeight,
+              child: Center(
+                child: EmptyCard(
+                  icon: CupertinoIcons.tray,
+                  text: '들어온 급여 신청이 없어요',
+                  framed: false,
+                ),
+              ),
+            )
+          else ...[
+            _PayrollDecideRow(
+              payslip: target,
+              index: index.clamp(0, inbox.length - 1),
+              total: inbox.length,
+              onMove: onMove,
+            ),
+            // 데스크톱은 옆 지급 카드와 높이를 맞추느라 남는 자리가 생긴다
+            if (isDesktop) Spacer() else SizedBox(height: 18),
+            if (isDesktop) SizedBox(height: 18),
+            // 서버가 처리를 MASTER 에게만 연다 — 눌러도 403 날 버튼은 안 보여준다
+            if (_canDecide)
+              if (target.status == PayslipStatus.approved)
+                // 승인은 끝났고 실제 입금만 남은 건
+                _PayButton(onTap: () => onPay(target))
+              else
+                DecideButtons(
+                  fill: true,
+                  onApprove: () => onApprove(target),
+                  onReject: () => onReject(target),
+                ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// 지급 처리 버튼 — 승인된 건에만 뜬다
+class _PayButton extends StatelessWidget {
+  _PayButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Pressable(
+    onTap: onTap,
+    scale: 0.97,
+    child: Container(
+      height: 44,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        '지급 처리',
+        style: AppTextStyles.body2.copyWith(
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+        ),
+      ),
+    ),
+  );
+}
+
+/// 결재 대기 한 건 — 누구 것을 보고 있는지
+class _PayrollDecideRow extends StatelessWidget {
+  _PayrollDecideRow({
+    required this.payslip,
+    required this.index,
+    required this.total,
+    required this.onMove,
+  });
+
+  final Payslip payslip;
+  final int index;
+  final int total;
+
+  final ValueChanged<int> onMove;
+
+  String get _name =>
+      StaffDirectory.instance.byId(payslip.employeeId)?.name ?? '알 수 없음';
+
+  String get _month => '${int.parse(payslip.yearMonth.substring(5))}월 급여';
+
+  /// 지금 어느 단계인가 — 승인 대기냐, 입금만 남았냐
+  String get _stage =>
+      payslip.status == PayslipStatus.approved ? '승인 완료 · 지급 대기' : '승인 대기';
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Avatar(name: _name, size: 34),
+            SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.body2.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    '$_month · $_stage',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.caption.copyWith(fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            // 한 건뿐이면 셈이 필요 없다
+            if (total > 1) ...[
+              SizedBox(width: 8),
+              _arrow(CupertinoIcons.chevron_left, () => onMove(-1)),
+              Text(
+                '${index + 1}/$total',
+                style: AppTextStyles.caption.copyWith(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              _arrow(CupertinoIcons.chevron_right, () => onMove(1)),
+            ],
+          ],
+        ),
+        if ((payslip.note ?? '').isNotEmpty) ...[
+          SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.gray50,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text('특이사항 · ${payslip.note}', style: AppTextStyles.caption),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _arrow(IconData icon, VoidCallback onTap) => Pressable(
+    onTap: onTap,
+    scale: 0.9,
+    child: Padding(
+      padding: EdgeInsets.all(5),
+      child: Icon(icon, size: 12, color: AppColors.textTertiary),
+    ),
+  );
+}
+
 /// 결재함 한 덩어리 — 대기 · 지급 대기 · 처리 내역
 class _ApprovalTab extends StatefulWidget {
   _ApprovalTab();

@@ -182,18 +182,31 @@ const _monthsToLoad = 6;
 /// 최근 명세서 (0번이 이번 달) — 서버에서 받아 채운다
 final _payslips = <_Payslip>[];
 
-Future<void> _loadPayslips() async {
+/// 명세서를 받아 [_payslips] 를 채운다.
+///
+/// [employeeId] 를 주면 **그 사람 것**을 받는다 — 대표·관리자가 결재하면서
+/// 신청자 화면을 그대로 볼 때다. 안 주면 본인 것이다.
+Future<void> _loadPayslips({String? employeeId}) async {
   final now = DateTime.now();
   final months = [
     for (var i = 0; i < _monthsToLoad; i++) DateTime(now.year, now.month - i),
   ];
 
   // 명세서 범위와 신청 창을 같이 띄워 둔다 (신청 창은 이번 달만 필요하다)
-  final listing = PayrollApi.list(
-    from: yearMonthKey(months.last),
-    to: yearMonthKey(months.first),
-  );
-  final windowRequest = PayrollApi.window(yearMonthKey(months.first));
+  final listing = employeeId == null
+      ? PayrollApi.list(
+          from: yearMonthKey(months.last),
+          to: yearMonthKey(months.first),
+        )
+      : PayrollApi.listOf(
+          employeeId,
+          from: yearMonthKey(months.last),
+          to: yearMonthKey(months.first),
+        );
+  // 남의 화면을 볼 때는 신청 창이 필요 없다 — 내가 낼 것이 아니다
+  final windowRequest = employeeId == null
+      ? PayrollApi.window(yearMonthKey(months.first))
+      : Future<PaydayWindow?>.value(null);
 
   // 산출 안 된 달은 응답에서 빠져 있다 — 달을 키로 짝지어 빈 자리를 남긴다
   final sources = {
