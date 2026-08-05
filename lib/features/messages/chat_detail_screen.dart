@@ -189,8 +189,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       if (mounted) AppToast.show(context, messageOf(error));
       return;
     }
+    if (!mounted) return;
+    // 화면이 닫히기 전에 띄운다 — 토스트는 최상위 Overlay 에 뜨므로 남아 있는다
+    AppToast.show(context, '채팅방에서 나왔어요');
     // `true` 로 닫으면 채팅방 화면이 자기도 닫는다 → 사내톡 목록으로 돌아간다
-    if (mounted) Navigator.pop(context, true);
+    Navigator.pop(context, true);
   }
 
   @override

@@ -5,8 +5,13 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
+import '../util/platform.dart';
 
-/// 하단 탭바 위로 잠깐 떠오르는 토스트 알림 (배경 반전 캡슐)
+/// 잠깐 떠올랐다 사라지는 토스트 알림
+///
+/// **폰은 아래, 데스크톱은 위에서 뜬다.** 폰은 하단 탭바 위가 손이 닿는
+/// 자리라 거기가 맞고, 데스크톱은 아래에 우하단 사내톡 필이 떠 있어서
+/// 겹친다 — 게다가 눈이 머무는 곳이 화면 위쪽이다.
 ///
 /// 사용: `AppToast.show(context, '세탁을 완료했습니다')`
 /// 새 토스트가 뜨면 이전 토스트는 즉시 교체된다.
@@ -79,11 +84,12 @@ class _ToastViewState extends State<_ToastView>
       reverseCurve: Curves.easeIn,
     );
 
+    // 데스크톱은 창 위쪽(타이틀바 아래), 폰은 하단 탭바 바로 위
     return Positioned(
       left: 20,
       right: 20,
-      // 하단 탭바 바로 위
-      bottom: 104,
+      top: isDesktop ? 28 : null,
+      bottom: isDesktop ? null : 104,
       child: IgnorePointer(
         // Material 바깥(Overlay)에서 텍스트에 노란 밑줄이 생기는 것을 막는다
         child: Material(
@@ -91,8 +97,10 @@ class _ToastViewState extends State<_ToastView>
           child: FadeTransition(
             opacity: curved,
             child: SlideTransition(
+              // 뜨는 자리 쪽에서 밀려 나온다 — 위에서 뜨는데 아래에서
+              // 올라오면 어디서 온 건지 안 읽힌다
               position: Tween(
-                begin: Offset(0, 0.4),
+                begin: Offset(0, isDesktop ? -0.4 : 0.4),
                 end: Offset.zero,
               ).animate(curved),
               child: Center(

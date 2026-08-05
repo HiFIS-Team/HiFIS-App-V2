@@ -456,7 +456,9 @@ class _DayDialogState extends State<_DayDialog> {
     if (draft == null || !mounted) return;
     try {
       final created = await _createEvent(draft);
-      if (mounted) setState(() => events.add(created));
+      if (!mounted) return;
+      setState(() => events.add(created));
+      AppToast.show(context, created.pending ? '일정을 신청했어요' : '일정을 추가했어요');
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
     }
@@ -511,7 +513,9 @@ class _DayDialogState extends State<_DayDialog> {
     try {
       if (edited.deleted) {
         if (id != null) await EventApi.delete(id);
-        if (mounted) setState(() => events.remove(event));
+        if (!mounted) return;
+        setState(() => events.remove(event));
+        AppToast.show(context, '일정을 삭제했어요');
         return;
       }
       if (edited.decision == EventDecision.reject) {
@@ -529,6 +533,10 @@ class _DayDialogState extends State<_DayDialog> {
         final index = events.indexOf(event);
         if (index >= 0) events[index] = saved;
       });
+      // 아직 안 올린 새 일정은 고칠 것도 없다 (화면 안에서만 바뀐다)
+      if (id != null) {
+        AppToast.show(context, saved.pending ? '고쳐서 다시 신청했어요' : '일정을 수정했어요');
+      }
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
     }

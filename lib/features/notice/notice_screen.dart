@@ -152,7 +152,7 @@ class _NoticeScreenState extends State<NoticeScreen> {
         return;
       }
       setState(() {});
-      if (isNew) AppToast.show(context, '공지를 올렸어요');
+      AppToast.show(context, isNew ? '공지를 올렸어요' : '공지를 수정했어요');
     } catch (error) {
       if (!mounted) return;
       // 실패하면 적던 내용을 지키기 위해 편집 상태로 되돌린다

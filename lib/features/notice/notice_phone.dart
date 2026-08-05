@@ -204,8 +204,8 @@ class _NoticePageState extends State<_NoticePage> {
       await _saveNotice(widget.notice);
       if (!mounted) return;
       setState(() {});
-      if (isNew && widget.notice.id != null) {
-        AppToast.show(context, '공지를 올렸어요');
+      if (widget.notice.id != null) {
+        AppToast.show(context, isNew ? '공지를 올렸어요' : '공지를 수정했어요');
       }
     } catch (error) {
       if (!mounted) return;

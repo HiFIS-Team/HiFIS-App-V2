@@ -104,7 +104,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
         return;
       }
       setState(() {});
-      if (isNew) AppToast.show(context, '회의록을 올렸어요');
+      AppToast.show(context, isNew ? '회의록을 올렸어요' : '회의록을 수정했어요');
     } catch (error) {
       if (!mounted) return;
       // 실패하면 적던 내용을 지키기 위해 편집 상태로 되돌린다

@@ -140,10 +140,16 @@ class _NoteScreenState extends State<_NoteScreen> {
       setState(() => _editing = true);
       return;
     }
+    final isNew = widget.note.id == null;
     setState(() => _editing = false);
     try {
       await _saveNote(widget.note);
-      if (mounted) setState(() {});
+      if (!mounted) return;
+      setState(() {});
+      // 아무것도 안 적어서 안 올라간 새 글은 알릴 것이 없다
+      if (widget.note.id != null) {
+        AppToast.show(context, isNew ? '회의록을 올렸어요' : '회의록을 수정했어요');
+      }
     } catch (error) {
       if (!mounted) return;
       // 실패하면 적던 내용을 지키기 위해 편집 상태로 되돌린다
