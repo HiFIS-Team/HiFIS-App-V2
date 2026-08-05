@@ -302,11 +302,9 @@ class _StatusNotice extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = payslip.status;
 
-    // 승인이 끝난 달은 알릴 게 없다
-    if (status == _PayStatus.approved || status == _PayStatus.paid) {
-      return SizedBox.shrink();
-    }
-
+    // 승인·지급이 끝난 달도 **이 자리를 비우지 않는다.** 예전에는 통째로
+    // 감췄는데, 그러면 요약 카드와 지난 흐름 사이가 뚝 끊겨서 신청 칸이
+    // 통째로 사라진 것처럼 보인다. 상태만 알리고 버튼을 안 준다.
     final (title, body, action, onAction) = switch (status) {
       _PayStatus.draft => (
         '아직 제출하지 않았어요',
@@ -319,6 +317,21 @@ class _StatusNotice extends StatelessWidget {
         '${_dayLabel(payslip.submittedAt!)} 제출 · 대표 승인을 기다리는 중이에요.',
         '제출 취소',
         onCancel,
+      ),
+      _PayStatus.approved => (
+        '승인됐어요',
+        '${_dayLabel(payslip.payDay)}에 입금될 예정이에요.',
+        null,
+        null,
+      ),
+      _PayStatus.paid => (
+        '${_won(payslip.total)}이 지급됐어요',
+        // 지급 시각은 대표가 이체를 확인하고 찍는다 — 없을 수도 있다
+        payslip.paidAt == null
+            ? '입금이 끝났어요.'
+            : '${_dayLabel(payslip.paidAt!)} 입금 완료.',
+        null,
+        null,
       ),
       _ => (
         '신청서가 반려됐어요',
@@ -375,29 +388,32 @@ class _StatusNotice extends StatelessWidget {
           // 버튼을 아래로 밀어 붙여 빈자리가 위쪽 설명 아래로 모이게 한다
           if (isDesktop) Spacer() else SizedBox(height: 12),
           if (isDesktop) SizedBox(height: 12),
-          Pressable(
-            onTap: onAction,
-            scale: 0.97,
-            child: Container(
-              height: 44,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: status == _PayStatus.pending
-                    ? AppColors.surface
-                    : AppColors.primary,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                action,
-                style: AppTextStyles.body2.copyWith(
-                  fontWeight: FontWeight.w700,
+          // 승인·지급이 끝나면 누를 것이 없다 — 버튼 자리를 아예 안 만든다
+          // (막힌 버튼을 남겨 두면 눌러 보고 안 되는 이유를 찾게 된다)
+          if (action != null && onAction != null)
+            Pressable(
+              onTap: onAction,
+              scale: 0.97,
+              child: Container(
+                height: 44,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
                   color: status == _PayStatus.pending
-                      ? AppColors.textPrimary
-                      : Colors.white,
+                      ? AppColors.surface
+                      : AppColors.primary,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  action,
+                  style: AppTextStyles.body2.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: status == _PayStatus.pending
+                        ? AppColors.textPrimary
+                        : Colors.white,
+                  ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
