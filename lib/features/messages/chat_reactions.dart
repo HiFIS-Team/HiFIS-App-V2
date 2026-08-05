@@ -130,13 +130,7 @@ class _MessageMenu extends StatelessWidget {
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppColors.gray100),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x1F101828),
-            blurRadius: 32,
-            offset: Offset(0, 10),
-          ),
-        ],
+        boxShadow: AppShadows.float,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,

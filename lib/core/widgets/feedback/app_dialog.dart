@@ -43,13 +43,7 @@ class _ModalFrame extends StatelessWidget {
       height: height < 600 ? height : 600,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppShadows.ink.withValues(alpha: 0.24),
-            blurRadius: 40,
-            offset: Offset(0, 16),
-          ),
-        ],
+        boxShadow: AppShadows.modal,
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),

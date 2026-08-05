@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../util/platform.dart';
+import '../../theme/app_shadows.dart';
 
 /// 잠깐 떠올랐다 사라지는 토스트 알림
 ///
@@ -111,13 +112,7 @@ class _ToastViewState extends State<_ToastView>
                     color: AppColors.surface,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: AppColors.gray100),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Color(0x24101828),
-                        blurRadius: 24,
-                        offset: Offset(0, 8),
-                      ),
-                    ],
+                    boxShadow: AppShadows.popup,
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,

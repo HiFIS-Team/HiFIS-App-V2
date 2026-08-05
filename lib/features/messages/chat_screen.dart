@@ -21,6 +21,7 @@ import '../../core/widgets/glass/top_frost.dart';
 import '../../core/widgets/input/pressable.dart';
 import 'chat_detail_screen.dart';
 import 'chat_store.dart';
+import '../../core/theme/app_shadows.dart';
 part 'chat_bubbles.dart';
 part 'chat_reactions.dart';
 

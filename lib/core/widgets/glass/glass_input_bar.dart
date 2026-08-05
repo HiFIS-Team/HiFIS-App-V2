@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
+import '../../theme/app_shadows.dart';
 
 /// 화면 아래 떠 있는 글래스 입력바 — 사내톡과 프로젝트 댓글이 같이 쓴다
 ///
@@ -76,13 +77,7 @@ class _GlassInputBarState extends State<GlassInputBar> {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x1F101828),
-            blurRadius: 32,
-            offset: Offset(0, 10),
-          ),
-        ],
+        boxShadow: AppShadows.float,
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(28),

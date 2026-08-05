@@ -72,13 +72,7 @@ class _FallbackTabBar extends StatelessWidget {
           DecoratedBox(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(28),
-              boxShadow: [
-                BoxShadow(
-                  color: AppShadows.ink.withValues(alpha: 0.08),
-                  blurRadius: 24,
-                  offset: Offset(0, 8),
-                ),
-              ],
+              boxShadow: AppShadows.popup,
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(28),

@@ -32,13 +32,7 @@ class _SlashMenu extends StatelessWidget {
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: AppColors.gray100),
-          boxShadow: [
-            BoxShadow(
-              color: AppShadows.ink.withValues(alpha: 0.12),
-              blurRadius: 24,
-              offset: Offset(0, 8),
-            ),
-          ],
+          boxShadow: AppShadows.popup,
         ),
         child: SingleChildScrollView(
           controller: controller,

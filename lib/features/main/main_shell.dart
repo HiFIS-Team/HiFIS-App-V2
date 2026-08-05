@@ -471,13 +471,7 @@ class _FloatingPanel extends StatelessWidget {
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: AppColors.gray100),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppShadows.ink.withValues(alpha: 0.14),
-                      blurRadius: 40,
-                      offset: Offset(0, 12),
-                    ),
-                  ],
+                  boxShadow: AppShadows.modal,
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(20),
@@ -588,13 +582,7 @@ class _ChatDockState extends State<_ChatDock> {
       child: DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(22),
-          boxShadow: [
-            BoxShadow(
-              color: AppShadows.ink.withValues(alpha: 0.10),
-              blurRadius: 24,
-              offset: Offset(0, 8),
-            ),
-          ],
+          boxShadow: AppShadows.popup,
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(22),

@@ -18,6 +18,7 @@ import '../../core/widgets/glass/top_frost.dart';
 import 'chat_screen.dart';
 import 'chat_store.dart';
 import 'new_message_screen.dart';
+import '../../core/theme/app_shadows.dart';
 
 /// 사내톡 화면 (인스타그램 DM 스타일)
 ///
@@ -372,13 +373,7 @@ class _FloatingSearchBar extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x1F101828),
-            blurRadius: 32,
-            offset: Offset(0, 10),
-          ),
-        ],
+        boxShadow: AppShadows.float,
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(28),

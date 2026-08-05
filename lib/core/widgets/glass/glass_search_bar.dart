@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
+import '../../theme/app_shadows.dart';
 
 /// 하단 고정 플로팅 글래스 검색 바 — 화면 Stack 안에서 쓰며 키보드와 함께 상승한다
 class GlassSearchBar extends StatelessWidget {
@@ -24,13 +25,7 @@ class GlassSearchBar extends StatelessWidget {
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(28),
-              boxShadow: [
-                BoxShadow(
-                  color: Color(0x1F101828),
-                  blurRadius: 32,
-                  offset: Offset(0, 10),
-                ),
-              ],
+              boxShadow: AppShadows.float,
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(28),

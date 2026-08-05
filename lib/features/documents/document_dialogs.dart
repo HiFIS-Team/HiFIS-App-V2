@@ -206,13 +206,7 @@ class _ContextMenu extends StatelessWidget {
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppColors.gray100),
-          boxShadow: [
-            BoxShadow(
-              color: AppShadows.ink.withValues(alpha: 0.16),
-              blurRadius: 28,
-              offset: Offset(0, 10),
-            ),
-          ],
+          boxShadow: AppShadows.modal,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,

@@ -258,13 +258,7 @@ class _UploadingChip extends StatelessWidget {
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(100),
         border: Border.all(color: AppColors.gray100),
-        boxShadow: [
-          BoxShadow(
-            color: AppShadows.ink.withValues(alpha: 0.12),
-            blurRadius: 24,
-            offset: Offset(0, 6),
-          ),
-        ],
+        boxShadow: AppShadows.popup,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
