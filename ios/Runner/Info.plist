@@ -8,10 +8,23 @@
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
 	<string>HiFIS</string>
-	<!-- 사내톡 사진을 사진첩에 저장할 때 iOS 가 물어보는 문구.
-	     이 줄이 없으면 저장을 누르는 순간 앱이 죽는다 (권한 설명 없이 요청 불가). -->
+	<!-- 권한 문구 넷. iOS 가 권한을 물을 때 그대로 보여주는 문장이라 사실대로 적는다.
+	     ⚠️ 여기 없는 권한을 코드가 참조하면 App Store 업로드가 통째로 거절된다
+	     (ITMS-90683 — 아래 셋이 빠져서 실제로 겪었다. 처리 중 거절이라 TestFlight 에
+	     빌드가 아예 안 뜨고 메일로만 사유가 온다).
+
+	     아래 셋은 앱이 직접 부르는 게 아니라 file_picker 가 iOS 에서 쓰는
+	     DKImagePickerController 를 통해 닿는다 — 폰에서 FileType.image 로 사진을 고르면
+	     그 화면이 뜨고, 카메라 버튼이 있고, 찍은 사진에 촬영 위치가 붙는다.
+	     file_picker 를 빼지 않는 한 셋 다 있어야 한다. -->
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>사내톡에서 받은 사진을 사진첩에 저장합니다.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>사내톡에 사진을 첨부하거나 프로필 사진을 바꿀 때 사진 보관함에서 사진을 고릅니다.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>사진을 고르는 화면에서 바로 찍어 첨부할 때 카메라를 사용합니다.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>카메라로 찍은 사진에 촬영 위치를 기록할 때 사용합니다. 앱이 따로 위치를 수집하지는 않습니다.</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
