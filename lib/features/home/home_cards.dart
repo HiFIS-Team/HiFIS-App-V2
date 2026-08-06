@@ -99,7 +99,19 @@ class _ProjectsCard extends StatelessWidget {
         children: [
           _CardHeader(title: '프로젝트', count: rows.length, onOpenAll: onOpenAll),
           SizedBox(height: 14),
-          if (rows.isEmpty)
+          if (rows.isEmpty && isDesktop)
+            // 옆 카드에 높이를 맞추느라 늘어난 자리 — 안내를 가운데에 놓는다.
+            // `Expanded` 는 Column 의 직계 자식이어야 해서 여기서 바로 감싼다.
+            Expanded(
+              child: Center(
+                child: EmptyCard(
+                  icon: Icons.folder_rounded,
+                  text: '진행 중인 프로젝트가 없어요',
+                  framed: false,
+                ),
+              ),
+            )
+          else if (rows.isEmpty)
             // 프로젝트 탭의 빈 상태와 같은 아이콘
             _CardBody(
               child: Center(
@@ -229,7 +241,18 @@ class _NoticeCard extends StatelessWidget {
         children: [
           _CardHeader(title: '공지', count: noticeCount, onOpenAll: onOpenAll),
           SizedBox(height: 4),
-          if (briefs.isEmpty)
+          if (briefs.isEmpty && isDesktop)
+            // 옆 카드에 높이를 맞추느라 늘어난 자리 — 안내를 가운데에 놓는다
+            Expanded(
+              child: Center(
+                child: EmptyCard(
+                  icon: Icons.campaign_rounded,
+                  text: '올라온 공지가 없어요',
+                  framed: false,
+                ),
+              ),
+            )
+          else if (briefs.isEmpty)
             // 공지 탭의 빈 상태와 같은 아이콘
             _CardBody(
               child: Center(

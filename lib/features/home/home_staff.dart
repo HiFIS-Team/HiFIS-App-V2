@@ -50,7 +50,10 @@ class _TodayStaffCard extends StatelessWidget {
             onOpenAll: onOpenAll,
           ),
           SizedBox(height: 14),
-          if (rows.isEmpty)
+          if (rows.isEmpty && isDesktop)
+            // 옆 카드에 높이를 맞추느라 늘어난 자리 — 안내를 가운데에 놓는다
+            Expanded(child: _EmptyRoster())
+          else if (rows.isEmpty)
             // 여기가 비는 건 명단을 못 받은 것이라 빈 목록과 다르다 —
             // 아이콘 카드 대신 사정을 적어 준다
             _EmptyRoster()

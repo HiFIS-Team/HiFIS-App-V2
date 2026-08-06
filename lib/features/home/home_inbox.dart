@@ -194,7 +194,11 @@ class _InboxCardState extends State<_InboxCard> {
         ),
     ];
 
+    // 줄이 없을 때(로딩·빈 결재함)는 안내를 **세로 가운데**에 놓는다.
+    // 데스크톱은 옆 카드에 높이를 맞추느라 카드가 늘어나는데, 안내가 위에
+    // 붙으면 아래가 휑하다. `centered` 가 true 면 남는 높이를 다 쓴다.
     final Widget body;
+    final bool centered = _loading || rows.isEmpty;
     if (_loading) {
       body = Center(
         child: CircularProgressIndicator(
@@ -237,8 +241,13 @@ class _InboxCardState extends State<_InboxCard> {
             onOpenAll: _openAll,
           ),
           SizedBox(height: 14),
-          // 폰은 내용이 없어도 카드가 안 줄어들게 세 줄 높이를 잡아 둔다
-          if (isDesktop)
+          // `Expanded` 는 Column 의 **직계 자식**이어야 해서 여기서 바로 감싼다
+          // (위젯으로 빼면 Flex 가 못 알아본다).
+          // 폰은 스크롤 안이라 높이가 무한이라 못 쓴다 — 대신 세 줄 높이를 잡아
+          // 카드가 줄어들지 않게만 한다.
+          if (isDesktop && centered)
+            Expanded(child: body)
+          else if (isDesktop)
             body
           else
             ConstrainedBox(
