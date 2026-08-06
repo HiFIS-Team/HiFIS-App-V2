@@ -206,8 +206,26 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   /// 파일 붙이기 — 입력바의 링크 아이콘이 부른다 (원래 비어 있던 버튼이다)
+  ///
+  /// **폰은 사진첩을 연다.** 기본값(`FileType.any`)은 iOS 에서 '파일' 앱을
+  /// 여는데, 거기서는 사진첩을 못 뒤진다 — 사진을 고를 길이 아예 없었다
+  /// (실기기에서 실제로 났다). PC 는 문서를 붙이는 자리라 파일 고르개 그대로다.
+  ///
+  /// **열기 전에 키보드를 내린다.** 안 내리면 네이티브 고르개가 떴다 사라진 뒤
+  /// 키보드가 화면에 눌어붙어서, 방을 나가 홈으로 가도 안 내려간다
+  /// (역시 실기기에서 났다 — 시뮬레이터는 키보드를 안 띄워서 안 보였다).
+  ///
+  /// **`compressionQuality` 를 0 보다 크게 준다.** 아이폰 사진은 HEIC 인데
+  /// 기본값 0 이면 사진첩이 원본을 그대로 준다. HEIC 는 서버에 올라가긴 해도
+  /// **Flutter 가 못 그려서 말풍선에서 깨진다** (지원 포맷에 HEIC 가 없다).
+  /// 0 보다 크면 사진첩이 호환 포맷(JPEG)으로 바꿔서 준다.
   Future<void> _attach() async {
-    final picked = await FilePicker.pickFiles(allowMultiple: true);
+    _inputFocus.unfocus();
+    final picked = await FilePicker.pickFiles(
+      allowMultiple: true,
+      type: isDesktop ? FileType.any : FileType.image,
+      compressionQuality: isDesktop ? 0 : 100,
+    );
     final files = [
       for (final f in picked?.files ?? const <PlatformFile>[])
         if (f.path case final path?) (path, f.name),

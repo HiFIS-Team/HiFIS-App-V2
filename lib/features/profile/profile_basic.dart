@@ -112,12 +112,24 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
     if (mounted) setState(() => _saving = false);
   }
 
-  /// 프로필 사진 고르기 — 서버가 png·jpg·gif·webp 만 받는다
+  /// 프로필 사진 고르기 — 서버가 png·jpg·jpeg·gif·webp 만 받는다
+  ///
+  /// **폰은 사진첩을 연다.** 확장자로 거르는 고르개(`FileType.custom`)는
+  /// iOS 에서 '파일' 앱을 여는데 거기서는 사진첩을 못 뒤진다 — 프로필 사진을
+  /// 고를 길이 아예 없었다 (사내톡 첨부와 같은 문제였다).
+  ///
+  /// 폰에서는 확장자를 못 거는 대신 `compressionQuality` 로 막는다. 아이폰
+  /// 사진은 HEIC 라 그대로 보내면 서버가 400 `INVALID_IMAGE` 를 주는데,
+  /// 0 보다 크면 사진첩이 호환 포맷(JPEG)으로 바꿔서 준다.
   Future<void> _pickImage() async {
+    final phone = !isDesktop;
     final picked = await FilePicker.pickFiles(
       dialogTitle: '프로필 사진 선택',
-      type: FileType.custom,
-      allowedExtensions: const ['png', 'jpg', 'jpeg', 'gif', 'webp'],
+      type: phone ? FileType.image : FileType.custom,
+      allowedExtensions: phone
+          ? null
+          : const ['png', 'jpg', 'jpeg', 'gif', 'webp'],
+      compressionQuality: phone ? 100 : 0,
     );
     final file = picked?.files.singleOrNull;
     final path = file?.path;

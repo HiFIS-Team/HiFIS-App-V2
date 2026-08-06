@@ -183,10 +183,18 @@ class _MyBubble extends StatelessWidget {
                         ),
                       ),
                     ),
-                  Text(
-                    text,
-                    style: AppTextStyles.body2.copyWith(color: Colors.white),
-                  ),
+                  // 상대 말풍선과 같은 차례 — 첨부가 위, 글이 아래.
+                  // 여기가 빠져 있어서 **내가 보낸 사진이 빈 말풍선으로** 떴다
+                  // (받는 쪽에서는 보였다). 본문이 없으면 글줄도 안 그린다
+                  if (attachments.isNotEmpty)
+                    _Attachments(urls: attachments, mine: true),
+                  if (text.isNotEmpty) ...[
+                    if (attachments.isNotEmpty) SizedBox(height: 6),
+                    Text(
+                      text,
+                      style: AppTextStyles.body2.copyWith(color: Colors.white),
+                    ),
+                  ],
                 ],
               ),
             ),
