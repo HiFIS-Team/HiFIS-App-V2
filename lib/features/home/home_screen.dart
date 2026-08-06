@@ -22,12 +22,15 @@ import '../../core/widgets/display/avatar.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/feedback/empty_card.dart';
 import '../../core/widgets/feedback/reject_reason_dialog.dart';
+import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/input/mini_button.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/input/see_all_button.dart';
+import '../approval/approval_screen.dart';
 import '../notice/notice_screen.dart';
 import '../notifications/notification_screen.dart';
 import '../project/project_screen.dart';
+import '../schedule/schedule_screen.dart';
 part 'home_inbox.dart';
 part 'home_staff.dart';
 part 'home_status.dart';
@@ -149,6 +152,37 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (mounted) setState(() {});
   }
 
+  void _open(Widget screen) =>
+      Navigator.push(context, CupertinoPageRoute(builder: (_) => screen));
+
+  /// 폰 홈 왼쪽 위 바로가기 — 일정 · 전자결재
+  ///
+  /// **폰에는 이 둘의 탭이 없다** (`MainShell._go` 가 갈 데가 없어 그냥 돌아온다).
+  /// 데스크톱은 사이드바에 메뉴가 있어서 안 그린다.
+  /// 셸 헤더 버튼이 오른쪽 위를 쓰고 있어 왼쪽이 비어 있다.
+  Widget _shortcuts() => SafeArea(
+    bottom: false,
+    child: Align(
+      alignment: Alignment.topLeft,
+      child: Padding(
+        padding: EdgeInsets.only(top: 8, left: 16),
+        child: Row(
+          children: [
+            GlassIconButton(
+              symbol: 'calendar',
+              onPressed: () => _open(ScheduleScreen()),
+            ),
+            SizedBox(width: 10),
+            GlassIconButton(
+              symbol: 'checkmark.seal',
+              onPressed: () => _open(ApprovalScreen()),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     // 데스크톱은 화면이 넓어서 프로젝트·공지를 나란히 배치한다
@@ -227,6 +261,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ],
             ),
           ),
+          // 홈에서만 보이는 바로가기 — 다른 탭에는 안 붙는다
+          if (!desktop) _shortcuts(),
         ],
       ),
     );
