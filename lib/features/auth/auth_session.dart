@@ -12,6 +12,7 @@ import '../../core/data/employee.dart';
 import '../../core/data/staff_directory.dart';
 import '../../core/util/capture_guard.dart';
 import '../messages/chat_store.dart';
+import '../../core/util/photo_cache.dart';
 
 /// 로그인 세션
 ///
@@ -131,6 +132,8 @@ class AuthSession extends ValueNotifier<bool> {
     StaffDirectory.instance.clear();
     // 다음 사람에게 앞사람 대화가 보이면 안 된다
     ChatStore.instance.clear();
+    // 받아 둔 사진 파일도 지운다 — 다음 사람에게 남의 사진이 남으면 안 된다
+    PhotoCache.clear();
     value = false;
   }
 }

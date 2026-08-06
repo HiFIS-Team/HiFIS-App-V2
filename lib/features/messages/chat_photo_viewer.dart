@@ -348,37 +348,124 @@ String _fileNameOf(String url) {
 /// 1. **보내는 중** — 아직 안 올라간 원본 ([localFilePrefix])
 /// 2. **방금 올린 것** — 올라간 뒤에도 기기에 남아 있는 파일 ([ChatStore.localCopyOf]).
 ///    서버에서 다시 받아 오면 그동안 사진이 사라졌다가 다시 뜬다
+/// [cacheWidth] — **말풍선에서는 반드시 준다.**
+/// 안 주면 1600px 원본을 그대로 풀어서 한 장이 7MB 넘게 메모리를 먹는다.
+/// 사진이 열 몇 장 쌓이면 이미지 캐시(100MB)가 넘쳐 오래된 것부터 버려지고,
+/// 스크롤을 올렸다 내리면 **사라졌다가 다시 뜬다** (실기기에서 실제로 났다).
+/// 크게 보기에서는 늘려 보므로 안 준다.
 Widget chatPhoto(
   String url, {
   double? width,
+  int? cacheWidth,
   BoxFit fit = BoxFit.cover,
   ImageErrorWidgetBuilder? onError,
 }) {
-  Widget fromServer() => Image.network(
-    fileUrl(url),
+  Widget file(File source, {ImageErrorWidgetBuilder? onFail}) => Image.file(
+    source,
     width: width,
+    cacheWidth: cacheWidth,
     fit: fit,
-    errorBuilder: onError,
+    frameBuilder: _fadeIn,
+    errorBuilder: onFail ?? onError,
   );
 
+  // 아직 안 올라간 것 — 고르자마자 기기 원본을 그린다
   if (url.startsWith(localFilePrefix)) {
-    return Image.file(
-      File(url.substring(localFilePrefix.length)),
-      width: width,
-      fit: fit,
-      errorBuilder: onError,
-    );
+    return file(File(url.substring(localFilePrefix.length)));
   }
 
-  final local = ChatStore.instance.localCopyOf(url);
-  if (local != null) {
-    return Image.file(
-      File(local),
-      width: width,
-      fit: fit,
-      // 임시 파일이 지워졌으면 서버에서 받아 온다
-      errorBuilder: (_, _, _) => fromServer(),
-    );
+  // 방금 내가 올린 것 — 서버 주소로 바뀌어도 올린 파일 그대로 쓴다
+  final mine = ChatStore.instance.localCopyOf(url);
+  if (mine != null && File(mine).existsSync()) return file(File(mine));
+
+  // 예전에 받아 둔 것 — 첫 프레임부터 뜬다 (흰 칸에서 튀어나오지 않는다)
+  final saved = PhotoCache.ready(url);
+  if (saved != null) return file(saved);
+
+  return _FetchedPhoto(
+    url: url,
+    width: width,
+    cacheWidth: cacheWidth,
+    fit: fit,
+    onError: onError,
+  );
+}
+
+/// 받아오는 동안 흰 칸이었다가 툭 튀어나오지 않게 살짝 들여 보낸다
+Widget _fadeIn(BuildContext _, Widget child, int? frame, bool alreadyThere) {
+  if (alreadyThere) return child;
+  return AnimatedOpacity(
+    opacity: frame == null ? 0 : 1,
+    duration: Duration(milliseconds: 200),
+    curve: Curves.easeOut,
+    child: child,
+  );
+}
+
+/// 아직 안 받아 본 사진 — 받아서 **파일로 남긴 뒤** 그린다
+///
+/// 받는 동안은 옅은 회색 칸으로 자리를 지킨다. 다음부터는 [PhotoCache.ready]
+/// 가 바로 찾아 줘서 이 위젯을 아예 안 거친다.
+class _FetchedPhoto extends StatefulWidget {
+  _FetchedPhoto({
+    required this.url,
+    required this.width,
+    required this.cacheWidth,
+    required this.fit,
+    required this.onError,
+  });
+
+  final String url;
+  final double? width;
+  final int? cacheWidth;
+  final BoxFit fit;
+  final ImageErrorWidgetBuilder? onError;
+
+  @override
+  State<_FetchedPhoto> createState() => _FetchedPhotoState();
+}
+
+class _FetchedPhotoState extends State<_FetchedPhoto> {
+  File? _file;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    PhotoCache.fetch(widget.url).then((file) {
+      if (!mounted) return;
+      setState(() {
+        _file = file;
+        _failed = file == null;
+      });
+    });
   }
-  return fromServer();
+
+  @override
+  Widget build(BuildContext context) {
+    final file = _file;
+    if (file != null) {
+      return Image.file(
+        file,
+        width: widget.width,
+        cacheWidth: widget.cacheWidth,
+        fit: widget.fit,
+        frameBuilder: _fadeIn,
+        errorBuilder: widget.onError,
+      );
+    }
+    // 못 받았으면 서버에서 바로 그려 본다 (거기서도 안 되면 부른 쪽이 정한다)
+    if (_failed) {
+      return Image.network(
+        fileUrl(widget.url),
+        width: widget.width,
+        cacheWidth: widget.cacheWidth,
+        fit: widget.fit,
+        frameBuilder: _fadeIn,
+        errorBuilder: widget.onError,
+      );
+    }
+    // 받는 동안 — 흰 바탕이 아니라 옅은 회색으로 자리를 지킨다
+    return Container(width: widget.width, color: AppColors.gray100);
+  }
 }

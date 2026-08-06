@@ -99,6 +99,11 @@ class _Attachments extends StatelessWidget {
   /// 한 장짜리 사진의 최대 높이 — 세로로 긴 사진이 화면을 다 먹지 않게
   static const _maxSingle = 280.0;
 
+  /// 풀어 둘 가로 픽셀 — 화면 배율 3배까지 보고 넉넉하게 잡는다.
+  /// 원본 그대로 풀면 캐시가 넘쳐 스크롤할 때마다 사진이 깜빡인다
+  static const _cacheSingle = 660;
+  static const _cacheTile = 330;
+
   Color get _tint => bare
       ? AppColors.textSecondary
       : (mine ? Colors.white : AppColors.textPrimary);
@@ -152,6 +157,7 @@ class _Attachments extends StatelessWidget {
       child: chatPhoto(
         url,
         width: _width,
+        cacheWidth: _cacheSingle,
         // 못 받아오면(서명 만료 등) 파일 줄로 떨어진다
         onError: (_, _, _) => _file(url, _tint),
       ),
@@ -212,8 +218,11 @@ class _Attachments extends StatelessWidget {
   Widget _tile(String url, {required int more}) => Stack(
     fit: StackFit.expand,
     children: [
+      // 사진이 오기 전 자리 — 흰 칸이 아니라 옅은 회색이라 덜 튄다
+      ColoredBox(color: AppColors.gray100),
       chatPhoto(
         url,
+        cacheWidth: _cacheTile,
         // 칸이 작아 파일 이름을 못 넣는다 — 자리는 남기고 아이콘만 둔다
         onError: (_, _, _) => ColoredBox(
           color: AppColors.gray100,

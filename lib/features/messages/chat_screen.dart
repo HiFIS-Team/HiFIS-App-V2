@@ -6,6 +6,7 @@ import 'dart:ui';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:gal/gal.dart';
 
 import '../../core/api/chat/chat_api.dart';
@@ -16,6 +17,7 @@ import '../../core/data/staff.dart';
 import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/util/photo_cache.dart';
 import '../../core/util/platform.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
@@ -166,7 +168,8 @@ class _ChatScreenState extends State<ChatScreen> {
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
     }
-    _scrollToBottom();
+    // 들어가자마자 바닥이어야 한다 — 위에서 스르륵 내려오면 어수선하다
+    _scrollToBottom(animate: false);
   }
 
   /// 새 메시지가 들어오면 아래에 붙어 있던 화면은 따라 내려간다
@@ -187,6 +190,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     _hovered.dispose();
+    _pin?.cancel();
     _typingStop?.cancel();
     if (_typingSent) _store.typing(_roomId, isTyping: false);
     _store.removeListener(_onStore);
@@ -237,7 +241,11 @@ class _ChatScreenState extends State<ChatScreen> {
     if (files.isEmpty || !mounted) return;
     setState(() => _uploading = true);
     try {
-      await _store.sendFiles(_roomId, files);
+      // 부르는 즉시 임시 말풍선이 붙는다 — 그걸 먼저 보여주고,
+      // 다 올라간 뒤 사진이 뜨면서 길어지는 만큼 한 번 더 따라 내려간다
+      final sending = _store.sendFiles(_roomId, files);
+      _scrollToBottom();
+      await sending;
       _scrollToBottom();
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
@@ -262,14 +270,58 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
   }
 
-  void _scrollToBottom() {
+  /// 바닥으로 내린 뒤 **잠깐 붙여 둔다**
+  ///
+  /// 사진은 받아오기 전에는 높이를 모른다. 한 번만 내리면 그 뒤에 사진이 뜨면서
+  /// 목록이 길어져 **화면이 중간에 선다** — 방에 들어갈 때도, 사진을 보낸
+  /// 직후에도 실제로 났다. [_pinFor] 동안 늘어나는 만큼 따라 내려간다.
+  ///
+  /// **사용자가 스크롤을 잡으면 즉시 그만둔다** — 위로 올려 보는 것을 붙잡으면 안 된다.
+  void _scrollToBottom({bool animate = true}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollController.hasClients) return;
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: Duration(milliseconds: 250),
-        curve: Curves.easeOut,
+      final bottom = _scrollController.position.maxScrollExtent;
+      if (animate) {
+        _scrollController.animateTo(
+          bottom,
+          duration: Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      } else {
+        _scrollController.jumpTo(bottom);
+      }
+      _pinToBottom(
+        after: animate ? Duration(milliseconds: 260) : Duration.zero,
       );
+    });
+  }
+
+  /// 바닥에 붙여 두는 시간 — 사진 몇 장이 뜨는 데 걸리는 만큼
+  static const _pinFor = Duration(milliseconds: 1500);
+
+  Timer? _pin;
+
+  void _pinToBottom({required Duration after}) {
+    _pin?.cancel();
+    final until = DateTime.now().add(after + _pinFor);
+    _pin = Timer.periodic(Duration(milliseconds: 50), (timer) {
+      if (!mounted || !_scrollController.hasClients) {
+        timer.cancel();
+        return;
+      }
+      if (DateTime.now().isAfter(until)) {
+        timer.cancel();
+        return;
+      }
+      final position = _scrollController.position;
+      // 손으로 스크롤을 잡았으면 놓아 준다
+      if (position.userScrollDirection != ScrollDirection.idle) {
+        timer.cancel();
+        return;
+      }
+      if ((position.pixels - position.maxScrollExtent).abs() > 1) {
+        _scrollController.jumpTo(position.maxScrollExtent);
+      }
     });
   }
 
