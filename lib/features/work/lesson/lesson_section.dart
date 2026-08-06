@@ -37,7 +37,13 @@ part 'lesson_sign.dart';
 /// - 상단: 회원 등록 / 세션 싸인 받기 버튼
 /// - 세션 기록: 받은 싸인 기록 (서명 미리보기·회차·시각)
 class LessonSection extends StatefulWidget {
-  LessonSection({super.key});
+  LessonSection({super.key, this.branchId});
+
+  /// 업무 화면 지점 고르개가 정한 지점 — null 이면 전 지점
+  ///
+  /// MASTER·ADMIN 만 고를 수 있고, 그 밖에는 늘 null 이라 서버가 본인 지점으로
+  /// 고정한다. 바뀌면 [didUpdateWidget] 에서 다시 받는다.
+  final String? branchId;
 
   @override
   State<LessonSection> createState() => _LessonSectionState();
@@ -52,9 +58,16 @@ class _LessonSectionState extends State<LessonSection> {
     _load();
   }
 
+  @override
+  void didUpdateWidget(LessonSection old) {
+    super.didUpdateWidget(old);
+    // 지점을 바꾸면 화면이 통째로 다른 지점 것이 된다 — 다시 받는다
+    if (old.branchId != widget.branchId) _load();
+  }
+
   Future<void> _load() async {
     try {
-      await _LessonStore.instance.load();
+      await _LessonStore.instance.load(branchId: widget.branchId);
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
     }

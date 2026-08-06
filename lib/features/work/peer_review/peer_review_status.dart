@@ -38,17 +38,6 @@ class _Submission {
   bool get complete => quota > 0 && done >= quota;
 }
 
-/// 지점 고르개에 세울 지점 — 정해진 차례(화순 → 첨단 → 동광주)
-///
-/// **본사(HQ)는 안 세운다** — 지점이 아니라 전사다 (조직도 필터와 같은 기준).
-/// **'전체'도 안 세운다** — 지점을 섞어 보면 어느 지점이 덜 냈는지가 안 보인다.
-List<Branch> _branchChoices() {
-  final directory = StaffDirectory.instance;
-  return [...directory.branches.where((branch) => !branch.isHq)]..sort(
-    (a, b) => directory.branchRank(a.id).compareTo(directory.branchRank(b.id)),
-  );
-}
-
 /// 사람별 제출 현황 — 안 낸 사람이 위로 온다
 ///
 /// 이 화면을 여는 이유가 "누가 아직 안 냈나" 이므로 그 순서로 세운다.
@@ -91,48 +80,27 @@ List<_Submission> _submissionsOf(List<PeerReview> reviews, {String? branchId}) {
 
 /// 대표·관리자가 보는 화면 — 이번 달 누가 평가를 냈는지
 ///
-/// 지점 바로 갈라서 본다. 전사를 한 목록에 두면 지점이 섞여서
-/// 어느 지점이 덜 냈는지가 안 보인다.
-class _SubmissionCard extends StatefulWidget {
-  _SubmissionCard({required this.reviews, required this.period});
+/// **지점은 업무 화면 머리의 고르개가 정한다** ([_BranchFilter]).
+/// 예전에는 여기 안에 지점 탭이 따로 있었는데, 다섯 항목이 다 지점별로 봐야
+/// 하는 데이터라 화면마다 고르개를 두지 않고 한 자리로 모았다.
+class _SubmissionCard extends StatelessWidget {
+  _SubmissionCard({required this.reviews, required this.period, this.branchId});
 
   final List<PeerReview> reviews;
   final String period;
 
-  @override
-  State<_SubmissionCard> createState() => _SubmissionCardState();
-}
-
-class _SubmissionCardState extends State<_SubmissionCard> {
-  /// 고른 지점 — 안 골랐으면 맨 앞 지점부터 본다
-  String? _branch;
+  /// 볼 지점 — null 이면 전 지점을 한 목록에 세운다
+  final String? branchId;
 
   /// 그 사람이 이번 달에 받은 평가를 열어 본다
-  void _open(Employee person) => showFullPage<void>(
+  void _open(BuildContext context, Employee person) => showFullPage<void>(
     context,
-    (_) => _ReceivedScreen(person: person, reviews: widget.reviews),
+    (_) => _ReceivedScreen(person: person, reviews: reviews),
   );
 
   @override
   Widget build(BuildContext context) {
-    final choices = _branchChoices();
-    // '전체'가 없으므로 늘 한 지점이 골라져 있다
-    final branch = _branch ?? (choices.isEmpty ? null : choices.first.id);
-    final rows = _submissionsOf(widget.reviews, branchId: branch);
-
-    // 지점이 한 곳뿐이면 고를 게 없다
-    final picker = [
-      if (choices.length > 1) ...[
-        SegmentedTabs(
-          labels: [for (final b in choices) b.name],
-          selected: choices
-              .indexWhere((b) => b.id == branch)
-              .clamp(0, choices.length - 1),
-          onSelect: (i) => setState(() => _branch = choices[i].id),
-        ),
-        SizedBox(height: 16),
-      ],
-    ];
+    final rows = _submissionsOf(reviews, branchId: branchId);
 
     // 폰은 사람마다 카드 한 장 — 평가 작성 목록([_PersonCard])과 같은 결이다.
     // 줄 내용은 그대로 두고 카드로만 나눈다. 전부 세우므로 전체보기가 없다.
@@ -140,13 +108,15 @@ class _SubmissionCardState extends State<_SubmissionCard> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          ...picker,
           if (rows.isEmpty)
             EmptyCard(icon: Icons.group_rounded, text: '평가 대상 인원이 없어요')
           else
             for (var i = 0; i < rows.length; i++) ...[
               if (i > 0) SizedBox(height: 12),
-              _SubmissionTile(row: rows[i], onTap: () => _open(rows[i].person)),
+              _SubmissionTile(
+                row: rows[i],
+                onTap: () => _open(context, rows[i].person),
+              ),
             ],
         ],
       );
@@ -157,7 +127,6 @@ class _SubmissionCardState extends State<_SubmissionCard> {
 
     return Column(
       children: [
-        ...picker,
         Container(
           width: double.infinity,
           padding: EdgeInsets.fromLTRB(20, 20, 20, 10),
@@ -173,10 +142,7 @@ class _SubmissionCardState extends State<_SubmissionCard> {
                     SeeAllButton(
                       onTap: () => showFullPage<void>(
                         context,
-                        (_) => _SubmissionScreen(
-                          rows: rows,
-                          reviews: widget.reviews,
-                        ),
+                        (_) => _SubmissionScreen(rows: rows, reviews: reviews),
                       ),
                     ),
                   ],
@@ -198,7 +164,7 @@ class _SubmissionCardState extends State<_SubmissionCard> {
                   if (i > 0) Divider(height: 1, color: AppColors.divider),
                   _SubmissionRow(
                     row: head[i],
-                    onTap: () => _open(head[i].person),
+                    onTap: () => _open(context, head[i].person),
                   ),
                 ],
             ],

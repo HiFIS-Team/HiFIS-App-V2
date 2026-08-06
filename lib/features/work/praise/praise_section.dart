@@ -30,7 +30,13 @@ part 'praise_survey.dart';
 /// 회원들이 남긴 칭찬과 컴플레인을 세그먼트로 나눠 본다.
 /// 카드에는 최근 5건만 보여주고, 전체 보기에서 날짜별로 모아 본다.
 class PraiseSection extends StatefulWidget {
-  PraiseSection({super.key});
+  PraiseSection({super.key, this.branchId});
+
+  /// 업무 화면 지점 고르개가 정한 지점 — null 이면 전 지점
+  ///
+  /// MASTER·ADMIN 만 고를 수 있고, 그 밖에는 늘 null 이라 서버가 본인 지점으로
+  /// 고정한다. 바뀌면 [didUpdateWidget] 에서 다시 받는다.
+  final String? branchId;
 
   @override
   State<PraiseSection> createState() => _PraiseSectionState();
@@ -48,9 +54,16 @@ class _PraiseSectionState extends State<PraiseSection> {
     _load();
   }
 
+  @override
+  void didUpdateWidget(PraiseSection old) {
+    super.didUpdateWidget(old);
+    // 지점을 바꾸면 화면이 통째로 다른 지점 것이 된다 — 다시 받는다
+    if (old.branchId != widget.branchId) _load();
+  }
+
   Future<void> _load() async {
     try {
-      await _loadSurveys();
+      await _loadSurveys(branchId: widget.branchId);
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
     }

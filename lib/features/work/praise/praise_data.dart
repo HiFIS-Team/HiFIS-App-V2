@@ -179,8 +179,8 @@ bool get _showStatus => true;
 final _feedbacks = <_Feedback>[];
 final _surveys = <_Survey>[];
 
-Future<void> _loadSurveys() async {
-  final rows = await KindnessApi.list();
+Future<void> _loadSurveys({String? branchId}) async {
+  final rows = await KindnessApi.list(branchId: branchId);
   final me = currentUser?.id;
 
   _surveys

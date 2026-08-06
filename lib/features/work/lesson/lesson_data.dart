@@ -36,15 +36,16 @@ class _LessonStore {
   /// 그게 다 넘어온다. 달로 잘라 받는다.
   List<SessionSign> signs = const [];
 
-  Future<void> load() async {
+  Future<void> load({String? branchId}) async {
     final now = DateTime.now();
     // 셋 다 서로를 안 기다려도 되니 같이 띄운다
-    final memberRequest = MemberApi.list();
+    final memberRequest = MemberApi.list(branchId: branchId);
     final registrationRequest = RegistrationApi.list();
     final signRequest = SessionSignApi.list(
       // 대표·관리자는 자기 싸인이 없다 — 안 주면 서버가 지점 전체를 준다
       trainerId: _viewOnly ? null : currentUser?.id,
       period: periodKey(now),
+      branchId: branchId,
     );
 
     members = await memberRequest;

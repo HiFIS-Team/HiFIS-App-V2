@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/api/client/api_exception.dart';
-import '../../../core/api/staff/staff_api.dart' show Branch;
 import '../../../core/api/work/peer_review_api.dart';
 import '../../../core/data/current_user.dart';
 import '../../../core/data/employee.dart';
@@ -41,7 +40,13 @@ part 'peer_review_form.dart';
 /// 평가는 **달마다 새로 쓴다.** 한 달 안에서는 같은 사람에게 한 번만 낼 수
 /// 있고 낸 뒤에는 못 고친다 — 다시 누르면 그때 쓴 내용을 읽기만 한다.
 class PeerReviewSection extends StatefulWidget {
-  PeerReviewSection({super.key});
+  PeerReviewSection({super.key, this.branchId});
+
+  /// 업무 화면 지점 고르개가 정한 지점 — null 이면 전 지점
+  ///
+  /// MASTER·ADMIN 만 고를 수 있고, 그 밖에는 늘 null 이라 서버가 본인 지점으로
+  /// 고정한다. 바뀌면 [didUpdateWidget] 에서 다시 받는다.
+  final String? branchId;
 
   @override
   State<PeerReviewSection> createState() => _PeerReviewSectionState();
@@ -81,6 +86,13 @@ class _PeerReviewSectionState extends State<PeerReviewSection> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didUpdateWidget(PeerReviewSection old) {
+    super.didUpdateWidget(old);
+    // 지점을 바꾸면 화면이 통째로 다른 지점 것이 된다 — 다시 받는다
+    if (old.branchId != widget.branchId) _load();
   }
 
   Future<void> _load() async {
@@ -154,7 +166,13 @@ class _PeerReviewSectionState extends State<PeerReviewSection> {
     }
 
     // 대표·관리자는 평가를 쓰지 않는다 — 누가 냈는지만 본다
-    if (!_canReview) return _SubmissionCard(reviews: _all, period: _period);
+    if (!_canReview) {
+      return _SubmissionCard(
+        reviews: _all,
+        period: _period,
+        branchId: widget.branchId,
+      );
+    }
 
     // 아직 안 한 사람이 위로 온다 — 무엇이 남았는지가 이 화면의 용건이다
     final pending = [

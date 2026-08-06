@@ -1,7 +1,9 @@
+import 'package:cupertino_native/cupertino_native.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/api/client/api_exception.dart';
+import '../../core/api/staff/staff_api.dart' show Branch;
 import '../../core/api/work/env_api.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
@@ -16,6 +18,7 @@ import '../../core/util/sf_symbols.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
+import '../../core/widgets/glass/glass_menu.dart';
 import '../../core/widgets/input/app_button.dart';
 import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/input/pressable.dart';
@@ -26,6 +29,7 @@ import 'lesson/lesson_section.dart';
 import 'peer_review/peer_review_section.dart';
 import 'praise/praise_section.dart';
 import '../../core/widgets/nav/pane_transition.dart';
+part 'work_branch_filter.dart';
 part 'work_tabs.dart';
 part 'work_checklist.dart';
 part 'work_history.dart';
@@ -63,18 +67,38 @@ class _WorkScreenState extends State<WorkScreen> {
 
   bool _envLoading = true;
 
+  /// 다섯 항목이 같이 보는 지점 — null 이면 전 지점
+  ///
+  /// 고르개는 MASTER·ADMIN 에게만 있고([_BranchFilter]), 나머지는 늘 null 이다.
+  /// 그 둘은 서버가 본인 지점으로 고정하므로 null 이 곧 '내 지점'이 된다.
+  String? _branch;
+
   @override
   void initState() {
     super.initState();
     _loadEnv();
   }
 
+  /// 지점을 바꾸면 이 화면이 들고 있는 것만 다시 받는다.
+  /// 항목 화면들은 각자 `didUpdateWidget` 에서 다시 받는다.
+  void _pickBranch(String? branchId) {
+    if (branchId == _branch) return;
+    setState(() {
+      _branch = branchId;
+      _envLoading = true;
+    });
+    _loadEnv();
+  }
+
   Future<void> _loadEnv() async {
-    // 지점을 반드시 지정한다 — 대표·관리자는 지점 스코프가 안 걸려서
-    // 안 주면 전 지점 항목이 다 온다 (지점 3개면 항목이 3벌씩 나온다)
-    final branchId = currentUser?.branchId;
+    final branchId = _branch;
     try {
-      final itemRequest = EnvApi.items(branchId: branchId);
+      // 점검 항목은 **직접 수행하는 사람**만 쓴다(`_canDoEnv`).
+      // 대표·관리자는 그리지도 않는 데다, 전 지점을 고르면 지점 수만큼
+      // 같은 항목이 겹쳐 오므로 아예 안 받는다.
+      final itemRequest = _canDoEnv
+          ? EnvApi.items(branchId: branchId)
+          : Future.value(const <EnvItem>[]);
       // 화면이 "오늘 점검"이라 오늘 것만 받는다 — 서버가 한국 시간으로 잘라 준다
       final logRequest = EnvApi.logs(
         branchId: branchId,
@@ -236,6 +260,35 @@ class _WorkScreenState extends State<WorkScreen> {
     );
   }
 
+  /// 지점 고르개 — 볼 사람이 아니면 안 그린다
+  Widget? get _filter => _BranchFilter.visible
+      ? _BranchFilter(branchId: _branch, onSelect: _pickBranch)
+      : null;
+
+  /// 폰에서 고르개를 콘텐츠 **위에 띄운다** — 셸의 헤더 버튼과 같은 층이다
+  ///
+  /// 셸이 오른쪽 위(`top 8 · right 16`)를 쓰고 있어 왼쪽 위가 비어 있다.
+  /// 스크롤에 안 딸려 가야 글래스 뒤로 콘텐츠가 지나가는 게 보인다.
+  Widget _withFilter(Widget body) {
+    final filter = _filter;
+    if (filter == null) return body;
+    return Stack(
+      children: [
+        body,
+        SafeArea(
+          bottom: false,
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: Padding(
+              padding: EdgeInsets.only(top: 8, left: 16),
+              child: filter,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final item = _items[_tab];
@@ -244,26 +297,33 @@ class _WorkScreenState extends State<WorkScreen> {
     // 목록 화면들처럼 탭을 고정하고 내용만 스크롤한다.
     if (!isApple && !isDesktop) {
       return Scaffold(
-        body: Column(
-          children: [
-            ColoredBox(
-              color: AppColors.background,
-              child: SafeArea(
-                bottom: false,
-                child: Padding(
-                  padding: EdgeInsets.only(top: 64),
-                  child: _tabs(),
+        body: _withFilter(
+          Column(
+            children: [
+              ColoredBox(
+                color: AppColors.background,
+                child: SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: EdgeInsets.only(top: 64),
+                    child: _tabs(),
+                  ),
                 ),
               ),
-            ),
-            Container(height: 1, color: AppColors.gray100),
-            Expanded(
-              child: ListView(
-                padding: EdgeInsets.fromLTRB(0, 20, 0, bottomBarInset(context)),
-                children: [_content(item)],
+              Container(height: 1, color: AppColors.gray100),
+              Expanded(
+                child: ListView(
+                  padding: EdgeInsets.fromLTRB(
+                    0,
+                    20,
+                    0,
+                    bottomBarInset(context),
+                  ),
+                  children: [_content(item)],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     }
@@ -277,7 +337,12 @@ class _WorkScreenState extends State<WorkScreen> {
           child: ListView(
             padding: EdgeInsets.fromLTRB(24, 64, 24, 32),
             children: [
-              DesktopHeader(title: '업무', subtitle: '이번 달 평가 항목을 확인하고 기록해요'),
+              // 머리말의 오른쪽 끝 — 화면 전체에 걸리는 컨트롤이 서는 자리다
+              DesktopHeader(
+                title: '업무',
+                subtitle: '이번 달 평가 항목을 확인하고 기록해요',
+                trailing: _filter,
+              ),
               SizedBox(height: 22),
               _tabs(),
               SizedBox(height: 16),
@@ -291,16 +356,18 @@ class _WorkScreenState extends State<WorkScreen> {
     // 홈처럼 화면 전체가 한 번에 스크롤된다.
     // 항목 탭도 같이 올라가야 위쪽 글래스 버튼에 콘텐츠가 비친다.
     return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: ListView(
-          padding: EdgeInsets.fromLTRB(0, 64, 0, bottomBarInset(context)),
-          children: [
-            _tabs(),
-            Container(height: 1, color: AppColors.gray100),
-            SizedBox(height: 20),
-            _content(item),
-          ],
+      body: _withFilter(
+        SafeArea(
+          bottom: false,
+          child: ListView(
+            padding: EdgeInsets.fromLTRB(0, 64, 0, bottomBarInset(context)),
+            children: [
+              _tabs(),
+              Container(height: 1, color: AppColors.gray100),
+              SizedBox(height: 20),
+              _content(item),
+            ],
+          ),
         ),
       ),
     );
@@ -395,17 +462,17 @@ class _WorkScreenState extends State<WorkScreen> {
           else if (item.label == '동료 평가')
             Padding(
               padding: EdgeInsets.symmetric(horizontal: _pad),
-              child: PeerReviewSection(),
+              child: PeerReviewSection(branchId: _branch),
             )
           else if (item.label == '수업 개수')
             Padding(
               padding: EdgeInsets.symmetric(horizontal: _pad),
-              child: LessonSection(),
+              child: LessonSection(branchId: _branch),
             )
           else if (item.label == '회원 친절도')
             Padding(
               padding: EdgeInsets.symmetric(horizontal: _pad),
-              child: PraiseSection(),
+              child: PraiseSection(branchId: _branch),
             )
           else
             Padding(

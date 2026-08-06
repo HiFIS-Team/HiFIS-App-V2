@@ -340,6 +340,7 @@ class SessionSignApi {
     String? trainerId,
     String? memberId,
     String? period,
+    String? branchId,
   }) async {
     final rows = await ApiClient.instance.getList(
       '/session-signs',
@@ -347,6 +348,8 @@ class SessionSignApi {
         'trainerId': ?trainerId,
         'memberId': ?memberId,
         'period': ?period,
+        // 안 주면 볼 수 있는 만큼 다 온다 — MEMBER·MANAGER 는 서버가 본인 지점으로 고정
+        'branchId': ?branchId,
       },
     );
     return [

@@ -95,10 +95,17 @@ class KindnessApi {
   ///
   /// [praisedEmployeeId] 를 주면 그 사람이 칭찬받은 것만. 안 주면 지점 전체
   /// (MASTER·ADMIN 은 전 지점).
-  static Future<List<KindnessSurvey>> list({String? praisedEmployeeId}) async {
+  static Future<List<KindnessSurvey>> list({
+    String? praisedEmployeeId,
+    String? branchId,
+  }) async {
     final rows = await _client.getList(
       '/kindness-surveys',
-      query: {'praisedEmployeeId': ?praisedEmployeeId},
+      query: {
+        'praisedEmployeeId': ?praisedEmployeeId,
+        // 안 주면 볼 수 있는 만큼 다 온다 — MEMBER·MANAGER 는 서버가 본인 지점으로 고정
+        'branchId': ?branchId,
+      },
     );
     return [
       for (final row in rows)
