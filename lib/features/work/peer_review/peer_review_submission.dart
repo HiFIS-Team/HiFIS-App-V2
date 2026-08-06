@@ -122,14 +122,25 @@ class _ReceivedScreen extends StatelessWidget {
       if (review.revieweeId == person.id) review.reviewerId: review,
   };
 
-  /// 평가를 쓴 사람을 낼 수 있는 차례대로 — 본인이 맨 앞, 그다음 같은 지점 사람들
+  /// 평가를 쓴 사람 — 본인이 맨 앞, 그다음 같은 지점 차례, 그 밖은 뒤에
   ///
-  /// 서로 평가하는 사이라 `_targetsOf(person)` 이 곧 이 사람을 평가할 수 있는
-  /// 사람들이다. **안 쓴 사람은 빠진다** — 이 화면은 받은 것만 모은다.
-  List<Employee> _writers(Map<String, PeerReview> received) => [
-    for (final employee in _PeerReviewSectionState._targetsOf(person))
-      if (received.containsKey(employee.id)) employee,
-  ];
+  /// 차례는 `_targetsOf(person)`(서로 평가하는 사이)을 따르지만 **그 명단으로
+  /// 거르지는 않는다.** 지점을 옮기면 옛 지점 동료가 쓴 평가가 그대로 남는데,
+  /// 명단에 없다고 빼면 받은 평가가 화면에서 사라진다 (실제로 한 건이 빠졌다).
+  /// **안 쓴 사람은 애초에 [received] 에 없다** — 이 화면은 받은 것만 모은다.
+  List<Employee> _writers(Map<String, PeerReview> received) {
+    final ordered = [
+      for (final employee in _PeerReviewSectionState._targetsOf(person))
+        if (received.containsKey(employee.id)) employee,
+    ];
+    final seen = {for (final employee in ordered) employee.id};
+    return [
+      ...ordered,
+      for (final id in received.keys)
+        if (!seen.contains(id))
+          ?StaffDirectory.instance.byId(id), // 명단에서 못 찾으면 그릴 수가 없다
+    ];
+  }
 
   /// 그 사람이 어떻게 매겼는지 — 평가 작성 화면을 읽기 전용으로 연다
   void _open(BuildContext context, PeerReview review) => showFullPage<void>(
