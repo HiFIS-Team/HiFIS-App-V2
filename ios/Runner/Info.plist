@@ -28,6 +28,11 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<!-- 수출 규정 — 업로드할 때마다 App Store Connect 가 묻는 질문을 미리 답해 둔다.
+	     앱이 쓰는 암호화는 HTTPS 뿐이라 면제 대상이다 (자체 암호 알고리즘이 없다).
+	     이 줄이 없으면 빌드가 '수출 규정 누락' 으로 테스터에게 안 내려간다. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>
