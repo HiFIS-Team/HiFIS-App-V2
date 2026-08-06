@@ -221,8 +221,8 @@ class _MainShellState extends State<MainShell> {
       onOpenProjects: _goProjects,
       onOpenNotices: _goNotices,
       onOpen: _go,
-      // 조직도는 데스크톱 사이드바에만 있다 — 폰은 넘기지 않는다
-      onOpenStaff: () => _paneIndex.value = 7,
+      // 오늘 출근 카드의 '전체' — 폰 카드에는 그 버튼이 없어 넘기지 않는다
+      onOpenAttendance: () => _go(NotificationTarget.attendance),
     ),
     WorkScreen(),
     ProjectScreen(),

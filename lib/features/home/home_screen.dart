@@ -47,7 +47,7 @@ class HomeScreen extends StatefulWidget {
     this.onOpenProjects,
     this.onOpenNotices,
     this.onOpen,
-    this.onOpenStaff,
+    this.onOpenAttendance,
   });
 
   /// 카드의 '전체'를 눌렀을 때 해당 탭으로 옮겨달라고 셸에 알린다
@@ -57,8 +57,12 @@ class HomeScreen extends StatefulWidget {
   /// 결재 대기 카드가 쓰는 통로 — 갈 곳이 셋이라 하나로 받는다
   final void Function(NotificationTarget)? onOpen;
 
-  /// 조직도로 — **데스크톱에만 있는 화면이라** 폰에서는 안 넘어온다
-  final VoidCallback? onOpenStaff;
+  /// 오늘 출근 카드의 '전체'가 가는 곳 — 근태·월차
+  ///
+  /// 대표·관리자의 근태 화면은 본인 집계가 아니라 **오늘 누가 어떤지**를
+  /// 이름으로 띄운다. 이 카드가 요약하는 그 내용이라 여기로 보낸다.
+  /// **폰에는 안 넘긴다** — 폰 카드에는 '전체' 버튼이 없다.
+  final VoidCallback? onOpenAttendance;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -159,7 +163,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           Expanded(
                             child: _TodayStaffCard(
                               fill: true,
-                              onOpenAll: widget.onOpenStaff,
+                              onOpenAll: widget.onOpenAttendance,
                             ),
                           ),
                         ],
