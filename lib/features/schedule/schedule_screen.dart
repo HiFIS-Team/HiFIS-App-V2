@@ -27,14 +27,14 @@ part 'schedule_data.dart';
 
 /// 일정 화면
 ///
-/// 화면을 꽉 채우는 월 달력 한 장으로 보여준다.
-/// 날짜 칸을 누르면 그 날 일정이 열리고, 거기서 추가·수정·삭제한다.
+/// PC 는 화면을 꽉 채우는 월 달력 한 장, **폰은 한 주를 세로 일곱 줄**로 본다
+/// ([_SchedulePhone]). 날짜를 누르면 그 날 일정이 열리고, 거기서 추가·수정·삭제한다.
 ///
-/// **폰은 탭이 없어 홈 왼쪽 위 바로가기로 들어온다** — 그래서 달력이
-/// 스크롤 안에 들어가고 칸 높이를 직접 정한다 ([_SchedulePhone]).
+/// **폰은 탭이 없어 홈 왼쪽 위 바로가기로 들어온다.**
 ///
 /// 일정은 **보고 있는 달만** 받는다. 한 번 받은 달은 다시 안 받으므로
-/// 달을 오가도 요청이 늘지 않는다.
+/// 달을 오가도 요청이 늘지 않는다. 폰도 달 단위로 받는다 — 주가 달을 걸쳐도
+/// [_loadMonth] 가 앞뒤로 한 주씩 넓혀 받아서 빈 날이 안 생긴다.
 class ScheduleScreen extends StatefulWidget {
   ScheduleScreen({super.key});
 
@@ -43,12 +43,22 @@ class ScheduleScreen extends StatefulWidget {
 }
 
 class _ScheduleScreenState extends State<ScheduleScreen> {
-  /// 보고 있는 달 (1일로 맞춰 둔다)
+  /// 보고 있는 달 (1일로 맞춰 둔다) — PC 달력이 쓴다
   late DateTime _month = _monthOf(DateTime.now());
+
+  /// 보고 있는 주의 일요일 — 폰 달력이 쓴다
+  late DateTime _week = _sundayOf(DateTime.now());
 
   bool _loading = true;
 
   static DateTime _monthOf(DateTime time) => DateTime(time.year, time.month);
+
+  /// 그 날이 낀 주의 일요일 — 달력이 일요일 시작이라 여기에 맞춘다
+  static DateTime _sundayOf(DateTime time) =>
+      DateTime(time.year, time.month, time.day - time.weekday % 7);
+
+  /// 받아야 하는 달 — 폰은 보고 있는 주가 낀 달이다
+  DateTime get _visibleMonth => isDesktop ? _month : _monthOf(_week);
 
   @override
   void initState() {
@@ -59,7 +69,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   /// 보고 있는 달을 받는다 — 이미 받은 달이면 바로 끝난다
   Future<void> _load() async {
     try {
-      await _loadMonth(_month);
+      await _loadMonth(_visibleMonth);
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
     }
@@ -71,8 +81,19 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     _load();
   }
 
+  void _moveWeek(int delta) {
+    setState(
+      () => _week = DateTime(_week.year, _week.month, _week.day + delta * 7),
+    );
+    _load();
+  }
+
   void _goToday() {
-    setState(() => _month = _monthOf(DateTime.now()));
+    final now = DateTime.now();
+    setState(() {
+      _month = _monthOf(now);
+      _week = _sundayOf(now);
+    });
     _load();
   }
 
@@ -87,10 +108,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   Future<void> _add() async {
     final now = DateTime.now();
-    // 이번 달을 보고 있으면 오늘, 다른 달이면 그 달 1일을 기본값으로
-    final base = _monthOf(now) == _month
+    // 오늘이 보이는 자리면 오늘, 아니면 보고 있는 달·주의 첫날을 기본값으로
+    final start = isDesktop ? _month : _week;
+    final base = (isDesktop ? _monthOf(now) : _sundayOf(now)) == start
         ? DateTime(now.year, now.month, now.day)
-        : _month;
+        : start;
     final draft = await showEventDialog(context, date: base);
     if (draft == null || !mounted) return;
     try {
@@ -107,9 +129,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   Widget build(BuildContext context) {
     if (!isDesktop) {
       return _SchedulePhone(
-        month: _month,
+        week: _week,
         loading: _loading,
-        onMove: _move,
+        onMove: _moveWeek,
         onToday: _goToday,
         onAdd: _add,
         onPick: _openDay,
