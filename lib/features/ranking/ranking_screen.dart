@@ -1,3 +1,4 @@
+import 'package:cupertino_native/cupertino_native.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -11,10 +12,13 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
+import '../../core/util/sf_symbols.dart';
 import '../../core/widgets/display/avatar.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/feedback/delayed_spinner.dart';
 import '../../core/widgets/feedback/empty_card.dart';
+import '../../core/widgets/glass/glass_icon_button.dart';
+import '../../core/widgets/glass/glass_menu.dart';
 import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/nav/desktop_header.dart';
@@ -155,6 +159,13 @@ class _RankingScreenState extends State<RankingScreen> {
     if (!isDesktop) {
       return PhoneListScaffold(
         title: '랭킹',
+        // 고를 지점이 하나뿐이면 안 그린다 (지점 없는 사람·명단을 못 받았을 때)
+        leading: _branchChoices.length > 1
+            ? _PhoneBranchFilter(
+                selected: _branch,
+                onSelect: (branch) => setState(() => _branch = branch),
+              )
+            : null,
         filter: _PhoneTabs(
           selected: _tab,
           onSelect: (i) => setState(() => _tab = i),

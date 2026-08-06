@@ -42,6 +42,7 @@ class PhoneListScaffold extends StatefulWidget {
     this.count,
     this.filter,
     this.onCreate,
+    this.leading,
   });
 
   final String title;
@@ -57,6 +58,10 @@ class PhoneListScaffold extends StatefulWidget {
 
   /// 좌측 상단 만들기 버튼 (없으면 안 그린다)
   final VoidCallback? onCreate;
+
+  /// 좌측 상단에 놓을 다른 버튼 (필터 등) — [onCreate] 와 같은 자리다.
+  /// 만들기 버튼이 없는 화면에서 쓴다 (랭킹 지점 필터).
+  final Widget? leading;
 
   @override
   State<PhoneListScaffold> createState() => _PhoneListScaffoldState();
@@ -177,6 +182,14 @@ class _PhoneListScaffoldState extends State<PhoneListScaffold> {
           isApple ? _oneScroll(context) : _fixedHeader(context),
           if (widget.onCreate != null)
             PhoneCreateButton(onTap: widget.onCreate!),
+          if (widget.leading case final leading?)
+            SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: EdgeInsets.only(top: 8, left: 16),
+                child: leading,
+              ),
+            ),
         ],
       ),
     );
