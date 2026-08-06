@@ -9,6 +9,7 @@ import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/feedback/empty_card.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/glass/top_frost.dart';
+import '../project/project_screen.dart' show requestedProjectId;
 import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/feedback/failed_card.dart';
@@ -123,6 +124,11 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
     final target = _targetOf(item.link);
     if (target == null) return;
+    // 프로젝트는 링크에 id 가 실려 온다 (`/projects/{id}`) — 그 프로젝트를 연다.
+    // 화면 요청보다 **먼저** 걸어야 프로젝트 화면이 뜨면서 바로 집어 간다.
+    if (target == NotificationTarget.project) {
+      requestedProjectId.value = _idOf(item.link);
+    }
     requestedScreen.value = target;
     // 폰은 알림이 화면으로 밀려 올라와 있어서, 닫아야 목적지가 보인다
     if (!widget.embedded) Navigator.pop(context);
@@ -290,6 +296,13 @@ final requestedScreen = ValueNotifier<NotificationTarget?>(null);
 /// - `/approvals/{id}` — 데스크톱에만 있는 화면이라 폰에서 갈 데가 없다
 /// - `/schedule` — 일정도 데스크톱 전용이라 폰에서는 읽음 처리만 된다
 /// - `/chat/rooms/{id}` — 사내톡이 아직 목업이라 방을 지정해 열 수 없다
+/// 링크 뒤에 붙은 id — `/projects/abc-123` → `abc-123` (없으면 null)
+String? _idOf(String? link) {
+  if (link == null) return null;
+  final parts = link.split('/').where((s) => s.isNotEmpty).toList();
+  return parts.length < 2 ? null : parts[1];
+}
+
 NotificationTarget? _targetOf(String? link) {
   if (link == null) return null;
   // 공지·결재는 뒤에 id 가 붙어 온다

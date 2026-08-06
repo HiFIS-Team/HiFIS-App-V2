@@ -54,6 +54,13 @@ class _MainShellState extends State<MainShell> {
   void initState() {
     super.initState();
     requestedScreen.addListener(_onRequestedScreen);
+    // 앱을 열 때 마감 임박 프로젝트를 한 장 짚어 준다.
+    //
+    // **여기서만 부른다** — `AppLifecycleState.resumed` 에 걸면 다른 창을 잠깐
+    // 보고 돌아올 때마다 요청이 나간다 (홈에서 실제로 겪었다, macos.md 3번).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) showProjectDueModal(context);
+    });
   }
 
   @override

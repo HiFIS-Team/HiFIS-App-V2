@@ -13,6 +13,7 @@ import '../../core/data/staff_directory.dart';
 import '../../core/util/capture_guard.dart';
 import '../messages/chat_store.dart';
 import '../../core/util/photo_cache.dart';
+import '../project/project_screen.dart' show resetProjectDueModal;
 
 /// 로그인 세션
 ///
@@ -134,6 +135,8 @@ class AuthSession extends ValueNotifier<bool> {
     ChatStore.instance.clear();
     // 받아 둔 사진 파일도 지운다 — 다음 사람에게 남의 사진이 남으면 안 된다
     PhotoCache.clear();
+    // 다음 사람이 켜면 마감 모달을 다시 판단해야 한다
+    resetProjectDueModal();
     value = false;
   }
 }

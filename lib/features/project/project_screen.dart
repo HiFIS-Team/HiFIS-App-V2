@@ -26,6 +26,10 @@ import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/nav/phone_scaffold.dart';
 import '../../core/util/when.dart';
 import '../../core/widgets/feedback/failed_card.dart';
+import '../../core/widgets/input/app_button.dart';
+import '../notifications/notification_screen.dart'
+    show NotificationTarget, requestedScreen;
+import 'package:shared_preferences/shared_preferences.dart';
 
 part 'project_comments.dart';
 part 'project_phone.dart';
@@ -36,6 +40,7 @@ part 'project_activity.dart';
 part 'project_dialogs.dart';
 part 'project_composer.dart';
 part 'project_data.dart';
+part 'project_due_modal.dart';
 
 /// 프로젝트 화면 (목업)
 ///
@@ -65,6 +70,9 @@ class _ProjectScreenState extends State<ProjectScreen> {
     // 홈에서 넘어오며 걸어둔 요청은 첫 빌드 전에 반영한다 (setState 필요 없음)
     _consumeRequest();
     requestedProject.addListener(_onRequest);
+    requestedProjectId.addListener(_onRequestId);
+    _pendingId = requestedProjectId.value;
+    requestedProjectId.value = null;
     _load();
   }
 
@@ -81,6 +89,37 @@ class _ProjectScreenState extends State<ProjectScreen> {
       if (mounted) AppToast.show(context, messageOf(error));
     }
     if (mounted) setState(() => _loading = false);
+    _openPending();
+  }
+
+  /// 알림에서 넘어온 프로젝트 id — 목록을 받은 뒤에 연다
+  String? _pendingId;
+
+  void _onRequestId() {
+    final id = requestedProjectId.value;
+    if (id == null) return;
+    requestedProjectId.value = null;
+    _pendingId = id;
+    _openPending();
+  }
+
+  /// 대기 중인 id 를 실제 프로젝트로 바꿔 연다
+  ///
+  /// **목록을 받기 전에는 아무것도 안 한다** — 알림을 누른 직후에는 아직
+  /// 목록이 비어 있어서 못 찾는다. 다 받고 나서 [_load] 가 다시 부른다.
+  void _openPending() {
+    final id = _pendingId;
+    if (id == null || _loading || !mounted) return;
+    _pendingId = null;
+    final found = _projects.where((p) => p.id == id).firstOrNull;
+    // 못 찾으면 목록만 보여준다 — 지워졌거나 내가 못 보는 프로젝트다
+    if (found == null) return;
+    setState(() {
+      _phase = found.phase;
+      _selected = found;
+    });
+    // 폰은 2단이 아니라서 선택만으로는 안 보인다 — 상세를 밀어 올린다
+    if (!isDesktop) ProjectBrief._(found).open(context);
   }
 
   void _retry() {
@@ -102,6 +141,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
   @override
   void dispose() {
     requestedProject.removeListener(_onRequest);
+    requestedProjectId.removeListener(_onRequestId);
     super.dispose();
   }
 
@@ -584,6 +624,13 @@ class _ProgressBar extends StatelessWidget {
 /// 폰은 홈에서 바로 상세를 밀어 올리지만, 데스크톱은 2단 구조라
 /// 프로젝트 화면으로 옮긴 뒤 이걸 보고 선택을 맞춘다.
 final requestedProject = ValueNotifier<ProjectBrief?>(null);
+
+/// 알림에서 열어달라고 요청한 프로젝트 **id**
+///
+/// [requestedProject] 와 갈라 둔 이유는 **들고 있는 것이 다르기** 때문이다 —
+/// 홈 카드는 이미 프로젝트를 쥐고 있지만, 알림에는 서버 링크의 id 뿐이라
+/// 목록을 받아 봐야 어느 것인지 안다. 목록이 늦게 오면 기다렸다 연다.
+final requestedProjectId = ValueNotifier<String?>(null);
 
 /// 홈 카드에 내보내는 프로젝트 요약
 ///
