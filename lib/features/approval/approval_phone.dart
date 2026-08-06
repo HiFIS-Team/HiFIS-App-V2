@@ -54,7 +54,7 @@ class _ApprovalPhone extends StatelessWidget {
             )
           else
             for (var i = 0; i < docs.length; i++) ...[
-              if (i > 0) SizedBox(height: 4),
+              if (i > 0) SizedBox(height: 12),
               _DocTile(
                 doc: docs[i],
                 selected: false,

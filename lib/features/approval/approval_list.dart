@@ -180,6 +180,67 @@ class _DocTileState extends State<_DocTile> {
   Widget build(BuildContext context) {
     final doc = widget.doc;
 
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(doc.kind.icon, size: 15, color: AppColors.textSecondary),
+            SizedBox(width: 6),
+            Text(
+              doc.kind.label,
+              style: AppTextStyles.caption.copyWith(fontSize: 11),
+            ),
+            Spacer(),
+            _StateBadge(state: doc.state),
+          ],
+        ),
+        SizedBox(height: 6),
+        Text(
+          doc.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w700),
+        ),
+        SizedBox(height: 6),
+        Row(
+          children: [
+            Avatar(name: doc.writer, size: 18),
+            SizedBox(width: 6),
+            Text(
+              '${doc.writer} · ${_date(doc.date)}',
+              style: AppTextStyles.caption.copyWith(fontSize: 11),
+            ),
+            Spacer(),
+            if (doc.amount > 0)
+              Text(
+                _won(doc.amount),
+                style: AppTextStyles.caption.copyWith(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+
+    // 폰은 회색 바탕 위에 카드 한 장씩 — 프로젝트 목록과 같은 결이다.
+    // 데스크톱은 흰 판(`_DocList`) 안의 줄이라 제 배경이 없다.
+    if (!isDesktop) {
+      return Pressable(
+        onTap: widget.onTap,
+        scale: 0.98,
+        borderRadius: BorderRadius.circular(24),
+        child: Container(
+          padding: EdgeInsets.fromLTRB(20, 18, 20, 18),
+          decoration: AppDecorations.card(),
+          child: content,
+        ),
+      );
+    }
+
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hover = true),
@@ -195,53 +256,7 @@ class _DocTileState extends State<_DocTile> {
                 : (_hover ? AppColors.gray50 : Colors.transparent),
             borderRadius: BorderRadius.circular(14),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(doc.kind.icon, size: 15, color: AppColors.textSecondary),
-                  SizedBox(width: 6),
-                  Text(
-                    doc.kind.label,
-                    style: AppTextStyles.caption.copyWith(fontSize: 11),
-                  ),
-                  Spacer(),
-                  _StateBadge(state: doc.state),
-                ],
-              ),
-              SizedBox(height: 6),
-              Text(
-                doc.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppTextStyles.body2.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              SizedBox(height: 6),
-              Row(
-                children: [
-                  Avatar(name: doc.writer, size: 18),
-                  SizedBox(width: 6),
-                  Text(
-                    '${doc.writer} · ${_date(doc.date)}',
-                    style: AppTextStyles.caption.copyWith(fontSize: 11),
-                  ),
-                  Spacer(),
-                  if (doc.amount > 0)
-                    Text(
-                      _won(doc.amount),
-                      style: AppTextStyles.caption.copyWith(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                ],
-              ),
-            ],
-          ),
+          child: content,
         ),
       ),
     );
