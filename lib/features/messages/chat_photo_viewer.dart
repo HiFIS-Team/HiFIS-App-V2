@@ -4,11 +4,19 @@ part of 'chat_screen.dart';
 
 /// 사진을 눌렀을 때 — 검은 화면에 한 장씩, 좌우로 넘긴다
 ///
-/// - **아래로 끌어내리면 닫힌다.** 끌어내리는 만큼 배경이 옅어져서 뒤 대화가 비친다
+/// **처음에는 사진만 보인다.** 화면을 한 번 누르면 위 머리말이 나타나고
+/// 다시 누르면 사라진다 (사진 앱·카톡과 같은 결이다).
+///
+/// - **아래로 끌어내리면 닫힌다.** 끌어내리는 만큼 배경이 옅어져 뒤 대화가 비친다
 /// - 손가락 두 개로 늘려 볼 수 있고, **늘린 상태에서는 넘기기·끌어내리기가 안 걸린다**
 ///   (사진을 옮기려는 손짓과 겹친다)
-/// - 여러 장이면 위에 `2 / 5` 가 뜬다
-void showPhotoViewer(BuildContext context, List<String> urls, int index) {
+void showPhotoViewer(
+  BuildContext context,
+  List<String> urls,
+  int index, {
+  required String title,
+  required DateTime time,
+}) {
   Navigator.push<void>(
     context,
     PageRouteBuilder<void>(
@@ -17,7 +25,8 @@ void showPhotoViewer(BuildContext context, List<String> urls, int index) {
       barrierColor: Colors.transparent,
       transitionDuration: Duration(milliseconds: 220),
       reverseTransitionDuration: Duration(milliseconds: 180),
-      pageBuilder: (_, _, _) => _PhotoViewer(urls: urls, index: index),
+      pageBuilder: (_, _, _) =>
+          _PhotoViewer(urls: urls, index: index, title: title, time: time),
       transitionsBuilder: (_, animation, _, child) =>
           FadeTransition(opacity: animation, child: child),
     ),
@@ -25,10 +34,21 @@ void showPhotoViewer(BuildContext context, List<String> urls, int index) {
 }
 
 class _PhotoViewer extends StatefulWidget {
-  _PhotoViewer({required this.urls, required this.index});
+  _PhotoViewer({
+    required this.urls,
+    required this.index,
+    required this.title,
+    required this.time,
+  });
 
   final List<String> urls;
   final int index;
+
+  /// 보낸 사람 이름 — 머리말 첫 줄
+  final String title;
+
+  /// 보낸 시각 — 머리말 둘째 줄
+  final DateTime time;
 
   @override
   State<_PhotoViewer> createState() => _PhotoViewerState();
@@ -46,6 +66,12 @@ class _PhotoViewerState extends State<_PhotoViewer> {
   /// 손가락으로 늘려 놓은 상태인지
   bool _zoomed = false;
 
+  /// 머리말이 떠 있는지 — 처음에는 사진만 보인다
+  bool _chrome = false;
+
+  /// 저장하는 중 (두 번 눌리지 않게)
+  bool _saving = false;
+
   /// 이만큼 끌어내리면 닫는다
   static const _dismissAt = 110.0;
 
@@ -59,6 +85,21 @@ class _PhotoViewerState extends State<_PhotoViewer> {
   /// 끌어내릴수록 배경이 옅어진다 — 뒤 대화가 비쳐서 어디로 돌아가는지 보인다
   double get _backdrop => (1 - _drag.abs() / 420).clamp(0.25, 1.0);
 
+  /// `2026. 8. 5. 오후 8:47` · 여러 장이면 `· 2 / 5` 를 뒤에 붙인다
+  ///
+  /// 장수는 카톡처럼 아래에 따로 두지 않고 날짜 옆에 붙인다 — 아래를 비워
+  /// 사진을 넓게 쓴다.
+  String get _subtitle {
+    final t = widget.time;
+    final pm = t.hour >= 12;
+    final hour12 = t.hour % 12 == 0 ? 12 : t.hour % 12;
+    final when =
+        '${t.year}. ${t.month}. ${t.day}. '
+        '${pm ? '오후' : '오전'} $hour12:${t.minute.toString().padLeft(2, '0')}';
+    if (widget.urls.length < 2) return when;
+    return '$when · ${_at + 1} / ${widget.urls.length}';
+  }
+
   void _onDragEnd(DragEndDetails details) {
     final fast = (details.primaryVelocity ?? 0).abs() > 700;
     if (_drag.abs() > _dismissAt || fast) {
@@ -68,10 +109,52 @@ class _PhotoViewerState extends State<_PhotoViewer> {
     setState(() => _drag = 0);
   }
 
+  /// 지금 보고 있는 사진 저장 — 폰은 사진첩, PC 는 파일로
+  Future<void> _save() async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    final url = widget.urls[_at];
+    try {
+      final bytes = await _bytesOf(url);
+      if (!mounted) return;
+      if (isDesktop) {
+        final target = await FilePicker.saveFile(
+          dialogTitle: '사진 저장',
+          fileName: _fileNameOf(url),
+          bytes: bytes,
+        );
+        if (!mounted || target == null) return;
+        AppToast.show(context, '사진을 저장했어요');
+        return;
+      }
+      await Gal.putImageBytes(bytes, name: _fileNameOf(url));
+      if (mounted) AppToast.show(context, '사진첩에 저장했어요');
+    } catch (error) {
+      if (mounted) {
+        AppToast.show(
+          context,
+          error is GalException ? '사진첩에 저장하지 못했어요' : messageOf(error),
+        );
+      }
+    }
+    if (mounted) setState(() => _saving = false);
+  }
+
+  /// 저장할 바이트 — 방금 올린 것은 기기에 있고, 아니면 서버에서 받는다
+  Future<Uint8List> _bytesOf(String url) async {
+    if (url.startsWith(localFilePrefix)) {
+      return File(url.substring(localFilePrefix.length)).readAsBytes();
+    }
+    final local = ChatStore.instance.localCopyOf(url);
+    if (local != null) {
+      final file = File(local);
+      if (file.existsSync()) return file.readAsBytes();
+    }
+    return Uint8List.fromList(await ApiClient.instance.getBytes(url));
+  }
+
   @override
   Widget build(BuildContext context) {
-    final many = widget.urls.length > 1;
-
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
@@ -82,6 +165,8 @@ class _PhotoViewerState extends State<_PhotoViewer> {
           Transform.translate(
             offset: Offset(0, _drag),
             child: GestureDetector(
+              // 한 번 누르면 머리말이 나왔다 들어간다 (사진 앱과 같다)
+              onTap: () => setState(() => _chrome = !_chrome),
               onVerticalDragUpdate: _zoomed
                   ? null
                   : (d) => setState(() => _drag += d.delta.dy),
@@ -116,33 +201,13 @@ class _PhotoViewerState extends State<_PhotoViewer> {
               ),
             ),
           ),
-          SafeArea(
-            child: Padding(
-              padding: EdgeInsets.only(top: 4, left: 8, right: 8),
-              child: Row(
-                children: [
-                  _RoundIconButton(
-                    icon: CupertinoIcons.xmark,
-                    onTap: () => Navigator.pop(context),
-                  ),
-                  Expanded(
-                    child: Center(
-                      child: many
-                          ? Text(
-                              '${_at + 1} / ${widget.urls.length}',
-                              style: AppTextStyles.body2.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            )
-                          : SizedBox.shrink(),
-                    ),
-                  ),
-                  // 가운데 숫자가 진짜 가운데 오게 왼쪽 버튼만큼 자리를 비운다
-                  SizedBox(width: 40),
-                ],
-              ),
-            ),
+          _Chrome(
+            shown: _chrome,
+            title: widget.title,
+            subtitle: _subtitle,
+            saving: _saving,
+            onClose: () => Navigator.pop(context),
+            onSave: _save,
           ),
         ],
       ),
@@ -150,7 +215,102 @@ class _PhotoViewerState extends State<_PhotoViewer> {
   }
 }
 
-/// 검은 화면 위 동그란 버튼 — 밝은 사진 위에서도 보이게 반투명 검정을 깐다
+/// 위 머리말 — 뒤로가기 · 보낸 사람 · 시각 · 저장
+///
+/// 밝은 사진 위에서도 글자가 보이게 **위쪽에 검정 그라데이션**을 깐다
+/// (막대를 통째로 칠하면 사진이 그만큼 잘려 보인다).
+class _Chrome extends StatelessWidget {
+  _Chrome({
+    required this.shown,
+    required this.title,
+    required this.subtitle,
+    required this.saving,
+    required this.onClose,
+    required this.onSave,
+  });
+
+  final bool shown;
+  final String title;
+  final String subtitle;
+  final bool saving;
+  final VoidCallback onClose;
+  final VoidCallback onSave;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      ignoring: !shown,
+      child: AnimatedOpacity(
+        opacity: shown ? 1 : 0,
+        duration: Duration(milliseconds: 180),
+        child: Container(
+          height: MediaQuery.paddingOf(context).top + 78,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withValues(alpha: 0.55),
+                Colors.transparent,
+              ],
+            ),
+          ),
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                children: [
+                  _RoundIconButton(
+                    icon: CupertinoIcons.chevron_back,
+                    onTap: onClose,
+                  ),
+                  SizedBox(width: 6),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.body1.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        SizedBox(height: 1),
+                        Text(
+                          subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.caption.copyWith(
+                            fontSize: 12,
+                            color: Colors.white.withValues(alpha: 0.8),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: 6),
+                  _RoundIconButton(
+                    icon: saving
+                        ? CupertinoIcons.hourglass
+                        : CupertinoIcons.arrow_down_to_line,
+                    onTap: onSave,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 사진 위 동그란 버튼 — 밝은 사진 위에서도 보이게 반투명 검정을 깐다
 class _RoundIconButton extends StatelessWidget {
   _RoundIconButton({required this.icon, required this.onTap});
 
@@ -174,15 +334,33 @@ class _RoundIconButton extends StatelessWidget {
   );
 }
 
-/// 사내톡 사진 한 장 — 서버 주소든 아직 안 올라간 기기 파일이든 같이 다룬다
+/// 저장할 때 쓸 파일 이름 — 주소 끝에서 뽑고 없으면 시각으로 만든다
+String _fileNameOf(String url) {
+  final path = url.split('?').first;
+  final name = path.substring(path.lastIndexOf('/') + 1);
+  if (name.isNotEmpty) return name;
+  return 'hifis_${DateTime.now().millisecondsSinceEpoch}.jpg';
+}
+
+/// 사내톡 사진 한 장 — 서버 주소든 기기 파일이든 같이 다룬다
 ///
-/// 보내는 중에는 기기 안 파일을 미리 그린다 ([localFilePrefix]).
+/// 기기 파일을 쓰는 자리가 둘이다.
+/// 1. **보내는 중** — 아직 안 올라간 원본 ([localFilePrefix])
+/// 2. **방금 올린 것** — 올라간 뒤에도 기기에 남아 있는 파일 ([ChatStore.localCopyOf]).
+///    서버에서 다시 받아 오면 그동안 사진이 사라졌다가 다시 뜬다
 Widget chatPhoto(
   String url, {
   double? width,
   BoxFit fit = BoxFit.cover,
   ImageErrorWidgetBuilder? onError,
 }) {
+  Widget fromServer() => Image.network(
+    fileUrl(url),
+    width: width,
+    fit: fit,
+    errorBuilder: onError,
+  );
+
   if (url.startsWith(localFilePrefix)) {
     return Image.file(
       File(url.substring(localFilePrefix.length)),
@@ -191,10 +369,16 @@ Widget chatPhoto(
       errorBuilder: onError,
     );
   }
-  return Image.network(
-    fileUrl(url),
-    width: width,
-    fit: fit,
-    errorBuilder: onError,
-  );
+
+  final local = ChatStore.instance.localCopyOf(url);
+  if (local != null) {
+    return Image.file(
+      File(local),
+      width: width,
+      fit: fit,
+      // 임시 파일이 지워졌으면 서버에서 받아 온다
+      errorBuilder: (_, _, _) => fromServer(),
+    );
+  }
+  return fromServer();
 }

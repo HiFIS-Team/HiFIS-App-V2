@@ -1,13 +1,15 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:gal/gal.dart';
 
 import '../../core/api/chat/chat_api.dart';
-import '../../core/api/client/api_client.dart' show fileUrl;
+import '../../core/api/client/api_client.dart' show ApiClient, fileUrl;
 import '../../core/api/client/api_exception.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/staff.dart';
@@ -517,6 +519,8 @@ class _ChatScreenState extends State<ChatScreen> {
             mine
                 ? _MyBubble(
                     text: message.body,
+                    sender: name,
+                    sentAt: message.createdAt,
                     attachments: message.attachments,
                     replyTo: message.replyTo?.preview,
                     reaction: reaction,
@@ -527,6 +531,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   )
                 : _TheirBubble(
                     name: name,
+                    sentAt: message.createdAt,
                     color: sender?.color ?? staffOf(name).color,
                     emoji: null,
                     text: message.body,

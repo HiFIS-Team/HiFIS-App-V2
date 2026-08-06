@@ -8,6 +8,10 @@
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
 	<string>HiFIS</string>
+	<!-- 사내톡 사진을 사진첩에 저장할 때 iOS 가 물어보는 문구.
+	     이 줄이 없으면 저장을 누르는 순간 앱이 죽는다 (권한 설명 없이 요청 불가). -->
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>사내톡에서 받은 사진을 사진첩에 저장합니다.</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>

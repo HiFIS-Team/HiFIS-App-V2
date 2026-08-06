@@ -64,6 +64,8 @@ class _Attachments extends StatelessWidget {
   _Attachments({
     required this.urls,
     required this.mine,
+    required this.sender,
+    required this.sentAt,
     this.bare = false,
     this.onDoubleTap,
     this.onLongPress,
@@ -71,6 +73,10 @@ class _Attachments extends StatelessWidget {
 
   final List<String> urls;
   final bool mine;
+
+  /// 크게 보기 머리말에 쓸 보낸 사람·시각
+  final String sender;
+  final DateTime sentAt;
 
   /// 말풍선이 받던 손짓 — 사진 위에서도 그대로 되게 넘겨받는다.
   /// 안 넘기면 사진을 누르는 순간 더블탭 ❤️·길게누르기가 죽는다
@@ -131,7 +137,8 @@ class _Attachments extends StatelessWidget {
     int index,
     Widget child,
   ) => GestureDetector(
-    onTap: () => showPhotoViewer(context, photos, index),
+    onTap: () =>
+        showPhotoViewer(context, photos, index, title: sender, time: sentAt),
     onDoubleTap: onDoubleTap,
     onLongPress: onLongPress,
     child: child,
@@ -256,6 +263,8 @@ class _Attachments extends StatelessWidget {
 class _MyBubble extends StatelessWidget {
   _MyBubble({
     required this.text,
+    required this.sender,
+    required this.sentAt,
     this.attachments = const [],
     this.replyTo,
     this.reaction,
@@ -266,6 +275,11 @@ class _MyBubble extends StatelessWidget {
   });
 
   final String text;
+
+  /// 사진 크게 보기 머리말에 쓴다 (보낸 사람·시각)
+  final String sender;
+  final DateTime sentAt;
+
   final List<String> attachments;
   final String? replyTo;
   final String? reaction;
@@ -307,6 +321,8 @@ class _MyBubble extends StatelessWidget {
                 ? _Attachments(
                     urls: attachments,
                     mine: true,
+                    sender: sender,
+                    sentAt: sentAt,
                     bare: true,
                     onDoubleTap: onDoubleTap,
                     onLongPress: onLongPress,
@@ -354,6 +370,8 @@ class _MyBubble extends StatelessWidget {
                           _Attachments(
                             urls: attachments,
                             mine: true,
+                            sender: sender,
+                            sentAt: sentAt,
                             onDoubleTap: onDoubleTap,
                             onLongPress: onLongPress,
                           ),
@@ -389,6 +407,7 @@ class _MyBubble extends StatelessWidget {
 class _TheirBubble extends StatelessWidget {
   _TheirBubble({
     required this.name,
+    required this.sentAt,
     required this.color,
     required this.text,
     this.attachments = const [],
@@ -401,6 +420,10 @@ class _TheirBubble extends StatelessWidget {
   });
 
   final String name;
+
+  /// 사진 크게 보기 머리말에 쓴다 (보낸 시각)
+  final DateTime sentAt;
+
   final Color color;
   final String? emoji;
   final String text;
@@ -452,6 +475,8 @@ class _TheirBubble extends StatelessWidget {
                     ? _Attachments(
                         urls: attachments,
                         mine: false,
+                        sender: name,
+                        sentAt: sentAt,
                         bare: true,
                         onDoubleTap: onDoubleTap,
                         onLongPress: onLongPress,
@@ -497,6 +522,8 @@ class _TheirBubble extends StatelessWidget {
                               _Attachments(
                                 urls: attachments,
                                 mine: false,
+                                sender: name,
+                                sentAt: sentAt,
                                 onDoubleTap: onDoubleTap,
                                 onLongPress: onLongPress,
                               ),

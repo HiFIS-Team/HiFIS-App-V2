@@ -75,17 +75,20 @@ Future<img.Image?> _decodeDown(Uint8List bytes) async {
     targetWidth: (descriptor.width * scale).round(),
     targetHeight: (descriptor.height * scale).round(),
   );
-  descriptor.dispose();
-  buffer.dispose();
 
+  // **다 풀고 나서 버린다.** 코덱을 만든 직후에 버리면 실제로 푸는 건
+  // `getNextFrame` 이라 없는 데이터를 읽는다 — 테스트에서는
+  // `Codec failed to produce an image` 로 튀고 실기기에서는 앱이 죽는다.
   final frame = await codec.getNextFrame();
   final image = frame.image;
-  // 크기는 버리기 전에 챙긴다 — dispose 한 뒤에는 못 읽는다
+  // 크기도 버리기 전에 챙긴다 — dispose 한 뒤에는 못 읽는다
   final width = image.width;
   final height = image.height;
   final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
   image.dispose();
   codec.dispose();
+  descriptor.dispose();
+  buffer.dispose();
   if (data == null) return null;
 
   return img.Image.fromBytes(

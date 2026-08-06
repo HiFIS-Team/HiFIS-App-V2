@@ -78,6 +78,7 @@ class ChatStore extends ChangeNotifier {
     _messages.clear();
     _typing.clear();
     _hasMore.clear();
+    _localCopies.clear();
     loaded = false;
     unreadRooms.value = 0;
     notifyListeners();
@@ -200,21 +201,48 @@ class ChatStore extends ChangeNotifier {
       // 올리기 전에 줄인다 — 사진첩 원본은 3~5MB 라 LTE 에서 장당 10초가 넘는다
       final uploaded = await Future.wait([
         for (final (path, name) in files)
-          shrinkPhoto(path, name).then(
-            (small) =>
-                ChatApi.uploadAttachment(roomId, small.$1, filename: small.$2),
-          ),
+          shrinkPhoto(path, name).then((small) async {
+            final at = await ChatApi.uploadAttachment(
+              roomId,
+              small.$1,
+              filename: small.$2,
+            );
+            return (at.url, small.$1);
+          }),
       ]);
+      // 올린 사진은 기기에 그대로 있다 — 서버 주소로 바뀐 뒤에도 이걸로 그린다
+      for (final (url, local) in uploaded) {
+        _rememberLocal(url, local);
+      }
       final sent = await ChatApi.send(
         roomId,
         body: '',
-        attachments: [for (final a in uploaded) a.url],
+        attachments: [for (final (url, _) in uploaded) url],
       );
       _replaceDraft(roomId, draft.id, sent);
     } catch (error) {
       // 실패하면 임시 말풍선을 걷어낸다 — 안 간 사진이 간 것처럼 남으면 안 된다
       _remove(roomId, draft.id);
       rethrow;
+    }
+  }
+
+  /// 방금 올린 사진의 기기 파일 — 서버 주소 → 기기 경로
+  ///
+  /// 올라가는 순간 말풍선이 `Image.file` 에서 `Image.network` 로 갈리는데,
+  /// 그러면 **방금 보이던 사진이 잠깐 사라졌다가** 서버에서 다시 받아 온 뒤에
+  /// 뜬다. 올린 파일이 기기에 그대로 있으니 그걸 계속 쓴다.
+  final Map<String, String> _localCopies = {};
+
+  /// 무한정 쌓이지 않게 이만큼만 들고 있는다 (넘으면 오래된 것부터 버린다)
+  static const _localCopyKeep = 40;
+
+  String? localCopyOf(String url) => _localCopies[url];
+
+  void _rememberLocal(String url, String path) {
+    _localCopies[url] = path;
+    while (_localCopies.length > _localCopyKeep) {
+      _localCopies.remove(_localCopies.keys.first);
     }
   }
 

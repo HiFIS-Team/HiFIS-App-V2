@@ -43,6 +43,8 @@ dependencies:
   # 올리기 전에 사진을 줄인다 (lib/core/util/photo.dart)
   # 네이티브 압축 패키지는 윈도우 지원이 불확실해서 순수 Dart 로 간다
   image: ^4.5.4
+  # 사진 크게 보기에서 사진첩에 저장 (폰만 — PC 는 file_picker 로 파일 저장)
+  gal: ^2.3.3
 
 dev_dependencies:
   flutter_test:
