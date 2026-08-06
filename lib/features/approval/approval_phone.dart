@@ -67,11 +67,15 @@ class _ApprovalPhone extends StatelessWidget {
   }
 }
 
-/// 폰 결재 상세 — 밀려 들어오는 한 장
+/// 폰 결재 상세 — 밀려 들어오는 한 장 (프로젝트 상세와 같은 틀)
 ///
 /// 본문은 데스크톱 우측 판([_DocDetail])을 그대로 쓴다. 그쪽이 이미 세로로
 /// 쌓이는 목록이라 폭만 좁아지면 된다.
-class _DocDetailScreen extends StatelessWidget {
+///
+/// **넘겨받은 문서를 그대로 들고 있지 않는다.** 승인·반려·댓글은 서버가
+/// 돌려준 문서로 목록을 갈아끼우므로([_replace]), 처음 넘어온 객체는 곧
+/// 옛것이 된다. 매번 [_docs] 에서 같은 id 를 찾아 쓴다.
+class _DocDetailScreen extends StatefulWidget {
   _DocDetailScreen({
     required this.doc,
     required this.onApprove,
@@ -80,21 +84,41 @@ class _DocDetailScreen extends StatelessWidget {
     required this.onComment,
   });
 
+  /// 열 때의 문서 — id 를 얻고, 목록에서 못 찾을 때의 대비책으로도 쓴다
   final _Doc doc;
-  final VoidCallback onApprove;
-  final VoidCallback onReject;
-  final VoidCallback onWithdraw;
-  final Future<void> Function(String) onComment;
+
+  final Future<void> Function(_Doc) onApprove;
+  final Future<void> Function(_Doc) onReject;
+  final Future<void> Function(_Doc) onWithdraw;
+  final Future<void> Function(_Doc, String) onComment;
+
+  @override
+  State<_DocDetailScreen> createState() => _DocDetailScreenState();
+}
+
+class _DocDetailScreenState extends State<_DocDetailScreen> {
+  _Doc get _doc {
+    for (final doc in _docs) {
+      if (doc.id == widget.doc.id) return doc;
+    }
+    return widget.doc;
+  }
+
+  /// 처리하고 이 화면을 다시 그린다 — 안 그리면 승인해도 '대기'로 남는다
+  Future<void> _run(Future<void> Function(_Doc) action) async {
+    await action(_doc);
+    if (mounted) setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) => PhoneDetailScaffold(
     title: '전자결재',
     child: _DocDetail(
-      doc: doc,
-      onApprove: onApprove,
-      onReject: onReject,
-      onWithdraw: onWithdraw,
-      onComment: onComment,
+      doc: _doc,
+      onApprove: () => _run(widget.onApprove),
+      onReject: () => _run(widget.onReject),
+      onWithdraw: () => _run(widget.onWithdraw),
+      onComment: (body) => _run((doc) => widget.onComment(doc, body)),
     ),
   );
 }

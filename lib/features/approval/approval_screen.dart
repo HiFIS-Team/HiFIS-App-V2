@@ -17,7 +17,9 @@ import '../../core/widgets/display/avatar.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/feedback/empty_card.dart';
+import '../../core/widgets/glass/glass_bottom_button.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
+import '../../core/widgets/glass/glass_input_bar.dart';
 import '../../core/widgets/input/decide_buttons.dart';
 import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/input/pressable.dart';
@@ -186,16 +188,21 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
   }
 
   /// 폰에서 상세를 열고 돌아온다 — 승인·반려로 바뀐 것이 목록에 반영돼야 한다
+  ///
+  /// **문서를 통째로 넘기지 않는다.** 승인·댓글은 서버가 돌려준 문서로
+  /// `_docs` 를 갈아끼우는데([_replace]), 넘긴 객체는 그때 옛것이 된다 —
+  /// 상세가 그걸 들고 있으면 승인해도 '대기'로 남고 댓글도 안 붙는다.
+  /// 상세가 id 로 지금 문서를 찾아 쓰게 하고, 여기서는 처리만 해 준다.
   Future<void> _openDoc(_Doc doc) async {
     await Navigator.push(
       context,
       CupertinoPageRoute(
         builder: (_) => _DocDetailScreen(
           doc: doc,
-          onApprove: () => _decide(doc, approve: true),
-          onReject: () => _decide(doc, approve: false),
-          onWithdraw: () => _withdraw(doc),
-          onComment: (body) => _comment(doc, body),
+          onApprove: (d) => _decide(d, approve: true),
+          onReject: (d) => _decide(d, approve: false),
+          onWithdraw: _withdraw,
+          onComment: _comment,
         ),
       ),
     );
