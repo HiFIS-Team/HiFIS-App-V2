@@ -19,12 +19,27 @@ const _dueModalWithin = 7;
 
 /// X 를 눌러 닫은 프로젝트 — 기기에 남는다
 ///
-/// 키에 **마감일을 같이 넣는다.** 기한 연장이 승인돼 마감이 밀리면 키가 달라져
-/// 다시 뜬다 — 새 마감은 새로 알려 줘야 한다.
+/// **영영 안 뜨는 게 아니라 그 회차만 접는다** (2026-08-06 결정).
+/// 서버가 알림을 다시 보낼 때가 되면 모달도 다시 떠야 한다.
 const _dueDismissKey = 'project_due_dismissed';
 
-String _dismissKeyOf(_Project project) =>
-    '${project.id}@${project.due.toIso8601String().substring(0, 10)}';
+/// 지금이 몇 번째 알림 회차인지 — **서버 리마인더 주기와 같게 잡는다**
+///
+/// - 마감 전 : 서버가 매일 09시에 한 번 → 닫으면 그날만 접히고 **다음 날 다시**
+/// - 마감 당일 : 매시간 → 닫으면 그 시간만 접히고 **다음 시간에 다시**
+/// - 마감 초과 : 서버는 1회지만 모달은 **날마다** 다시 짚는다 (제일 급한 것이라)
+String _windowOf(_Project project, DateTime now) {
+  final day = '${now.year}-${now.month}-${now.day}';
+  return _daysLeft(project, now) == 0 ? '$day/${now.hour}' : day;
+}
+
+/// 프로젝트 + 마감일 + 회차
+///
+/// 마감일을 넣는 이유는 기한 연장이 승인돼 마감이 밀리면 **새 마감을 새로
+/// 알려 줘야** 하기 때문이다 — 키가 달라져서 저절로 다시 뜬다.
+String _dismissKeyOf(_Project project, DateTime now) =>
+    '${project.id}@${project.due.toIso8601String().substring(0, 10)}'
+    '#${_windowOf(project, now)}';
 
 /// 이번 실행에서 이미 띄웠는지 — 탭을 옮길 때마다 다시 뜨지 않게 한다
 bool _dueModalShown = false;
@@ -42,39 +57,47 @@ Future<void> showProjectDueModal(BuildContext context) async {
   await loadProjectsIfNeeded();
   if (!context.mounted) return;
 
+  final now = DateTime.now();
   final prefs = await SharedPreferences.getInstance();
   final dismissed = prefs.getStringList(_dueDismissKey) ?? const <String>[];
-  final target = _mostUrgent(dismissed);
+  final target = _mostUrgent(dismissed, now);
   if (target == null || !context.mounted) return;
 
   final closed = await showAppDialog<bool>(
     context,
     (_) => _ProjectDueDialog(project: target),
   );
-  // **X 를 눌렀을 때만** 그만 뜬다. 바깥을 눌러 닫거나 프로젝트를 열어 본 것은
-  // '봤다'로 안 친다 — 다음에 열 때 다시 짚어 준다 (2026-08-06 결정).
+  // **X 를 눌렀을 때만** 접는다. 바깥을 눌러 닫거나 프로젝트를 열어 본 것은
+  // '봤다'로 안 친다 — 다음에 열 때 다시 짚어 준다.
   if (closed != true) return;
+  final key = _dismissKeyOf(target, now);
+  // **지난 회차 기록은 버린다** — 안 버리면 목록이 끝없이 길어지고,
+  // 어차피 회차가 지나면 다시 떠야 하는 것들이라 들고 있을 이유가 없다
+  final today = '${now.year}-${now.month}-${now.day}';
   await prefs.setStringList(_dueDismissKey, [
-    ...dismissed.where((k) => k != _dismissKeyOf(target)),
-    _dismissKeyOf(target),
+    // 회차는 `#날짜` 또는 `#날짜/시` 라 끝이거나 뒤에 `/` 가 온다.
+    // `contains` 만 쓰면 `#2026-8-1` 이 `#2026-8-10` 에도 걸린다
+    ...dismissed.where(
+      (k) => k != key && (k.endsWith('#$today') || k.contains('#$today/')),
+    ),
+    key,
   ]);
 }
 
 /// 제일 급한 프로젝트 하나 — 없으면 null
 ///
 /// 누락이 제일 급하고, 그다음이 마감일이 가까운 순이다.
-_Project? _mostUrgent(List<String> dismissed) {
-  final today = DateTime.now();
+_Project? _mostUrgent(List<String> dismissed, DateTime now) {
   final candidates = <_Project>[
     for (final project in _projects)
       if (project.id != null &&
           project.phase != _Phase.done &&
-          _daysLeft(project, today) <= _dueModalWithin &&
-          !dismissed.contains(_dismissKeyOf(project)))
+          _daysLeft(project, now) <= _dueModalWithin &&
+          !dismissed.contains(_dismissKeyOf(project, now)))
         project,
   ];
   if (candidates.isEmpty) return null;
-  candidates.sort((a, b) => _daysLeft(a, today).compareTo(_daysLeft(b, today)));
+  candidates.sort((a, b) => _daysLeft(a, now).compareTo(_daysLeft(b, now)));
   return candidates.first;
 }
 
