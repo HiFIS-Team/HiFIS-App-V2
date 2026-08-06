@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/api/client/api_exception.dart';
@@ -19,6 +20,7 @@ import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
 import '../../core/widgets/display/avatar.dart';
 import '../../core/widgets/feedback/app_toast.dart';
+import '../../core/widgets/feedback/empty_card.dart';
 import '../../core/widgets/feedback/reject_reason_dialog.dart';
 import '../../core/widgets/input/mini_button.dart';
 import '../../core/widgets/input/pressable.dart';
@@ -30,6 +32,19 @@ part 'home_inbox.dart';
 part 'home_staff.dart';
 part 'home_status.dart';
 part 'home_cards.dart';
+
+/// 폰 홈 카드 본문의 **최소** 높이 — 내용이 없다고 카드가 줄지 않게 한다
+///
+/// 네 장(결재 대기·오늘 출근·프로젝트·공지)이 세로로 쌓이는데 한 장만 짧으면
+/// 화면이 들쭉날쭉해 보인다. 그래서 늘 세 줄이 들어갈 만큼을 잡아 둔다.
+/// 줄 하나가 약 42(이름 15×1.5 + 1 + 직급 13×1.4), 줄 사이가 14 → 42×3 + 14×2.
+///
+/// **최소값이라 줄이 더 높거나 많으면 카드가 따라 커진다** (넘치지 않는다).
+/// 데스크톱은 두 장을 나란히 놓고 `IntrinsicHeight` 로 맞추므로 안 쓴다.
+const phoneCardBody = 154.0;
+
+/// 폰 홈 카드에 세우는 줄 수 — 네 장이 같아야 나란히 놓았을 때 안 어긋난다
+const phoneCardRows = 3;
 
 /// 홈 화면 — 모든 직원이 처음 보는 화면
 ///
@@ -61,7 +76,6 @@ class HomeScreen extends StatefulWidget {
   ///
   /// 대표·관리자의 근태 화면은 본인 집계가 아니라 **오늘 누가 어떤지**를
   /// 이름으로 띄운다. 이 카드가 요약하는 그 내용이라 여기로 보낸다.
-  /// **폰에는 안 넘긴다** — 폰 카드에는 '전체' 버튼이 없다.
   final VoidCallback? onOpenAttendance;
 
   @override
@@ -172,7 +186,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   else ...[
                     _InboxCard(onOpen: widget.onOpen),
                     SizedBox(height: 16),
-                    _TodayStaffCard(fill: false),
+                    _TodayStaffCard(
+                      fill: false,
+                      onOpenAll: widget.onOpenAttendance,
+                    ),
                   ],
                 ] else
                   _HeroStatusCard(attendance: _summary?.attendance),

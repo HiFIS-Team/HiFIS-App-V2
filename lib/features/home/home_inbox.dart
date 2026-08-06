@@ -62,7 +62,8 @@ class _InboxCardState extends State<_InboxCard> {
   String? _busyId;
 
   /// 데스크톱은 나란히 선 프로젝트 카드와 줄 수를 맞춘다
-  static const _max = 4;
+  /// 카드에 세우는 줄 수 — 폰은 네 장을 같게 맞춘다
+  int get _max => isDesktop ? 4 : phoneCardRows;
 
   @override
   void initState() {
@@ -193,6 +194,37 @@ class _InboxCardState extends State<_InboxCard> {
         ),
     ];
 
+    final Widget body;
+    if (_loading) {
+      body = Center(
+        child: CircularProgressIndicator(
+          strokeWidth: 2.4,
+          valueColor: AlwaysStoppedAnimation(AppColors.primary),
+        ),
+      );
+    } else if (rows.isEmpty) {
+      // 결재함이 비었다는 뜻이라 월차·급여 결재함과 같은 쟁반 아이콘을 쓴다
+      body = Center(
+        child: EmptyCard(
+          icon: CupertinoIcons.tray,
+          text: '결재할 게 없어요',
+          framed: false,
+        ),
+      );
+    } else {
+      body = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 줄 간격은 늘 14로 둔다. 남는 높이를 나눠 가지면(spaceBetween)
+          // 승인·반려로 줄이 줄었을 때 두 줄이 카드 위아래로 갈라진다.
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0) SizedBox(height: 14),
+            rows[i],
+          ],
+        ],
+      );
+    }
+
     return Container(
       padding: EdgeInsets.all(20),
       decoration: AppDecorations.card(),
@@ -205,35 +237,14 @@ class _InboxCardState extends State<_InboxCard> {
             onOpenAll: _openAll,
           ),
           SizedBox(height: 14),
-          if (_loading)
-            Padding(
-              padding: EdgeInsets.symmetric(vertical: 22),
-              child: Center(
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.4,
-                  valueColor: AlwaysStoppedAnimation(AppColors.primary),
-                ),
-              ),
-            )
-          else if (rows.isEmpty)
-            Padding(
-              padding: EdgeInsets.symmetric(vertical: 22),
-              child: Center(
-                child: Text(
-                  '결재할 게 없어요',
-                  style: AppTextStyles.body2.copyWith(
-                    color: AppColors.textTertiary,
-                  ),
-                ),
-              ),
-            )
+          // 폰은 내용이 없어도 카드가 안 줄어들게 세 줄 높이를 잡아 둔다
+          if (isDesktop)
+            body
           else
-            // 줄 간격은 늘 14로 둔다. 남는 높이를 나눠 가지면(spaceBetween)
-            // 승인·반려로 줄이 줄었을 때 두 줄이 카드 위아래로 갈라진다.
-            for (var i = 0; i < rows.length; i++) ...[
-              if (i > 0) SizedBox(height: 14),
-              rows[i],
-            ],
+            ConstrainedBox(
+              constraints: BoxConstraints(minHeight: phoneCardBody),
+              child: body,
+            ),
         ],
       ),
     );

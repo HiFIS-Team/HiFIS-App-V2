@@ -10,7 +10,8 @@ class _TodayStaffCard extends StatelessWidget {
   final bool fill;
   final VoidCallback? onOpenAll;
 
-  static const _max = 4;
+  /// 카드에 세우는 줄 수 — 폰은 네 장을 같게 맞춘다
+  int get _max => isDesktop ? 4 : phoneCardRows;
 
   /// 재직자만 — 퇴사·비활성은 오늘 나올 사람이 아니다
   List<Employee> get _staff => [
@@ -50,17 +51,9 @@ class _TodayStaffCard extends StatelessWidget {
           ),
           SizedBox(height: 14),
           if (rows.isEmpty)
-            Padding(
-              padding: EdgeInsets.symmetric(vertical: 22),
-              child: Center(
-                child: Text(
-                  '명단을 아직 못 받았어요',
-                  style: AppTextStyles.body2.copyWith(
-                    color: AppColors.textTertiary,
-                  ),
-                ),
-              ),
-            )
+            // 여기가 비는 건 명단을 못 받은 것이라 빈 목록과 다르다 —
+            // 아이콘 카드 대신 사정을 적어 준다
+            _EmptyRoster()
           else if (fill)
             Expanded(
               child: Column(
@@ -68,11 +61,22 @@ class _TodayStaffCard extends StatelessWidget {
                 children: rows,
               ),
             )
+          // 폰은 내용이 적어도 카드가 안 줄어들게 세 줄 높이를 잡아 둔다
           else
-            for (var i = 0; i < rows.length; i++) ...[
-              if (i > 0) SizedBox(height: 14),
-              rows[i],
-            ],
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: isDesktop ? 0 : phoneCardBody,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < rows.length; i++) ...[
+                    if (i > 0) SizedBox(height: 14),
+                    rows[i],
+                  ],
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -142,4 +146,18 @@ class _StaffRow extends StatelessWidget {
       ],
     );
   }
+}
+
+/// 명단을 못 받았을 때 — **빈 목록이 아니라 사정이 있는 것**이라 문구로 알린다
+class _EmptyRoster extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => ConstrainedBox(
+    constraints: BoxConstraints(minHeight: isDesktop ? 0 : phoneCardBody),
+    child: Center(
+      child: Text(
+        '명단을 아직 못 받았어요',
+        style: AppTextStyles.body2.copyWith(color: AppColors.textTertiary),
+      ),
+    ),
+  );
 }

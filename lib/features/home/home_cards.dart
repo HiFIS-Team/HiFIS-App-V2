@@ -1,5 +1,22 @@
 part of 'home_screen.dart';
 
+/// 폰에서 카드 본문이 줄어들지 않게 세 줄 높이를 잡아 주는 껍데기
+///
+/// 데스크톱은 두 장을 나란히 놓고 `IntrinsicHeight` 로 맞추므로 그냥 통과시킨다.
+class _CardBody extends StatelessWidget {
+  _CardBody({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => isDesktop
+      ? child
+      : ConstrainedBox(
+          constraints: BoxConstraints(minHeight: phoneCardBody),
+          child: child,
+        );
+}
+
 class _CardHeader extends StatelessWidget {
   _CardHeader({
     required this.title,
@@ -83,14 +100,13 @@ class _ProjectsCard extends StatelessWidget {
           _CardHeader(title: '프로젝트', count: rows.length, onOpenAll: onOpenAll),
           SizedBox(height: 14),
           if (rows.isEmpty)
-            Padding(
-              padding: EdgeInsets.symmetric(vertical: 22),
+            // 프로젝트 탭의 빈 상태와 같은 아이콘
+            _CardBody(
               child: Center(
-                child: Text(
-                  '진행 중인 프로젝트가 없어요',
-                  style: AppTextStyles.body2.copyWith(
-                    color: AppColors.textTertiary,
-                  ),
+                child: EmptyCard(
+                  icon: Icons.folder_rounded,
+                  text: '진행 중인 프로젝트가 없어요',
+                  framed: false,
                 ),
               ),
             )
@@ -102,10 +118,17 @@ class _ProjectsCard extends StatelessWidget {
               ),
             )
           else
-            for (var i = 0; i < rows.length; i++) ...[
-              if (i > 0) SizedBox(height: 14),
-              rows[i],
-            ],
+            _CardBody(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < rows.length; i++) ...[
+                    if (i > 0) SizedBox(height: 14),
+                    rows[i],
+                  ],
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -195,7 +218,8 @@ class _NoticeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // 고정 공지가 위, 그다음 최신순으로 5개
-    final briefs = noticeBriefs(5);
+    // 폰은 네 장을 같은 줄 수로 맞춘다 — PC 는 옆 카드에 높이를 맞추므로 더 세운다
+    final briefs = noticeBriefs(isDesktop ? 5 : phoneCardRows);
 
     return Container(
       padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
@@ -206,14 +230,13 @@ class _NoticeCard extends StatelessWidget {
           _CardHeader(title: '공지', count: noticeCount, onOpenAll: onOpenAll),
           SizedBox(height: 4),
           if (briefs.isEmpty)
-            Padding(
-              padding: EdgeInsets.fromLTRB(0, 18, 0, 26),
+            // 공지 탭의 빈 상태와 같은 아이콘
+            _CardBody(
               child: Center(
-                child: Text(
-                  '올라온 공지가 없어요',
-                  style: AppTextStyles.body2.copyWith(
-                    color: AppColors.textTertiary,
-                  ),
+                child: EmptyCard(
+                  icon: Icons.campaign_rounded,
+                  text: '올라온 공지가 없어요',
+                  framed: false,
                 ),
               ),
             )

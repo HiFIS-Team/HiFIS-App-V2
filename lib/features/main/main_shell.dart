@@ -99,6 +99,7 @@ class _MainShellState extends State<MainShell> {
       onOpenProjects: _goProjects,
       onOpenNotices: _goNotices,
       onOpen: _go,
+      onOpenAttendance: () => _go(NotificationTarget.attendance),
     ),
     WorkScreen(),
     ProjectScreen(),
