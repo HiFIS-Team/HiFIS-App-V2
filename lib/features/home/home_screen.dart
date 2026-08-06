@@ -176,7 +176,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           SizedBox(width: 16),
                           Expanded(
                             child: _TodayStaffCard(
-                              fill: true,
                               onOpenAll: widget.onOpenAttendance,
                             ),
                           ),
@@ -186,10 +185,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   else ...[
                     _InboxCard(onOpen: widget.onOpen),
                     SizedBox(height: 16),
-                    _TodayStaffCard(
-                      fill: false,
-                      onOpenAll: widget.onOpenAttendance,
-                    ),
+                    _TodayStaffCard(onOpenAll: widget.onOpenAttendance),
                   ],
                 ] else
                   _HeroStatusCard(attendance: _summary?.attendance),
@@ -203,7 +199,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         Expanded(
                           child: _ProjectsCard(
                             count: 5,
-                            fill: true,
                             onOpenAll: widget.onOpenProjects,
                             onChanged: _refresh,
                           ),

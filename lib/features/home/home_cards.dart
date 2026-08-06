@@ -1,5 +1,28 @@
 part of 'home_screen.dart';
 
+/// 카드 안의 줄들 — **위에서부터 간격 14로 쌓는다**
+///
+/// 남는 높이를 나눠 갖지 않는다(`spaceBetween`). 그러면 줄이 모자랄 때
+/// **가운데가 비고** 줄이 카드 위아래로 갈라진다. 결재 대기는 승인·반려로
+/// 줄이 계속 사라지는 자리라 그때마다 남은 줄이 움직이면 다음 버튼을 조준하기
+/// 어렵다. 네 장(결재 대기·오늘 출근·프로젝트·공지)이 다 이 방식이다.
+class _StackedRows extends StatelessWidget {
+  _StackedRows({required this.rows});
+
+  final List<Widget> rows;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      for (var i = 0; i < rows.length; i++) ...[
+        if (i > 0) SizedBox(height: 14),
+        rows[i],
+      ],
+    ],
+  );
+}
+
 /// 폰에서 카드 본문이 줄어들지 않게 세 줄 높이를 잡아 주는 껍데기
 ///
 /// 데스크톱은 두 장을 나란히 놓고 `IntrinsicHeight` 로 맞추므로 그냥 통과시킨다.
@@ -52,18 +75,12 @@ class _CardHeader extends StatelessWidget {
 }
 
 class _ProjectsCard extends StatelessWidget {
-  _ProjectsCard({
-    this.count = 3,
-    this.fill = false,
-    this.onOpenAll,
-    required this.onChanged,
-  });
+  _ProjectsCard({this.count = 3, this.onOpenAll, required this.onChanged});
 
   /// 표시할 프로젝트 수 (데스크톱은 5개까지)
   final int count;
 
   /// true면 카드 높이에 맞춰 행 간격을 고르게 벌린다 (데스크톱 나란히 배치용)
-  final bool fill;
 
   final VoidCallback? onOpenAll;
 
@@ -122,25 +139,8 @@ class _ProjectsCard extends StatelessWidget {
                 ),
               ),
             )
-          else if (fill)
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: rows,
-              ),
-            )
           else
-            _CardBody(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (var i = 0; i < rows.length; i++) ...[
-                    if (i > 0) SizedBox(height: 14),
-                    rows[i],
-                  ],
-                ],
-              ),
-            ),
+            _CardBody(child: _StackedRows(rows: rows)),
         ],
       ),
     );

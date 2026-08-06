@@ -5,9 +5,8 @@ part of 'home_screen.dart';
 /// **요청을 안 보낸다.** 명단(`StaffDirectory`)에 서버가 판정한 오늘 상태
 /// (`Employee.todayStatus`)가 같이 실려 오므로 그걸 그대로 센다.
 class _TodayStaffCard extends StatelessWidget {
-  _TodayStaffCard({required this.fill, this.onOpenAll});
+  _TodayStaffCard({this.onOpenAll});
 
-  final bool fill;
   final VoidCallback? onOpenAll;
 
   /// 카드에 세우는 줄 수 — 폰은 네 장을 같게 맞춘다
@@ -57,29 +56,8 @@ class _TodayStaffCard extends StatelessWidget {
             // 여기가 비는 건 명단을 못 받은 것이라 빈 목록과 다르다 —
             // 아이콘 카드 대신 사정을 적어 준다
             _EmptyRoster()
-          else if (fill)
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: rows,
-              ),
-            )
-          // 폰은 내용이 적어도 카드가 안 줄어들게 세 줄 높이를 잡아 둔다
           else
-            ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: isDesktop ? 0 : phoneCardBody,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (var i = 0; i < rows.length; i++) ...[
-                    if (i > 0) SizedBox(height: 14),
-                    rows[i],
-                  ],
-                ],
-              ),
-            ),
+            _CardBody(child: _StackedRows(rows: rows)),
         ],
       ),
     );

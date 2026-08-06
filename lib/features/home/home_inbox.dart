@@ -216,17 +216,7 @@ class _InboxCardState extends State<_InboxCard> {
         ),
       );
     } else {
-      body = Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 줄 간격은 늘 14로 둔다. 남는 높이를 나눠 가지면(spaceBetween)
-          // 승인·반려로 줄이 줄었을 때 두 줄이 카드 위아래로 갈라진다.
-          for (var i = 0; i < rows.length; i++) ...[
-            if (i > 0) SizedBox(height: 14),
-            rows[i],
-          ],
-        ],
-      );
+      body = _StackedRows(rows: rows);
     }
 
     return Container(
