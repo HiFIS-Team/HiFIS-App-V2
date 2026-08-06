@@ -71,7 +71,7 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final _scrollController = ScrollController();
   final _inputFocus = FocusNode();
 
@@ -124,9 +124,25 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    // 키보드가 오르내리는 것을 알아야 대화를 따라 올릴 수 있다 ([didChangeMetrics])
+    WidgetsBinding.instance.addObserver(this);
     _store.addListener(_onStore);
     _scrollController.addListener(_onScroll);
     _open();
+  }
+
+  /// 키보드가 오르내릴 때 — 바닥을 보고 있었으면 계속 바닥을 보게 한다
+  ///
+  /// 안 하면 키보드가 마지막 말풍선을 덮어버리고, 앞서 쓰던 타이머 방식으로
+  /// 따라가면 **50ms 마다 한 칸씩 튀어서 사진이 흔들리며 올라간다**
+  /// (실기기에서 실제로 났다). [_pinToBottom] 이 프레임마다 따라간다.
+  @override
+  void didChangeMetrics() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    // 위를 보고 있으면 붙잡지 않는다
+    if (position.pixels < position.maxScrollExtent - 80) return;
+    _pinToBottom(after: Duration.zero, hold: _keyboardPinFor);
   }
 
   /// 위로 끝까지 올리면 이전 대화를 더 받아온다
@@ -190,7 +206,8 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     _hovered.dispose();
-    _pin?.cancel();
+    _pinUntil = null;
+    WidgetsBinding.instance.removeObserver(this);
     _typingStop?.cancel();
     if (_typingSent) _store.typing(_roomId, isTyping: false);
     _store.removeListener(_onStore);
@@ -299,30 +316,65 @@ class _ChatScreenState extends State<ChatScreen> {
   /// 바닥에 붙여 두는 시간 — 사진 몇 장이 뜨는 데 걸리는 만큼
   static const _pinFor = Duration(milliseconds: 1500);
 
-  Timer? _pin;
+  /// 키보드를 따라갈 때 붙여 두는 시간 — 올라오는 동안 계속 갱신되므로
+  /// 애니메이션이 끝난 뒤 조금만 더 버티면 된다
+  static const _keyboardPinFor = Duration(milliseconds: 300);
 
-  void _pinToBottom({required Duration after}) {
-    _pin?.cancel();
-    final until = DateTime.now().add(after + _pinFor);
-    _pin = Timer.periodic(Duration(milliseconds: 50), (timer) {
+  /// 이 시각까지 매 프레임 바닥을 따라간다 (null 이면 안 따라간다)
+  DateTime? _pinUntil;
+
+  /// 이 시각 전에는 따라가지 않는다 — 스르륵 내려가는 중에 붙잡으면
+  /// 그 애니메이션이 중간에 끊긴다 (`jumpTo` 가 진행 중인 이동을 취소한다)
+  DateTime _pinFrom = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// 다음 프레임 콜백을 이미 걸어 뒀는지 — 한 프레임에 하나만 건다
+  bool _pinQueued = false;
+
+  /// **타이머가 아니라 프레임마다** 따라간다
+  ///
+  /// 50ms 타이머로 하면 초당 20번만 따라가서, 키보드처럼 60번 움직이는 것을
+  /// 쫓을 때 **계단처럼 튄다** — 사진이 흔들리며 올라가 보였다.
+  void _pinToBottom({required Duration after, Duration hold = _pinFor}) {
+    final now = DateTime.now();
+    final until = now.add(after + hold);
+    // 이미 따라가는 중이면 마감만 늦춘다 (연달아 부르면 더 오래 붙어 있는다)
+    if (_pinUntil == null || until.isAfter(_pinUntil!)) _pinUntil = until;
+    final from = now.add(after);
+    if (from.isAfter(_pinFrom)) _pinFrom = from;
+    _queuePin();
+  }
+
+  void _queuePin() {
+    if (_pinQueued) return;
+    _pinQueued = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _pinQueued = false;
+      final until = _pinUntil;
+      if (until == null) return;
       if (!mounted || !_scrollController.hasClients) {
-        timer.cancel();
-        return;
-      }
-      if (DateTime.now().isAfter(until)) {
-        timer.cancel();
+        _pinUntil = null;
         return;
       }
       final position = _scrollController.position;
       // 손으로 스크롤을 잡았으면 놓아 준다
       if (position.userScrollDirection != ScrollDirection.idle) {
-        timer.cancel();
+        _pinUntil = null;
         return;
       }
-      if ((position.pixels - position.maxScrollExtent).abs() > 1) {
+      final now = DateTime.now();
+      if (now.isAfter(_pinFrom) &&
+          (position.pixels - position.maxScrollExtent).abs() > 0.5) {
         _scrollController.jumpTo(position.maxScrollExtent);
       }
+      if (now.isAfter(until)) {
+        _pinUntil = null;
+        return;
+      }
+      _queuePin();
     });
+    // 화면이 그대로면 프레임이 안 도니까 직접 부른다 —
+    // 사진이 늦게 떠서 목록이 길어지는 것을 기다리는 자리다
+    WidgetsBinding.instance.scheduleFrame();
   }
 
   Future<void> _openDetail() async {

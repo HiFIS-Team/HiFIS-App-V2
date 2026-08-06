@@ -59,7 +59,13 @@ class _HiFISAppState extends State<HiFISApp> with WidgetsBindingObserver {
     // (앱이 멈춘 것처럼 보인다) 프라이버시 커버를 모바일에서만 쓴다
     if (isDesktop) return;
     final obscured = state != AppLifecycleState.resumed;
-    if (obscured != _obscured) setState(() => _obscured = obscured);
+    if (obscured == _obscured) return;
+    // **가리기 전에 키보드를 내린다.** 키보드는 Flutter 화면이 아니라 iOS 가
+    // 따로 그리는 창이라 이 가림막이 못 덮는다 — 홈 바를 끌면 FS 마크 위에
+    // 키보드만 남아 있고, 앱 전환 화면 미리보기에도 그 모양으로 찍힌다
+    // (실기기에서 실제로 났다).
+    if (obscured) FocusManager.instance.primaryFocus?.unfocus();
+    setState(() => _obscured = obscured);
   }
 
   @override
