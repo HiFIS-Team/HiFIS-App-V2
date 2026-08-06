@@ -103,6 +103,10 @@ class _DocList extends StatelessWidget {
 }
 
 /// 대기 / 승인 / 반려 세그먼트
+/// 상태 탭 — 다른 목록바와 같은 공용 부품을 쓴다
+///
+/// 예전에는 여기만 따로 그렸다(높이 44·반경 14). 업무·월차·급여·모니터링이
+/// 전부 [SegmentedTabs] 라 이 화면만 결이 달랐다.
 class _StateTabs extends StatelessWidget {
   _StateTabs({required this.selected, required this.onSelect});
 
@@ -111,53 +115,13 @@ class _StateTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 44,
-      padding: EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: AppColors.gray50,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          // 회수는 탭을 따로 두지 않는다 — 반려 칸에 같이 들어간다
-          for (final state in _State.tabs)
-            Expanded(
-              child: Pressable(
-                onTap: () => onSelect(state),
-                scale: 0.97,
-                // 배경은 애니메이션 없이 즉시 바꾼다
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: state == selected
-                        ? AppColors.surface
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: state == selected
-                          ? AppColors.gray100
-                          : Colors.transparent,
-                    ),
-                  ),
-                  child: Center(
-                    child: Text(
-                      state.label,
-                      style: AppTextStyles.body2.copyWith(
-                        fontSize: 13,
-                        color: state == selected
-                            ? AppColors.textPrimary
-                            : AppColors.gray500,
-                        fontWeight: state == selected
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
+    // 회수는 탭을 따로 두지 않는다 — 반려 칸에 같이 들어간다
+    const tabs = _State.tabs;
+    return SegmentedTabs(
+      labels: [for (final state in tabs) state.label],
+      // 목록에 없는 상태(회수)를 보고 있어도 칸 밖으로 안 나가게 막는다
+      selected: tabs.indexOf(selected).clamp(0, tabs.length - 1),
+      onSelect: (i) => onSelect(tabs[i]),
     );
   }
 }
