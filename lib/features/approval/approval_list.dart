@@ -103,10 +103,14 @@ class _DocList extends StatelessWidget {
 }
 
 /// 대기 / 승인 / 반려 세그먼트
-/// 상태 탭 — 다른 목록바와 같은 공용 부품을 쓴다
+/// 상태 탭
 ///
-/// 예전에는 여기만 따로 그렸다(높이 44·반경 14). 업무·월차·급여·모니터링이
-/// 전부 [SegmentedTabs] 라 이 화면만 결이 달랐다.
+/// **폰은 프로젝트 목록바(`_PhaseTabs`)와 같은 토큰**을 쓴다 — 두 목록이
+/// 나란히 쓰이는 자리라 결이 다르면 바로 눈에 띈다.
+/// 공용 [SegmentedTabs] 는 고른 칸 글자가 파랑이라 안 쓴다.
+///
+/// **PC 는 예전 모양 그대로** 둔다. 거기는 320 좌측 판 안이라 폰 목록바와
+/// 같은 자리가 아니다.
 class _StateTabs extends StatelessWidget {
   _StateTabs({required this.selected, required this.onSelect});
 
@@ -115,13 +119,59 @@ class _StateTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 회수는 탭을 따로 두지 않는다 — 반려 칸에 같이 들어간다
-    const tabs = _State.tabs;
-    return SegmentedTabs(
-      labels: [for (final state in tabs) state.label],
-      // 목록에 없는 상태(회수)를 보고 있어도 칸 밖으로 안 나가게 막는다
-      selected: tabs.indexOf(selected).clamp(0, tabs.length - 1),
-      onSelect: (i) => onSelect(tabs[i]),
+    final phone = !isDesktop;
+
+    return Container(
+      height: 44,
+      padding: EdgeInsets.all(4),
+      decoration: phone
+          ? segmentTrack()
+          : BoxDecoration(
+              color: AppColors.gray50,
+              borderRadius: BorderRadius.circular(14),
+            ),
+      child: Row(
+        children: [
+          // 회수는 탭을 따로 두지 않는다 — 반려 칸에 같이 들어간다
+          for (final state in _State.tabs)
+            Expanded(
+              child: Pressable(
+                onTap: () => onSelect(state),
+                scale: 0.97,
+                // 배경은 애니메이션 없이 즉시 바꾼다
+                child: Container(
+                  decoration: phone
+                      ? segmentFill(selected: state == selected)
+                      : BoxDecoration(
+                          color: state == selected
+                              ? AppColors.surface
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: state == selected
+                                ? AppColors.gray100
+                                : Colors.transparent,
+                          ),
+                        ),
+                  child: Center(
+                    child: Text(
+                      state.label,
+                      style: AppTextStyles.body2.copyWith(
+                        fontSize: 13,
+                        color: state == selected
+                            ? AppColors.textPrimary
+                            : (phone ? AppColors.gray600 : AppColors.gray500),
+                        fontWeight: state == selected
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
