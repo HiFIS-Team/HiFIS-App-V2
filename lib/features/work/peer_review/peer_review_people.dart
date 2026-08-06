@@ -6,23 +6,10 @@ part of 'peer_review_section.dart';
 
 /// 이번 달 평가 진행 — 몇 명 중 몇 명을 마쳤는지
 class _ReviewProgress extends StatelessWidget {
-  _ReviewProgress({
-    required this.done,
-    required this.total,
-    this.finishedText = '이번 달 평가를 모두 마쳤어요',
-    this.pendingLabel = _defaultPending,
-  });
+  _ReviewProgress({required this.done, required this.total});
 
   final int done;
   final int total;
-
-  /// 다 끝났을 때 아래에 뜨는 문구
-  final String finishedText;
-
-  /// 남았을 때 뜨는 문구 (남은 인원을 받는다)
-  final String Function(int left) pendingLabel;
-
-  static String _defaultPending(int left) => '$left명 남았어요';
 
   @override
   Widget build(BuildContext context) {
@@ -71,7 +58,7 @@ class _ReviewProgress extends StatelessWidget {
               SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  finished ? finishedText : pendingLabel(left),
+                  finished ? '이번 달 평가를 모두 마쳤어요' : '$left명 남았어요',
                   style: AppTextStyles.caption.copyWith(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,

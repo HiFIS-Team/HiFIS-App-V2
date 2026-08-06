@@ -99,7 +99,6 @@ class _SubmissionCardState extends State<_SubmissionCard> {
     // '전체'가 없으므로 늘 한 지점이 골라져 있다
     final branch = _branch ?? (choices.isEmpty ? null : choices.first.id);
     final rows = _submissionsOf(widget.reviews, branchId: branch);
-    final done = rows.where((r) => r.complete).length;
     // 카드에는 다섯 명만 — 나머지는 전체 보기에서
     final head = rows.take(5).toList();
 
@@ -116,13 +115,6 @@ class _SubmissionCardState extends State<_SubmissionCard> {
           ),
           SizedBox(height: 16),
         ],
-        _ReviewProgress(
-          done: done,
-          total: rows.length,
-          finishedText: '모두 제출했어요',
-          pendingLabel: (left) => '아직 $left명이 안 냈어요',
-        ),
-        SizedBox(height: 16),
         Container(
           width: double.infinity,
           padding: EdgeInsets.fromLTRB(20, 20, 20, 10),
