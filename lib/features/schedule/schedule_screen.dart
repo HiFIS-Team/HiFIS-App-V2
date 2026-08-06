@@ -447,17 +447,22 @@ class _DayCellState extends State<_DayCell> {
 
 /// 달력 칸 안의 일정 한 줄
 class _Chip extends StatelessWidget {
-  _Chip({required this.event});
+  _Chip({required this.event, this.big = false});
 
   final Event event;
+
+  /// 폰 주 달력용 — 줄이 가로로 길어서 칩도 크게 잡는다.
+  /// PC 달 격자는 칸이 좁아 예전 크기 그대로다
+  /// (칸에 몇 개 들어가는지 재는 `_DayCell` 의 21 이 그 크기를 본다).
+  final bool big;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 19,
+      height: big ? 26 : 19,
       width: double.infinity,
-      margin: EdgeInsets.only(bottom: 2),
-      padding: EdgeInsets.symmetric(horizontal: 6),
+      margin: EdgeInsets.only(bottom: big ? 4 : 2),
+      padding: EdgeInsets.symmetric(horizontal: big ? 10 : 6),
       alignment: Alignment.centerLeft,
       decoration: BoxDecoration(
         // 대기 중인 것은 옅게 깔고 테두리로 가른다 — 아직 확정이 아니다
@@ -472,7 +477,7 @@ class _Chip extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: AppTextStyles.caption.copyWith(
-          fontSize: 11,
+          fontSize: big ? 13 : 11,
           color: event.kind.color.withValues(alpha: event.pending ? 0.6 : 1),
           fontWeight: FontWeight.w600,
         ),

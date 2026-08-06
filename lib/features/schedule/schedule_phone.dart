@@ -187,7 +187,8 @@ class _DayRow extends StatelessWidget {
             SizedBox(width: 8),
             Expanded(
               child: Padding(
-                padding: EdgeInsets.only(top: 5),
+                // 첫 칩 가운데를 날짜 동그라미 가운데에 맞춘다 (2 + 26/2 = 15 = 30/2)
+                padding: EdgeInsets.only(top: list.isEmpty ? 5 : 2),
                 child: list.isEmpty
                     ? Text(
                         '—',
@@ -198,7 +199,8 @@ class _DayRow extends StatelessWidget {
                     // 줄이 가로로 길어서 접을 것이 없다 — 그날 것을 다 세운다
                     : Column(
                         children: [
-                          for (final event in list) _Chip(event: event),
+                          for (final event in list)
+                            _Chip(event: event, big: true),
                         ],
                       ),
               ),
