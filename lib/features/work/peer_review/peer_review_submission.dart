@@ -399,6 +399,8 @@ class _SubmissionRow extends StatelessWidget {
   final _Submission row;
 
   /// 누르면 그 사람이 누구를 어떻게 평가했는지 열린다
+  ///
+  /// **null 이면 안 눌린다** — 폰은 줄이 카드 한 장이라 카드 쪽이 누름을 받는다.
   final VoidCallback? onTap;
 
   @override
@@ -409,7 +411,7 @@ class _SubmissionRow extends StatelessWidget {
     // 한 건도 안 낸 사람이 이 화면의 용건이라 눈에 띄게 둔다
     final untouched = row.done == 0;
 
-    return Padding(
+    final content = Padding(
       padding: EdgeInsets.symmetric(horizontal: 4, vertical: 12),
       child: Row(
         children: [
@@ -471,6 +473,16 @@ class _SubmissionRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+
+    final tap = onTap;
+    if (tap == null) return content;
+    return Pressable(
+      onTap: tap,
+      scale: 0.98,
+      pressedColor: AppColors.gray50,
+      borderRadius: BorderRadius.circular(12),
+      child: content,
     );
   }
 }

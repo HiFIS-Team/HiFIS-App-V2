@@ -126,7 +126,7 @@ class _SubmissionCardState extends State<_SubmissionCard> {
           else
             for (var i = 0; i < rows.length; i++) ...[
               if (i > 0) SizedBox(height: 12),
-              _SubmissionTile(row: rows[i]),
+              _SubmissionTile(row: rows[i], onTap: () => _open(rows[i].person)),
             ],
         ],
       );
@@ -195,14 +195,23 @@ class _SubmissionCardState extends State<_SubmissionCard> {
 /// 그만큼 뺀다. 그래야 평가 작성 카드([_PersonCard], 가로 20·세로 18)와
 /// 글자 시작점이 같아진다.
 class _SubmissionTile extends StatelessWidget {
-  _SubmissionTile({required this.row});
+  _SubmissionTile({required this.row, required this.onTap});
 
   final _Submission row;
 
+  /// 누르면 그 사람이 누구를 어떻게 평가했는지 열린다
+  final VoidCallback onTap;
+
   @override
-  Widget build(BuildContext context) => Container(
-    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-    decoration: AppDecorations.card(),
-    child: _SubmissionRow(row: row),
+  Widget build(BuildContext context) => Pressable(
+    onTap: onTap,
+    scale: 0.98,
+    borderRadius: BorderRadius.circular(24),
+    child: Container(
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: AppDecorations.card(),
+      // 누름은 카드가 받으므로 줄에는 안 건다
+      child: _SubmissionRow(row: row),
+    ),
   );
 }
