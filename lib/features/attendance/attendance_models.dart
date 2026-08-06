@@ -260,7 +260,13 @@ Future<void> _loadAttendance() async {
 
   _todayStaff
     ..clear()
-    ..addAll(staff);
+    // 대표·관리자는 출퇴근을 안 찍는다 — 세면 근무시간이 지나는 순간
+    // **매일 결근**으로 선다. 전사 달력도 서버가 같은 기준으로 빼 준다.
+    ..addAll(
+      staff.where(
+        (person) => person.role != Role.master && person.role != Role.admin,
+      ),
+    );
 
   _roster.clear();
   await _loadRoster(_monthKey(now));

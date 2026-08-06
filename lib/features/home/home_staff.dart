@@ -13,9 +13,16 @@ class _TodayStaffCard extends StatelessWidget {
   int get _max => isDesktop ? 4 : phoneCardRows;
 
   /// 재직자만 — 퇴사·비활성은 오늘 나올 사람이 아니다
+  ///
+  /// **MASTER·ADMIN 도 뺀다** — 출퇴근을 안 찍어서 근무시간이 지나는 순간
+  /// **매일 결근**으로 선다. 근태 화면의 오늘 판과 전사 달력도 같은 기준이다
+  /// (달력은 서버가 빼 준다).
   List<Employee> get _staff => [
     for (final employee in StaffDirectory.instance.employees)
-      if (employee.status == EmployeeStatus.active) employee,
+      if (employee.status == EmployeeStatus.active &&
+          employee.role != Role.master &&
+          employee.role != Role.admin)
+        employee,
   ];
 
   @override
