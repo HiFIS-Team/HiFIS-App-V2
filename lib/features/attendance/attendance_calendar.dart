@@ -413,3 +413,192 @@ class _DayCellState extends State<_DayCell> {
     ),
   );
 }
+
+/// 대표·관리자 **폰** 달력 — 한 주를 세로 일곱 줄로 본다
+///
+/// 대표 칸에는 그날 누가 어땠는지가 이름으로 들어가서, 한 칸이 폰 폭의 7분의 1
+/// (약 53)이면 `김트레이너 외 3명 출근` 이 들어갈 자리가 없다. 게다가 칸이
+/// 상태 줄만큼 자라서([_bossCellHeight]) 한 달을 세우면 화면이 한참 길어진다.
+/// 그래서 폰에서만 주 단위로 접고, **PC 는 폭이 남아 달 그대로**다.
+///
+/// 하루가 가로로 긴 줄 하나라 지금 칸에 들어가던 이름 줄을 그대로 쓴다.
+class _WeekCalendar extends StatelessWidget {
+  _WeekCalendar({
+    required this.start,
+    required this.onMove,
+    required this.onPick,
+  });
+
+  /// 그 주의 일요일 — 달력이 일요일 시작이라 여기에 맞춘다
+  final DateTime start;
+
+  /// -1 이면 지난 주, 1 이면 다음 주
+  final ValueChanged<int> onMove;
+  final ValueChanged<DateTime> onPick;
+
+  /// 그 주에 걸치는 날짜 일곱 개
+  List<DateTime> get _dates => [
+    for (var i = 0; i < 7; i++)
+      DateTime(start.year, start.month, start.day + i),
+  ];
+
+  /// `8.3(일) ~ 8.9(토)` — 달을 넘어가도 어느 주인지 바로 보인다
+  String get _title {
+    final end = _dates.last;
+    return '${start.month}.${start.day}(${_weekday(start)})'
+        ' ~ ${end.month}.${end.day}(${_weekday(end)})';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final dates = _dates;
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(14, 18, 14, 8),
+      decoration: AppDecorations.card(),
+      child: Column(
+        children: [
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 6),
+            child: Row(
+              children: [
+                _arrow(CupertinoIcons.chevron_left, () => onMove(-1)),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Center(
+                    child: Text(_title, style: AppTextStyles.title3),
+                  ),
+                ),
+                SizedBox(width: 10),
+                _arrow(CupertinoIcons.chevron_right, () => onMove(1)),
+              ],
+            ),
+          ),
+          SizedBox(height: 8),
+          // 기록이 없는 날도 줄은 세운다 — 주말이 어디인지가 보여야 한다
+          for (final date in dates)
+            _WeekRow(
+              date: date,
+              today: _sameDay(date, now),
+              onTap: () => onPick(date),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _arrow(IconData icon, VoidCallback onTap) => Pressable(
+    onTap: onTap,
+    scale: 0.9,
+    child: Container(
+      width: 30,
+      height: 30,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppColors.gray50,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Icon(icon, size: 13, color: AppColors.textSecondary),
+    ),
+  );
+}
+
+/// 주 달력의 하루 — 날짜 + 그날 상태 줄들
+class _WeekRow extends StatelessWidget {
+  _WeekRow({required this.date, required this.today, required this.onTap});
+
+  final DateTime date;
+  final bool today;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final lines = _rosterLines(date);
+    final sunday = date.weekday % 7 == 0;
+
+    return Pressable(
+      onTap: onTap,
+      scale: 0.99,
+      pressedColor: AppColors.gray50,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 9),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 날짜 칸 — 오늘은 달력 칸과 같은 파란 동그라미
+            Container(
+              width: 30,
+              height: 30,
+              alignment: Alignment.center,
+              decoration: today
+                  ? BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                    )
+                  : null,
+              child: Text(
+                '${date.day}',
+                style: AppTextStyles.body2.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: today
+                      ? Colors.white
+                      : sunday
+                      ? AppColors.error
+                      : AppColors.textPrimary,
+                ),
+              ),
+            ),
+            SizedBox(width: 6),
+            SizedBox(
+              width: 20,
+              child: Padding(
+                padding: EdgeInsets.only(top: 6),
+                child: Text(
+                  _weekday(date),
+                  style: AppTextStyles.caption.copyWith(
+                    fontSize: 11,
+                    color: sunday ? AppColors.error : AppColors.textTertiary,
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(width: 8),
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(top: 5),
+                child: lines.isEmpty
+                    ? Text(
+                        '—',
+                        style: AppTextStyles.body2.copyWith(
+                          color: AppColors.gray300,
+                        ),
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (var i = 0; i < lines.length; i++) ...[
+                            if (i > 0) SizedBox(height: 3),
+                            Text(
+                              lines[i].$1,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.caption.copyWith(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: lines[i].$2,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
