@@ -23,7 +23,15 @@ class _DocDetail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: EdgeInsets.fromLTRB(32, 64, 32, bottomBarInset(context)),
+      // 폰은 밀려 들어오는 한 장이라 좌우 20 · 제목 아래에서 시작한다
+      padding: isDesktop
+          ? EdgeInsets.fromLTRB(32, 64, 32, bottomBarInset(context))
+          : EdgeInsets.fromLTRB(
+              20,
+              PhoneDetailScaffold.topPadding,
+              20,
+              bottomBarInset(context),
+            ),
       children: [
         Row(
           children: [

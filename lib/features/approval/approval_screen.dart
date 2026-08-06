@@ -14,14 +14,17 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
 import '../../core/widgets/display/avatar.dart';
-import '../../core/widgets/display/placeholder_screen.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/widgets/feedback/app_toast.dart';
+import '../../core/widgets/feedback/empty_card.dart';
+import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/input/decide_buttons.dart';
 import '../../core/widgets/input/pressable.dart';
+import '../../core/widgets/nav/phone_scaffold.dart';
 import '../../core/util/when.dart';
 part 'approval_list.dart';
 part 'approval_detail.dart';
+part 'approval_phone.dart';
 part 'approval_comments.dart';
 part 'approval_composer.dart';
 part 'approval_decide.dart';
@@ -181,10 +184,25 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
     }
   }
 
+  /// 폰에서 상세를 열고 돌아온다 — 승인·반려로 바뀐 것이 목록에 반영돼야 한다
+  Future<void> _openDoc(_Doc doc) async {
+    await Navigator.push(
+      context,
+      CupertinoPageRoute(
+        builder: (_) => _DocDetailScreen(
+          doc: doc,
+          onApprove: () => _decide(doc, approve: true),
+          onReject: () => _decide(doc, approve: false),
+          onWithdraw: () => _withdraw(doc),
+          onComment: (body) => _comment(doc, body),
+        ),
+      ),
+    );
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (!isDesktop) return PlaceholderScreen(emoji: '✅', title: '전자결재');
-
     if (_loading) {
       return Scaffold(
         body: Center(
@@ -197,6 +215,17 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
     }
 
     final list = _visible;
+
+    if (!isDesktop) {
+      return _ApprovalPhone(
+        docs: list,
+        filter: _filter,
+        onFilter: (v) => setState(() => _filter = v),
+        onCreate: _canWrite ? _create : null,
+        onOpen: _openDoc,
+      );
+    }
+
     final selected = _syncSelection(list);
 
     return Scaffold(

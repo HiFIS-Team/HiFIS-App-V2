@@ -10,7 +10,6 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
 import '../../core/widgets/display/avatar.dart';
-import '../../core/widgets/display/placeholder_screen.dart';
 import '../../core/widgets/display/scroll_box.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/feedback/reject_reason_dialog.dart';
@@ -18,15 +17,21 @@ import '../../core/widgets/input/mini_button.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/theme/app_decorations.dart';
+import '../../core/util/layout.dart';
+import '../../core/widgets/glass/glass_icon_button.dart';
+import '../../core/widgets/nav/phone_scaffold.dart';
+part 'schedule_phone.dart';
 part 'schedule_day.dart';
 part 'schedule_form.dart';
 part 'schedule_data.dart';
 
 /// 일정 화면
 ///
-/// 데스크톱은 화면을 꽉 채우는 월 달력 한 장으로 보여준다.
+/// 화면을 꽉 채우는 월 달력 한 장으로 보여준다.
 /// 날짜 칸을 누르면 그 날 일정이 열리고, 거기서 추가·수정·삭제한다.
-/// 모바일 화면은 아직 준비 중 — PC를 먼저 다듬는다.
+///
+/// **폰은 탭이 없어 홈 왼쪽 위 바로가기로 들어온다** — 그래서 달력이
+/// 스크롤 안에 들어가고 칸 높이를 직접 정한다 ([_SchedulePhone]).
 ///
 /// 일정은 **보고 있는 달만** 받는다. 한 번 받은 달은 다시 안 받으므로
 /// 달을 오가도 요청이 늘지 않는다.
@@ -100,7 +105,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (!isDesktop) return PlaceholderScreen(emoji: '📅', title: '일정');
+    if (!isDesktop) {
+      return _SchedulePhone(
+        month: _month,
+        loading: _loading,
+        onMove: _move,
+        onToday: _goToday,
+        onAdd: _add,
+        onPick: _openDay,
+      );
+    }
 
     // 그 달 1일이 낀 주의 일요일부터 채운다
     final first = _month.subtract(Duration(days: _month.weekday % 7));
