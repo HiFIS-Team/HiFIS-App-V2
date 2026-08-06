@@ -125,12 +125,16 @@ Future<void> _loadRanking() async {
 }
 
 /// 지점 필터 — 맨 앞은 모든 지점을 함께 보는 '전체'
+///
+/// **본사(HQ)는 안 세운다.** 지점이 아니라 전사인데 서버가 하필 `전체` 라고
+/// 불러서, 안 빼면 목록에 '전체'가 **두 번** 선다 (맨 앞 항목과 HQ).
+/// HQ 소속인 사람의 실적은 '전체'에서 같이 보인다 — 조직도·업무 필터와 같은 기준이다.
 const _allBranches = '전체';
 List<String> get _branches => [
   _allBranches,
   ...{
     for (final r in _rankers)
-      if (r.branch.isNotEmpty) r.branch,
+      if (r.branch.isNotEmpty && r.branch != _allBranches) r.branch,
   },
 ];
 
