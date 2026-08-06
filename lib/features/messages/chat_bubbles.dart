@@ -61,10 +61,21 @@ bool _photoOnly(String text, String? replyTo, List<String> attachments) =>
 /// | 3 · 5 · 6 | 세 칸씩 |
 /// | 7 이상 | 여섯 칸까지 세우고 마지막 칸에 `+N` |
 class _Attachments extends StatelessWidget {
-  _Attachments({required this.urls, required this.mine, this.bare = false});
+  _Attachments({
+    required this.urls,
+    required this.mine,
+    this.bare = false,
+    this.onDoubleTap,
+    this.onLongPress,
+  });
 
   final List<String> urls;
   final bool mine;
+
+  /// 말풍선이 받던 손짓 — 사진 위에서도 그대로 되게 넘겨받는다.
+  /// 안 넘기면 사진을 누르는 순간 더블탭 ❤️·길게누르기가 죽는다
+  final VoidCallback? onDoubleTap;
+  final VoidCallback? onLongPress;
 
   /// 말풍선 밖에 놓였는지 — 실패했을 때 쓸 글자색이 갈린다
   /// (말풍선 안에서는 흰 글씨인데, 밖에서는 흰 배경이라 안 보인다)
@@ -102,9 +113,9 @@ class _Attachments extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (photos.length == 1)
-          _single(photos.first)
+          _open(context, photos, 0, _single(photos.first))
         else if (photos.length > 1)
-          _grid(photos),
+          _grid(context, photos),
         for (var i = 0; i < files.length; i++) ...[
           if (i > 0 || photos.isNotEmpty) SizedBox(height: 6),
           _file(files[i], _tint),
@@ -113,17 +124,29 @@ class _Attachments extends StatelessWidget {
     );
   }
 
+  /// 눌러서 크게 보기 — 말풍선이 받던 손짓도 같이 얹는다
+  Widget _open(
+    BuildContext context,
+    List<String> photos,
+    int index,
+    Widget child,
+  ) => GestureDetector(
+    onTap: () => showPhotoViewer(context, photos, index),
+    onDoubleTap: onDoubleTap,
+    onLongPress: onLongPress,
+    child: child,
+  );
+
   /// 한 장 — 비율 그대로
   Widget _single(String url) => ClipRRect(
     borderRadius: BorderRadius.circular(14),
     child: ConstrainedBox(
       constraints: BoxConstraints(maxHeight: _maxSingle),
-      child: Image.network(
-        fileUrl(url),
+      child: chatPhoto(
+        url,
         width: _width,
-        fit: BoxFit.cover,
         // 못 받아오면(서명 만료 등) 파일 줄로 떨어진다
-        errorBuilder: (_, _, _) => _file(url, _tint),
+        onError: (_, _, _) => _file(url, _tint),
       ),
     ),
   );
@@ -131,7 +154,7 @@ class _Attachments extends StatelessWidget {
   /// 여러 장 — 정사각으로 잘라 격자로
   ///
   /// 바깥 모서리만 둥글린다 (칸마다 둥글리면 틈이 도드라진다).
-  Widget _grid(List<String> photos) {
+  Widget _grid(BuildContext context, List<String> photos) {
     final shown = photos.length > _maxTiles ? _maxTiles : photos.length;
     final columns = (shown == 2 || shown == 4) ? 2 : 3;
     final tile = (_width - _gap * (columns - 1)) / columns;
@@ -157,10 +180,15 @@ class _Attachments extends StatelessWidget {
                       // 마지막 줄이 덜 찼으면 빈 자리로 둔다 (회색 칸을 안 그린다)
                       child: switch (row * columns + col) {
                         final i when i >= shown => null,
-                        final i => _tile(
-                          photos[i],
-                          // 못 보여준 장수는 마지막 칸에 얹는다
-                          more: i == shown - 1 && rest > 0 ? rest : 0,
+                        final i => _open(
+                          context,
+                          photos,
+                          i,
+                          _tile(
+                            photos[i],
+                            // 못 보여준 장수는 마지막 칸에 얹는다
+                            more: i == shown - 1 && rest > 0 ? rest : 0,
+                          ),
                         ),
                       },
                     ),
@@ -177,11 +205,10 @@ class _Attachments extends StatelessWidget {
   Widget _tile(String url, {required int more}) => Stack(
     fit: StackFit.expand,
     children: [
-      Image.network(
-        fileUrl(url),
-        fit: BoxFit.cover,
+      chatPhoto(
+        url,
         // 칸이 작아 파일 이름을 못 넣는다 — 자리는 남기고 아이콘만 둔다
-        errorBuilder: (_, _, _) => ColoredBox(
+        onError: (_, _, _) => ColoredBox(
           color: AppColors.gray100,
           child: Icon(CupertinoIcons.doc, size: 18, color: AppColors.gray400),
         ),
@@ -277,7 +304,13 @@ class _MyBubble extends StatelessWidget {
             onLongPress: onLongPress,
             // 사진만 보냈으면 말풍선 없이 그림만 (더블탭·길게누르기는 그대로)
             child: _photoOnly(text, replyTo, attachments)
-                ? _Attachments(urls: attachments, mine: true, bare: true)
+                ? _Attachments(
+                    urls: attachments,
+                    mine: true,
+                    bare: true,
+                    onDoubleTap: onDoubleTap,
+                    onLongPress: onLongPress,
+                  )
                 : Container(
                     constraints: BoxConstraints(maxWidth: 280),
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -318,7 +351,12 @@ class _MyBubble extends StatelessWidget {
                         // 여기가 빠져 있어서 **내가 보낸 사진이 빈 말풍선으로** 떴다
                         // (받는 쪽에서는 보였다). 본문이 없으면 글줄도 안 그린다
                         if (attachments.isNotEmpty)
-                          _Attachments(urls: attachments, mine: true),
+                          _Attachments(
+                            urls: attachments,
+                            mine: true,
+                            onDoubleTap: onDoubleTap,
+                            onLongPress: onLongPress,
+                          ),
                         if (text.isNotEmpty) ...[
                           if (attachments.isNotEmpty) SizedBox(height: 6),
                           Text(
@@ -411,7 +449,13 @@ class _TheirBubble extends StatelessWidget {
                 onLongPress: onLongPress,
                 // 사진만 왔으면 말풍선 없이 그림만 (내 쪽과 같은 기준)
                 child: _photoOnly(text, replyTo, attachments)
-                    ? _Attachments(urls: attachments, mine: false, bare: true)
+                    ? _Attachments(
+                        urls: attachments,
+                        mine: false,
+                        bare: true,
+                        onDoubleTap: onDoubleTap,
+                        onLongPress: onLongPress,
+                      )
                     : Container(
                         constraints: BoxConstraints(maxWidth: 260),
                         padding: EdgeInsets.symmetric(
@@ -450,7 +494,12 @@ class _TheirBubble extends StatelessWidget {
                                 ),
                               ),
                             if (attachments.isNotEmpty)
-                              _Attachments(urls: attachments, mine: false),
+                              _Attachments(
+                                urls: attachments,
+                                mine: false,
+                                onDoubleTap: onDoubleTap,
+                                onLongPress: onLongPress,
+                              ),
                             if (text.isNotEmpty) ...[
                               if (attachments.isNotEmpty) SizedBox(height: 6),
                               Text(text, style: AppTextStyles.body2),

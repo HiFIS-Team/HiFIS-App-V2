@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui';
 
 import 'package:file_picker/file_picker.dart';
@@ -23,6 +24,7 @@ import 'chat_detail_screen.dart';
 import 'chat_store.dart';
 import '../../core/theme/app_shadows.dart';
 part 'chat_bubbles.dart';
+part 'chat_photo_viewer.dart';
 part 'chat_reactions.dart';
 
 /// 리액션으로 고를 수 있는 이모지 목록

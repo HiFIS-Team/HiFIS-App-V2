@@ -40,6 +40,9 @@ dependencies:
   desktop_drop: ^0.7.1
   shared_preferences: ^2.5.5
   dio: ^5.11.0
+  # 올리기 전에 사진을 줄인다 (lib/core/util/photo.dart)
+  # 네이티브 압축 패키지는 윈도우 지원이 불확실해서 순수 Dart 로 간다
+  image: ^4.5.4
 
 dev_dependencies:
   flutter_test:

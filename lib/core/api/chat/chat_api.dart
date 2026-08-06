@@ -128,21 +128,32 @@ class ChatMessage {
       );
 
   /// 보내는 중인 임시 메시지 — id 가 서버 것이 아니라 시각으로 만든 것이다
+  ///
+  /// 사진은 올라가기 전에 **기기에 있는 파일**을 미리 보여준다
+  /// ([attachments] 에 [localFilePrefix] 를 붙인 경로를 넣는다).
   static ChatMessage sending({
     required String roomId,
     required String senderId,
     required String body,
     MessageRef? replyTo,
+    List<String> attachments = const [],
   }) => ChatMessage(
     id: 'pending-${DateTime.now().microsecondsSinceEpoch}',
     roomId: roomId,
     senderId: senderId,
     body: body,
     replyTo: replyTo,
+    attachments: attachments,
     createdAt: DateTime.now(),
     pending: true,
   );
 }
+
+/// 아직 안 올라간 기기 안 파일임을 나타내는 접두사
+///
+/// 올라가기 전 미리보기와 서버 주소를 갈라야 한다 — 서버 주소는 앞에
+/// API 주소를 붙이지만([fileUrl]) 이건 기기 경로라 그대로 읽어야 한다.
+const localFilePrefix = 'local://';
 
 ChatMessage? _last(dynamic value) =>
     value is Map ? ChatMessage.fromJson(value.cast<String, dynamic>()) : null;

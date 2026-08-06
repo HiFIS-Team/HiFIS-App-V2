@@ -137,7 +137,10 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
 
     setState(() => _uploading = true);
     try {
-      applyCurrentUser(await StaffApi.uploadAvatar(path, filename: file.name));
+      // 올리기 전에 줄인다 — 사진첩 원본은 3~5MB 라 느리고, 서버는 5MB 를
+      // 넘기면 `IMAGE_TOO_LARGE` 로 튕긴다
+      final (small, smallName) = await shrinkPhoto(path, file.name);
+      applyCurrentUser(await StaffApi.uploadAvatar(small, filename: smallName));
       if (!mounted) return;
       widget.onChanged();
       AppToast.show(context, '프로필 사진을 올렸어요');

@@ -8,6 +8,7 @@ import '../../core/api/notice/reaction_api.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
 import '../../core/data/staff_directory.dart';
+import '../../core/util/photo.dart';
 
 /// 사내톡 상태 한 곳
 ///
@@ -180,17 +181,41 @@ class ChatStore extends ChangeNotifier {
     List<(String path, String name)> files,
   ) async {
     if (files.isEmpty) return;
-    final urls = <String>[];
-    for (final (path, name) in files) {
-      final uploaded = await ChatApi.uploadAttachment(
+    final myId = currentUser?.id;
+    if (myId == null) return;
+
+    // 올라가기 전에 기기 안 사진으로 먼저 그린다 — 사진은 글보다 한참 오래
+    // 걸려서(LTE 에서 몇 초), 안 그리면 누른 게 먹은 건지 알 수가 없다.
+    // 글을 보낼 때와 같은 방식이라 흐리게 뜨다가 또렷해진다.
+    final draft = ChatMessage.sending(
+      roomId: roomId,
+      senderId: myId,
+      body: '',
+      attachments: [for (final (path, _) in files) '$localFilePrefix$path'],
+    );
+    _append(roomId, draft);
+
+    try {
+      // **한꺼번에 올린다.** 하나씩 기다리면 장수만큼 시간이 곱해진다.
+      // 올리기 전에 줄인다 — 사진첩 원본은 3~5MB 라 LTE 에서 장당 10초가 넘는다
+      final uploaded = await Future.wait([
+        for (final (path, name) in files)
+          shrinkPhoto(path, name).then(
+            (small) =>
+                ChatApi.uploadAttachment(roomId, small.$1, filename: small.$2),
+          ),
+      ]);
+      final sent = await ChatApi.send(
         roomId,
-        path,
-        filename: name,
+        body: '',
+        attachments: [for (final a in uploaded) a.url],
       );
-      urls.add(uploaded.url);
+      _replaceDraft(roomId, draft.id, sent);
+    } catch (error) {
+      // 실패하면 임시 말풍선을 걷어낸다 — 안 간 사진이 간 것처럼 남으면 안 된다
+      _remove(roomId, draft.id);
+      rethrow;
     }
-    final sent = await ChatApi.send(roomId, body: '', attachments: urls);
-    _replaceDraft(roomId, '', sent);
   }
 
   /// 이 방 알림 끄기/켜기
