@@ -14,7 +14,12 @@ List<Employee> _reviewers() => [
 
 /// 한 사람의 이번 달 제출 현황
 class _Submission {
-  _Submission({required this.person, required this.done, required this.quota});
+  _Submission({
+    required this.person,
+    required this.done,
+    required this.quota,
+    this.rating,
+  });
 
   final Employee person;
 
@@ -23,6 +28,12 @@ class _Submission {
 
   /// 내야 하는 수 — 본인 지점에서 평가할 사람 수 (자기 자신 포함)
   final int quota;
+
+  /// **받은** 평가의 별 평균 — 아직 못 받았으면 null
+  ///
+  /// 낸 건수(`done`)와 다른 축이다. 눌러서 여는 화면이 받은 평가라
+  /// 목록에서 그 값을 미리 보여준다.
+  final double? rating;
 
   bool get complete => quota > 0 && done >= quota;
 }
@@ -51,9 +62,17 @@ List<_Submission> _submissionsOf(List<PeerReview> reviews, {String? branchId}) {
     quota[employee.branchId] = (quota[employee.branchId] ?? 0) + 1;
   }
   final counts = <String, int>{};
+  // 받은 평가의 별을 사람별로 모은다 — 자기 평가도 센다 (받은 평가 화면과 같은 범위)
+  final stars = <String, List<int>>{};
   for (final review in reviews) {
     counts[review.reviewerId] = (counts[review.reviewerId] ?? 0) + 1;
+    stars.putIfAbsent(review.revieweeId, () => []).addAll(review.stars.values);
   }
+  final ratings = <String, double>{
+    for (final entry in stars.entries)
+      if (entry.value.isNotEmpty)
+        entry.key: entry.value.reduce((a, b) => a + b) / entry.value.length,
+  };
 
   return [
     for (final employee in reviewers)
@@ -62,6 +81,7 @@ List<_Submission> _submissionsOf(List<PeerReview> reviews, {String? branchId}) {
           person: employee,
           done: counts[employee.id] ?? 0,
           quota: quota[employee.branchId] ?? 0,
+          rating: ratings[employee.id],
         ),
   ]..sort((a, b) {
     if (a.complete != b.complete) return a.complete ? 1 : -1;
@@ -193,7 +213,7 @@ class _SubmissionCardState extends State<_SubmissionCard> {
 ///
 /// [_SubmissionRow] 가 제 여백(가로 4·세로 12)을 들고 있어서 카드 여백에서
 /// 그만큼 뺀다. 그래야 평가 작성 카드([_PersonCard], 가로 20·세로 18)와
-/// 글자 시작점이 같아진다.
+/// 글자 시작점이 같아진다. 아래 별 줄의 위아래 간격도 같은 셈으로 맞춘다.
 class _SubmissionTile extends StatelessWidget {
   _SubmissionTile({required this.row, required this.onTap});
 
@@ -203,15 +223,59 @@ class _SubmissionTile extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Pressable(
-    onTap: onTap,
-    scale: 0.98,
-    borderRadius: BorderRadius.circular(24),
-    child: Container(
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      decoration: AppDecorations.card(),
-      // 누름은 카드가 받으므로 줄에는 안 건다
-      child: _SubmissionRow(row: row),
-    ),
-  );
+  Widget build(BuildContext context) {
+    final rating = row.rating;
+
+    return Pressable(
+      onTap: onTap,
+      scale: 0.98,
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        decoration: AppDecorations.card(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 누름은 카드가 받으므로 줄에는 안 건다
+            _SubmissionRow(row: row),
+            // 받은 평점 미리보기 — 줄이 이미 아래 12를 들고 있어 2만 더한다
+            Padding(
+              padding: EdgeInsets.fromLTRB(4, 2, 4, 12),
+              child: Row(
+                children: [
+                  for (var i = 1; i <= peerStarCount; i++) ...[
+                    if (i > 1) SizedBox(width: 3),
+                    Icon(
+                      rating != null && i <= rating.round()
+                          ? CupertinoIcons.star_fill
+                          : CupertinoIcons.star,
+                      size: 15,
+                      color: rating != null
+                          ? AppColors.primary
+                          : AppColors.gray300,
+                    ),
+                  ],
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      rating?.toStringAsFixed(1) ?? '아직 받은 평가가 없어요',
+                      style: AppTextStyles.caption.copyWith(
+                        fontSize: 12,
+                        fontWeight: rating != null
+                            ? FontWeight.w700
+                            : FontWeight.w400,
+                        color: rating != null
+                            ? AppColors.primary
+                            : AppColors.textTertiary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
