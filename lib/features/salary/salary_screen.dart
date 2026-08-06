@@ -140,6 +140,9 @@ class _SalaryScreenState extends State<SalaryScreen> {
       final submitted = await PayrollApi.submit(
         payslip.key,
         note: payslip.note,
+        // 안 고쳤으면 null 이라 안 실린다 — 서버 계산값 그대로 쓴다
+        incentiveNew: payslip.adjustNew,
+        incentiveRenewal: payslip.adjustRenewal,
       );
       if (!mounted) return;
       setState(() {

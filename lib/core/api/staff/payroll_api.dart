@@ -94,6 +94,8 @@ class Payslip {
     required this.incentiveNew,
     required this.incentiveRenewal,
     required this.otherAllowances,
+    this.incentiveNewAuto,
+    this.incentiveRenewalAuto,
     required this.gross,
     required this.deductions,
     required this.totalDeduction,
@@ -115,6 +117,8 @@ class Payslip {
     baseSalary: json['baseSalary'] as int,
     incentiveNew: json['incentiveNew'] as int,
     incentiveRenewal: json['incentiveRenewal'] as int,
+    incentiveNewAuto: json['incentiveNewAuto'] as int?,
+    incentiveRenewalAuto: json['incentiveRenewalAuto'] as int?,
     otherAllowances: json['otherAllowances'] as int,
     gross: json['gross'] as int,
     deductions: [
@@ -146,6 +150,19 @@ class Payslip {
   final int baseSalary;
   final int incentiveNew;
   final int incentiveRenewal;
+
+  /// 서버가 계산한 원래 커미션 — 위 두 값과 다르면 **본인이 고쳐서 신청한 것**이다
+  ///
+  /// 이 기능이 생기기 전 명세서는 null 이라 '고쳤는지'를 알 수 없다.
+  final int? incentiveNewAuto;
+  final int? incentiveRenewalAuto;
+
+  /// 본인이 커미션을 고쳐서 낸 명세서인가 — 결재 화면이 차이를 보여준다
+  bool get adjusted =>
+      (incentiveNewAuto != null && incentiveNewAuto != incentiveNew) ||
+      (incentiveRenewalAuto != null &&
+          incentiveRenewalAuto != incentiveRenewal);
+
   final int otherAllowances;
 
   /// 세전 총액
@@ -223,6 +240,7 @@ class Accrued {
     required this.sessionSigns,
     required this.newSessions,
     required this.renewalSessions,
+    required this.canAdjust,
   });
 
   factory Accrued.fromJson(Map<String, dynamic> json) => Accrued(
@@ -236,6 +254,7 @@ class Accrued {
     sessionSigns: json['sessionSigns'] as int,
     newSessions: json['newSessions'] as int,
     renewalSessions: json['renewalSessions'] as int,
+    canAdjust: json['canAdjust'] as bool? ?? false,
   );
 
   /// 이 주기가 만들 명세서의 달 (`2026-09`)
@@ -256,6 +275,12 @@ class Accrued {
   final int sessionSigns;
   final int newSessions;
   final int renewalSessions;
+
+  /// 신청할 때 본인이 커미션을 고칠 수 있는 사람인가
+  ///
+  /// **서버가 정한다.** 앱이 직급으로 따로 판정하면 요율이 바뀔 때 어긋나서,
+  /// 못 고치는 사람에게 입력칸이 열리고 제출에서 400 이 난다.
+  final bool canAdjust;
 }
 
 DateTime? _localTime(String? value) =>
@@ -320,10 +345,24 @@ class PayrollApi {
   }
 
   /// 급여 신청 — 지급일 당일에만 된다 (아니면 403 NOT_PAYDAY)
-  static Future<Payslip> submit(String yearMonth, {String? note}) async {
+  ///
+  /// [incentiveNew]·[incentiveRenewal] 을 주면 **본인이 고친 커미션**으로 낸다
+  /// (자동 집계가 빠뜨린 수업을 바로잡는 자리다). 안 주면 서버 계산값 그대로다.
+  /// 기본급은 못 고치고, 알바·FC 가 보내면 `400 NO_INCENTIVE` 다.
+  static Future<Payslip> submit(
+    String yearMonth, {
+    String? note,
+    int? incentiveNew,
+    int? incentiveRenewal,
+  }) async {
     final data = await _client.post(
       '/payslips/me/submit',
-      body: {'yearMonth': yearMonth, 'note': ?note},
+      body: {
+        'yearMonth': yearMonth,
+        'note': ?note,
+        'incentiveNew': ?incentiveNew,
+        'incentiveRenewal': ?incentiveRenewal,
+      },
     );
     return Payslip.fromJson(data!);
   }

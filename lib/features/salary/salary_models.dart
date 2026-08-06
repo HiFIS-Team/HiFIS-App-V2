@@ -40,15 +40,23 @@ enum _PayStatus {
   };
 }
 
+/// 신청서에서 본인이 고칠 수 있는 줄 — 기본급은 여기 없다
+///
+/// 자동 집계가 빠뜨린 수업(대타·기록 누락)을 신청할 때 바로잡으라고 연 자리다.
+enum _Adjustable { incentiveNew, incentiveRenewal }
+
 /// 명세서 한 줄 — 이름, 계산 근거, 금액
 class _PayItem {
-  const _PayItem(this.label, this.amount, {this.note});
+  const _PayItem(this.label, this.amount, {this.note, this.adjust});
 
   final String label;
   final int amount;
 
   /// '62회 × 15,000' 처럼 왜 이 금액인지
   final String? note;
+
+  /// 신청서에서 고칠 수 있는 줄이면 어느 값인지 — null 이면 못 고친다
+  final _Adjustable? adjust;
 }
 
 /// 한 달치 급여 명세서
@@ -92,6 +100,41 @@ class _Payslip {
 
   bool get submitted => status != _PayStatus.draft;
 
+  /// 신청서에서 본인이 고친 커미션 — null 이면 서버 계산값 그대로 낸다
+  ///
+  /// 폼이 여기 담아 두면 [_SalaryScreenState._submit] 이 서버로 보낸다
+  /// (특이사항 [note] 와 같은 방식이다).
+  int? adjustNew;
+  int? adjustRenewal;
+
+  /// 서버가 계산한 원래 커미션 — 신청서 입력칸의 시작값이자 비교 기준
+  ///
+  /// 확정 명세서는 `incentiveNewAuto`(고치기 전 값), 아직 없는 달은 진행 중
+  /// 누계를 쓴다. 이 기능 전에 만들어진 명세서는 `auto` 가 없어 지금 값이 곧 원래 값이다.
+  int get autoNew =>
+      source?.incentiveNewAuto ??
+      source?.incentiveNew ??
+      _live?.incentiveNew ??
+      0;
+  int get autoRenewal =>
+      source?.incentiveRenewalAuto ??
+      source?.incentiveRenewal ??
+      _live?.incentiveRenewal ??
+      0;
+
+  /// 기본급 — 신청서에서 못 고친다 (직급 정책에서 나온다)
+  int get baseSalary => source?.baseSalary ?? 0;
+
+  /// 본인이 커미션을 고쳐서 낸 명세서인가 — 결재 화면이 차이를 보여준다
+  bool get adjusted => source?.adjusted ?? false;
+
+  /// 신청서에서 커미션을 고칠 수 있는 사람인가 — **서버가 정한다**
+  ///
+  /// 알바(시급제)와 커미션 요율이 0인 직급(FC)은 고칠 자리가 없다.
+  /// 앱이 직급으로 따로 판정하면 요율이 바뀔 때 어긋나서, 못 고치는 사람에게
+  /// 칸이 열리고 제출에서 400 이 난다.
+  bool get canAdjust => _accrued?.canAdjust ?? false;
+
   /// 진행 중인 주기라면 지금까지 쌓인 커미션 — 아니면 null
   ///
   /// 명세서가 아직 없는 달(`source == null`) 중에서 **이번 주기 하나**만 해당한다.
@@ -126,6 +169,7 @@ class _Payslip {
           note: (live?.newSessions ?? 0) == 0
               ? null
               : '워크인 ${live!.newSessions}회',
+          adjust: _Adjustable.incentiveNew,
         ),
         _PayItem(
           'PT 커미션 · 재등록',
@@ -133,6 +177,7 @@ class _Payslip {
           note: (live?.renewalSessions ?? 0) == 0
               ? null
               : '소개 포함 ${live!.renewalSessions}회',
+          adjust: _Adjustable.incentiveRenewal,
         ),
       ];
     }
@@ -142,12 +187,14 @@ class _Payslip {
         'PT 커미션 · 신규',
         payslip.incentiveNew,
         note: newSessions == 0 ? null : '워크인 $newSessions회',
+        adjust: _Adjustable.incentiveNew,
       ),
       _PayItem(
         'PT 커미션 · 재등록',
         payslip.incentiveRenewal,
         // 서버가 재등록과 지인소개를 같은 요율로 한 통에 담는다
         note: renewalSessions == 0 ? null : '소개 포함 $renewalSessions회',
+        adjust: _Adjustable.incentiveRenewal,
       ),
       if (payslip.otherAllowances != 0)
         _PayItem('기타 수당', payslip.otherAllowances),

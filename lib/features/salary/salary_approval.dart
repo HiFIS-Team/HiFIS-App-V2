@@ -207,6 +207,10 @@ class _PayrollDecideRow extends StatelessWidget {
             ],
           ],
         ),
+        if (payslip.adjusted) ...[
+          SizedBox(height: 10),
+          _AdjustedNotice(payslip: payslip),
+        ],
         if ((payslip.note ?? '').isNotEmpty) ...[
           SizedBox(height: 10),
           Container(
@@ -540,6 +544,10 @@ class _ApprovalRow extends StatelessWidget {
               ),
             ],
           ),
+          if (payslip.adjusted) ...[
+            SizedBox(height: 10),
+            _AdjustedNotice(payslip: payslip),
+          ],
           if ((payslip.note ?? '').isNotEmpty) ...[
             SizedBox(height: 10),
             Container(
@@ -578,6 +586,38 @@ class _ApprovalRow extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// 본인이 커미션을 고쳐서 낸 명세서에만 붙는 줄 — 안 고쳤으면 안 뜬다
+///
+/// 고친 값으로 덮어써 버리면 **무엇을 승인하는지 모른 채 결재**하게 된다.
+/// 자동 집계가 빠뜨린 수업을 바로잡으라고 연 자리라, 원래 값을 같이 보여준다.
+class _AdjustedNotice extends StatelessWidget {
+  _AdjustedNotice({required this.payslip});
+
+  final Payslip payslip;
+
+  int get _auto =>
+      (payslip.incentiveNewAuto ?? 0) + (payslip.incentiveRenewalAuto ?? 0);
+  int get _asked => payslip.incentiveNew + payslip.incentiveRenewal;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      // 특이사항 칸과 같은 회색 면이다 — 색을 새로 만들지 않는다
+      // (`AppColors` 머리말: 여기 없는 색을 화면에서 만들지 않는다)
+      decoration: BoxDecoration(
+        color: AppColors.gray50,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        'PT 커미션을 고쳐서 신청했어요 · 자동 계산 ${_won(_auto)} → 신청 ${_won(_asked)}',
+        style: AppTextStyles.caption,
       ),
     );
   }

@@ -26,16 +26,50 @@ class _PayslipForm extends StatefulWidget {
 class _PayslipFormState extends State<_PayslipForm> {
   late final _note = TextEditingController(text: widget.payslip.note ?? '');
 
-  /// 특이사항만 담아 닫는다 — 실제 제출 요청은 부르는 쪽이 보낸다
+  /// 고칠 수 있는 두 줄 — 자동 집계가 빠뜨린 수업을 여기서 바로잡는다
+  ///
+  /// **기본급은 없다.** 직급 정책에서 나오는 값이라 본인이 정할 것이 아니다.
+  /// 서버가 `canAdjust` 로 열어 준 사람에게만 입력칸이 된다 (알바·FC 는 제외).
+  late final _newAmount = TextEditingController(
+    text: _amount(widget.payslip.autoNew),
+  );
+  late final _renewalAmount = TextEditingController(
+    text: _amount(widget.payslip.autoRenewal),
+  );
+
+  bool get _canAdjust => widget.payslip.canAdjust;
+
+  /// 입력칸의 숫자 — 쉼표를 빼고 읽는다 (비었으면 0)
+  int _read(TextEditingController field) =>
+      int.tryParse(field.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+
+  int get _newValue => _canAdjust ? _read(_newAmount) : widget.payslip.autoNew;
+  int get _renewalValue =>
+      _canAdjust ? _read(_renewalAmount) : widget.payslip.autoRenewal;
+
+  /// 기본급 + 고친 커미션 — 입력하는 동안 바로 따라 움직인다
+  int get _total => widget.payslip.baseSalary + _newValue + _renewalValue;
+
+  /// 고친 값을 담아 닫는다 — 실제 제출 요청은 부르는 쪽이 보낸다
   void _submit() {
     final note = _note.text.trim();
     widget.payslip.note = note.isEmpty ? null : note;
+    // 안 고쳤으면 아예 안 보낸다 — 서버 계산값 그대로 쓰라는 뜻이다
+    widget.payslip.adjustNew = _canAdjust && _newValue != widget.payslip.autoNew
+        ? _newValue
+        : null;
+    widget.payslip.adjustRenewal =
+        _canAdjust && _renewalValue != widget.payslip.autoRenewal
+        ? _renewalValue
+        : null;
     Navigator.pop(context, true);
   }
 
   @override
   void dispose() {
     _note.dispose();
+    _newAmount.dispose();
+    _renewalAmount.dispose();
     super.dispose();
   }
 
@@ -78,7 +112,7 @@ class _PayslipFormState extends State<_PayslipForm> {
                     ),
                   ),
                   Text(
-                    _won(payslip.total),
+                    _won(_total),
                     style: AppTextStyles.title3.copyWith(
                       color: AppColors.primary,
                     ),
@@ -99,7 +133,10 @@ class _PayslipFormState extends State<_PayslipForm> {
             SizedBox(width: 5),
             Expanded(
               child: Text(
-                '세션·등록 건수는 수업 기록에서 회사가 집계한 값이라 고칠 수 없어요.',
+                _canAdjust
+                    ? '세션·등록 건수는 수업 기록에서 회사가 집계한 값이에요. '
+                          '금액이 다르면 고쳐서 신청하고 이유를 적어 주세요.'
+                    : '세션·등록 건수는 수업 기록에서 회사가 집계한 값이라 고칠 수 없어요.',
                 style: AppTextStyles.caption.copyWith(fontSize: 12),
               ),
             ),
@@ -220,15 +257,74 @@ class _PayslipFormState extends State<_PayslipForm> {
         ),
       ),
       SizedBox(width: 10),
-      Text(
-        _won(item.amount),
-        style: AppTextStyles.caption.copyWith(
-          fontWeight: FontWeight.w600,
-          color: AppColors.primary,
+      if (_canAdjust && item.adjust != null)
+        _AmountField(
+          controller: item.adjust == _Adjustable.incentiveNew
+              ? _newAmount
+              : _renewalAmount,
+          onChanged: () => setState(() {}),
+        )
+      else
+        Text(
+          _won(item.amount),
+          style: AppTextStyles.caption.copyWith(
+            fontWeight: FontWeight.w600,
+            color: AppColors.primary,
+          ),
         ),
-      ),
     ],
   );
+}
+
+/// 신청서에서 커미션을 고치는 입력칸
+///
+/// 오른쪽 정렬 + 뒤에 '원' 을 붙여서 **읽기 전용 줄과 글자 위치가 같다.**
+/// 폭을 고정하지 않으면 숫자 길이에 따라 줄마다 오른쪽 끝이 어긋난다.
+class _AmountField extends StatelessWidget {
+  _AmountField({required this.controller, required this.onChanged});
+
+  final TextEditingController controller;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = AppTextStyles.caption.copyWith(
+      fontWeight: FontWeight.w600,
+      color: AppColors.primary,
+    );
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 92,
+          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: AppColors.primary.withValues(alpha: 0.25),
+            ),
+          ),
+          child: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.right,
+            style: style,
+            cursorColor: AppColors.primary,
+            onChanged: (_) => onChanged(),
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              isCollapsed: true,
+              hintText: '0',
+              hintStyle: style.copyWith(color: AppColors.gray400),
+            ),
+          ),
+        ),
+        SizedBox(width: 3),
+        Text('원', style: style),
+      ],
+    );
+  }
 }
 
 /// 공제 전 금액이라는 경고 — 실제 입금액과 다른 이유를 짚어 준다
