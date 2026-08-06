@@ -99,22 +99,45 @@ class _SubmissionCardState extends State<_SubmissionCard> {
     // '전체'가 없으므로 늘 한 지점이 골라져 있다
     final branch = _branch ?? (choices.isEmpty ? null : choices.first.id);
     final rows = _submissionsOf(widget.reviews, branchId: branch);
+
+    // 지점이 한 곳뿐이면 고를 게 없다
+    final picker = [
+      if (choices.length > 1) ...[
+        SegmentedTabs(
+          labels: [for (final b in choices) b.name],
+          selected: choices
+              .indexWhere((b) => b.id == branch)
+              .clamp(0, choices.length - 1),
+          onSelect: (i) => setState(() => _branch = choices[i].id),
+        ),
+        SizedBox(height: 16),
+      ],
+    ];
+
+    // 폰은 사람마다 카드 한 장 — 평가 작성 목록([_PersonCard])과 같은 결이다.
+    // 줄 내용은 그대로 두고 카드로만 나눈다. 전부 세우므로 전체보기가 없다.
+    if (!isDesktop) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ...picker,
+          if (rows.isEmpty)
+            EmptyCard(icon: Icons.group_rounded, text: '평가 대상 인원이 없어요')
+          else
+            for (var i = 0; i < rows.length; i++) ...[
+              if (i > 0) SizedBox(height: 12),
+              _SubmissionTile(row: rows[i]),
+            ],
+        ],
+      );
+    }
+
     // 카드에는 다섯 명만 — 나머지는 전체 보기에서
     final head = rows.take(5).toList();
 
     return Column(
       children: [
-        // 지점이 한 곳뿐이면 고를 게 없다
-        if (choices.length > 1) ...[
-          SegmentedTabs(
-            labels: [for (final b in choices) b.name],
-            selected: choices
-                .indexWhere((b) => b.id == branch)
-                .clamp(0, choices.length - 1),
-            onSelect: (i) => setState(() => _branch = choices[i].id),
-          ),
-          SizedBox(height: 16),
-        ],
+        ...picker,
         Container(
           width: double.infinity,
           padding: EdgeInsets.fromLTRB(20, 20, 20, 10),
@@ -164,4 +187,22 @@ class _SubmissionCardState extends State<_SubmissionCard> {
       ],
     );
   }
+}
+
+/// 폰 목록의 한 장 — 줄 내용은 그대로 두고 카드로만 나눈다
+///
+/// [_SubmissionRow] 가 제 여백(가로 4·세로 12)을 들고 있어서 카드 여백에서
+/// 그만큼 뺀다. 그래야 평가 작성 카드([_PersonCard], 가로 20·세로 18)와
+/// 글자 시작점이 같아진다.
+class _SubmissionTile extends StatelessWidget {
+  _SubmissionTile({required this.row});
+
+  final _Submission row;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+    decoration: AppDecorations.card(),
+    child: _SubmissionRow(row: row),
+  );
 }
