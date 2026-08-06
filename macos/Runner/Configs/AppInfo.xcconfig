@@ -8,7 +8,7 @@
 PRODUCT_NAME = HiFIS
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = app.hifis.hifisApp
+PRODUCT_BUNDLE_IDENTIFIER = app.hifis.hifis
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 com.hifis. All rights reserved.
