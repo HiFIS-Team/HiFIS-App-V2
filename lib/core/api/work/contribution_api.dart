@@ -91,11 +91,17 @@ class ContributionApi {
   /// [period] 는 `2026-07`. 안 주면 그 사람 것이 전부 온다.
   static Future<List<ContributionGrant>> list({
     String? employeeId,
+    String? grantedById,
     String? period,
   }) async {
     final rows = await _client.getList(
       '/contributions',
-      query: {'employeeId': ?employeeId, 'period': ?period},
+      query: {
+        'employeeId': ?employeeId,
+        // 준 사람으로 거르기 — '내가 준 기여 내역'이 쓴다
+        'grantedById': ?grantedById,
+        'period': ?period,
+      },
     );
     return [
       for (final row in rows)

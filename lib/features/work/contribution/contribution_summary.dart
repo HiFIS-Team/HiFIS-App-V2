@@ -5,10 +5,17 @@ part of 'contribution_section.dart';
 // ---------------------------------------------------------------------------
 
 /// 이번 달 기여 점수 — 총점과 부여/자동 비중
+///
+/// 대표·관리자는 받는 쪽이 아니라 **주는 쪽**이라 같은 카드를 '내가 준 점수'로
+/// 쓴다. 그때는 비중 막대를 안 그린다 — 준 것은 전부 사람이 준 것이라
+/// '부여/자동' 이 늘 100 대 0 이 되어 아무 것도 안 알려 준다.
 class _ScoreCard extends StatelessWidget {
-  _ScoreCard({required this.items});
+  _ScoreCard({required this.items, this.given = false});
 
   final List<_Contribution> items;
+
+  /// 내가 준 점수를 보는 중인가
+  final bool given;
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +37,9 @@ class _ScoreCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '${DateTime.now().month}월 기여 점수',
+                  given
+                      ? '${DateTime.now().month}월 내가 준 점수'
+                      : '${DateTime.now().month}월 기여 점수',
                   style: AppTextStyles.label,
                 ),
               ),
@@ -47,17 +56,19 @@ class _ScoreCard extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: 14),
-          // 받은 점수와 자동으로 쌓인 점수의 비중
-          ProgressBar(ratio: total == 0 ? 0 : granted / total),
-          SizedBox(height: 12),
-          Row(
-            children: [
-              _legend(AppColors.primary, '부여받은 점수', granted),
-              SizedBox(width: 16),
-              _legend(AppColors.gray300, '자동 집계', auto),
-            ],
-          ),
+          if (!given) ...[
+            SizedBox(height: 14),
+            // 받은 점수와 자동으로 쌓인 점수의 비중
+            ProgressBar(ratio: total == 0 ? 0 : granted / total),
+            SizedBox(height: 12),
+            Row(
+              children: [
+                _legend(AppColors.primary, '부여받은 점수', granted),
+                SizedBox(width: 16),
+                _legend(AppColors.gray300, '자동 집계', auto),
+              ],
+            ),
+          ],
         ],
       ),
     );

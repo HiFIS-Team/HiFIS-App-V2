@@ -25,17 +25,33 @@ class _GrantScreenState extends State<_GrantScreen> {
   ///
   /// 점장은 자기 지점만, 대표·관리자는 전 지점.
   /// (서버는 대상 지점을 막지 않지만, 안 보고 준 점수는 근거가 없다)
+  ///
+  /// 권한은 **서버가 막는다** — 아래 [_grantable] 과 같은 표가 서버에도 있어서
+  /// 못 주는 사람을 고르면 403 `NOT_GRANTABLE` 이 난다. 눌렀을 때 튕길 사람은
+  /// 애초에 안 세운다.
   List<Employee> get _people {
     final me = currentUser;
     if (me == null) return const [];
     final sameBranchOnly = me.role == Role.manager;
+    final allowed = _grantable[me.role] ?? const <Role>{};
     return [
       for (final employee in StaffDirectory.instance.employees)
         if (employee.id != me.id &&
+            allowed.contains(employee.role) &&
             (!sameBranchOnly || employee.branchId == me.branchId))
           employee,
     ];
   }
+
+  /// 누가 누구에게 줄 수 있나 — 서버 `GRANTABLE` 과 같은 표
+  ///
+  /// **자기보다 아래에만** 준다. 점장끼리 서로 얹어 주면 랭킹이 뜻을 잃고,
+  /// 표에 자기 권한이 없어 본인에게 주는 길도 같이 막힌다.
+  static const _grantable = {
+    Role.master: {Role.manager, Role.member},
+    Role.admin: {Role.manager, Role.member},
+    Role.manager: {Role.member},
+  };
 
   bool get _ready => _target != null && _title.text.trim().isNotEmpty;
 

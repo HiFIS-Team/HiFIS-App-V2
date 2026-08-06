@@ -105,10 +105,10 @@ class _ContributionCard extends StatelessWidget {
                     ),
                     SizedBox(height: 2),
                     Text(
-                      // 부여 항목은 누가 줬는지가 근거다
-                      item.by == null
+                      // 부여 항목은 상대가 근거다 — 조사로 준 것·받은 것을 가른다
+                      item.personLabel == null
                           ? _dayLabel(item.date)
-                          : '${item.by}님 · ${_dayLabel(item.date)}',
+                          : '${item.personLabel} · ${_dayLabel(item.date)}',
                       style: AppTextStyles.caption.copyWith(fontSize: 12),
                     ),
                   ],
@@ -185,10 +185,10 @@ class _ContributionRow extends StatelessWidget {
                 ),
                 SizedBox(height: 2),
                 Text(
-                  // 부여 항목은 누가 줬는지가 근거다
-                  item.by == null
+                  // 부여 항목은 상대가 근거다 — 조사로 준 것·받은 것을 가른다
+                  item.personLabel == null
                       ? '${item.kind.label} · ${_dayLabel(item.date)}'
-                      : '${item.kind.label} · ${item.by}님 · '
+                      : '${item.kind.label} · ${item.personLabel} · '
                             '${_dayLabel(item.date)}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,

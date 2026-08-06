@@ -55,6 +55,13 @@ class _ContributionSectionState extends State<ContributionSection> {
     _load();
   }
 
+  /// 받는 쪽이 아니라 **주는 쪽만** 보는 사람인가 — 대표·관리자
+  ///
+  /// 기여도는 자기보다 아래에만 주는 것이라(서버 `GRANTABLE`) 그 둘은 받을
+  /// 일이 없다. 본인 것으로 거르면 늘 비어서, 대신 **내가 준 내역**을 본다.
+  /// 점장은 주기도 받기도 해서 둘을 한 목록에 담는다.
+  static bool get _givenOnly => myRole == Role.master || myRole == Role.admin;
+
   Future<void> _load() async {
     final me = currentUser;
     if (me == null) {
@@ -62,22 +69,29 @@ class _ContributionSectionState extends State<ContributionSection> {
       return;
     }
     final period = periodKey(DateTime.now());
+    const noGrants = <ContributionGrant>[];
     try {
-      // 부여 내역과 점수 원장을 같이 띄운다 — 둘 다 이번 달만
-      final grantRequest = ContributionApi.list(
-        employeeId: me.id,
-        period: period,
-      );
-      final eventRequest = ScoreApi.events(
-        employeeId: me.id,
-        category: ScoreCategory.contrib,
-        period: period,
-      );
-      final grants = await grantRequest;
+      // 셋 다 이번 달만. 안 쓰는 것은 아예 안 부른다.
+      final givenRequest = myRole.canGrant
+          ? ContributionApi.list(grantedById: me.id, period: period)
+          : Future.value(noGrants);
+      final receivedRequest = _givenOnly
+          ? Future.value(noGrants)
+          : ContributionApi.list(employeeId: me.id, period: period);
+      // 자동으로 쌓인 점수는 받는 쪽에만 있다 — 주는 목록에는 낄 자리가 없다
+      final eventRequest = _givenOnly
+          ? Future.value(const <ScoreEvent>[])
+          : ScoreApi.events(
+              employeeId: me.id,
+              category: ScoreCategory.contrib,
+              period: period,
+            );
+      final given = await givenRequest;
+      final received = await receivedRequest;
       final events = await eventRequest;
       if (!mounted) return;
       setState(() {
-        _items = _merge(grants, events);
+        _items = _merge(received, given, events);
         _loading = false;
       });
     } catch (error) {
@@ -93,17 +107,28 @@ class _ContributionSectionState extends State<ContributionSection> {
   /// 있으므로 원장에서 **사람이 준 게 아닌 것**만 골라 붙인다.
   /// 둘을 다 원장에서 뽑으면 아이디어인지 목표 업무인지 알 수 없다.
   static List<_Contribution> _merge(
-    List<ContributionGrant> grants,
+    List<ContributionGrant> received,
+    List<ContributionGrant> given,
     List<ScoreEvent> events,
   ) {
     return [
-      for (final grant in grants)
+      for (final grant in received)
         _Contribution(
           kind: grant.type,
           title: grant.reason,
           points: grant.points,
           date: grant.createdAt,
-          by: StaffDirectory.instance.byId(grant.grantedById)?.name,
+          person: StaffDirectory.instance.byId(grant.grantedById)?.name,
+        ),
+      for (final grant in given)
+        _Contribution(
+          kind: grant.type,
+          title: grant.reason,
+          points: grant.points,
+          date: grant.createdAt,
+          // 준 목록에서는 상대가 **받은 사람**이다
+          person: StaffDirectory.instance.byId(grant.employeeId)?.name,
+          given: true,
         ),
       for (final event in events)
         if (event.automatic)
@@ -200,7 +225,7 @@ class _ContributionSectionState extends State<ContributionSection> {
 
     return Column(
       children: [
-        _ScoreCard(items: _items),
+        _ScoreCard(items: _items, given: _givenOnly),
         SizedBox(height: 16),
         // 항목 넷 — 무엇으로 점수가 쌓였는지
         _KindGrid(items: _items),
@@ -253,7 +278,8 @@ class _Contribution {
     required this.title,
     required this.points,
     required this.date,
-    this.by,
+    this.person,
+    this.given = false,
   });
 
   final ContribType kind;
@@ -263,11 +289,22 @@ class _Contribution {
   final int points;
   final DateTime date;
 
-  /// 준 사람 — 자동으로 쌓인 점수는 비어 있다
-  final String? by;
+  /// 상대 이름 — 받은 것은 **준 사람**, 준 것은 **받은 사람**.
+  /// 자동으로 쌓인 점수는 상대가 없어서 비어 있다.
+  final String? person;
+
+  /// 내가 준 것인가 — 점장은 준 것과 받은 것을 한 목록에서 본다
+  final bool given;
 
   /// 사람이 준 게 아니라 기록에서 자동으로 들어온 점수인가
-  bool get automatic => by == null;
+  bool get automatic => person == null;
+
+  /// 카드 한 줄의 상대 표시 — 조사로 방향을 가른다
+  String? get personLabel => person == null
+      ? null
+      : given
+      ? '$person님께'
+      : '$person님이';
 }
 
 int _sum(List<_Contribution> items) =>
