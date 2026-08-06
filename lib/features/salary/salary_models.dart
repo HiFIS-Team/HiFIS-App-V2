@@ -92,6 +92,12 @@ class _Payslip {
 
   bool get submitted => status != _PayStatus.draft;
 
+  /// 진행 중인 주기라면 지금까지 쌓인 커미션 — 아니면 null
+  ///
+  /// 명세서가 아직 없는 달(`source == null`) 중에서 **이번 주기 하나**만 해당한다.
+  Accrued? get _live =>
+      source == null && _accrued?.yearMonth == key ? _accrued : null;
+
   /// 지급 항목 — 서버가 계산한 값을 그대로 늘어놓는다
   ///
   /// **세션 수당 줄은 없다.** 커미션 모델에서는 세션 급여가 곧 신규·재등록
@@ -104,13 +110,30 @@ class _Payslip {
   /// 아직 산출 안 된 달도 **항목은 0원으로 늘어놓는다.** 빈 목록을 주면
   /// 카드에 제목과 '총 지급액 0원' 만 남아서 화면이 고장 난 것처럼 보인다
   /// (실제로 그렇게 보였다). 무엇을 받는 자리인지는 금액이 0이어도 알려 준다.
+  ///
+  /// **진행 중인 주기는 커미션 두 줄이 실시간으로 오른다** — 세션 싸인을
+  /// 찍을 때마다 서버가 다시 세어 준다. 기본급은 지급일에 확정되므로
+  /// 그때까지 0 이다 (미리 더해 두면 아직 안 정해진 금액을 약속하는 셈이다).
   List<_PayItem> get pays {
     final payslip = source;
     if (payslip == null) {
-      return const [
-        _PayItem('기본급', 0),
-        _PayItem('PT 커미션 · 신규', 0),
-        _PayItem('PT 커미션 · 재등록', 0),
+      final live = _live;
+      return [
+        const _PayItem('기본급', 0),
+        _PayItem(
+          'PT 커미션 · 신규',
+          live?.incentiveNew ?? 0,
+          note: (live?.newSessions ?? 0) == 0
+              ? null
+              : '워크인 ${live!.newSessions}회',
+        ),
+        _PayItem(
+          'PT 커미션 · 재등록',
+          live?.incentiveRenewal ?? 0,
+          note: (live?.renewalSessions ?? 0) == 0
+              ? null
+              : '소개 포함 ${live!.renewalSessions}회',
+        ),
       ];
     }
     return [
@@ -138,8 +161,8 @@ class _Payslip {
   /// (짧은 빈칸으로 채우면 두 줄로 접히는 문장과 높이가 어긋난다).
   String get payNote => '이번 달 세션 $sessions회 · 회차마다 등록 단가가 달라 합계로 보여드려요';
 
-  /// 각주를 보여줄 달인가 — 산출된 달만
-  bool get hasPayNote => source != null;
+  /// 각주를 보여줄 달인가 — 산출된 달과 진행 중인 주기
+  bool get hasPayNote => source != null || _live != null;
 
   /// 공제 항목 (4대 보험·세금) — 서버가 직급·공제 방식에 따라 계산한다
   List<_PayItem> get deductions => [
@@ -147,8 +170,8 @@ class _Payslip {
       _PayItem(line.label, line.amount),
   ];
 
-  /// 세전 총액
-  int get total => source?.gross ?? 0;
+  /// 세전 총액 — 진행 중인 주기는 **지금까지 쌓인 커미션**이다 (기본급 전)
+  int get total => source?.gross ?? _live?.total ?? 0;
 
   /// 실수령액
   int get net => source?.net ?? 0;
@@ -156,7 +179,7 @@ class _Payslip {
   int get totalDeduction => source?.totalDeduction ?? 0;
 
   /// 이번 달 세션 싸인 수 — 금액이 아니라 참고용 숫자다
-  int get sessions => source?.basis.sessionSigns ?? 0;
+  int get sessions => source?.basis.sessionSigns ?? _live?.sessionSigns ?? 0;
 
   /// 시급으로 계산된 달인가 (알바)
   ///
@@ -165,8 +188,10 @@ class _Payslip {
 
   /// 커미션이 붙은 세션 수 — `newSales`·`renewalSales` 는 등록 건이 아니라
   /// **세션 한 건씩**이다 (서버가 `{회차} · {워크인|재등록|지인소개}` 로 담는다).
-  int get newSessions => source?.basis.newSales.length ?? 0;
-  int get renewalSessions => source?.basis.renewalSales.length ?? 0;
+  int get newSessions =>
+      source?.basis.newSales.length ?? _live?.newSessions ?? 0;
+  int get renewalSessions =>
+      source?.basis.renewalSales.length ?? _live?.renewalSessions ?? 0;
 
   /// 지급일 — 서버가 알려 준다 (명세서에 실려 오고, 없으면 신청 창에서)
   ///
@@ -195,17 +220,32 @@ class _Payslip {
 /// 범위로 한 번에 받아오므로 늘려도 요청 수는 그대로다.
 const _monthsToLoad = 6;
 
-/// 최근 명세서 (0번이 이번 달) — 서버에서 받아 채운다
+/// 최근 명세서 (0번이 진행 중인 주기) — 서버에서 받아 채운다
 final _payslips = <_Payslip>[];
+
+/// 진행 중인 주기에 지금까지 쌓인 커미션 — 본인 화면일 때만 채워진다
+Accrued? _accrued;
 
 /// 명세서를 받아 [_payslips] 를 채운다.
 ///
 /// [employeeId] 를 주면 **그 사람 것**을 받는다 — 대표·관리자가 결재하면서
 /// 신청자 화면을 그대로 볼 때다. 안 주면 본인 것이다.
 Future<void> _loadPayslips({String? employeeId}) async {
+  // **달력 월이 아니라 급여 주기로 센다.** 동광주·첨단 트레이너는 지급일이
+  // 익월 10일이라, 9월 15일에 진행 중인 것은 9월치가 아니라 10월치(9/10~10/9)다.
+  // 서버가 알려 주는 그 달을 맨 위에 두고 거슬러 올라간다.
+  // (남의 화면을 볼 때는 못 받으므로 예전처럼 이번 달부터 센다)
+  _accrued = employeeId == null ? await _fetchAccrued() : null;
   final now = DateTime.now();
+  final anchor = _accrued == null
+      ? DateTime(now.year, now.month)
+      : DateTime(
+          int.parse(_accrued!.yearMonth.substring(0, 4)),
+          int.parse(_accrued!.yearMonth.substring(5, 7)),
+        );
   final months = [
-    for (var i = 0; i < _monthsToLoad; i++) DateTime(now.year, now.month - i),
+    for (var i = 0; i < _monthsToLoad; i++)
+      DateTime(anchor.year, anchor.month - i),
   ];
 
   // 명세서 범위와 신청 창을 같이 띄워 둔다 (신청 창은 이번 달만 필요하다)
@@ -240,6 +280,15 @@ Future<void> _loadPayslips({String? employeeId}) async {
           window: i == 0 ? window : null,
         )..note = sources[yearMonthKey(months[i])]?.note,
     ]);
+}
+
+/// 쌓인 커미션 — 못 받아도 화면은 그대로 뜬다 (금액이 0으로 남을 뿐이다)
+Future<Accrued?> _fetchAccrued() async {
+  try {
+    return await PayrollApi.accrued();
+  } catch (_) {
+    return null;
+  }
 }
 
 /// 1234567 → '1,234,567'

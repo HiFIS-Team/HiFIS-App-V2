@@ -203,6 +203,61 @@ class PaydayWindow {
   final bool isOpen;
 }
 
+/// 진행 중인 주기에 **지금까지 쌓인 PT 커미션** — 기본급·공제는 없다
+///
+/// 명세서는 지급일에 나오지만 그 전까지 얼마 쌓였는지 볼 길이 없었다.
+/// 세션 싸인을 찍을 때마다 오르고, 주기가 넘어가면 0부터 다시 센다.
+///
+/// **급여 주기는 달력 월이 아니다** — 지점·직급마다 지급일이 달라서
+/// 화순·FC 는 `1일~말일`, 동광주·첨단 트레이너는 `전월 10일~당월 9일` 이다.
+/// [yearMonth] 는 이 주기가 나중에 만들 명세서의 달이다.
+class Accrued {
+  Accrued({
+    required this.yearMonth,
+    required this.periodStart,
+    required this.periodEnd,
+    required this.payday,
+    required this.incentiveNew,
+    required this.incentiveRenewal,
+    required this.total,
+    required this.sessionSigns,
+    required this.newSessions,
+    required this.renewalSessions,
+  });
+
+  factory Accrued.fromJson(Map<String, dynamic> json) => Accrued(
+    yearMonth: json['yearMonth'] as String,
+    periodStart: DateTime.parse(json['periodStart'] as String),
+    periodEnd: DateTime.parse(json['periodEnd'] as String),
+    payday: DateTime.parse(json['payday'] as String),
+    incentiveNew: json['incentiveNew'] as int,
+    incentiveRenewal: json['incentiveRenewal'] as int,
+    total: json['total'] as int,
+    sessionSigns: json['sessionSigns'] as int,
+    newSessions: json['newSessions'] as int,
+    renewalSessions: json['renewalSessions'] as int,
+  );
+
+  /// 이 주기가 만들 명세서의 달 (`2026-09`)
+  final String yearMonth;
+
+  final DateTime periodStart;
+
+  /// **이 날 전날까지**가 이번 주기다 (끝은 안 포함)
+  final DateTime periodEnd;
+
+  final DateTime payday;
+  final int incentiveNew;
+  final int incentiveRenewal;
+
+  /// 둘의 합 — 기본급은 안 들어간다
+  final int total;
+
+  final int sessionSigns;
+  final int newSessions;
+  final int renewalSessions;
+}
+
 DateTime? _localTime(String? value) =>
     value == null ? null : DateTime.parse(value).toLocal();
 
@@ -256,6 +311,12 @@ class PayrollApi {
       query: {'yearMonth': yearMonth},
     );
     return PaydayWindow.fromJson(data);
+  }
+
+  /// 진행 중인 주기에 지금까지 쌓인 PT 커미션 (본인 것만)
+  static Future<Accrued> accrued() async {
+    final data = await _client.get('/payslips/me/accrued');
+    return Accrued.fromJson(data);
   }
 
   /// 급여 신청 — 지급일 당일에만 된다 (아니면 403 NOT_PAYDAY)
