@@ -87,10 +87,10 @@ class _SubmissionCardState extends State<_SubmissionCard> {
   /// 고른 지점 — 안 골랐으면 맨 앞 지점부터 본다
   String? _branch;
 
-  /// 그 사람이 이번 달에 누구를 어떻게 평가했는지 열어 본다
-  void _open(Employee reviewer) => showFullPage<void>(
+  /// 그 사람이 이번 달에 받은 평가를 열어 본다
+  void _open(Employee person) => showFullPage<void>(
     context,
-    (_) => _ReviewerScreen(reviewer: reviewer, reviews: widget.reviews),
+    (_) => _ReceivedScreen(person: person, reviews: widget.reviews),
   );
 
   @override

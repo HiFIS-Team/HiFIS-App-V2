@@ -60,8 +60,8 @@ class _SubmissionScreen extends StatelessWidget {
                       row: rows[index],
                       onTap: () => showFullPage<void>(
                         context,
-                        (_) => _ReviewerScreen(
-                          reviewer: rows[index].person,
+                        (_) => _ReceivedScreen(
+                          person: rows[index].person,
                           reviews: reviews,
                         ),
                       ),
@@ -100,39 +100,52 @@ class _SubmissionScreen extends StatelessWidget {
   }
 }
 
-/// 한 사람이 이번 달에 누구를 어떻게 평가했는지 — 제출 현황에서 눌러 연다
+/// 한 사람이 이번 달에 **받은** 평가 — 제출 현황에서 눌러 연다
 ///
 /// 면담 자료라 **대표·관리자만** 본다 (서버가 `/peer-reviews` 를 그렇게 막아 뒀다).
 /// 요청을 따로 안 보낸다 — 제출 현황이 이미 받아 둔 이번 달 평가에서 골라 쓴다.
-class _ReviewerScreen extends StatefulWidget {
-  _ReviewerScreen({required this.reviewer, required this.reviews});
+///
+/// 카드 한 장이 **그 사람을 평가한 사람** 하나다. 본인이 쓴 자기 평가도 같이 선다.
+/// 누르면 그 사람이 어떻게 매겼는지가 읽기 전용으로 열린다.
+class _ReceivedScreen extends StatelessWidget {
+  _ReceivedScreen({required this.person, required this.reviews});
 
-  /// 평가를 쓴 사람
-  final Employee reviewer;
+  /// 평가를 받은 사람 — 이 화면의 주인
+  final Employee person;
 
-  /// 이번 달 전체 평가 — 이 안에서 이 사람이 쓴 것만 골라 쓴다
+  /// 이번 달 전체 평가 — 이 안에서 이 사람이 받은 것만 골라 쓴다
   final List<PeerReview> reviews;
 
-  @override
-  State<_ReviewerScreen> createState() => _ReviewerScreenState();
-}
-
-class _ReviewerScreenState extends State<_ReviewerScreen> {
-  /// 펼쳐 둔 줄 (받는 사람 id)
-  final _open = <String>{};
-
-  /// 이 사람이 쓴 평가 — 받는 사람 id 로 찾는다
-  Map<String, PeerReview> get _written => {
-    for (final review in widget.reviews)
-      if (review.reviewerId == widget.reviewer.id) review.revieweeId: review,
+  /// 이 사람이 받은 평가 — 쓴 사람 id 로 찾는다
+  Map<String, PeerReview> get _received => {
+    for (final review in reviews)
+      if (review.revieweeId == person.id) review.reviewerId: review,
   };
+
+  /// 평가를 쓴 사람을 낼 수 있는 차례대로 — 본인이 맨 앞, 그다음 같은 지점 사람들
+  ///
+  /// 서로 평가하는 사이라 `_targetsOf(person)` 이 곧 이 사람을 평가할 수 있는
+  /// 사람들이다. **안 쓴 사람은 빠진다** — 이 화면은 받은 것만 모은다.
+  List<Employee> _writers(Map<String, PeerReview> received) => [
+    for (final employee in _PeerReviewSectionState._targetsOf(person))
+      if (received.containsKey(employee.id)) employee,
+  ];
+
+  /// 그 사람이 어떻게 매겼는지 — 평가 작성 화면을 읽기 전용으로 연다
+  void _open(BuildContext context, PeerReview review) => showFullPage<void>(
+    context,
+    (_) => _PeerReviewFormScreen(
+      // 화면의 대상은 '평가받은 사람'이다 — 쓴 사람이 아니다
+      person: person,
+      isSelf: review.isSelf,
+      submitted: review,
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
-    // 평가 화면과 같은 명단을 쓴다 — 본인이 맨 앞, 그다음 같은 지점 사람들
-    final targets = _PeerReviewSectionState._targetsOf(widget.reviewer);
-    final written = _written;
-    final done = targets.where((t) => written.containsKey(t.id)).length;
+    final received = _received;
+    final writers = _writers(received);
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -151,16 +164,14 @@ class _ReviewerScreenState extends State<_ReviewerScreen> {
                       Expanded(
                         child: Text(
                           [
-                            widget.reviewer.rank.label,
-                            StaffDirectory.instance.branchName(
-                              widget.reviewer.branchId,
-                            ),
+                            person.rank.label,
+                            StaffDirectory.instance.branchName(person.branchId),
                           ].where((s) => s.isNotEmpty).join(' · '),
                           style: AppTextStyles.caption,
                         ),
                       ),
                       Text(
-                        '$done / ${targets.length}건 제출',
+                        '${writers.length}건 받음',
                         style: AppTextStyles.caption.copyWith(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w700,
@@ -171,10 +182,10 @@ class _ReviewerScreenState extends State<_ReviewerScreen> {
                 ),
                 Container(height: 1, color: AppColors.gray100),
                 Expanded(
-                  child: targets.isEmpty
+                  child: writers.isEmpty
                       ? Center(
                           child: Text(
-                            '평가할 사람이 없어요',
+                            '아직 받은 평가가 없어요',
                             style: AppTextStyles.body2.copyWith(
                               color: AppColors.textTertiary,
                             ),
@@ -183,25 +194,21 @@ class _ReviewerScreenState extends State<_ReviewerScreen> {
                       : ListView.separated(
                           padding: EdgeInsets.fromLTRB(
                             20,
-                            8,
+                            16,
                             20,
                             MediaQuery.paddingOf(context).bottom + 24,
                           ),
-                          itemCount: targets.length,
-                          separatorBuilder: (_, _) =>
-                              Divider(height: 1, color: AppColors.divider),
+                          itemCount: writers.length,
+                          separatorBuilder: (_, _) => SizedBox(height: 12),
                           itemBuilder: (_, index) {
-                            final person = targets[index];
-                            return _GivenReviewRow(
-                              person: person,
-                              isSelf: person.id == widget.reviewer.id,
-                              review: written[person.id],
-                              open: _open.contains(person.id),
-                              onTap: () => setState(() {
-                                if (!_open.remove(person.id)) {
-                                  _open.add(person.id);
-                                }
-                              }),
+                            final writer = writers[index];
+                            final review = received[writer.id]!;
+                            // 평가 작성 목록과 같은 카드 — 이름은 **쓴 사람**이다
+                            return _PersonCard(
+                              person: writer,
+                              isSelf: review.isSelf,
+                              review: review,
+                              onTap: () => _open(context, review),
                             );
                           },
                         ),
@@ -216,7 +223,7 @@ class _ReviewerScreenState extends State<_ReviewerScreen> {
                 height: 56,
                 child: Center(
                   child: Text(
-                    '${widget.reviewer.name}님이 쓴 평가',
+                    '${person.name}님이 받은 평가',
                     style: AppTextStyles.title3,
                   ),
                 ),
@@ -237,159 +244,6 @@ class _ReviewerScreenState extends State<_ReviewerScreen> {
       ),
     );
   }
-}
-
-/// 준 평가 한 줄 — 누르면 항목별 별과 사유가 펼쳐진다
-class _GivenReviewRow extends StatelessWidget {
-  _GivenReviewRow({
-    required this.person,
-    required this.isSelf,
-    required this.review,
-    required this.open,
-    required this.onTap,
-  });
-
-  /// 평가를 받은 사람
-  final Employee person;
-
-  /// 자기 자신에게 쓴 평가인가 — 별 하나의 점수가 다르다(1점 vs 4점)
-  final bool isSelf;
-
-  /// 아직 안 썼으면 null
-  final PeerReview? review;
-
-  final bool open;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final written = review;
-
-    final header = Padding(
-      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 12),
-      child: Row(
-        children: [
-          Avatar(name: person.name, size: 38),
-          SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        person.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTextStyles.body2.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    if (isSelf) ...[
-                      SizedBox(width: 6),
-                      Text('본인', style: AppTextStyles.caption),
-                    ],
-                  ],
-                ),
-                SizedBox(height: 2),
-                Text(
-                  person.rank.label,
-                  style: AppTextStyles.caption.copyWith(fontSize: 11),
-                ),
-              ],
-            ),
-          ),
-          if (written == null)
-            Text(
-              '아직 안 썼어요',
-              style: AppTextStyles.caption.copyWith(color: AppColors.error),
-            )
-          else ...[
-            // 별 다섯 개를 다 그리면 줄이 넘쳐서 평균만 별 하나로 접는다
-            Icon(CupertinoIcons.star_fill, size: 13, color: AppColors.warning),
-            SizedBox(width: 3),
-            Text(
-              _average(written).toStringAsFixed(1),
-              style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w600),
-            ),
-            SizedBox(width: 10),
-            Text(
-              '${written.total}점',
-              style: AppTextStyles.body2.copyWith(
-                fontWeight: FontWeight.w700,
-                color: AppColors.primary,
-              ),
-            ),
-            SizedBox(width: 6),
-            Icon(
-              open ? CupertinoIcons.chevron_up : CupertinoIcons.chevron_down,
-              size: 12,
-              color: AppColors.gray400,
-            ),
-          ],
-        ],
-      ),
-    );
-
-    if (written == null) return header;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Pressable(
-          onTap: onTap,
-          scale: 1,
-          borderRadius: BorderRadius.circular(14),
-          child: header,
-        ),
-        if (open)
-          Padding(
-            padding: EdgeInsets.fromLTRB(4, 2, 4, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final category in PeerCategory.values) ...[
-                  SizedBox(height: 14),
-                  // 평가 작성 화면과 같은 별 줄 — 여기서는 못 건드린다
-                  _StarRow(
-                    label: category.label,
-                    stars: written.stars[category] ?? 0,
-                    pointsPerStar: peerPointsPerStar(isSelf: isSelf),
-                    onChanged: (_) {},
-                    readOnly: true,
-                  ),
-                  if ((written.reasons[category] ?? '').isNotEmpty) ...[
-                    SizedBox(height: 8),
-                    Container(
-                      width: double.infinity,
-                      padding: EdgeInsets.fromLTRB(14, 12, 14, 12),
-                      decoration: BoxDecoration(
-                        color: AppColors.gray50,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        written.reasons[category]!,
-                        style: AppTextStyles.body2.copyWith(height: 1.5),
-                      ),
-                    ),
-                  ],
-                ],
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-/// 항목 다섯 개의 별 평균 — 줄에 별을 다 그리면 넘쳐서 한 숫자로 접는다
-double _average(PeerReview review) {
-  final stars = [
-    for (final category in PeerCategory.values) review.stars[category] ?? 0,
-  ];
-  return stars.reduce((a, b) => a + b) / stars.length;
 }
 
 /// 제출 현황 한 줄 — 이름·직급과 낸 건수
