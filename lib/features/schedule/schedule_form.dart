@@ -4,11 +4,22 @@ part of 'schedule_screen.dart';
 
 /// 일정 추가·수정 폼.
 /// [origin]을 주면 수정 모드가 되고, 삭제를 누르면 deleted가 켜진 값이 돌아온다.
+///
+/// **폰은 옆에서 밀려 들어오는 페이지**로 연다 — 창은 폭 440 이라 폰에 안 들어간다.
+/// PC 는 달력 위에 뜨는 창 그대로다.
 Future<Event?> showEventDialog(
   BuildContext context, {
   required DateTime date,
   Event? origin,
 }) {
+  if (!isDesktop) {
+    return Navigator.push<Event>(
+      context,
+      CupertinoPageRoute(
+        builder: (_) => _EventDialog(date: date, origin: origin),
+      ),
+    );
+  }
   return showDialog<Event>(
     context: context,
     barrierColor: Colors.black.withValues(alpha: 0.45),
@@ -66,8 +77,10 @@ class _EventDialogState extends State<_EventDialog> {
   void initState() {
     super.initState();
     _title.addListener(() => setState(() {}));
-    // 잠긴 폼에 커서를 세우면 고칠 수 있는 것처럼 보인다
-    if (!_locked) _titleFocus.requestFocus();
+    // 잠긴 폼에 커서를 세우면 고칠 수 있는 것처럼 보인다.
+    // 폰은 페이지가 밀려 들어오는 중에 키보드가 같이 올라오면 어수선해서
+    // 자동 포커스를 두지 않는다 (새 프로젝트와 같다)
+    if (!_locked && isDesktop) _titleFocus.requestFocus();
   }
 
   @override
@@ -249,9 +262,259 @@ class _EventDialogState extends State<_EventDialog> {
     );
   }
 
+  /// 창 제목 · 폰 페이지 제목 — 같은 말을 쓴다
+  String get _heading => _locked
+      ? '일정'
+      : _editing
+      ? '일정 수정'
+      : '새 일정';
+
+  /// 입력칸들 — 창이든 페이지든 같은 것이 선다
+  Widget _body() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _Field(
+          controller: _title,
+          focusNode: _titleFocus,
+          hint: '일정 이름',
+          bold: true,
+          readOnly: _locked,
+          onSubmitted: _submit,
+        ),
+        SizedBox(height: 12),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            for (final kind in Kind.values)
+              // 잠겼으면 고른 것만 남긴다 — 못 누르는 칩이 줄줄이
+              // 남아 있으면 고를 수 있는 것처럼 보인다
+              if (!_locked || kind == _kind)
+                Pressable(
+                  onTap: _tap(() => setState(() => _kind = kind)),
+                  scale: 0.96,
+                  borderRadius: BorderRadius.circular(100),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: kind == _kind
+                          ? kind.color.withValues(alpha: 0.14)
+                          : AppColors.gray50,
+                      borderRadius: BorderRadius.circular(100),
+                    ),
+                    child: Text(
+                      kind.label,
+                      style: AppTextStyles.body2.copyWith(
+                        fontSize: 13,
+                        color: kind == _kind
+                            ? kind.color
+                            : AppColors.textSecondary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+          ],
+        ),
+        SizedBox(height: 16),
+        Row(
+          children: [
+            SizedBox(width: 62, child: Text('날짜', style: AppTextStyles.label)),
+            _PickButton(
+              icon: Icons.calendar_today_rounded,
+              label: _dayLabel(_date),
+              onTap: _tap(() => _pickDate(start: true)),
+            ),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4),
+              child: Text('~', style: AppTextStyles.caption),
+            ),
+            _PickButton(
+              label: _dayLabel(_until),
+              onTap: _tap(() => _pickDate(start: false)),
+            ),
+          ],
+        ),
+        SizedBox(height: 10),
+        Row(
+          children: [
+            SizedBox(width: 62, child: Text('시간', style: AppTextStyles.label)),
+            Pressable(
+              onTap: _tap(() => setState(() => _allDay = !_allDay)),
+              scale: 0.96,
+              borderRadius: BorderRadius.circular(100),
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: _allDay ? AppColors.primaryLight : AppColors.gray50,
+                  borderRadius: BorderRadius.circular(100),
+                ),
+                child: Text(
+                  '종일',
+                  style: AppTextStyles.body2.copyWith(
+                    fontSize: 13,
+                    color: _allDay
+                        ? AppColors.primary
+                        : AppColors.textSecondary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+            if (!_allDay) ...[
+              SizedBox(width: 6),
+              _PickButton(
+                icon: Icons.schedule_rounded,
+                label: _time(_start),
+                onTap: _tap(() => _pickTime(start: true)),
+              ),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4),
+                child: Text('~', style: AppTextStyles.caption),
+              ),
+              _PickButton(
+                label: _time(_end),
+                onTap: _tap(() => _pickTime(start: false)),
+              ),
+            ],
+          ],
+        ),
+        SizedBox(height: 12),
+        _Field(controller: _place, hint: '장소 (선택)', readOnly: _locked),
+        SizedBox(height: 14),
+        Text('참석자', style: AppTextStyles.label),
+        SizedBox(height: 8),
+        ScrollBox(maxHeight: kChipBoxHeight, child: _personGrid()),
+        SizedBox(height: 14),
+        _Field(controller: _memo, hint: '메모 (선택)', lines: 2, readOnly: _locked),
+      ],
+    );
+  }
+
+  /// 아래 버튼 줄 — 삭제·결재 / 취소 · 저장
+  Widget _footer() {
+    final empty = _title.text.trim().isEmpty;
+    return Row(
+      children: [
+        // 대기 중인 신청은 삭제 대신 결재를 낸다 — 반려가 곧 지우는 것이다
+        if (_deciding) ...[
+          _TextButton(label: '반려', color: AppColors.error, onTap: _reject),
+          _TextButton(label: '승인', color: AppColors.primary, onTap: _approve),
+        ] else if (_editing && !_locked)
+          _TextButton(label: '삭제', color: AppColors.error, onTap: _delete),
+        Spacer(),
+        Pressable(
+          onTap: () => Navigator.pop(context),
+          scale: 0.97,
+          pressedColor: AppColors.gray100,
+          borderRadius: BorderRadius.circular(12),
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+          child: Text(
+            _locked ? '닫기' : '취소',
+            style: AppTextStyles.body2.copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        if (!_locked) ...[
+          SizedBox(width: 8),
+          Pressable(
+            onTap: _submit,
+            scale: 0.97,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              decoration: BoxDecoration(
+                // 이름을 적기 전에는 흐리게 — 눌러도 안내만 뜬다
+                color: empty ? AppColors.gray200 : AppColors.primary,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                _editing ? '저장' : '추가',
+                style: AppTextStyles.body2.copyWith(
+                  color: empty ? AppColors.gray500 : Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// 카드 끝에 붙는 곁버튼 — 삭제 · 결재 (폰)
+  ///
+  /// 창에서는 버튼 줄 왼쪽에 서던 것들이다. 폰은 주 동작(추가·저장)이
+  /// 아래 글래스 버튼으로 내려가서 여기가 이것들의 자리가 된다.
+  Widget? _sideActions() {
+    // 대기 중인 신청은 삭제 대신 결재를 낸다 — 반려가 곧 지우는 것이다
+    if (_deciding) {
+      return Row(
+        children: [
+          _TextButton(label: '반려', color: AppColors.error, onTap: _reject),
+          _TextButton(label: '승인', color: AppColors.primary, onTap: _approve),
+        ],
+      );
+    }
+    if (_editing && !_locked) {
+      return Row(
+        children: [
+          _TextButton(label: '삭제', color: AppColors.error, onTap: _delete),
+        ],
+      );
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final empty = _title.text.trim().isEmpty;
+    // 폰은 옆에서 밀려 들어온 페이지 — 제목은 껍데기가 그리고,
+    // 주 동작은 하단 탭바 자리의 글래스 버튼이 받는다 (새 프로젝트와 같은 틀)
+    if (!isDesktop) {
+      final side = _sideActions();
+      return PhoneDetailScaffold(
+        title: _heading,
+        // 남의 일정을 열어 본 것이면 저장할 게 없어 버튼을 안 낸다
+        bottomBar: _locked
+            ? null
+            : GlassBottomButton(
+                label: _editing ? '저장' : '추가',
+                active: _title.text.trim().isNotEmpty,
+                onPressed: _submit,
+              ),
+        child: ListView(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            PhoneDetailScaffold.topPadding,
+            20,
+            _locked
+                ? bottomBarInset(context)
+                : GlassBottomButton.inset(context),
+          ),
+          children: [
+            // 창에서는 제목 옆에 붙던 줄 — 제목이 껍데기로 가서 여기로 내린다
+            if (_locked) ...[
+              Text('만든 사람만 고칠 수 있어요', style: AppTextStyles.caption),
+              SizedBox(height: 12),
+            ],
+            // 입력칸(gray50)이 회색 배경에 묻히지 않게 흰 카드 위에 올린다
+            Container(
+              padding: EdgeInsets.fromLTRB(20, 20, 20, 22),
+              decoration: AppDecorations.card(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _body(),
+                  if (side != null) ...[SizedBox(height: 6), side],
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Container(
       width: 440,
@@ -270,14 +533,7 @@ class _EventDialogState extends State<_EventDialog> {
           children: [
             Row(
               children: [
-                Text(
-                  _locked
-                      ? '일정'
-                      : _editing
-                      ? '일정 수정'
-                      : '새 일정',
-                  style: AppTextStyles.title2,
-                ),
+                Text(_heading, style: AppTextStyles.title2),
                 if (_locked) ...[
                   SizedBox(width: 8),
                   Text('만든 사람만 고칠 수 있어요', style: AppTextStyles.caption),
@@ -285,215 +541,9 @@ class _EventDialogState extends State<_EventDialog> {
               ],
             ),
             SizedBox(height: 16),
-            Flexible(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _Field(
-                      controller: _title,
-                      focusNode: _titleFocus,
-                      hint: '일정 이름',
-                      bold: true,
-                      readOnly: _locked,
-                      onSubmitted: _submit,
-                    ),
-                    SizedBox(height: 12),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        for (final kind in Kind.values)
-                          // 잠겼으면 고른 것만 남긴다 — 못 누르는 칩이 줄줄이
-                          // 남아 있으면 고를 수 있는 것처럼 보인다
-                          if (!_locked || kind == _kind)
-                            Pressable(
-                              onTap: _tap(() => setState(() => _kind = kind)),
-                              scale: 0.96,
-                              borderRadius: BorderRadius.circular(100),
-                              child: Container(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 7,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: kind == _kind
-                                      ? kind.color.withValues(alpha: 0.14)
-                                      : AppColors.gray50,
-                                  borderRadius: BorderRadius.circular(100),
-                                ),
-                                child: Text(
-                                  kind.label,
-                                  style: AppTextStyles.body2.copyWith(
-                                    fontSize: 13,
-                                    color: kind == _kind
-                                        ? kind.color
-                                        : AppColors.textSecondary,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ),
-                      ],
-                    ),
-                    SizedBox(height: 16),
-                    Row(
-                      children: [
-                        SizedBox(
-                          width: 62,
-                          child: Text('날짜', style: AppTextStyles.label),
-                        ),
-                        _PickButton(
-                          icon: Icons.calendar_today_rounded,
-                          label: _dayLabel(_date),
-                          onTap: _tap(() => _pickDate(start: true)),
-                        ),
-                        Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 4),
-                          child: Text('~', style: AppTextStyles.caption),
-                        ),
-                        _PickButton(
-                          label: _dayLabel(_until),
-                          onTap: _tap(() => _pickDate(start: false)),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 10),
-                    Row(
-                      children: [
-                        SizedBox(
-                          width: 62,
-                          child: Text('시간', style: AppTextStyles.label),
-                        ),
-                        Pressable(
-                          onTap: _tap(() => setState(() => _allDay = !_allDay)),
-                          scale: 0.96,
-                          borderRadius: BorderRadius.circular(100),
-                          child: Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 7,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _allDay
-                                  ? AppColors.primaryLight
-                                  : AppColors.gray50,
-                              borderRadius: BorderRadius.circular(100),
-                            ),
-                            child: Text(
-                              '종일',
-                              style: AppTextStyles.body2.copyWith(
-                                fontSize: 13,
-                                color: _allDay
-                                    ? AppColors.primary
-                                    : AppColors.textSecondary,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ),
-                        if (!_allDay) ...[
-                          SizedBox(width: 6),
-                          _PickButton(
-                            icon: Icons.schedule_rounded,
-                            label: _time(_start),
-                            onTap: _tap(() => _pickTime(start: true)),
-                          ),
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 4),
-                            child: Text('~', style: AppTextStyles.caption),
-                          ),
-                          _PickButton(
-                            label: _time(_end),
-                            onTap: _tap(() => _pickTime(start: false)),
-                          ),
-                        ],
-                      ],
-                    ),
-                    SizedBox(height: 12),
-                    _Field(
-                      controller: _place,
-                      hint: '장소 (선택)',
-                      readOnly: _locked,
-                    ),
-                    SizedBox(height: 14),
-                    Text('참석자', style: AppTextStyles.label),
-                    SizedBox(height: 8),
-                    ScrollBox(maxHeight: kChipBoxHeight, child: _personGrid()),
-                    SizedBox(height: 14),
-                    _Field(
-                      controller: _memo,
-                      hint: '메모 (선택)',
-                      lines: 2,
-                      readOnly: _locked,
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            Flexible(child: SingleChildScrollView(child: _body())),
             SizedBox(height: 18),
-            Row(
-              children: [
-                // 대기 중인 신청은 삭제 대신 결재를 낸다 — 반려가 곧 지우는 것이다
-                if (_deciding) ...[
-                  _TextButton(
-                    label: '반려',
-                    color: AppColors.error,
-                    onTap: _reject,
-                  ),
-                  _TextButton(
-                    label: '승인',
-                    color: AppColors.primary,
-                    onTap: _approve,
-                  ),
-                ] else if (_editing && !_locked)
-                  _TextButton(
-                    label: '삭제',
-                    color: AppColors.error,
-                    onTap: _delete,
-                  ),
-                Spacer(),
-                Pressable(
-                  onTap: () => Navigator.pop(context),
-                  scale: 0.97,
-                  pressedColor: AppColors.gray100,
-                  borderRadius: BorderRadius.circular(12),
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-                  child: Text(
-                    _locked ? '닫기' : '취소',
-                    style: AppTextStyles.body2.copyWith(
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                if (!_locked) ...[
-                  SizedBox(width: 8),
-                  Pressable(
-                    onTap: _submit,
-                    scale: 0.97,
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        // 이름을 적기 전에는 흐리게 — 눌러도 안내만 뜬다
-                        color: empty ? AppColors.gray200 : AppColors.primary,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        _editing ? '저장' : '추가',
-                        style: AppTextStyles.body2.copyWith(
-                          color: empty ? AppColors.gray500 : Colors.white,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
+            _footer(),
           ],
         ),
       ),
