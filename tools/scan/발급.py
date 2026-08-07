@@ -77,6 +77,12 @@ with open(out, "w", encoding="utf-8") as f:
 
 # 센터 PC 에 파일을 옮길 방법이 마땅치 않다 (Git 도 USB 도 없을 수 있다).
 # scan.ps1 을 통째로 base64 로 실어서 **한 번 붙여넣으면 설치가 끝나는** 덩어리를 만든다.
+#
+# ⚠️ **바이트 그대로 실어야 한다 — scan.ps1 앞의 UTF-8 BOM 을 떼면 안 된다.**
+# Windows PowerShell 5.1 은 `.ps1` 에 BOM 이 없으면 UTF-8 이 아니라 시스템
+# 코드페이지(한국어 윈도우면 CP949)로 읽는다. 그러면 주석·로그 문구의 한글이
+# 깨지고, 깨진 바이트가 따옴표를 먹어서 **파일 전체가 파싱 에러**가 난다
+# (2026-08-07 화순점에서 실제로 겪었다 — `Try 문에 해당 Catch 블록이 없습니다`).
 here = os.path.dirname(os.path.abspath(__file__))
 script_b64 = base64.b64encode(
     open(os.path.join(here, "scan.ps1"), "rb").read()
