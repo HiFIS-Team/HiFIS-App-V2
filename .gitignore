@@ -133,3 +133,5 @@ app.*.symbols
 # 지점 출퇴근 단말 설정 — 단말 토큰이 들어 있다 (tools/scan/설치.md)
 tools/scan/config.json
 tools/scan/*.log
+tools/scan/config-*.json
+tools/scan/설치-*.ps1.txt
