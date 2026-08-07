@@ -10,7 +10,6 @@ import '../../core/api/client/token_store.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
 import '../../core/data/staff_directory.dart';
-import '../../core/util/attendance_scanner.dart';
 import '../../core/util/capture_guard.dart';
 import '../messages/chat_store.dart';
 import '../../core/util/photo_cache.dart';
@@ -72,8 +71,6 @@ class AuthSession extends ValueNotifier<bool> {
       // 방 목록도 미리 받아 둔다 — 사내톡을 한 번도 안 열면 안 읽음 배지가
       // 안 뜬다 (헤더 메시지 버튼·우하단 필의 빨간 점이 이 값을 본다)
       unawaited(ChatStore.instance.loadRooms().catchError((_) {}));
-      // 지점 PC 는 앱이 켜져 있는 동안 배경에서 출퇴근 스캐너를 듣는다
-      AttendanceScanner.start();
       value = true;
     } catch (_) {
       // 서버가 꺼져 있거나 토큰이 죽었다 — 조용히 로그인 화면부터 시작한다
@@ -113,7 +110,6 @@ class AuthSession extends ValueNotifier<bool> {
     // 전송은 REST 로 나가므로 대화가 막히지 않는다
     unawaited(ChatSocket.instance.connect());
     unawaited(ChatStore.instance.loadRooms().catchError((_) {}));
-    AttendanceScanner.start();
 
     value = true;
   }
@@ -129,7 +125,6 @@ class AuthSession extends ValueNotifier<bool> {
       // 네트워크가 없어도 로그아웃은 진행한다
     }
     await ChatSocket.instance.disconnect();
-    await AttendanceScanner.stop();
     await TokenStore.instance.clear();
     me = null;
     currentUser = null;

@@ -19,20 +19,6 @@ import '../../theme/app_shadows.dart';
 abstract final class AppToast {
   static OverlayEntry? _entry;
 
-  /// 화면 밖에서 토스트를 띄우려고 [MaterialApp] 에 걸어 두는 키
-  ///
-  /// 배경에서 도는 것들(지점 출퇴근 스캐너 등)은 `BuildContext` 가 없다.
-  static final navigatorKey = GlobalKey<NavigatorState>();
-
-  /// 화면 없이 띄운다 — 띄울 자리가 아직 없으면 조용히 넘어간다
-  ///
-  /// 로그인 화면이든 메인이든 [MaterialApp] 의 Navigator 가 들고 있는
-  /// 오버레이에 얹는다.
-  static void showGlobal(String message) {
-    final overlay = navigatorKey.currentState?.overlay;
-    if (overlay != null) _insert(overlay, message);
-  }
-
   static void show(BuildContext context, String message) {
     final overlay = Overlay.maybeOf(context, rootOverlay: true);
     if (overlay != null) _insert(overlay, message);
