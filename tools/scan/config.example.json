@@ -1,0 +1,4 @@
+{
+  "apiBase": "https://api.hifis.app",
+  "terminalToken": "여기에 발급받은 단말 토큰을 붙여 넣는다"
+}

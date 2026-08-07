@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:barcode_widget/barcode_widget.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/api/staff/attendance_api.dart';
 import '../../core/data/current_user.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/feedback/app_toast.dart';
 
 /// 출퇴근 바코드 오버레이
 ///
@@ -47,8 +51,89 @@ Future<void> showAttendanceBarcode(BuildContext context) {
   );
 }
 
-class _BarcodeOverlay extends StatelessWidget {
+class _BarcodeOverlay extends StatefulWidget {
   _BarcodeOverlay();
+
+  @override
+  State<_BarcodeOverlay> createState() => _BarcodeOverlayState();
+}
+
+class _BarcodeOverlayState extends State<_BarcodeOverlay> {
+  /// 찍혔는지 서버에 물어보는 간격
+  ///
+  /// 스캔은 **카운터 PC 에서** 일어나서 폰은 그 사실을 모른다. 푸시가 아직
+  /// 안 가므로(backend-gap 78번) 바코드를 띄우고 있는 동안만 짧게 물어본다.
+  static const _pollEvery = Duration(seconds: 2);
+
+  /// 이만큼 지나면 그만 물어본다 — 켜 둔 채 놔둬도 요청이 계속 나가면 안 된다
+  static const _pollFor = Duration(minutes: 2);
+
+  Timer? _timer;
+  DateTime? _until;
+
+  /// 열었을 때의 상태 — 이게 바뀌면 방금 찍힌 것이다
+  ({DateTime? checkIn, DateTime? checkOut})? _before;
+  bool _told = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _until = DateTime.now().add(_pollFor);
+    unawaited(_poll());
+    _timer = Timer.periodic(_pollEvery, (_) => unawaited(_poll()));
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _poll() async {
+    if (_told || DateTime.now().isAfter(_until!)) {
+      _timer?.cancel();
+      return;
+    }
+    final me = currentUser?.id;
+    if (me == null) return;
+
+    final today = DateTime.now();
+    final month = '${today.year}-${today.month.toString().padLeft(2, '0')}';
+    try {
+      final rows = await AttendanceApi.list(employeeId: me, month: month);
+      final mine = rows.where(
+        (r) =>
+            r.date.year == today.year &&
+            r.date.month == today.month &&
+            r.date.day == today.day,
+      );
+      final now = mine.isEmpty
+          ? (checkIn: null, checkOut: null)
+          : (checkIn: mine.first.checkIn, checkOut: mine.first.checkOut);
+
+      // 첫 응답은 기준값으로만 쓴다 — 어제 찍어 둔 걸 방금 찍힌 것으로
+      // 오해하면 안 된다
+      if (_before == null) {
+        _before = now;
+        return;
+      }
+      if (now == _before) return;
+
+      _told = true;
+      _timer?.cancel();
+      if (!mounted) return;
+      // **토스트를 먼저 띄우고 닫는다.** 토스트는 뿌리 오버레이에 얹히므로
+      // 이 화면이 닫혀도 그대로 떠 있다.
+      AppToast.show(
+        context,
+        now.checkOut != null && _before!.checkOut == null ? '퇴근했어요' : '출근했어요',
+      );
+      // 찍혔으면 바코드를 더 보여 줄 이유가 없다 — 알아서 닫힌다
+      Navigator.of(context).pop();
+    } catch (_) {
+      // 네트워크가 잠깐 끊긴 것뿐이다 — 다음 차례에 다시 물어본다
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

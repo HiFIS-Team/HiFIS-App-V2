@@ -16,5 +16,9 @@
 	     read-only 로 두면 저장 창은 뜨는데 쓰기에서 막힌다. -->
 	<key>com.apple.security.files.user-selected.read-write</key>
 	<true/>
+	<!-- 지점 출퇴근 스캐너(USB CDC)를 읽는다. 없으면 샌드박스가
+	     /dev/cu.usbmodem* 을 아예 못 열게 막는다. -->
+	<key>com.apple.security.device.serial</key>
+	<true/>
 </dict>
 </plist>

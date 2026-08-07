@@ -45,6 +45,7 @@ dependencies:
   image: ^4.5.4
   # 사진 크게 보기에서 사진첩에 저장 (폰만 — PC 는 file_picker 로 파일 저장)
   gal: ^2.3.3
+  flutter_libserialport: ^0.6.0
 
 dev_dependencies:
   flutter_test:

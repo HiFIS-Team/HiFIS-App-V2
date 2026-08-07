@@ -19,25 +19,50 @@ import '../../theme/app_shadows.dart';
 abstract final class AppToast {
   static OverlayEntry? _entry;
 
-  static void show(BuildContext context, String message) {
-    final old = _entry;
-    _entry = null;
-    old?.remove();
+  /// 화면 밖에서 토스트를 띄우려고 [MaterialApp] 에 걸어 두는 키
+  ///
+  /// 배경에서 도는 것들(지점 출퇴근 스캐너 등)은 `BuildContext` 가 없다.
+  static final navigatorKey = GlobalKey<NavigatorState>();
 
+  /// 화면 없이 띄운다 — 띄울 자리가 아직 없으면 조용히 넘어간다
+  ///
+  /// 로그인 화면이든 메인이든 [MaterialApp] 의 Navigator 가 들고 있는
+  /// 오버레이에 얹는다.
+  static void showGlobal(String message) {
+    final overlay = navigatorKey.currentState?.overlay;
+    if (overlay != null) _insert(overlay, message);
+  }
+
+  static void show(BuildContext context, String message) {
+    final overlay = Overlay.maybeOf(context, rootOverlay: true);
+    if (overlay != null) _insert(overlay, message);
+  }
+
+  static void _insert(OverlayState overlay, String message) {
+    _clear();
     late final OverlayEntry entry;
     entry = OverlayEntry(
       builder: (_) =>
           _ToastView(message: message, onDismissed: () => _remove(entry)),
     );
     _entry = entry;
-    Overlay.of(context, rootOverlay: true).insert(entry);
+    overlay.insert(entry);
+  }
+
+  /// 떠 있던 토스트를 치운다
+  ///
+  /// **`mounted` 를 반드시 본다.** 로그아웃하면 Navigator 가 새로 만들어지면서
+  /// 오버레이가 통째로 사라지는데, static 인 [_entry] 는 그 참조를 그대로
+  /// 들고 있다. 그대로 `remove()` 를 부르면 "이미 지운 걸 또 지운다"고
+  /// 터진다 (실제 발생 — 그 예외 때문에 토스트가 아예 안 떴다).
+  static void _clear() {
+    final old = _entry;
+    _entry = null;
+    if (old != null && old.mounted) old.remove();
   }
 
   static void _remove(OverlayEntry entry) {
-    if (_entry == entry) {
-      _entry = null;
-      entry.remove();
-    }
+    if (_entry == entry) _clear();
   }
 }
 

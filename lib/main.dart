@@ -8,6 +8,7 @@ import 'core/theme/app_theme.dart';
 import 'core/util/capture_guard.dart';
 import 'core/util/platform.dart';
 import 'core/widgets/feedback/app_loading.dart';
+import 'core/widgets/feedback/app_toast.dart';
 import 'features/auth/auth_screen.dart';
 import 'features/auth/auth_session.dart';
 import 'features/main/main_shell.dart';
@@ -74,6 +75,8 @@ class _HiFISAppState extends State<HiFISApp> with WidgetsBindingObserver {
       title: 'HiFIS',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.current,
+      // 화면 밖(배경)에서 토스트를 띄울 때 쓴다 — 지점 출퇴근 스캐너가 그렇다
+      navigatorKey: AppToast.navigatorKey,
       home: _SplashGate(),
       // 앱 전환 화면(멀티태스킹)에서는 내용 대신 마크만 보이도록
       // 비활성 상태에 가림막을 덮는다 (토스식 프라이버시 커버).
