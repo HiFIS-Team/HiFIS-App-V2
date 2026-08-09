@@ -525,15 +525,19 @@ class _MemberChip extends StatelessWidget {
   }
 }
 
-/// 참여 멤버 관리 — 직원을 눌러 넣고 뺀다
+/// 참여 멤버 관리 — 직원을 눌러 넣고 뺀 뒤 '추가' 로 확정한다
+///
+/// **고르는 동안에는 프로젝트를 안 건드린다.** 팝업 안에서만 담아 두고
+/// '추가' 를 눌러야 반영한다 — 그래야 '취소' 가 뜻이 있다.
+/// (예전에는 누르는 즉시 반영돼서 되돌릴 방법이 없었다.)
 void _showMemberManager(
   BuildContext context,
   _Project project,
   VoidCallback onChanged,
 ) {
-  // 고를 때마다 뒤 화면까지 다시 그리면 한 번 누른 게 두 번 반응한 것처럼 보인다.
-  // 팝업 안에서만 갱신하고, 닫을 때 한 번만 위로 알린다.
-  showAppDialog<void>(
+  final picked = {...project.members};
+
+  showAppDialog<bool>(
     context,
     (context) => StatefulBuilder(
       builder: (context, setLocal) => Container(
@@ -562,19 +566,11 @@ void _showMemberManager(
                   for (final staff in staffList)
                     _MemberToggleRow(
                       staff: staff,
-                      joined: project.members.contains(staff.name),
+                      joined: picked.contains(staff.name),
                       onTap: () {
                         setLocal(() {
-                          if (project.members.contains(staff.name)) {
-                            project.members.remove(staff.name);
-                            // 빠진 사람이 맡고 있던 할 일은 담당자를 비운다
-                            for (final todo in project.todos) {
-                              if (todo.assignee == staff.name) {
-                                todo.assignee = null;
-                              }
-                            }
-                          } else {
-                            project.members.add(staff.name);
+                          if (!picked.remove(staff.name)) {
+                            picked.add(staff.name);
                           }
                         });
                         HapticFeedback.selectionClick();
@@ -583,11 +579,43 @@ void _showMemberManager(
                 ],
               ),
             ),
+            SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: AppButton(
+                    label: '취소',
+                    onTap: () => Navigator.pop(context, false),
+                  ),
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: AppButton(
+                    label: '추가',
+                    filled: true,
+                    onTap: () => Navigator.pop(context, true),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
     ),
-  ).then((_) => onChanged());
+  ).then((confirmed) {
+    // 바깥을 눌러 닫으면 null 이다 — 취소와 같이 다룬다
+    if (confirmed != true) return;
+    project.members
+      ..clear()
+      ..addAll(picked);
+    // 빠진 사람이 맡고 있던 할 일은 담당자를 비운다
+    for (final todo in project.todos) {
+      if (todo.assignee case final name? when !picked.contains(name)) {
+        todo.assignee = null;
+      }
+    }
+    onChanged();
+  });
 }
 
 /// 멤버 관리 한 줄 — 오른쪽 동그라미로 참여 여부를 보여준다
