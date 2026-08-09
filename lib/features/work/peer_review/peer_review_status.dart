@@ -160,17 +160,67 @@ class _SubmissionCard extends StatelessWidget {
                   ),
                 )
               else
-                for (var i = 0; i < head.length; i++) ...[
-                  if (i > 0) Divider(height: 1, color: AppColors.divider),
-                  _SubmissionRow(
-                    row: head[i],
-                    onTap: () => _open(context, head[i].person),
+                // 조직도 카드와 같은 틀로 늘어놓는다 — 평가 대상·칭찬 목록과도 같다
+                Padding(
+                  padding: EdgeInsets.fromLTRB(4, 4, 4, 12),
+                  child: PersonGrid(
+                    children: [
+                      for (final row in head)
+                        _SubmissionCardTile(
+                          row: row,
+                          onTap: () => _open(context, row.person),
+                        ),
+                    ],
                   ),
-                ],
+                ),
             ],
           ),
         ),
       ],
+    );
+  }
+}
+
+/// 제출 현황 한 칸 (PC) — 조직도 카드와 같은 틀
+///
+/// **보여주는 값은 [_SubmissionRow] 와 같다** — 아바타(다 낸 사람은 흐리게) ·
+/// 이름 · 직급 · `0 / 13건` · 끝의 체크. 틀만 조직도 카드로 바꿨다.
+class _SubmissionCardTile extends StatelessWidget {
+  _SubmissionCardTile({required this.row, required this.onTap});
+
+  final _Submission row;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final person = row.person;
+    final complete = row.complete;
+    // 한 건도 안 낸 사람이 이 화면의 용건이라 눈에 띄게 둔다
+    final untouched = row.done == 0;
+
+    return PersonCard(
+      name: person.name,
+      color: person.color ?? avatarColorFor(person.name),
+      avatarUrl: person.avatarUrl,
+      dimmed: complete,
+      onTap: onTap,
+      subtitle: person.rank.label,
+      trailing: Icon(
+        complete ? CupertinoIcons.checkmark_circle_fill : CupertinoIcons.circle,
+        size: 16,
+        color: complete ? AppColors.success : AppColors.gray300,
+      ),
+      body: Text(
+        '${row.done} / ${row.quota}건',
+        style: AppTextStyles.body2.copyWith(
+          fontWeight: FontWeight.w700,
+          color: complete
+              ? AppColors.success
+              : untouched
+              ? AppColors.error
+              : AppColors.primary,
+        ),
+      ),
     );
   }
 }

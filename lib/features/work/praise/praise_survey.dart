@@ -100,13 +100,19 @@ class _SurveyCard extends StatelessWidget {
               ),
             )
           else
-            for (var i = 0; i < recent.length; i++) ...[
-              if (i > 0) Divider(height: 1, color: AppColors.divider),
-              _SurveyRow(
-                survey: recent[i],
-                onTap: () => _showSurveyDetail(context, recent[i]),
+            // 조직도 카드와 같은 틀 — 업무의 사람 목록은 PC 에서 다 이 모양이다
+            Padding(
+              padding: EdgeInsets.fromLTRB(4, 4, 4, 12),
+              child: PersonGrid(
+                children: [
+                  for (final survey in recent)
+                    _SurveyTile(
+                      survey: survey,
+                      onTap: () => _showSurveyDetail(context, survey),
+                    ),
+                ],
               ),
-            ],
+            ),
         ],
       ),
     );
@@ -207,6 +213,53 @@ class _SurveyCardItem extends StatelessWidget {
 }
 
 /// 설문 한 줄 — 성함 · 칭찬한 직원 · 계기 미리보기
+/// 설문 한 칸 (PC) — 조직도 카드와 같은 틀
+///
+/// **보여주는 값은 [_SurveyRow] 와 같다** — 아바타 · 이름 · 칭찬/개선 꼬리표 ·
+/// 방문 이유 · 시각. 틀만 조직도 카드로 바꿨다.
+class _SurveyTile extends StatelessWidget {
+  _SurveyTile({required this.survey, required this.onTap});
+
+  final _Survey survey;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return PersonCard(
+      name: survey.name,
+      color: survey.color,
+      onTap: onTap,
+      subtitle: _formatStamp(survey.time),
+      // 누구를 칭찬했는지 / 개선 요청만 남겼는지 한눈에
+      trailing: survey.praised.isNotEmpty || survey.improve.isNotEmpty
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (survey.praised.isNotEmpty)
+                  _SurveyTag(
+                    label: '칭찬 ${survey.praised}',
+                    color: AppColors.primary,
+                  ),
+                if (survey.improve.isNotEmpty) ...[
+                  if (survey.praised.isNotEmpty) SizedBox(width: 6),
+                  _SurveyTag(label: '개선 요청', color: AppColors.warning),
+                ],
+              ],
+            )
+          : null,
+      body: Text(
+        survey.motive,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: AppTextStyles.body2.copyWith(
+          color: AppColors.textSecondary,
+          height: 1.45,
+        ),
+      ),
+    );
+  }
+}
+
 class _SurveyRow extends StatelessWidget {
   _SurveyRow({required this.survey, required this.onTap});
 
