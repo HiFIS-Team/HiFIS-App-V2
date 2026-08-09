@@ -9,6 +9,23 @@ class _GreetingCard extends StatelessWidget {
     return '${now.month}월 ${now.day}일 ${weekdays[now.weekday - 1]}요일';
   }
 
+  /// 지금 시간에 맞는 인사말
+  ///
+  /// **시간만 본다.** 오늘 근태로 가르면 출퇴근을 안 찍는 대표·관리자가
+  /// 늘 '출근 전' 으로 잡혀서 종일 아침 인사가 뜬다.
+  ///
+  /// 화면을 다시 그릴 때마다 새로 셈한다 — 홈에 머무는 동안 시간이 넘어가면
+  /// 다음 그리기에서 저절로 바뀐다.
+  String get _greeting {
+    final hour = DateTime.now().hour;
+    if (hour < 5) return '늦은 시간까지 고생이 많아요 🌙';
+    if (hour < 11) return '좋은 아침이에요 👋';
+    if (hour < 14) return '점심 드셨나요 🍚';
+    if (hour < 18) return '오후도 힘내요 ☀️';
+    if (hour < 22) return '오늘도 고생하셨어요 🌙';
+    return '늦은 시간까지 고생이 많아요 🌙';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -20,7 +37,7 @@ class _GreetingCard extends StatelessWidget {
         children: [
           Text(_todayLabel, style: AppTextStyles.caption),
           SizedBox(height: 4),
-          Text('좋은 아침이에요 👋', style: AppTextStyles.title1),
+          Text(_greeting, style: AppTextStyles.title1),
           // 이름에만 브랜드 그라데이션 포인트
           ShaderMask(
             blendMode: BlendMode.srcIn,
