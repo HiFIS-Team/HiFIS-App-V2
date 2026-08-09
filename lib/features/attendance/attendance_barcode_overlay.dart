@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:barcode_widget/barcode_widget.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/api/client/api_exception.dart';
 import '../../core/api/staff/attendance_api.dart';
+import '../../core/data/attendance_signal.dart';
 import '../../core/data/current_user.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -75,6 +77,15 @@ class _BarcodeOverlayState extends State<_BarcodeOverlay> {
   ({DateTime? checkIn, DateTime? checkOut})? _before;
   bool _told = false;
 
+  /// 잇달아 실패한 횟수 — 한 번 튄 것으로 경고를 띄우지 않는다
+  int _failures = 0;
+
+  /// 실패를 이미 알렸나 — 2초마다 같은 말을 쌓지 않는다
+  bool _warned = false;
+
+  /// 이만큼 잇달아 실패하면 알린다 (2초 × 3 ≈ 6초)
+  static const _failuresBeforeWarn = 3;
+
   @override
   void initState() {
     super.initState();
@@ -111,6 +122,9 @@ class _BarcodeOverlayState extends State<_BarcodeOverlay> {
           ? (checkIn: null, checkOut: null)
           : (checkIn: mine.first.checkIn, checkOut: mine.first.checkOut);
 
+      // 물어보는 데 성공했다 — 실패 셈을 되돌린다
+      _failures = 0;
+
       // 첫 응답은 기준값으로만 쓴다 — 어제 찍어 둔 걸 방금 찍힌 것으로
       // 오해하면 안 된다
       if (_before == null) {
@@ -121,6 +135,9 @@ class _BarcodeOverlayState extends State<_BarcodeOverlay> {
 
       _told = true;
       _timer?.cancel();
+      // 홈의 '오늘 근무' 카드가 따라오게 알린다 — 서로 남남이라
+      // 이걸 안 보내면 찍고 홈으로 와도 한동안 '미출근' 그대로다
+      notifyAttendanceChanged();
       if (!mounted) return;
       // **토스트를 먼저 띄우고 닫는다.** 토스트는 뿌리 오버레이에 얹히므로
       // 이 화면이 닫혀도 그대로 떠 있다.
@@ -130,8 +147,14 @@ class _BarcodeOverlayState extends State<_BarcodeOverlay> {
       );
       // 찍혔으면 바코드를 더 보여 줄 이유가 없다 — 알아서 닫힌다
       Navigator.of(context).pop();
-    } catch (_) {
-      // 네트워크가 잠깐 끊긴 것뿐이다 — 다음 차례에 다시 물어본다
+    } catch (error) {
+      // 한 번 튄 것은 넘어간다 — 2초마다 묻는 자리라 흔하다.
+      // 잇달아 실패하면 **찍혔는지 확인할 수 없다는 것**을 알린다.
+      // 가만히 두면 사용자는 안 찍힌 줄도 모르고 계속 대고 있게 된다.
+      _failures++;
+      if (_warned || _failures < _failuresBeforeWarn || !mounted) return;
+      _warned = true;
+      AppToast.show(context, '${messageOf(error)} 찍혔는지 확인할 수 없어요');
     }
   }
 

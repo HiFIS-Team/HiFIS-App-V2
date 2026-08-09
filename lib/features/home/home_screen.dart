@@ -9,6 +9,7 @@ import '../../core/api/home/home_api.dart';
 import '../../core/api/project/event_api.dart';
 import '../../core/api/staff/attendance_api.dart';
 import '../../core/api/staff/payroll_api.dart';
+import '../../core/data/attendance_signal.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
 import '../../core/data/staff.dart';
@@ -106,13 +107,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // 바코드 화면이 '방금 찍혔다'고 알려 주면 바로 다시 받는다.
+    // 안 걸면 찍고 홈으로 와도 '오늘 근무' 가 한동안 미출근 그대로다
+    // (아래 [_minReloadGap] 에 막혀서 포커스를 옮겨도 안 바뀐다).
+    attendanceChanged.addListener(_reload);
     _load();
   }
 
   @override
   void dispose() {
+    attendanceChanged.removeListener(_reload);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  /// 근태가 바뀌었다는 신호 — 간격을 안 따지고 바로 받는다
+  void _reload() {
+    if (mounted) _load();
   }
 
   /// 앱을 다시 열면 다시 받는다 — 배경에 둔 사이 출퇴근이나 날짜가 바뀐다
