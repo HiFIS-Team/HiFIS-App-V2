@@ -20,9 +20,9 @@ enum InviteStatus {
 
 /// 초대키 한 장 (서버 `InviteKeyOut`)
 ///
-/// **가입할 때의 지점·직급·권한이 이 키에 박혀 있다.** 회원가입은 키에 적힌
-/// 값을 그대로 쓰므로(`branch_id=key.branch_id`), 사람을 어느 지점으로 받을지는
-/// 키를 발급할 때 정해진다.
+/// **가입할 때의 지점·직급·권한·고용 형태가 이 키에 박혀 있다.** 회원가입은 키에
+/// 적힌 값을 그대로 쓰므로(`branch_id=key.branch_id`), 사람을 어느 지점으로
+/// 받을지는 키를 발급할 때 정해진다.
 class InviteKey {
   InviteKey({
     required this.id,
@@ -30,6 +30,7 @@ class InviteKey {
     required this.branchId,
     required this.role,
     required this.rank,
+    required this.employmentType,
     required this.status,
     required this.issuedById,
     required this.expiresAt,
@@ -43,6 +44,7 @@ class InviteKey {
     branchId: json['branchId'] as String,
     role: Role.parse(json['role'] as String?),
     rank: Rank.parse(json['rank'] as String?),
+    employmentType: EmploymentType.parse(json['employmentType'] as String?),
     status: InviteStatus.parse(json['status'] as String?),
     issuedById: json['issuedById'] as String,
     expiresAt: _time(json['expiresAt']),
@@ -58,6 +60,12 @@ class InviteKey {
   final String branchId;
   final Role role;
   final Rank rank;
+
+  /// 이 키로 들어오면 정규직인가 알바인가
+  ///
+  /// 들어온 뒤 정규직으로 올리거나 퇴사시키는 건 인사 정보 변경(MASTER) 쪽이다.
+  final EmploymentType employmentType;
+
   final InviteStatus status;
   final String issuedById;
   final DateTime expiresAt;
@@ -100,6 +108,7 @@ class InviteKeyApi {
     required String branchId,
     required Role role,
     required Rank rank,
+    EmploymentType employmentType = EmploymentType.fullTime,
     String? team,
     String? code,
     DateTime? expiresAt,
@@ -110,6 +119,7 @@ class InviteKeyApi {
         'branchId': branchId,
         'role': role.wire,
         'rank': rank.wire,
+        'employmentType': employmentType.wire,
         'team': ?team,
         'code': ?code,
         'expiresAt': ?expiresAt?.toUtc().toIso8601String(),

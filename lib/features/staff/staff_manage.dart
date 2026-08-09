@@ -535,6 +535,10 @@ class _InviteKeyRow extends StatelessWidget {
                     if (branch.isNotEmpty) branch,
                     invite.rank.label,
                     invite.role.label,
+                    // 알바일 때만 붙인다 — 정규직이 대부분이라 늘 적으면
+                    // 줄만 길어지고 눈에 안 들어온다
+                    if (invite.employmentType == EmploymentType.partTime)
+                      invite.employmentType.label,
                   ].join(' · '),
                   style: AppTextStyles.caption,
                 ),
@@ -655,6 +659,7 @@ class _InviteKeyFormState extends State<_InviteKeyForm> {
   String? _branchId;
   Rank _rank = Rank.trainer;
   Role _role = Role.member;
+  EmploymentType _employment = EmploymentType.fullTime;
   bool _saving = false;
 
   Future<void> _submit() async {
@@ -669,6 +674,7 @@ class _InviteKeyFormState extends State<_InviteKeyForm> {
         branchId: branchId,
         role: _role,
         rank: _rank,
+        employmentType: _employment,
       );
       if (mounted) Navigator.pop(context, made);
     } catch (error) {
@@ -722,6 +728,18 @@ class _InviteKeyFormState extends State<_InviteKeyForm> {
             options: [for (final r in _grantableRoles) (r.wire, r.label)],
             selected: _role.wire,
             onSelect: (wire) => setState(() => _role = Role.parse(wire)),
+          ),
+          SizedBox(height: 12),
+          // 고용 형태는 **여기서만** 정할 수 있다 — 키에 박혀서 가입할 때 그대로
+          // 붙는다. 들어온 뒤 정규직으로 올리는 건 인사 정보 변경 쪽이라,
+          // 그 화면과 같은 순서(지점·직급·권한·고용 형태)로 둔다.
+          _PickerCard(
+            title: '고용 형태',
+            note: '알바는 직급과 상관없이 시급으로만 받아요',
+            options: [for (final t in EmploymentType.values) (t.wire, t.label)],
+            selected: _employment.wire,
+            onSelect: (wire) =>
+                setState(() => _employment = EmploymentType.parse(wire)),
           ),
           SizedBox(height: 20),
           AppButton(
