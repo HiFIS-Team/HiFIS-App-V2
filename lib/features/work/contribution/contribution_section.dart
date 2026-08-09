@@ -13,7 +13,6 @@ import '../../../core/theme/app_decorations.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/util/platform.dart';
 import '../../../core/widgets/display/avatar.dart';
-import '../../../core/widgets/display/progress_bar.dart';
 import '../../../core/widgets/feedback/app_dialog.dart';
 import '../../../core/widgets/feedback/app_toast.dart';
 import '../../../core/widgets/feedback/empty_card.dart';
@@ -225,8 +224,6 @@ class _ContributionSectionState extends State<ContributionSection> {
 
     return Column(
       children: [
-        _ScoreCard(items: _items, given: _givenOnly),
-        SizedBox(height: 16),
         // 항목 넷 — 무엇으로 점수가 쌓였는지
         _KindGrid(items: _items),
         if (myRole.canGrant) ...[
