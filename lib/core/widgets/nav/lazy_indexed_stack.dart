@@ -46,9 +46,14 @@ class _LazyIndexedStackState extends State<LazyIndexedStack>
     curve: PaneTransition.curve,
   );
 
-  /// 살짝 아래에서 올라오면서 나타난다 (화면 높이의 1.2% ≈ 9px)
+  /// 살짝 아래에서 올라오면서 나타난다 (화면 높이의 1.2%)
+  ///
+  /// **여기는 비율 그대로 둔다.** 사이드바는 화면을 통째로 바꾸는 자리라
+  /// 화면이 길수록 크게 움직이는 게 맞다. 화면 **안**의 판을 바꾸는
+  /// [PaneTransition] 만 픽셀로 고정했다 — 거기는 판 길이가 제각각이라
+  /// 같은 바인데 항목마다 다르게 움직였다.
   late final _slide = Tween(
-    begin: PaneTransition.beginOffset,
+    begin: const Offset(0, 0.012),
     end: Offset.zero,
   ).animate(_fade);
 
