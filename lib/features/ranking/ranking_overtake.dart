@@ -101,13 +101,21 @@ class _OvertakeCardState extends State<_OvertakeCard> {
             ],
           ),
           SizedBox(height: 12),
-          if (_loading)
-            DelayedSpinner()
-          else if (rows.isEmpty)
-            EmptyCard(
-              icon: CupertinoIcons.arrow_up_arrow_down,
-              text: '아직 순위가 바뀐 적이 없어요',
-              framed: false,
+          // 비어 있을 때는 남는 공간 가운데에 놓는다.
+          //
+          // PC 는 이 카드가 **시상대 높이에 맞춰 늘어난다**(`IntrinsicHeight` +
+          // `stretch`). 그냥 두면 아이콘이 카드 위쪽에 붙고 아래가 휑하게 남는다.
+          // **폰에서는 `Expanded` 를 쓰면 안 된다** — 높이가 안 정해진 Column 이라
+          // 터진다. 폰은 카드가 내용만큼만 크므로 원래도 문제가 없다.
+          if (_loading || rows.isEmpty)
+            _placeholder(
+              _loading
+                  ? DelayedSpinner()
+                  : EmptyCard(
+                      icon: CupertinoIcons.arrow_up_arrow_down,
+                      text: '아직 순위가 바뀐 적이 없어요',
+                      framed: false,
+                    ),
             )
           else
             for (var i = 0; i < rows.length; i++) ...[
@@ -122,6 +130,10 @@ class _OvertakeCardState extends State<_OvertakeCard> {
       ),
     );
   }
+
+  /// 비어 있을 때 들어가는 자리 — PC 는 남는 높이 가운데, 폰은 그대로
+  Widget _placeholder(Widget child) =>
+      isDesktop ? Expanded(child: Center(child: child)) : child;
 }
 
 /// 추월 한 줄 — 누가 누구를 · 얼마 차이로 · 언제
