@@ -295,7 +295,15 @@ class _StaffScreenState extends State<StaffScreen> {
                               _ => '찾는 직원이 없어요',
                             },
                           ))
-                  : Column(children: _body(list)),
+                  // **stretch 를 반드시 준다.** Column 의 가로 정렬 기본값은
+                  // 가운데라, 카드를 담은 Wrap 이 제 내용만큼만 넓어지면서
+                  // 통째로 가운데로 밀린다. 명단이 길 때는 카드가 폭을 다
+                  // 채워서 티가 안 나다가, 대표·개발자처럼 **한두 명만 남으면
+                  // 그 순간 가운데에서 시작한다** (실제로 그렇게 보였다).
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: _body(list),
+                    ),
             ),
           ],
         ),
