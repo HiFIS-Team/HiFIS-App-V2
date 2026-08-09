@@ -45,83 +45,60 @@ class _Survey {
 
 // 설문 목록(_surveys)은 위 _loadSurveys() 가 채운다.
 
-/// '전체' 탭 카드 — 최근 설문 5건과 전체 보기 버튼
+/// '전체' 탭 — 들어온 설문을 조직도 카드 틀로 전부 세운다
 class _SurveyCard extends StatelessWidget {
-  _SurveyCard({required this.onOpenAll});
-
-  final VoidCallback onOpenAll;
+  _SurveyCard();
 
   @override
   Widget build(BuildContext context) {
+    // **전체를 다 세운다** — 전체 보기를 없앴으므로 여기서 다 보여야 한다
     final sorted = _surveys;
-    final recent = sorted.take(5).toList();
 
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.fromLTRB(20, 20, 20, 10),
-      decoration: AppDecorations.card(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 4),
-            child: Row(
-              children: [
-                Text('설문 응답', style: AppTextStyles.label),
-                SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    '${sorted.length}',
-                    style: AppTextStyles.label.copyWith(
-                      color: AppColors.textTertiary,
-                    ),
-                  ),
-                ),
-                SeeAllButton(onTap: onOpenAll),
-              ],
-            ),
+    // 흰 카드로 감싸지 않는다 — 조직도처럼 머리말 선으로만 가른다
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionHeader(
+          title: '설문 응답',
+          info: Text('${sorted.length}', style: AppTextStyles.caption),
+        ),
+        Padding(
+          padding: EdgeInsets.fromLTRB(0, 8, 0, 0),
+          child: Text(
+            'QR 설문으로 들어온 응답을 사람 구분 없이 모두 보여줘요',
+            style: AppTextStyles.caption.copyWith(fontSize: 12),
           ),
+        ),
+        SizedBox(height: 14),
+        if (sorted.isEmpty)
           Padding(
-            padding: EdgeInsets.fromLTRB(4, 6, 4, 2),
+            padding: EdgeInsets.fromLTRB(0, 8, 0, 22),
             child: Text(
-              'QR 설문으로 들어온 응답을 사람 구분 없이 모두 보여줘요',
-              style: AppTextStyles.caption.copyWith(fontSize: 12),
+              '아직 들어온 설문이 없어요',
+              style: AppTextStyles.body2.copyWith(
+                color: AppColors.textTertiary,
+              ),
             ),
-          ),
-          SizedBox(height: 6),
-          if (recent.isEmpty)
-            Padding(
-              padding: EdgeInsets.fromLTRB(4, 16, 4, 22),
-              child: Text(
-                '아직 들어온 설문이 없어요',
-                style: AppTextStyles.body2.copyWith(
-                  color: AppColors.textTertiary,
+          )
+        else
+          // 조직도 카드와 같은 틀 — 업무의 사람 목록은 PC 에서 다 이 모양이다
+          PersonGrid(
+            children: [
+              for (final survey in sorted)
+                _SurveyTile(
+                  survey: survey,
+                  onTap: () => _showSurveyDetail(context, survey),
                 ),
-              ),
-            )
-          else
-            // 조직도 카드와 같은 틀 — 업무의 사람 목록은 PC 에서 다 이 모양이다
-            Padding(
-              padding: EdgeInsets.fromLTRB(4, 4, 4, 12),
-              child: PersonGrid(
-                children: [
-                  for (final survey in recent)
-                    _SurveyTile(
-                      survey: survey,
-                      onTap: () => _showSurveyDetail(context, survey),
-                    ),
-                ],
-              ),
-            ),
-        ],
-      ),
+            ],
+          ),
+      ],
     );
   }
 }
 
 /// 폰 설문 카드 — 피드백 카드와 같은 결
 ///
-/// 데스크톱은 아직 [_SurveyRow] 를 쓴다 (2단 화면이라 카드가 과하다).
+/// 데스크톱은 [_SurveyTile] — 조직도 카드와 같은 틀이다.
 class _SurveyCardItem extends StatelessWidget {
   _SurveyCardItem({required this.survey, required this.onTap});
 
@@ -212,7 +189,6 @@ class _SurveyCardItem extends StatelessWidget {
   }
 }
 
-/// 설문 한 줄 — 성함 · 칭찬한 직원 · 계기 미리보기
 /// 설문 한 칸 (PC) — 조직도 카드와 같은 틀
 ///
 /// **보여주는 값은 [_SurveyRow] 와 같다** — 아바타 · 이름 · 칭찬/개선 꼬리표 ·
@@ -260,6 +236,7 @@ class _SurveyTile extends StatelessWidget {
   }
 }
 
+/// 설문 한 줄 — 성함 · 칭찬한 직원 · 계기 미리보기 (**폰 전체 보기 전용**)
 class _SurveyRow extends StatelessWidget {
   _SurveyRow({required this.survey, required this.onTap});
 

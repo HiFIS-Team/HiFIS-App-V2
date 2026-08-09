@@ -17,6 +17,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
 import '../../core/widgets/display/avatar.dart';
 import '../../core/widgets/display/placeholder_screen.dart';
+import '../../core/widgets/display/section_header.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/feedback/empty_card.dart';

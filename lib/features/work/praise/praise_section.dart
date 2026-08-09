@@ -11,6 +11,7 @@ import '../../../core/theme/app_decorations.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/util/platform.dart';
 import '../../../core/widgets/display/person_card.dart';
+import '../../../core/widgets/display/section_header.dart';
 import '../../../core/widgets/display/progress_bar.dart';
 import '../../../core/widgets/feedback/app_dialog.dart';
 import '../../../core/widgets/feedback/app_toast.dart';
@@ -165,10 +166,7 @@ class _PraiseSectionState extends State<PraiseSection> {
         ]);
       }
 
-      return _framed([
-        SizedBox(height: 16),
-        _SurveyCard(onOpenAll: _openSurveys),
-      ]);
+      return _framed([SizedBox(height: 16), _SurveyCard()]);
     }
 
     final items = _feedbacks.where((f) => f.complaint == _complaint).toList();
@@ -229,78 +227,52 @@ class _PraiseSectionState extends State<PraiseSection> {
       SizedBox(height: 16),
       _FeedbackSummary(),
       SizedBox(height: 16),
-      Container(
-        width: double.infinity,
-        padding: EdgeInsets.fromLTRB(20, 20, 20, 10),
-        decoration: AppDecorations.card(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      // 흰 카드로 감싸지 않는다 — 조직도처럼 머리말 선으로만 가른다
+      SectionHeader(
+        title: title,
+        info: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 4),
-              child: Row(
-                children: [
-                  Text(title, style: AppTextStyles.label),
-                  SizedBox(width: 6),
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Text(
-                          '${items.length}',
-                          style: AppTextStyles.label.copyWith(
-                            color: AppColors.textTertiary,
-                          ),
-                        ),
-                        // 컴플레인은 아직 손대지 않은 건수를 같이 알려준다
-                        if (unresolved > 0) ...[
-                          SizedBox(width: 6),
-                          Text(
-                            '미처리 $unresolved',
-                            style: AppTextStyles.caption.copyWith(
-                              color: AppColors.warning,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  SeeAllButton(onTap: _openHistory),
-                ],
-              ),
-            ),
-            SizedBox(height: 8),
-            if (recent.isEmpty)
-              Padding(
-                padding: EdgeInsets.fromLTRB(4, 16, 4, 22),
-                child: Text(
-                  _complaint ? '아직 컴플레인이 없어요' : '아직 받은 칭찬이 없어요',
-                  style: AppTextStyles.body2.copyWith(
-                    color: AppColors.textTertiary,
-                  ),
+            Text('${items.length}', style: AppTextStyles.caption),
+            // 컴플레인은 아직 손대지 않은 건수를 같이 알려준다
+            if (unresolved > 0) ...[
+              SizedBox(width: 6),
+              Text(
+                '미처리 $unresolved',
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.warning,
+                  fontWeight: FontWeight.w700,
                 ),
-              )
-            else
-              // 조직도 카드와 같은 틀로 늘어놓는다 — 동료 평가 목록과도 같은 모양
-              Padding(
-                padding: EdgeInsets.fromLTRB(4, 4, 4, 12),
-                child: PersonGrid(
-                  children: [
-                    for (final feedback in recent)
-                      _FeedbackTile(
-                        feedback: feedback,
-                        onTap: () => _showFeedbackDetail(
-                          context,
-                          feedback,
-                          onChanged: () => setState(() {}),
-                        ),
-                      ),
-                  ],
+              ),
+            ],
+          ],
+        ),
+      ),
+      SizedBox(height: 16),
+      // **전체를 다 세운다** — 전체 보기를 없앴으므로 여기서 다 보여야 한다
+      if (items.isEmpty)
+        Padding(
+          padding: EdgeInsets.fromLTRB(0, 8, 0, 22),
+          child: Text(
+            _complaint ? '아직 컴플레인이 없어요' : '아직 받은 칭찬이 없어요',
+            style: AppTextStyles.body2.copyWith(color: AppColors.textTertiary),
+          ),
+        )
+      else
+        // 조직도 카드와 같은 틀 — 업무의 사람 목록은 PC 에서 다 이 모양이다
+        PersonGrid(
+          children: [
+            for (final feedback in items)
+              _FeedbackTile(
+                feedback: feedback,
+                onTap: () => _showFeedbackDetail(
+                  context,
+                  feedback,
+                  onChanged: () => setState(() {}),
                 ),
               ),
           ],
         ),
-      ),
     ]);
   }
 }

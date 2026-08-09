@@ -288,21 +288,8 @@ class _SectionHeader extends StatelessWidget {
   final int count;
 
   @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Text(
-          title,
-          style: AppTextStyles.label.copyWith(
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        SizedBox(width: 8),
-        Text('$count명', style: AppTextStyles.caption),
-        SizedBox(width: 14),
-        Expanded(child: Container(height: 1, color: AppColors.gray200)),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => SectionHeader(
+    title: title,
+    info: Text('$count명', style: AppTextStyles.caption),
+  );
 }

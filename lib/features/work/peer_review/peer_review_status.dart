@@ -122,60 +122,37 @@ class _SubmissionCard extends StatelessWidget {
       );
     }
 
-    // 카드에는 다섯 명만 — 나머지는 전체 보기에서
-    final head = rows.take(5).toList();
-
+    // 흰 카드로 감싸지 않는다 — 안에 카드가 또 들어가 층이 두 겹이 된다.
+    // 조직도처럼 머리말 선으로만 가르고 카드를 바탕 위에 바로 놓는다.
+    // **전체를 다 세운다** — 전체 보기를 없앴으므로 여기서 다 보여야 한다.
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          width: double.infinity,
-          padding: EdgeInsets.fromLTRB(20, 20, 20, 10),
-          decoration: AppDecorations.card(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 4),
-                child: Row(
-                  children: [
-                    Expanded(child: Text('제출 현황', style: AppTextStyles.label)),
-                    SeeAllButton(
-                      onTap: () => showFullPage<void>(
-                        context,
-                        (_) => _SubmissionScreen(rows: rows, reviews: reviews),
-                      ),
-                    ),
-                  ],
-                ),
+        SectionHeader(
+          title: '제출 현황',
+          info: Text('${rows.length}명', style: AppTextStyles.caption),
+        ),
+        SizedBox(height: 16),
+        if (rows.isEmpty)
+          Padding(
+            padding: EdgeInsets.fromLTRB(0, 8, 0, 22),
+            child: Text(
+              '평가 대상 인원이 없어요',
+              style: AppTextStyles.body2.copyWith(
+                color: AppColors.textTertiary,
               ),
-              SizedBox(height: 8),
-              if (rows.isEmpty)
-                Padding(
-                  padding: EdgeInsets.fromLTRB(4, 16, 4, 22),
-                  child: Text(
-                    '평가 대상 인원이 없어요',
-                    style: AppTextStyles.body2.copyWith(
-                      color: AppColors.textTertiary,
-                    ),
-                  ),
-                )
-              else
-                // 조직도 카드와 같은 틀로 늘어놓는다 — 평가 대상·칭찬 목록과도 같다
-                Padding(
-                  padding: EdgeInsets.fromLTRB(4, 4, 4, 12),
-                  child: PersonGrid(
-                    children: [
-                      for (final row in head)
-                        _SubmissionCardTile(
-                          row: row,
-                          onTap: () => _open(context, row.person),
-                        ),
-                    ],
-                  ),
+            ),
+          )
+        else
+          PersonGrid(
+            children: [
+              for (final row in rows)
+                _SubmissionCardTile(
+                  row: row,
+                  onTap: () => _open(context, row.person),
                 ),
             ],
           ),
-        ),
       ],
     );
   }

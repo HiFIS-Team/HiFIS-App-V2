@@ -1,105 +1,5 @@
 part of 'peer_review_section.dart';
 
-/// 제출 현황 전체 — 면담 준비할 때 훑어보는 목록
-class _SubmissionScreen extends StatelessWidget {
-  _SubmissionScreen({required this.rows, required this.reviews});
-
-  final List<_Submission> rows;
-
-  /// 줄을 누르면 그 사람이 쓴 평가를 여는 데 쓴다
-  final List<PeerReview> reviews;
-
-  @override
-  Widget build(BuildContext context) {
-    final done = rows.where((r) => r.complete).length;
-
-    return Scaffold(
-      backgroundColor: AppColors.surface,
-      body: Stack(
-        children: [
-          SafeArea(
-            bottom: false,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 상단 고정 타이틀 영역만큼 비워둔다
-                SizedBox(height: 56),
-                Padding(
-                  padding: EdgeInsets.fromLTRB(24, 12, 24, 12),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '${DateTime.now().month}월 동료 평가',
-                          style: AppTextStyles.caption,
-                        ),
-                      ),
-                      Text(
-                        '$done / ${rows.length}명 제출',
-                        style: AppTextStyles.caption.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(height: 1, color: AppColors.gray100),
-                Expanded(
-                  child: ListView.separated(
-                    padding: EdgeInsets.fromLTRB(
-                      20,
-                      8,
-                      20,
-                      MediaQuery.paddingOf(context).bottom + 24,
-                    ),
-                    itemCount: rows.length,
-                    separatorBuilder: (_, _) =>
-                        Divider(height: 1, color: AppColors.divider),
-                    itemBuilder: (context, index) => _SubmissionRow(
-                      row: rows[index],
-                      onTap: () => showFullPage<void>(
-                        context,
-                        (_) => _ReceivedScreen(
-                          person: rows[index].person,
-                          reviews: reviews,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // 상단 중앙 고정 타이틀 (터치는 아래로 통과)
-          IgnorePointer(
-            child: SafeArea(
-              bottom: false,
-              child: SizedBox(
-                height: 56,
-                child: Center(
-                  child: Text('제출 현황', style: AppTextStyles.title3),
-                ),
-              ),
-            ),
-          ),
-          // 좌측 상단 고정 뒤로가기 글래스 버튼
-          SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: EdgeInsets.only(top: 8, left: 16),
-              child: GlassIconButton(
-                symbol: 'chevron.backward',
-                onPressed: () => Navigator.pop(context),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 /// 한 사람이 이번 달에 **받은** 평가 — 제출 현황에서 눌러 연다
 ///
 /// 면담 자료라 **대표·관리자만** 본다 (서버가 `/peer-reviews` 를 그렇게 막아 뒀다).
@@ -257,16 +157,14 @@ class _ReceivedScreen extends StatelessWidget {
   }
 }
 
-/// 제출 현황 한 줄 — 이름·직급과 낸 건수
+/// 제출 현황 한 줄 — 이름·직급과 낸 건수 (**폰 전용**)
+///
+/// 누름은 이 줄을 감싼 카드([_SubmissionTile])가 받는다.
+/// PC 는 [_SubmissionCardTile] — 조직도 카드와 같은 틀이다.
 class _SubmissionRow extends StatelessWidget {
-  _SubmissionRow({required this.row, this.onTap});
+  _SubmissionRow({required this.row});
 
   final _Submission row;
-
-  /// 누르면 그 사람이 누구를 어떻게 평가했는지 열린다
-  ///
-  /// **null 이면 안 눌린다** — 폰은 줄이 카드 한 장이라 카드 쪽이 누름을 받는다.
-  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -340,14 +238,6 @@ class _SubmissionRow extends StatelessWidget {
       ),
     );
 
-    final tap = onTap;
-    if (tap == null) return content;
-    return Pressable(
-      onTap: tap,
-      scale: 0.98,
-      pressedColor: AppColors.gray50,
-      borderRadius: BorderRadius.circular(12),
-      child: content,
-    );
+    return content;
   }
 }

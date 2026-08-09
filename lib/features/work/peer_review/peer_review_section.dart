@@ -14,6 +14,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/util/platform.dart';
 import '../../../core/widgets/display/avatar.dart';
 import '../../../core/widgets/display/person_card.dart';
+import '../../../core/widgets/display/section_header.dart';
 import '../../../core/widgets/display/progress_bar.dart';
 import '../../../core/widgets/feedback/app_dialog.dart';
 import '../../../core/widgets/feedback/app_toast.dart';
@@ -22,7 +23,6 @@ import '../../../core/widgets/glass/glass_bottom_button.dart';
 import '../../../core/widgets/glass/glass_icon_button.dart';
 import '../../../core/widgets/input/mode_switch.dart';
 import '../../../core/widgets/input/pressable.dart';
-import '../../../core/widgets/input/see_all_button.dart';
 part 'peer_review_status.dart';
 part 'peer_review_submission.dart';
 part 'peer_review_people.dart';
@@ -222,64 +222,47 @@ class _PeerReviewSectionState extends State<PeerReviewSection> {
     }
 
     return Column(
+      // 머리말 선과 카드 판이 폭을 다 쓰게 한다 (기본값은 가운데 정렬이라
+      // 사람이 적으면 통째로 가운데로 밀린다 — 조직도에서 겪었다)
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _ReviewProgress(done: done.length, total: _targets.length),
         SizedBox(height: 16),
-        Container(
-          width: double.infinity,
-          padding: EdgeInsets.fromLTRB(20, 20, 20, 10),
-          decoration: AppDecorations.card(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 4),
-                child: Row(
-                  children: [
-                    Expanded(child: Text('평가 작성', style: AppTextStyles.label)),
-                    Text(
-                      pending.isEmpty ? '모두 마쳤어요' : '남은 ${pending.length}명',
-                      style: AppTextStyles.caption.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: pending.isEmpty
-                            ? AppColors.success
-                            : AppColors.primary,
-                      ),
-                    ),
-                  ],
-                ),
+        // 흰 카드로 감싸지 않는다 — 조직도처럼 머리말 선으로만 가른다
+        SectionHeader(
+          title: '평가 작성',
+          info: Text(
+            pending.isEmpty ? '모두 마쳤어요' : '남은 ${pending.length}명',
+            style: AppTextStyles.caption.copyWith(
+              fontWeight: FontWeight.w700,
+              color: pending.isEmpty ? AppColors.success : AppColors.primary,
+            ),
+          ),
+        ),
+        SizedBox(height: 16),
+        if (ordered.isEmpty)
+          Padding(
+            padding: EdgeInsets.fromLTRB(0, 8, 0, 22),
+            child: Text(
+              '평가할 사람이 없어요',
+              style: AppTextStyles.body2.copyWith(
+                color: AppColors.textTertiary,
               ),
-              SizedBox(height: 8),
-              if (ordered.isEmpty)
-                Padding(
-                  padding: EdgeInsets.fromLTRB(4, 16, 4, 22),
-                  child: Text(
-                    '평가할 사람이 없어요',
-                    style: AppTextStyles.body2.copyWith(
-                      color: AppColors.textTertiary,
-                    ),
-                  ),
-                )
-              else
-                // 조직도 카드와 같은 틀로 늘어놓는다 — 같은 사람을 보는 자리라
-                // 화면마다 줄 모양이 다르면 어색하다
-                Padding(
-                  padding: EdgeInsets.fromLTRB(4, 4, 4, 12),
-                  child: PersonGrid(
-                    children: [
-                      for (final person in ordered)
-                        _PersonTile(
-                          person: person,
-                          isSelf: person.id == currentUser?.id,
-                          done: _mine.containsKey(person.id),
-                          onTap: () => _openForm(person),
-                        ),
-                    ],
-                  ),
+            ),
+          )
+        else
+          // 조직도 카드와 같은 틀 — 같은 사람을 보는 자리라 결이 같아야 한다
+          PersonGrid(
+            children: [
+              for (final person in ordered)
+                _PersonTile(
+                  person: person,
+                  isSelf: person.id == currentUser?.id,
+                  done: _mine.containsKey(person.id),
+                  onTap: () => _openForm(person),
                 ),
             ],
           ),
-        ),
       ],
     );
   }
