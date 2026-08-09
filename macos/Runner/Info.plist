@@ -20,6 +20,11 @@
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<!-- Mac App Store 필수. 없으면 업로드가 통째로 거절된다
+	     (`90242 ... must contain a LSApplicationCategoryType key` — 실제로 겪었다).
+	     iOS 는 안 보는 값이라 빌드 3 까지는 몰랐다. -->
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.business</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSHumanReadableCopyright</key>
