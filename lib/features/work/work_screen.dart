@@ -246,15 +246,13 @@ class _WorkScreenState extends State<WorkScreen> {
     // 데스크톱은 넓은 화면에 밑줄 탭이 헐거워 보여서
     // 분절 토글(ModeSwitch) 스타일의 알약 탭으로 보여준다
     if (isDesktop) {
-      return Align(
-        alignment: Alignment.centerLeft,
-        child: SegmentedTabs(
-          labels: [for (final item in _items) item.label],
-          selected: _tab,
-          onSelect: (i) => setState(() => _tab = i),
-          // 왼쪽에 붙는 탭이라 글자 폭만큼만 차지한다
-          expand: false,
-        ),
+      // 랭킹과 같이 **폭을 꽉 채워 균등하게** 나눈다.
+      // 예전에는 글자 폭만큼만 잡고 왼쪽에 붙여 뒀는데, 넓은 화면에서
+      // 오른쪽이 휑하게 남아 랭킹 탭과 결이 달랐다.
+      return SegmentedTabs(
+        labels: [for (final item in _items) item.label],
+        selected: _tab,
+        onSelect: (i) => setState(() => _tab = i),
       );
     }
 
