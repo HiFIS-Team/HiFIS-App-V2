@@ -14,6 +14,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
+import '../../theme/app_shadows.dart';
 import '../../theme/app_text_styles.dart';
 
 /// 메뉴 한 줄
@@ -177,43 +178,99 @@ class _GlassMenuBody<T> extends StatelessWidget {
 
   final List<GlassMenuEntry<T>> items;
 
+  /// 유리판 모서리 — 카드(20)보다 조금 작게 잡아 떠 있는 판으로 읽히게 한다
+  static const _radius = 18.0;
+
+  /// 뒤를 흐리면서 **색을 진하게** 뽑는다 — 이게 '리퀴드 글래스'의 핵심이다
+  ///
+  /// 흐리기만 하면 뒤가 뿌연 회색으로 뭉개져서 그냥 반투명 판이 된다.
+  /// 애플 것은 흐린 뒤 채도를 올려서 밑에 깔린 색이 유리를 통해 배어 나온다.
+  static ImageFilter get _glass => ImageFilter.compose(
+    outer: ColorFilter.matrix(_saturate(1.7)),
+    inner: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+  );
+
+  /// 채도 행렬 — [amount] 가 1이면 그대로, 크면 진해진다
+  static List<double> _saturate(double amount) {
+    final r = 0.213 * (1 - amount);
+    final g = 0.715 * (1 - amount);
+    final b = 0.072 * (1 - amount);
+    return [
+      r + amount, g, b, 0, 0, //
+      r, g + amount, b, 0, 0, //
+      r, g, b + amount, 0, 0, //
+      0, 0, 0, 1, 0, //
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
+    final dark = AppColors.isDark;
     return Material(
       color: Colors.transparent,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              // 반투명이라 뒤가 비친다. 글자가 묻히지 않을 만큼만 열어 둔다
-              color: AppColors.surface.withValues(alpha: 0.86),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.gray100),
-            ),
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 6),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (final item in items)
-                    switch (item) {
-                      GlassMenuItem<T>() => _GlassMenuRow<T>(item: item),
-                      GlassMenuHeader<T>() => Padding(
-                        padding: EdgeInsets.fromLTRB(14, 7, 14, 5),
-                        child: Text(
-                          item.label,
-                          style: AppTextStyles.caption.copyWith(fontSize: 12),
-                        ),
-                      ),
-                      GlassMenuDivider<T>() => Padding(
-                        padding: EdgeInsets.symmetric(vertical: 4),
-                        child: Divider(height: 1),
-                      ),
-                    },
-                ],
+      child: DecoratedBox(
+        // 떠 있는 판이라 그림자가 있어야 뒤와 갈린다. `popup` 은 원래
+        // '메뉴·토스트·탭바' 용으로 만들어 둔 토큰인데 이 메뉴만 안 쓰고 있었다
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(_radius),
+          boxShadow: AppShadows.popup,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(_radius),
+          child: BackdropFilter(
+            filter: _glass,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                // 반투명이라 뒤가 비친다. 글자가 묻히지 않을 만큼만 열어 둔다
+                color: AppColors.surface.withValues(alpha: dark ? 0.66 : 0.74),
+                borderRadius: BorderRadius.circular(_radius),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: dark ? 0.14 : 0.6),
+                ),
+              ),
+              // 위쪽에 흰 기를 얹어 유리 모서리에 빛이 닿은 것처럼 보이게 한다.
+              // 단색 테두리만 두르면 판이 납작해 보인다.
+              // **바탕색과 한 상자에 못 넣는다** — BoxDecoration 은 color 와
+              // gradient 를 같이 주면 터진다. 그래서 층을 나눈다
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(_radius),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.white.withValues(alpha: dark ? 0.10 : 0.34),
+                      Colors.white.withValues(alpha: 0),
+                    ],
+                    stops: const [0, 0.45],
+                  ),
+                ),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 6),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (final item in items)
+                        switch (item) {
+                          GlassMenuItem<T>() => _GlassMenuRow<T>(item: item),
+                          GlassMenuHeader<T>() => Padding(
+                            padding: EdgeInsets.fromLTRB(14, 7, 14, 5),
+                            child: Text(
+                              item.label,
+                              style: AppTextStyles.caption.copyWith(
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          GlassMenuDivider<T>() => Padding(
+                            padding: EdgeInsets.symmetric(vertical: 4),
+                            child: Divider(height: 1),
+                          ),
+                        },
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
@@ -248,13 +305,20 @@ class _GlassMenuRowState<T> extends State<_GlassMenuRow<T>> {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => Navigator.pop(context, item.value),
-        child: Container(
+        child: AnimatedContainer(
+          duration: Duration(milliseconds: 110),
           height: 42,
           margin: EdgeInsets.symmetric(horizontal: 6),
           padding: EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
-            color: _hover ? AppColors.gray50 : Colors.transparent,
-            borderRadius: BorderRadius.circular(9),
+            // 고른 줄은 옅은 알약을 깔아 둔다 — 유리라 뒤가 비쳐서
+            // 글자 색만 바꾸면 어느 줄이 걸렸는지 잘 안 보인다
+            color: item.selected
+                ? AppColors.primary.withValues(alpha: 0.10)
+                : _hover
+                ? AppColors.gray100.withValues(alpha: 0.7)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(11),
           ),
           child: Row(
             children: [

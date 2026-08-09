@@ -6,6 +6,7 @@ import '../../core/api/client/api_exception.dart';
 import '../../core/api/staff/attendance_api.dart';
 import '../../core/api/staff/invite_key_api.dart';
 import '../../core/api/staff/staff_api.dart';
+import '../../core/data/branch_scope.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
 import '../../core/data/staff.dart';
@@ -63,8 +64,11 @@ class _StaffScreenState extends State<StaffScreen> {
   String _query = '';
   String _rank = _allRanks;
 
-  /// 지점은 전체로 시작한다 (내 지점만 보려면 직접 고른다)
-  String _branch = _allBranches;
+  /// 보고 있는 지점 — **헤더의 지점 아이콘이 정한다** (업무·랭킹과 같은 값)
+  ///
+  /// 예전에는 이 화면이 제 고르개를 들고 있었다. 화면마다 따로 고르는 게
+  /// 번거로워서 헤더로 옮겼다 (core/data/branch_scope.dart).
+  String get _branch => branchScopeName;
 
   /// 0 재직자 · 1 알바 · 2 퇴사자
   int _tab = 0;
@@ -77,7 +81,22 @@ class _StaffScreenState extends State<StaffScreen> {
   @override
   void initState() {
     super.initState();
+    branchScope.addListener(_onBranchScope);
     _load();
+  }
+
+  @override
+  void dispose() {
+    branchScope.removeListener(_onBranchScope);
+    super.dispose();
+  }
+
+  /// 헤더에서 지점을 바꿨다
+  ///
+  /// 직급 필터를 같이 되돌린다 — 그 지점에 없는 직급이 걸린 채로 남으면
+  /// 지점을 옮기자마자 빈 화면이 된다 (고르개가 이 화면에 있을 때와 같은 규칙).
+  void _onBranchScope() {
+    if (mounted) setState(() => _rank = _allRanks);
   }
 
   /// 못 받았다 — **목록이 비어 있을 때만** 실패 카드를 낸다.
@@ -217,24 +236,12 @@ class _StaffScreenState extends State<StaffScreen> {
             DesktopHeader(
               title: '직원',
               subtitle: '지점 구성원을 찾아보고 바로 연락해요',
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
+              // 지점 고르개는 헤더의 지점 아이콘으로 옮겼다 — 업무·랭킹과 같은
+              // 값을 보므로 화면마다 두지 않는다 (core/data/branch_scope.dart)
+              trailing: _canManageStaff
                   // 신규 입사자의 지점·직급은 초대키가 정한다 (staff_manage.dart)
-                  if (_canManageStaff) ...[
-                    _InviteButton(onTap: _openInvites),
-                    SizedBox(width: 8),
-                  ],
-                  // 지점은 한 번에 한 곳만 보므로 목록에서 골라 바꾼다
-                  _BranchPicker(
-                    selected: _branch,
-                    onSelect: (branch) => setState(() {
-                      _branch = branch;
-                      _rank = _allRanks;
-                    }),
-                  ),
-                ],
-              ),
+                  ? _InviteButton(onTap: _openInvites)
+                  : null,
             ),
             SizedBox(height: 22),
             _MyCard(branch: _branch),

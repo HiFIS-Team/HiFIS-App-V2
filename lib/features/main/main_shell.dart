@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/api/chat/chat_api.dart';
+import '../../core/data/branch_scope.dart';
 import '../../core/data/staff.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -13,6 +14,7 @@ import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/nav/android_tab_bar.dart';
 import '../../core/widgets/nav/app_tab_bar.dart';
+import '../../core/widgets/nav/branch_scope_button.dart';
 import '../../core/widgets/nav/lazy_indexed_stack.dart';
 import '../approval/approval_screen.dart';
 import '../attendance/attendance_barcode_overlay.dart';
@@ -845,6 +847,13 @@ class _HeaderButtonsState extends State<_HeaderButtons> {
               ),
             ),
           ),
+          SizedBox(width: 10),
+        ],
+        // 지점 고르개 — 조직도·업무·랭킹이 같이 보는 값이라 화면마다 두지 않고
+        // 여기 하나만 둔다. **MASTER·ADMIN 에게만, 데스크톱에서만** 뜬다
+        // (폰은 업무 화면이 제 왼쪽 위에 따로 띄운다).
+        if (desktop && branchScopeVisible) ...[
+          BranchScopeButton(enabled: !_overlayOpen),
           SizedBox(width: 10),
         ],
         _bell(),

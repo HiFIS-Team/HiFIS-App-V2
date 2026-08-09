@@ -7,6 +7,7 @@ import '../../core/api/auth/auth_api.dart';
 import '../../core/api/chat/chat_socket.dart';
 import '../../core/api/client/api_client.dart';
 import '../../core/api/client/token_store.dart';
+import '../../core/data/branch_scope.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
 import '../../core/data/staff_directory.dart';
@@ -137,6 +138,8 @@ class AuthSession extends ValueNotifier<bool> {
     PhotoCache.clear();
     // 다음 사람이 켜면 마감 모달을 다시 판단해야 한다
     resetProjectDueModal();
+    // 앞사람이 보던 지점이 다음 사람 화면에 걸려 있으면 안 된다
+    resetBranchScope();
     value = false;
   }
 }

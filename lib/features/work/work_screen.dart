@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/api/client/api_exception.dart';
 import '../../core/api/staff/staff_api.dart' show Branch;
 import '../../core/api/work/env_api.dart';
+import '../../core/data/branch_scope.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
 import '../../core/data/staff.dart';
@@ -67,15 +68,35 @@ class _WorkScreenState extends State<WorkScreen> {
 
   bool _envLoading = true;
 
+  /// 폰에서 고른 지점 — PC 는 헤더 아이콘이 정한다
+  String? _phoneBranch;
+
   /// 다섯 항목이 같이 보는 지점 — null 이면 전 지점
   ///
-  /// 고르개는 MASTER·ADMIN 에게만 있고([_BranchFilter]), 나머지는 늘 null 이다.
+  /// 고르개는 MASTER·ADMIN 에게만 있고, 나머지는 늘 null 이다.
   /// 그 둘은 서버가 본인 지점으로 고정하므로 null 이 곧 '내 지점'이 된다.
-  String? _branch;
+  ///
+  /// **PC 는 헤더의 지점 아이콘**(조직도·랭킹과 같은 값)이고,
+  /// 폰은 이 화면 왼쪽 위의 [_BranchFilter] 다.
+  String? get _branch => isDesktop ? branchScopeId : _phoneBranch;
 
   @override
   void initState() {
     super.initState();
+    branchScope.addListener(_onBranchScope);
+    _loadEnv();
+  }
+
+  @override
+  void dispose() {
+    branchScope.removeListener(_onBranchScope);
+    super.dispose();
+  }
+
+  /// 헤더에서 지점을 바꿨다 (PC)
+  void _onBranchScope() {
+    if (!mounted || !isDesktop) return;
+    setState(() => _envLoading = true);
     _loadEnv();
   }
 
@@ -84,7 +105,7 @@ class _WorkScreenState extends State<WorkScreen> {
   void _pickBranch(String? branchId) {
     if (branchId == _branch) return;
     setState(() {
-      _branch = branchId;
+      _phoneBranch = branchId;
       _envLoading = true;
     });
     _loadEnv();
@@ -261,7 +282,10 @@ class _WorkScreenState extends State<WorkScreen> {
   }
 
   /// 지점 고르개 — 볼 사람이 아니면 안 그린다
-  Widget? get _filter => _BranchFilter.visible
+  ///
+  /// **폰에만 남는다.** PC 는 헤더의 지점 아이콘이 정한다 — 조직도·랭킹과
+  /// 같은 값을 보므로 화면마다 두지 않는다 (core/data/branch_scope.dart).
+  Widget? get _filter => !isDesktop && _BranchFilter.visible
       ? _BranchFilter(branchId: _branch, onSelect: _pickBranch)
       : null;
 

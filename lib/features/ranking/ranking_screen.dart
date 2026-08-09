@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/api/client/api_exception.dart';
 import '../../core/api/work/score_api.dart';
+import '../../core/data/branch_scope.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
 import '../../core/data/staff.dart';
@@ -54,7 +55,19 @@ class _RankingScreenState extends State<RankingScreen> {
   @override
   void initState() {
     super.initState();
+    // PC 는 헤더 아이콘이 지점을 정한다 — 바뀌면 순위표를 다시 세운다
+    branchScope.addListener(_onBranchScope);
     _load();
+  }
+
+  @override
+  void dispose() {
+    branchScope.removeListener(_onBranchScope);
+    super.dispose();
+  }
+
+  void _onBranchScope() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _load() async {
@@ -66,8 +79,14 @@ class _RankingScreenState extends State<RankingScreen> {
     if (mounted) setState(() {});
   }
 
-  /// 지점은 전체로 시작한다 (내 지점만 보려면 직접 고른다)
-  String _branch = _allBranches;
+  /// 폰에서 고른 지점 — 폰은 머리말 왼쪽에 고르개가 그대로 있다
+  String _phoneBranch = _allBranches;
+
+  /// 보고 있는 지점
+  ///
+  /// **PC 는 헤더의 지점 아이콘이 정한다** (조직도·업무와 같은 값).
+  /// 폰에는 그 헤더가 없어서 화면이 제 고르개를 그대로 쓴다.
+  String get _branch => isDesktop ? branchScopeName : _phoneBranch;
 
   _Metric get _metric => _Metric.values[_tab];
 
@@ -163,7 +182,7 @@ class _RankingScreenState extends State<RankingScreen> {
         leading: _branchChoices.length > 1
             ? _PhoneBranchFilter(
                 selected: _branch,
-                onSelect: (branch) => setState(() => _branch = branch),
+                onSelect: (branch) => setState(() => _phoneBranch = branch),
               )
             : null,
         filter: _PhoneTabs(
@@ -190,10 +209,8 @@ class _RankingScreenState extends State<RankingScreen> {
             DesktopHeader(
               title: '랭킹',
               subtitle: '$_month 실적 기준으로 줄 세웠어요',
-              trailing: _BranchPicker(
-                selected: _branch,
-                onSelect: (branch) => setState(() => _branch = branch),
-              ),
+              // 지점 고르개는 헤더의 지점 아이콘으로 옮겼다 — 조직도·업무와
+              // 같은 값을 본다 (core/data/branch_scope.dart)
             ),
             SizedBox(height: 22),
             _tabs(),

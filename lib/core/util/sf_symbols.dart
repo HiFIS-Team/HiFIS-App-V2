@@ -18,6 +18,9 @@ const _icons = <String, IconData>{
   'arrow.up.left.and.arrow.down.right': Icons.open_in_full_rounded,
   'barcode.viewfinder': Icons.qr_code_scanner_rounded,
   'bell': Icons.notifications_none_rounded,
+  'building.2': Icons.apartment_rounded,
+  // 지점이 걸려 있을 때 — 안 넣으면 안드로이드·윈도우에서 빈 원이 된다
+  'building.2.fill': Icons.domain_rounded,
   'calendar': Icons.calendar_today_rounded,
   'calendar.badge.plus': Icons.edit_calendar_rounded,
   'checkmark': Icons.done_all_rounded,
