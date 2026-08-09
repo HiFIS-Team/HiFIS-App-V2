@@ -17,6 +17,7 @@ import '../../core/widgets/display/scroll_box.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/feedback/empty_card.dart';
+import '../../core/widgets/feedback/empty_state.dart';
 import '../../core/widgets/glass/glass_bottom_button.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/glass/glass_input_bar.dart';
@@ -515,39 +516,13 @@ class _EmptyDetail extends StatelessWidget {
   final _Phase phase;
 
   @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 88,
-            height: 88,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.gray200, width: 2),
-            ),
-            child: Center(
-              child: Icon(
-                Icons.folder_rounded,
-                size: 38,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ),
-          SizedBox(height: 20),
-          Text('프로젝트', style: AppTextStyles.title2),
-          SizedBox(height: 6),
-          Text(
-            phase == _Phase.running
-                ? '왼쪽에서 프로젝트를 골라주세요'
-                : '${phase.label} 프로젝트가 아직 없어요',
-            style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => EmptyState(
+    icon: Icons.folder_rounded,
+    title: '프로젝트',
+    text: phase == _Phase.running
+        ? '왼쪽에서 프로젝트를 골라주세요'
+        : '${phase.label} 프로젝트가 아직 없어요',
+  );
 }
 
 // ── 공통 조각 ──

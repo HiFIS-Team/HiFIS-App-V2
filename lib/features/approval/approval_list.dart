@@ -286,56 +286,11 @@ class _EmptyDetail extends StatelessWidget {
   final VoidCallback? onCreate;
 
   @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 88,
-            height: 88,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.gray200, width: 2),
-            ),
-            child: Center(
-              child: Icon(
-                Icons.assignment_turned_in_outlined,
-                size: 38,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ),
-          SizedBox(height: 20),
-          Text('전자결재', style: AppTextStyles.title2),
-          SizedBox(height: 6),
-          Text(
-            '${filter.label} 결재가 아직 없어요',
-            style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
-          ),
-          if (onCreate case final create?) ...[
-            SizedBox(height: 24),
-            Pressable(
-              onTap: create,
-              scale: 0.97,
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '결재 올리기',
-                  style: AppTextStyles.body2.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => EmptyState(
+    icon: Icons.assignment_turned_in_outlined,
+    title: '전자결재',
+    text: '${filter.label} 결재가 아직 없어요',
+    actionLabel: '결재 올리기',
+    onAction: onCreate,
+  );
 }

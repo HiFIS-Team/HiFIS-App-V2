@@ -322,31 +322,11 @@ class _Empty extends StatelessWidget {
             _Place.starred => '즐겨찾기한 문서가 없어요',
           };
 
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 64,
-            height: 64,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.gray50,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Icon(
-              searching ? Icons.search_rounded : Icons.folder_open_rounded,
-              size: 28,
-              color: AppColors.gray400,
-            ),
-          ),
-          SizedBox(height: 14),
-          Text(
-            text,
-            style: AppTextStyles.body2.copyWith(color: AppColors.textTertiary),
-          ),
-        ],
-      ),
+    // 판이 통째로 비는 자리라 전자결재·프로젝트와 같은 안내를 쓴다
+    return EmptyState(
+      icon: searching ? Icons.search_rounded : Icons.folder_open_rounded,
+      title: '문서함',
+      text: text,
     );
   }
 }
