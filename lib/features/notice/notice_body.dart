@@ -351,6 +351,8 @@ class _ReadCard extends StatelessWidget {
       child: FutureBuilder<NoticeReaders>(
         // 본문을 볼 때만 따로 받는다 — 목록에는 인원수(readCount)만 있으면 된다
         future: _readersOf(notice),
+        // 한 번 받아 둔 공지는 첫 프레임부터 그대로 그린다 (깜빡임 방지)
+        initialData: notice.id == null ? null : _readersData[notice.id],
         builder: (context, snapshot) {
           final data = snapshot.data;
           final people = data?.people ?? const <NoticeReader>[];
@@ -405,6 +407,14 @@ class _ReadCard extends StatelessWidget {
 /// 확인 현황 — 같은 공지를 다시 열 때 또 받지 않도록 들고 있는다
 final _readersCache = <String, Future<NoticeReaders>>{};
 
+/// 이미 받아 둔 값 — `FutureBuilder` 의 **첫 프레임**을 채우는 데 쓴다
+///
+/// 캐시(위)만으로는 깜빡임이 안 없어진다. `FutureBuilder` 는 이미 끝난
+/// Future 를 줘도 **첫 프레임은 `data == null`** 로 그린다 (마이크로태스크가
+/// 한 번 돌아야 값이 붙는다). 그래서 공지를 옮길 때마다 확인 현황 카드가
+/// 사람 알약 없이 한 번 그려졌다가 커지면서 아래가 밀렸다.
+final _readersData = <String, NoticeReaders>{};
+
 Future<NoticeReaders> _readersOf(_Notice notice) {
   final id = notice.id;
   if (id == null) {
@@ -414,10 +424,14 @@ Future<NoticeReaders> _readersOf(_Notice notice) {
   }
   // 실패한 요청은 남기지 않는다 — 캐시에 박히면 다시 열어도 영영 못 받는다
   return _readersCache[id] ??= NoticeApi.readers(id)
-    ..catchError((Object error) {
-      _readersCache.remove(id);
-      throw error;
-    });
+      .then((readers) {
+        _readersData[id] = readers;
+        return readers;
+      })
+      .catchError((Object error) {
+        _readersCache.remove(id);
+        throw error;
+      });
 }
 
 /// 확인 여부 알약 — 안 본 사람은 흐리게

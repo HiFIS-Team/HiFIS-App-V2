@@ -142,8 +142,32 @@ void _markRead(_Notice notice) {
   if (id == null || notice.read) return;
   notice.read = true;
   notice.readCount++;
-  // 확인 현황에 내가 더해졌으니 받아 둔 목록은 버린다
-  _readersCache.remove(id);
+  // 받아 둔 확인 현황에 **나만 읽은 것으로 바꿔 넣는다.**
+  //
+  // 예전에는 통째로 버렸는데, 그러면 공지를 열 때마다 다시 받게 되고 그동안
+  // 카드가 사람 알약 없이 그려졌다가 값이 오면서 커졌다 (항목을 옮길 때
+  // 깜빡이던 원인). 바뀌는 건 내 줄 하나뿐이라 여기서 고쳐 넣으면 된다.
+  final cached = _readersData[id];
+  if (cached != null) {
+    final me = currentUser?.id;
+    _readersData[id] = NoticeReaders(
+      total: cached.total,
+      readCount: cached.readCount + 1,
+      people: [
+        for (final person in cached.people)
+          if (person.employeeId == me)
+            NoticeReader(
+              employeeId: person.employeeId,
+              name: person.name,
+              avatarColor: person.avatarColor,
+              readAt: DateTime.now(),
+            )
+          else
+            person,
+      ],
+    );
+    _readersCache[id] = Future.value(_readersData[id]);
+  }
   NoticeApi.markRead(id).catchError((_) {});
 }
 
