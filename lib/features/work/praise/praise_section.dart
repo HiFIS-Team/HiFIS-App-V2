@@ -12,7 +12,6 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/util/platform.dart';
 import '../../../core/widgets/display/person_card.dart';
 import '../../../core/widgets/display/section_header.dart';
-import '../../../core/widgets/display/progress_bar.dart';
 import '../../../core/widgets/feedback/app_dialog.dart';
 import '../../../core/widgets/feedback/app_toast.dart';
 import '../../../core/widgets/feedback/empty_card.dart';
@@ -30,7 +29,9 @@ part 'praise_survey.dart';
 /// 회원 친절도 탭 콘텐츠
 ///
 /// 회원들이 남긴 칭찬과 컴플레인을 세그먼트로 나눠 본다.
-/// 카드에는 최근 5건만 보여주고, 전체 보기에서 날짜별로 모아 본다.
+///
+/// **폰**은 최근 5건만 보여주고 전체 보기에서 날짜별로 모아 본다.
+/// **PC**는 전체 보기 없이 다 세운다 (조직도와 같은 카드 판).
 class PraiseSection extends StatefulWidget {
   PraiseSection({super.key, this.branchId});
 
@@ -224,8 +225,6 @@ class _PraiseSectionState extends State<PraiseSection> {
     }
 
     return _framed([
-      SizedBox(height: 16),
-      _FeedbackSummary(),
       SizedBox(height: 16),
       // 흰 카드로 감싸지 않는다 — 조직도처럼 머리말 선으로만 가른다
       SectionHeader(
