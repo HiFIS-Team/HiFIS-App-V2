@@ -126,7 +126,7 @@ class _FilterTabs extends StatelessWidget {
 /// 아바타·이름·상태 배지 / 직급 / 별점 요약. 아직 안 한 사람은 빈 별이라
 /// **무엇이 남았는지가 한눈에 보인다.**
 ///
-/// 데스크톱은 아직 [_PersonRow] 를 쓴다 (2단 화면이라 카드가 과하다).
+/// 데스크톱은 [_PersonTile] — 조직도 카드와 같은 틀이다.
 class _PersonCard extends StatelessWidget {
   _PersonCard({
     required this.person,
@@ -279,12 +279,12 @@ class _Chip extends StatelessWidget {
   }
 }
 
-/// 사람 한 줄 — 아바타·이름·소속과 끝의 이동 화살표
+/// 평가 대상 한 칸 (PC) — 조직도 카드와 같은 틀
 ///
-/// 이미 평가한 사람은 아바타가 한 톤 흐려지고 끝에 체크가 붙는다.
-/// (눌러서 그때 쓴 내용을 다시 볼 수는 있다 — 고치지는 못한다)
-class _PersonRow extends StatelessWidget {
-  _PersonRow({
+/// **보여주는 값은 [_PersonRow] 와 같다** — 아바타(끝낸 사람은 흐리게) ·
+/// 이름 · `나` 배지 · 직급/완료 문구 · 끝의 체크. 틀만 조직도 카드로 바꿨다.
+class _PersonTile extends StatelessWidget {
+  _PersonTile({
     required this.person,
     required this.isSelf,
     required this.onTap,
@@ -298,99 +298,53 @@ class _PersonRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = person.color ?? avatarColorFor(person.name);
-
-    return Pressable(
+    return PersonCard(
+      name: person.name,
+      color: person.color ?? avatarColorFor(person.name),
+      avatarUrl: person.avatarUrl,
+      dimmed: done,
       onTap: onTap,
-      scale: 0.98,
-      pressedColor: AppColors.gray50,
-      borderRadius: BorderRadius.circular(12),
-      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 12),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: done ? color.withValues(alpha: 0.35) : color,
-              shape: BoxShape.circle,
-            ),
-            child: Text(
-              person.name.characters.first,
-              style: TextStyle(
-                fontFamily: AppTextStyles.fontFamily,
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-          ),
-          SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      person.name,
-                      style: AppTextStyles.body2.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    if (isSelf) ...[
-                      SizedBox(width: 6),
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(100),
-                        ),
-                        child: Text(
-                          '나',
-                          style: AppTextStyles.caption.copyWith(
-                            fontSize: 10,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                SizedBox(height: 2),
-                Text(
-                  done
-                      ? '평가 완료'
-                      : isSelf
-                      ? '본인 평가'
-                      : person.rank.label,
-                  style: AppTextStyles.caption.copyWith(
-                    fontSize: 11,
-                    fontWeight: done ? FontWeight.w600 : FontWeight.w400,
-                    color: done
-                        ? AppColors.success
-                        : isSelf
-                        ? AppColors.primary
-                        : AppColors.textTertiary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Icon(
-            done
-                ? CupertinoIcons.checkmark_circle_fill
-                : CupertinoIcons.chevron_right,
-            size: 16,
-            color: done ? AppColors.success : AppColors.gray300,
-          ),
-        ],
+      tag: isSelf ? _MeTag() : null,
+      subtitle: done
+          ? '평가 완료'
+          : isSelf
+          ? '본인 평가'
+          : person.rank.label,
+      subtitleColor: done
+          ? AppColors.success
+          : isSelf
+          ? AppColors.primary
+          : AppColors.textTertiary,
+      subtitleWeight: done ? FontWeight.w600 : FontWeight.w400,
+      trailing: Icon(
+        done
+            ? CupertinoIcons.checkmark_circle_fill
+            : CupertinoIcons.chevron_right,
+        size: 16,
+        color: done ? AppColors.success : AppColors.gray300,
       ),
     );
   }
+}
+
+/// 이름 옆 `나` 배지 — 줄과 카드가 같이 쓴다
+class _MeTag extends StatelessWidget {
+  _MeTag();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+    decoration: BoxDecoration(
+      color: AppColors.primary,
+      borderRadius: BorderRadius.circular(100),
+    ),
+    child: Text(
+      '나',
+      style: AppTextStyles.caption.copyWith(
+        fontSize: 10,
+        color: Colors.white,
+        fontWeight: FontWeight.w700,
+      ),
+    ),
+  );
 }

@@ -13,6 +13,7 @@ import '../../../core/theme/app_decorations.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/util/platform.dart';
 import '../../../core/widgets/display/avatar.dart';
+import '../../../core/widgets/display/person_card.dart';
 import '../../../core/widgets/display/progress_bar.dart';
 import '../../../core/widgets/feedback/app_dialog.dart';
 import '../../../core/widgets/feedback/app_toast.dart';
@@ -260,15 +261,22 @@ class _PeerReviewSectionState extends State<PeerReviewSection> {
                   ),
                 )
               else
-                for (var i = 0; i < ordered.length; i++) ...[
-                  if (i > 0) Divider(height: 1, color: AppColors.divider),
-                  _PersonRow(
-                    person: ordered[i],
-                    isSelf: ordered[i].id == currentUser?.id,
-                    done: _mine.containsKey(ordered[i].id),
-                    onTap: () => _openForm(ordered[i]),
+                // 조직도 카드와 같은 틀로 늘어놓는다 — 같은 사람을 보는 자리라
+                // 화면마다 줄 모양이 다르면 어색하다
+                Padding(
+                  padding: EdgeInsets.fromLTRB(4, 4, 4, 12),
+                  child: PersonGrid(
+                    children: [
+                      for (final person in ordered)
+                        _PersonTile(
+                          person: person,
+                          isSelf: person.id == currentUser?.id,
+                          done: _mine.containsKey(person.id),
+                          onTap: () => _openForm(person),
+                        ),
+                    ],
                   ),
-                ],
+                ),
             ],
           ),
         ),

@@ -312,6 +312,43 @@ class _FeedbackCard extends StatelessWidget {
   }
 }
 
+/// 칭찬·컴플레인 한 칸 (PC) — 조직도 카드와 같은 틀
+///
+/// **보여주는 값은 [_FeedbackRow] 와 같다** — 아바타 · 이름 · `누구에게 · 시각` ·
+/// 처리 단계(컴플레인만) · 본문. 틀만 조직도 카드로 바꿨다.
+class _FeedbackTile extends StatelessWidget {
+  _FeedbackTile({required this.feedback, required this.onTap});
+
+  final _Feedback feedback;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final showStatus = feedback.complaint && _showStatus;
+
+    return PersonCard(
+      name: feedback.name,
+      color: feedback.color,
+      onTap: onTap,
+      // 전사로 볼 때는 누구에게 온 것인지가 먼저다
+      subtitle: feedback.about == null
+          ? _formatStamp(feedback.time)
+          : '${feedback.about} · ${_formatStamp(feedback.time)}',
+      // 컴플레인만 처리 단계가 있다 — 칭찬은 배지 자리가 빈다
+      trailing: showStatus ? _StatusChip(status: feedback.status) : null,
+      body: Text(
+        feedback.text,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: AppTextStyles.body2.copyWith(
+          color: AppColors.textSecondary,
+          height: 1.45,
+        ),
+      ),
+    );
+  }
+}
+
 class _FeedbackRow extends StatelessWidget {
   _FeedbackRow({required this.feedback, required this.onTap});
 

@@ -10,6 +10,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/util/platform.dart';
+import '../../../core/widgets/display/person_card.dart';
 import '../../../core/widgets/display/progress_bar.dart';
 import '../../../core/widgets/feedback/app_dialog.dart';
 import '../../../core/widgets/feedback/app_toast.dart';
@@ -280,17 +281,23 @@ class _PraiseSectionState extends State<PraiseSection> {
                 ),
               )
             else
-              for (var i = 0; i < recent.length; i++) ...[
-                if (i > 0) Divider(height: 1, color: AppColors.divider),
-                _FeedbackRow(
-                  feedback: recent[i],
-                  onTap: () => _showFeedbackDetail(
-                    context,
-                    recent[i],
-                    onChanged: () => setState(() {}),
-                  ),
+              // 조직도 카드와 같은 틀로 늘어놓는다 — 동료 평가 목록과도 같은 모양
+              Padding(
+                padding: EdgeInsets.fromLTRB(4, 4, 4, 12),
+                child: PersonGrid(
+                  children: [
+                    for (final feedback in recent)
+                      _FeedbackTile(
+                        feedback: feedback,
+                        onTap: () => _showFeedbackDetail(
+                          context,
+                          feedback,
+                          onChanged: () => setState(() {}),
+                        ),
+                      ),
+                  ],
                 ),
-              ],
+              ),
           ],
         ),
       ),
