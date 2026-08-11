@@ -123,14 +123,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
   void _open(AppNotification item) {
     _read(item);
 
-    final target = _targetOf(item.link);
-    if (target == null) return;
-    // 프로젝트는 링크에 id 가 실려 온다 (`/projects/{id}`) — 그 프로젝트를 연다.
-    // 화면 요청보다 **먼저** 걸어야 프로젝트 화면이 뜨면서 바로 집어 간다.
-    if (target == NotificationTarget.project) {
-      requestedProjectId.value = _idOf(item.link);
-    }
-    requestedScreen.value = target;
+    if (!goToNotificationLink(item.link)) return;
     // 폰은 알림이 화면으로 밀려 올라와 있어서, 닫아야 목적지가 보인다
     if (!widget.embedded) Navigator.pop(context);
   }
@@ -287,6 +280,22 @@ enum NotificationTarget {
 
 /// 알림에서 열어달라고 요청한 화면 — `MainShell` 이 보고 탭을 옮긴다
 final requestedScreen = ValueNotifier<NotificationTarget?>(null);
+
+/// 서버가 준 링크대로 화면을 옮긴다 — 갈 데가 있었으면 true
+///
+/// **알림함과 푸시가 같이 쓴다.** 둘이 갈라지면 같은 알림을 어디서 눌렀느냐에
+/// 따라 다른 데로 가게 된다.
+bool goToNotificationLink(String? link) {
+  final target = _targetOf(link);
+  if (target == null) return false;
+  // 프로젝트는 링크에 id 가 실려 온다 (`/projects/{id}`) — 그 프로젝트를 연다.
+  // 화면 요청보다 **먼저** 걸어야 프로젝트 화면이 뜨면서 바로 집어 간다.
+  if (target == NotificationTarget.project) {
+    requestedProjectId.value = _idOf(link);
+  }
+  requestedScreen.value = target;
+  return true;
+}
 
 /// 서버 링크 → 갈 화면. 갈 데가 없으면 null (읽음 처리만 한다)
 ///

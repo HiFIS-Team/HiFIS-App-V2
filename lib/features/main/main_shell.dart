@@ -9,6 +9,7 @@ import '../../core/data/staff.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
+import '../../core/util/push.dart';
 import '../../core/util/sf_symbols.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/input/pressable.dart';
@@ -56,19 +57,32 @@ class _MainShellState extends State<MainShell> {
   void initState() {
     super.initState();
     requestedScreen.addListener(_onRequestedScreen);
+    PushGuard.tappedLink.addListener(_onPushTap);
     // 앱을 열 때 마감 임박 프로젝트를 한 장 짚어 준다.
     //
     // **여기서만 부른다** — `AppLifecycleState.resumed` 에 걸면 다른 창을 잠깐
     // 보고 돌아올 때마다 요청이 나간다 (홈에서 실제로 겪었다, macos.md 3번).
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) showProjectDueModal(context);
+      if (!mounted) return;
+      // 꺼져 있던 앱을 푸시로 켜면 셸이 뜨기 **전에** 링크가 도착해 있다
+      _onPushTap();
+      showProjectDueModal(context);
     });
   }
 
   @override
   void dispose() {
     requestedScreen.removeListener(_onRequestedScreen);
+    PushGuard.tappedLink.removeListener(_onPushTap);
     super.dispose();
+  }
+
+  /// 푸시를 눌러서 들어왔다 — 알림함에서 누른 것과 같은 곳으로 보낸다
+  void _onPushTap() {
+    final link = PushGuard.tappedLink.value;
+    if (link == null) return;
+    PushGuard.tappedLink.value = null;
+    goToNotificationLink(link);
   }
 
   /// 알림을 눌러 화면을 열어달라고 걸어 둔 요청을 처리한다.

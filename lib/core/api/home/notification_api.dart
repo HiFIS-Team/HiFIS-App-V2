@@ -93,4 +93,23 @@ class NotificationApi {
   /// 전부 읽음 처리 — 안 읽은 것만 바뀐다
   static Future<void> markAllRead() =>
       _client.post('/notifications/read-all').then((_) {});
+
+  /// 이 기기로 푸시를 보내 달라고 등록한다 — 켤 때마다 불러도 된다 (갱신만 됨)
+  ///
+  /// [sandbox] 는 애플의 **개발용 푸시 서버**를 쓰는 빌드인가다. 네이티브가
+  /// 서명에 박힌 값을 읽어 넘겨 준다 (디버그 빌드인지와 다르다).
+  static Future<void> registerDevice({
+    required String token,
+    required String platform,
+    required bool sandbox,
+  }) => _client
+      .post(
+        '/push/devices',
+        body: {'token': token, 'platform': platform, 'sandbox': sandbox},
+      )
+      .then((_) {});
+
+  /// 로그아웃할 때 지운다 — 안 지우면 이 기기로 앞사람 알림이 계속 간다
+  static Future<void> unregisterDevice(String token) =>
+      _client.delete('/push/devices/$token');
 }

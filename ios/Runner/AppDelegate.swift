@@ -1,5 +1,6 @@
 import Flutter
 import UIKit
+import UserNotifications
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
@@ -19,10 +20,25 @@ import UIKit
   /// MASTER 면 감시하지 않는다 — 켜져 있을 때만 신고가 나간다
   private var guarding = false
 
+  /// 푸시 알림 — 기기 토큰을 Dart 에 넘기고, 알림을 눌렀을 때 갈 곳을 알린다
+  private var pushChannel: FlutterMethodChannel?
+
+  /// Dart 쪽 수신 준비가 끝났는가
+  ///
+  /// 꺼져 있던 앱을 알림으로 켜면 **네이티브가 Dart 보다 먼저** 눌린 것을 안다.
+  /// 그 사이에 온 것은 [pendingLink] 에 담아 두고 준비되면 건넨다.
+  private var dartReady = false
+
+  /// 아직 Dart 에 못 넘긴 링크 (앱이 꺼져 있을 때 눌린 알림)
+  private var pendingLink: String?
+
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
+    // 눌린 알림을 받으려면 **엔진이 뜨기 전에** 잡아 둬야 한다.
+    // 여기서 안 걸면 꺼져 있던 앱을 알림으로 켰을 때 그 알림이 그냥 사라진다.
+    UNUserNotificationCenter.current().delegate = self
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
@@ -49,6 +65,8 @@ import UIKit
       }
     }
 
+    wirePush(messenger: registrar.messenger())
+
     let center = NotificationCenter.default
     center.addObserver(
       self,
@@ -74,5 +92,117 @@ import UIKit
     // 미러링·에어플레이도 여기 걸린다 — 화면이 다른 데로 나가는 건 매한가지다
     let capturing = UIScreen.screens.contains { $0.isCaptured }
     captureChannel?.invokeMethod("onCaptureChanged", arguments: capturing)
+  }
+
+  // MARK: - 푸시 알림
+
+  private func wirePush(messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(name: "com.hifis/push", binaryMessenger: messenger)
+    pushChannel = channel
+
+    channel.setMethodCallHandler { [weak self] call, result in
+      switch call.method {
+      // Dart 가 받을 준비를 마쳤다 — 그동안 담아 둔 링크를 흘려보낸다
+      case "ready":
+        self?.dartReady = true
+        self?.flushPendingLink()
+        result(nil)
+      case "register":
+        self?.requestPush(result)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+  }
+
+  /// 알림 권한을 묻고, 허락하면 애플에 기기를 등록한다
+  ///
+  /// 이미 한 번 물어본 뒤라면 시스템 창이 다시 뜨지 않는다 — 그때의 답이
+  /// 그대로 돌아온다. 그래서 로그인할 때마다 불러도 사용자에게는 조용하다.
+  private func requestPush(_ result: @escaping FlutterResult) {
+    UNUserNotificationCenter.current()
+      .requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
+        DispatchQueue.main.async {
+          // 거절해도 등록은 해 둔다 — 나중에 설정에서 켜면 바로 온다
+          UIApplication.shared.registerForRemoteNotifications()
+          result(granted)
+        }
+      }
+  }
+
+  override func application(
+    _ application: UIApplication,
+    didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+  ) {
+    super.application(
+      application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
+    let token = deviceToken.map { String(format: "%02x", $0) }.joined()
+    pushChannel?.invokeMethod(
+      "onToken",
+      arguments: ["token": token, "platform": "IOS", "sandbox": usesSandboxPush]
+    )
+  }
+
+  override func application(
+    _ application: UIApplication,
+    didFailToRegisterForRemoteNotificationsWithError error: Error
+  ) {
+    super.application(application, didFailToRegisterForRemoteNotificationsWithError: error)
+    // 시뮬레이터·기기 설정 문제 등 — 앱은 그대로 돌아간다 (앱 안 알림함은 살아 있다)
+    NSLog("푸시 등록 실패: \(error.localizedDescription)")
+  }
+
+  /// 알림을 눌렀다 — 그 알림이 가리키는 화면으로 보낸다
+  override func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    didReceive response: UNNotificationResponse,
+    withCompletionHandler completionHandler: @escaping () -> Void
+  ) {
+    deliver(link: response.notification.request.content.userInfo["link"] as? String)
+    super.userNotificationCenter(
+      center, didReceive: response, withCompletionHandler: completionHandler)
+  }
+
+  private func deliver(link: String?) {
+    guard let link, !link.isEmpty else { return }
+    guard dartReady, let channel = pushChannel else {
+      pendingLink = link
+      return
+    }
+    channel.invokeMethod("onTap", arguments: link)
+  }
+
+  private func flushPendingLink() {
+    guard let link = pendingLink else { return }
+    pendingLink = nil
+    pushChannel?.invokeMethod("onTap", arguments: link)
+  }
+
+  /// 이 빌드가 애플의 **개발용** 푸시 서버를 쓰는가
+  ///
+  /// 서버가 보낼 주소를 이 값으로 고른다 (`api.sandbox.push.apple.com` ↔
+  /// `api.push.apple.com`). 틀리면 `BadDeviceToken` 으로 조용히 안 간다.
+  ///
+  /// **디버그 빌드인지로 가르면 틀린다** — 폰에 까는 `flutter run --release`
+  /// 도 개발 서명이라 sandbox 토큰이다. 그래서 서명에 실제로 박힌
+  /// `aps-environment` 를 읽는다.
+  private var usesSandboxPush: Bool {
+    guard
+      let url = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision"),
+      let data = try? Data(contentsOf: url),
+      // 서명 봉투(DER) 안에 plist 가 통째로 들어 있다 — 그 구간만 잘라 낸다
+      let text = String(data: data, encoding: .isoLatin1),
+      let start = text.range(of: "<?xml"),
+      let end = text.range(of: "</plist>"),
+      let plist = String(text[start.lowerBound..<end.upperBound]).data(using: .isoLatin1),
+      let root = try? PropertyListSerialization.propertyList(from: plist, format: nil)
+        as? [String: Any],
+      let entitlements = root["Entitlements"] as? [String: Any],
+      let environment = entitlements["aps-environment"] as? String
+    else {
+      // 프로필이 없으면 앱스토어에서 받은 빌드다 — 운영 주소가 맞다
+      return false
+    }
+    return environment == "development"
   }
 }

@@ -12,6 +12,7 @@ import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
 import '../../core/data/staff_directory.dart';
 import '../../core/util/capture_guard.dart';
+import '../../core/util/push.dart';
 import '../messages/chat_store.dart';
 import '../../core/util/photo_cache.dart';
 import '../project/project_screen.dart' show resetProjectDueModal;
@@ -63,6 +64,8 @@ class AuthSession extends ValueNotifier<bool> {
       email = me!.email;
       // 권한을 알게 됐으니 캡처 방지를 그 사람 기준으로 맞춘다
       unawaited(CaptureGuard.apply());
+      // 이 기기로 푸시를 받겠다고 서버에 알린다 — 켤 때마다 불러도 된다
+      unawaited(PushGuard.register());
       await StaffDirectory.instance.load();
       // 사내톡은 화면을 열 때가 아니라 로그인해 있는 동안 늘 붙어 있다 —
       // 목록 화면에서 안 연 방의 새 메시지도 받아야 한다.
@@ -101,6 +104,7 @@ class AuthSession extends ValueNotifier<bool> {
     me = result.employee;
     currentUser = me;
     unawaited(CaptureGuard.apply());
+    unawaited(PushGuard.register());
     await StaffDirectory.instance.load();
 
     final prefs = await SharedPreferences.getInstance();
@@ -120,6 +124,9 @@ class AuthSession extends ValueNotifier<bool> {
   /// 서버에도 알려 이 계정의 기존 토큰을 전부 무효화한다. 서버가 응답하지
   /// 않아도 기기에서는 반드시 로그아웃되어야 하므로 실패는 무시한다.
   Future<void> signOut() async {
+    // **토큰을 지우기 전에** 부른다 — 이 요청도 로그인 상태여야 나간다.
+    // 안 지우면 이 기기로 앞사람 알림이 계속 간다.
+    await PushGuard.unregister();
     try {
       await AuthApi.logout();
     } catch (_) {

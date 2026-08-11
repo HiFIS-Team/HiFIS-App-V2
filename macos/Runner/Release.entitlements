@@ -10,5 +10,9 @@
 	<!-- 문서함: 올릴 파일 고르기(읽기) + 내려받아 저장하기(쓰기) -->
 	<key>com.apple.security.files.user-selected.read-write</key>
 	<true/>
+	<!-- 푸시 알림. 배포 빌드는 운영 서버를 쓴다 (DebugProfile 은 development).
+	     **키 이름이 iOS 와 다르다** — macOS 는 `com.apple.developer.` 가 붙는다 -->
+	<key>com.apple.developer.aps-environment</key>
+	<string>production</string>
 </dict>
 </plist>

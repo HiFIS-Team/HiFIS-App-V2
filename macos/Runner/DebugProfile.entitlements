@@ -16,5 +16,11 @@
 	     read-only 로 두면 저장 창은 뜨는데 쓰기에서 막힌다. -->
 	<key>com.apple.security.files.user-selected.read-write</key>
 	<true/>
+	<!-- 푸시 알림. 개발 빌드는 애플의 **개발용** 서버를 쓴다
+	     (Release.entitlements 는 production).
+	     **키 이름이 iOS 와 다르다** — iOS 는 `aps-environment`, macOS 는
+	     `com.apple.developer.` 가 앞에 붙는다. 틀리면 서명에서 조용히 빠진다. -->
+	<key>com.apple.developer.aps-environment</key>
+	<string>development</string>
 </dict>
 </plist>

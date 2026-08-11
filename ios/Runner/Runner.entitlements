@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- 푸시 알림. `development` 로 두는 것이 맞다 — 배포용으로 내보낼 때
+	     Xcode 가 `production` 으로 바꿔 준다. 여기에 production 을 박아 두면
+	     `flutter run --release` (개발 서명) 가 서명에서 막힌다. -->
+	<key>aps-environment</key>
+	<string>development</string>
+</dict>
+</plist>

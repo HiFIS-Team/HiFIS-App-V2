@@ -39,6 +39,11 @@ class MainFlutterWindow: NSWindow {
       }
     }
 
+    // 푸시는 창이 아니라 **앱**에 오므로 AppDelegate 가 받는다.
+    // 채널을 만들 수 있는 건 엔진을 든 이 쪽이라 여기서 건네준다.
+    (NSApp.delegate as? AppDelegate)?
+      .wirePush(messenger: flutterViewController.engine.binaryMessenger)
+
     super.awakeFromNib()
   }
 }
