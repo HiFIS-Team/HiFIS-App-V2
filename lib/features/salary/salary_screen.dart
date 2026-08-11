@@ -71,8 +71,13 @@ class _SalaryScreenState extends State<SalaryScreen> {
       if (_isPayBoss) {
         // 결재 대기(제출됨)가 먼저, 그다음 지급 대기(승인됨).
         // 대표·관리자는 자기 급여를 낼 일이 없어서 화면 전체가 이 사람들 것이다.
-        final waiting = await PayrollApi.box('inbox');
-        final handled = await PayrollApi.box('decided');
+        // 두 함은 서로 상관없어서 한 번에 던진다 (하나씩 기다리면 왕복이 두 배)
+        final boxes = await Future.wait([
+          PayrollApi.box('inbox'),
+          PayrollApi.box('decided'),
+        ]);
+        final waiting = boxes[0];
+        final handled = boxes[1];
         _inbox = [
           ...waiting,
           for (final p in handled)

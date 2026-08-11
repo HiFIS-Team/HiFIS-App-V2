@@ -223,23 +223,44 @@ final _todayStaff = <Employee>[];
 ///
 /// 달력이 앞뒤 달을 넘겨볼 수 있어야 해서 이번 달과 지난달을 같이 받는다.
 /// 월차는 기간 필터가 없어 통째로 받아 둔다.
+///
+/// **일곱 개를 한 번에 던진다.** 서로 상관없는 요청인데 `await` 로 하나씩
+/// 기다리면 왕복 시간이 그대로 더해진다 — 운영 서버가 요청당 0.2~0.7초라
+/// 이 화면 첫 로딩만 몇 초씩 걸렸다 (제일 오래 걸리는 화면이었다).
 Future<void> _loadAttendance() async {
   final now = DateTime.now();
+  final thisMonth = _monthKey(now);
+
+  // 전사 기록도 같이 던지므로 받아 둔 것을 **먼저** 비운다
+  _roster.clear();
+
+  final got = await Future.wait<Object?>([
+    AttendanceApi.calendar(month: _monthKey(DateTime(now.year, now.month - 1))),
+    AttendanceApi.calendar(month: thisMonth),
+    AttendanceApi.leaves(employeeId: currentUser?.id),
+    AttendanceApi.balance(),
+    // 남이 낸 신청은 결재할 수 있는 사람만 받는다 (지점 제한은 서버가 건다)
+    if (_canSeeLeaveInbox)
+      AttendanceApi.leaves(status: LeaveStatus.pending)
+    else
+      Future.value(const <LeaveRequest>[]),
+    // 대표 화면의 '오늘 근무' 판 — 명단에 오늘 판정이 얹혀 온다
+    if (_isBoss) StaffApi.list() else Future.value(const <Employee>[]),
+    if (_isBoss)
+      AttendanceApi.roster(month: thisMonth)
+    else
+      Future.value(const <AttendanceRosterDay>[]),
+  ]);
 
   final days = <AttendanceDay>[
-    ...await AttendanceApi.calendar(
-      month: _monthKey(DateTime(now.year, now.month - 1)),
-    ),
-    ...await AttendanceApi.calendar(month: _monthKey(now)),
+    ...got[0] as List<AttendanceDay>,
+    ...got[1] as List<AttendanceDay>,
   ];
-  final leaves = await AttendanceApi.leaves(employeeId: currentUser?.id);
-  final balance = await AttendanceApi.balance();
-  // 남이 낸 신청은 결재할 수 있는 사람만 받는다 (지점 제한은 서버가 건다)
-  final inbox = _canSeeLeaveInbox
-      ? await AttendanceApi.leaves(status: LeaveStatus.pending)
-      : const <LeaveRequest>[];
-  // 대표 화면의 '오늘 근무' 판 — 명단에 오늘 판정이 얹혀 온다
-  final staff = _isBoss ? await StaffApi.list() : const <Employee>[];
+  final leaves = got[2] as List<LeaveRequest>;
+  final balance = got[3] as LeaveBalance;
+  final inbox = got[4] as List<LeaveRequest>;
+  final staff = got[5] as List<Employee>;
+  final roster = got[6] as List<AttendanceRosterDay>;
 
   _balance = balance;
 
@@ -268,8 +289,7 @@ Future<void> _loadAttendance() async {
       ),
     );
 
-  _roster.clear();
-  await _loadRoster(_monthKey(now));
+  if (_isBoss) _roster[thisMonth] = roster;
 }
 
 /// 대표 달력이 쓰는 전사 기록 — 달마다 한 번씩 받아 둔다 (키는 `2026-08`)

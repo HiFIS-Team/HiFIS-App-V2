@@ -1020,9 +1020,14 @@ final _projects = <Project>[];
 
 Future<void> _loadNotes() async {
   // 회의록과 같이 받는다 — 걸린 프로젝트 **이름**을 읽을 때도 써서
-  // 고르개를 열 때 받으면 안 고치는 사람에게는 이름이 안 뜬다
-  final rows = await MeetingApi.list();
-  final projects = await ProjectApi.list();
+  // 고르개를 열 때 받으면 안 고치는 사람에게는 이름이 안 뜬다.
+  // 서로 상관없는 요청이라 한 번에 던진다 (하나씩 기다리면 왕복이 두 배다)
+  final got = await Future.wait<Object?>([
+    MeetingApi.list(),
+    ProjectApi.list(),
+  ]);
+  final rows = got[0] as List<Meeting>;
+  final projects = got[1] as List<Project>;
   _notes
     ..clear()
     ..addAll([for (final row in rows) _fromServer(row)]);
