@@ -33,22 +33,41 @@ List<_BreakdownLine> _breakdownOf(_Ranker r) => [
 
 /// 점수 내역 카드 — PC 는 순위표 옆에, 폰은 아래에서 올라오는 시트 안에 놓인다
 class _ScoreBreakdown extends StatelessWidget {
-  _ScoreBreakdown({required this.ranker, this.onClose});
+  _ScoreBreakdown({required this.ranker, this.onClose, this.sheet = false});
 
   final _Ranker ranker;
 
   /// PC 에서 판을 닫는 X. 폰 시트는 밖을 눌러 닫으므로 안 준다.
   final VoidCallback? onClose;
 
+  /// 폰 시트 안인가 — 시트가 곧 면이라 카드 껍데기를 두르지 않고
+  /// 대신 위에 쓸어내릴 손잡이를 둔다
+  final bool sheet;
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.fromLTRB(16, 16, 16, 10),
-      decoration: AppDecorations.card(radius: 20),
+      padding: sheet
+          ? EdgeInsets.fromLTRB(20, 8, 20, 4)
+          : EdgeInsets.fromLTRB(16, 16, 16, 10),
+      decoration: sheet ? null : AppDecorations.card(radius: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (sheet) ...[
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.gray300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            SizedBox(height: 16),
+          ],
           Row(
             children: [
               Avatar(name: ranker.name, size: 32),
@@ -90,6 +109,8 @@ class _ScoreBreakdown extends StatelessWidget {
             _BreakdownRow(line: line),
             SizedBox(height: 2),
           ],
+          // 시트는 화면 아래 끝에 붙는다 — 홈 인디케이터 자리를 비워 준다
+          if (sheet) SizedBox(height: MediaQuery.paddingOf(context).bottom + 8),
         ],
       ),
     );
@@ -144,51 +165,6 @@ class _BreakdownRow extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// 폰에서 아래에 붙는 점수 내역 바
-///
-/// **모달이 아니다.** 예전에는 `showModalBottomSheet` 로 띄워서 뒤가 어두워지고
-/// 순위표가 멈췄는데, 순위를 훑어보면서 열어 보는 자리라 화면 안에서
-/// 미끄러져 올라오는 편이 맞다. 열어 둔 채로 목록을 그대로 스크롤할 수 있다.
-///
-/// 접힐 때도 안이 채워진 채로 내려가야 해서 [ranker] 는 마지막 사람을 들고 있고
-/// [shown] 만 오르내림을 정한다.
-class _BreakdownBar extends StatelessWidget {
-  _BreakdownBar({required this.ranker, required this.shown, this.onClose});
-
-  final _Ranker? ranker;
-  final bool shown;
-  final VoidCallback? onClose;
-
-  @override
-  Widget build(BuildContext context) {
-    final person = ranker;
-    if (person == null) return SizedBox.shrink();
-
-    return Positioned(
-      left: 0,
-      right: 0,
-      // 하단바를 가리지 않는 자리까지만 올라온다
-      bottom: bottomBarInset(context) - 8,
-      child: IgnorePointer(
-        ignoring: !shown,
-        child: AnimatedSlide(
-          offset: shown ? Offset.zero : Offset(0, 1.2),
-          duration: Duration(milliseconds: 260),
-          curve: shown ? Curves.easeOutCubic : Curves.easeInCubic,
-          child: AnimatedOpacity(
-            opacity: shown ? 1 : 0,
-            duration: Duration(milliseconds: shown ? 160 : 200),
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: _ScoreBreakdown(ranker: person, onClose: onClose),
-            ),
-          ),
-        ),
       ),
     );
   }
