@@ -374,9 +374,19 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 ] else ...[
                   SizedBox(height: 16),
                   // 있을 때만 그린다 — 빈 상태 문구는 원래 자리 그대로다
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                  //
+                  // 인스타처럼 **한 줄에 3칸**. 칸 크기를 고정하지 않고 폭을
+                  // 3등분하므로 기기 폭이 달라도 줄당 개수가 안 바뀐다
+                  // (`Wrap` + 고정 88 이던 때는 폭에 따라 3개도 4개도 됐다).
+                  GridView.count(
+                    // 바깥 ListView 안에 있으므로 자기 높이만 차지하고
+                    // 따로 스크롤하지 않는다
+                    shrinkWrap: true,
+                    physics: NeverScrollableScrollPhysics(),
+                    padding: EdgeInsets.zero,
+                    crossAxisCount: 3,
+                    mainAxisSpacing: 8,
+                    crossAxisSpacing: 8,
                     children: [
                       for (final url in _shared[_shareTab])
                         _SharedThumb(url: url, photo: _shareTab == 0),
@@ -429,10 +439,9 @@ class _SharedThumb extends StatelessWidget {
     if (photo) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(10),
+        // 크기를 안 준다 — 격자 칸이 정해 주는 대로 채운다
         child: Image.network(
           fileUrl(url),
-          width: 88,
-          height: 88,
           fit: BoxFit.cover,
           errorBuilder: (_, _, _) => _box(),
         ),
@@ -442,8 +451,6 @@ class _SharedThumb extends StatelessWidget {
   }
 
   Widget _box() => Container(
-    width: 88,
-    height: 88,
     padding: EdgeInsets.all(8),
     alignment: Alignment.center,
     decoration: BoxDecoration(
