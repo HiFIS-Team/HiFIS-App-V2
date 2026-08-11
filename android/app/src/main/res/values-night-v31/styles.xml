@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 다크 모드 + Android 12(API 31)+ 런치 테마.
+
+     **이 폴더가 없으면 다크 모드에서만 설정이 안 먹는다.** 리소스 우선순위가
+     야간 모드(night) > 플랫폼 버전(v31) 이라, 다크 모드 기기에서는
+     values-v31 이 아니라 values-night 이 뽑힌다. 그래서 둘을 겹친 폴더를
+     따로 둔다.
+
+     내용은 values-v31 과 같다 — 앱에 다크 테마가 없어서 런치도 흰색이다. -->
+<resources>
+    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+        <item name="android:windowSplashScreenBackground">@android:color/white</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/launch_splash_icon</item>
+    </style>
+</resources>

@@ -1,12 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Modify this file to customize your launch splash screen -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="?android:colorBackground" />
+<!-- 런치 스크린 — iOS 와 같은 계보다.
 
-    <!-- You can insert your own image assets here -->
-    <!-- <item>
+     마크를 **높이 110dp** 로 두고 폭은 마크 비율을 따라간다
+     (drawable-*/launch_mark.png 는 밀도별로 그 크기에 맞춰 만들어 둔 것이다).
+     앱이 뜨자마자 나오는 AppLoading(size: 110) 과 크기·위치가 같아야
+     런치 스크린에서 앱으로 넘어갈 때 마크가 안 튄다.
+
+     배경은 다크 모드여도 **흰색 고정**이다. 앱에 다크 테마가 없어서
+     ?android:colorBackground 를 쓰면 런치만 검게 떴다가 흰 앱으로 넘어간다.
+     마크도 색이 들어간 그림이라 검은 바탕에서는 안 보인다. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@android:color/white" />
+
+    <item>
         <bitmap
             android:gravity="center"
-            android:src="@mipmap/launch_image" />
-    </item> -->
+            android:src="@drawable/launch_mark" />
+    </item>
 </layer-list>

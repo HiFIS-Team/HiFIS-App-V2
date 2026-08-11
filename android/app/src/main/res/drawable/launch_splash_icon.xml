@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+ 시스템 스플래시의 아이콘 자리를 비워 두는 투명 그림.
+
+     Android 12 부터는 앱이 뜨기 전에 OS 가 먼저 스플래시를 그리는데, 아무것도
+     안 정해 두면 **앱 아이콘(ic_launcher)을 제 고정 크기로** 띄운다.
+     그 자리는 지름 160dp 원 안에 들어가야 해서, 우리 마크(211×110dp)를
+     넣으면 양 끝이 잘린다. 그래서 크기를 맞출 수가 없다.
+
+     아이콘 자리를 비우면 흰 화면으로 시작해 곧바로 launch_background 의
+     마크(110dp)로 이어진다 — 크기가 한 번도 안 바뀐다.
+     이걸 안 두면 **작은 아이콘 → 110 마크**로 확 커진다 (실제로 그랬다). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@android:color/transparent" />
+</shape>
