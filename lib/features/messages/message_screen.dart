@@ -114,6 +114,9 @@ class _MessageScreenState extends State<MessageScreen> {
   /// 안 읽은 대화만 볼지 — 헤더 필터 메뉴에서 켠다
   bool _unreadOnly = false;
 
+  /// 하단 검색바에 친 말 — **방 이름만** 본다 (대화 내용은 안 뒤진다)
+  String _query = '';
+
   /// 고른 항목 처리 — 네이티브 메뉴와 폴백 메뉴가 같이 쓴다
   void _pick(String? value) {
     switch (value) {
@@ -231,12 +234,16 @@ class _MessageScreenState extends State<MessageScreen> {
   @override
   Widget build(BuildContext context) {
     final rooms = _store.rooms;
-    final shown = _unreadOnly
-        ? [
-            for (final room in rooms)
-              if (room.unreadCount > 0) room,
-          ]
-        : rooms;
+    // 이름 비교는 목록 카드가 그리는 값([chatRoomTitle])으로 한다 — DM 은 방
+    // 이름이 null 이라 `room.name` 을 보면 상대 이름으로 못 찾는다.
+    final needle = _query.toLowerCase();
+    final shown = [
+      for (final room in rooms)
+        if ((!_unreadOnly || room.unreadCount > 0) &&
+            (needle.isEmpty ||
+                chatRoomTitle(room).toLowerCase().contains(needle)))
+          room,
+    ];
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -339,7 +346,12 @@ class _MessageScreenState extends State<MessageScreen> {
                   children: [
                     // 연필이 앉을 자리만 비워 둔다 (52 + 간격 10)
                     SizedBox(width: 62),
-                    Expanded(child: _FloatingSearchBar()),
+                    Expanded(
+                      child: _FloatingSearchBar(
+                        onChanged: (value) =>
+                            setState(() => _query = value.trim()),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -366,7 +378,13 @@ class _MessageScreenState extends State<MessageScreen> {
 }
 
 class _FloatingSearchBar extends StatelessWidget {
-  _FloatingSearchBar();
+  _FloatingSearchBar({this.onChanged});
+
+  /// 친 말을 위로 올린다 — **이게 없으면 칸이 장식일 뿐이다.**
+  /// 예전에 `controller` 도 `onChanged` 도 없어서 아무리 쳐도 목록이
+  /// 그대로였다 (실제 발생). 컨트롤러는 `TextField` 가 알아서 들고 있으므로
+  /// 여기서는 값만 넘긴다.
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -396,6 +414,7 @@ class _FloatingSearchBar extends StatelessWidget {
                   child: TextField(
                     style: AppTextStyles.body2,
                     cursorColor: AppColors.primary,
+                    onChanged: onChanged,
                     decoration: InputDecoration(
                       hintText: '검색',
                       hintStyle: AppTextStyles.body2.copyWith(
