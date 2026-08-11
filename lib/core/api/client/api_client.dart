@@ -150,6 +150,13 @@ class ApiClient {
     return _refreshing ??= _doRefresh().whenComplete(() => _refreshing = null);
   }
 
+  /// 밖에서 부르는 재발급 — 사내톡 소켓이 쓴다.
+  ///
+  /// REST 는 401 을 받고 스스로 되살리는데, WebSocket 은 그 길이 없다.
+  /// 손을 안 대고 앱을 켜 두면 access 가 만료돼도 갱신될 일이 없어서
+  /// 소켓이 계속 거절당한다 ([ChatSocket] 참고).
+  Future<bool> refreshAccessToken() => _refresh();
+
   Future<bool> _doRefresh() async {
     final refreshToken = TokenStore.instance.refreshToken;
     if (refreshToken == null) return false;

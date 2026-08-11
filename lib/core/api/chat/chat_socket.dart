@@ -71,6 +71,9 @@ class ChatSocket {
   /// 일부러 끊은 것인지 — 로그아웃하면 다시 붙지 않는다
   bool _closed = true;
 
+  /// 이번 시도에서 토큰을 이미 되살려 봤는지 — 무한히 되풀이하지 않으려고 둔다
+  bool _refreshed = false;
+
   final _events = StreamController<ChatEvent>.broadcast();
 
   Stream<ChatEvent> get events => _events.stream;
@@ -98,6 +101,7 @@ class ChatSocket {
       }
       _socket = socket;
       _backoff = const Duration(seconds: 1);
+      _refreshed = false;
       _sub = socket.listen(
         _onFrame,
         onDone: _onDropped,
@@ -106,6 +110,17 @@ class ChatSocket {
       );
     } catch (error) {
       debugPrint('사내톡 연결 실패: $error');
+      // 서버가 handshake 를 거절한 것(403)은 대개 **access 토큰 만료**다.
+      // REST 는 401 을 받고 스스로 되살리는데 소켓은 그 길이 없어서,
+      // 앱을 켜 두고 아무것도 안 누르면 30분 뒤부터 영영 못 붙는다.
+      // 끊긴 것(네트워크·서버 다운)은 토큰 문제가 아니므로 건드리지 않는다.
+      if (error is WebSocketException && !_refreshed) {
+        _refreshed = true;
+        if (await ApiClient.instance.refreshAccessToken()) {
+          await connect();
+          return;
+        }
+      }
       _scheduleRetry();
     }
   }
@@ -135,6 +150,9 @@ class ChatSocket {
       if (_backoff > const Duration(seconds: 30)) {
         _backoff = const Duration(seconds: 30);
       }
+      // 시도마다 한 번은 다시 되살려 볼 수 있게 푼다 — 안 그러면 오래 끊겨 있는
+      // 동안 새로 받은 토큰마저 만료됐을 때 되살릴 기회가 없다
+      _refreshed = false;
       connect();
     });
   }
