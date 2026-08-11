@@ -397,7 +397,7 @@ class _MainShellState extends State<MainShell> {
               alignment: Alignment.topRight,
               child: Padding(
                 padding: EdgeInsets.only(top: 8, right: 16),
-                child: _HeaderButtons(),
+                child: _HeaderButtons(onHome: _androidTab == 0),
               ),
             ),
           ),
@@ -436,7 +436,7 @@ class _MainShellState extends State<MainShell> {
               alignment: Alignment.topRight,
               child: Padding(
                 padding: EdgeInsets.only(top: 8, right: 16),
-                child: _HeaderButtons(),
+                child: _HeaderButtons(onHome: !_subMenu && _mainIndex == 0),
               ),
             ),
           ),
@@ -782,10 +782,14 @@ class _ChatDockState extends State<_ChatDock> {
 /// 바코드 오버레이가 떠 있는 동안에는 버튼 모양은 그대로 두고
 /// 터치만 비활성화한다. 글래스 눌림 효과가 딤 위로 그려지는 것을 막기 위함.
 class _HeaderButtons extends StatefulWidget {
-  _HeaderButtons({this.notiOpen});
+  _HeaderButtons({this.notiOpen, this.onHome = true});
 
   /// 데스크톱 알림 패널 열림 상태. null이면(폰) 알림을 화면 전환으로 연다.
   final ValueNotifier<bool>? notiOpen;
+
+  /// 지금 홈 탭인가 — **폰 지점 고르개를 홈에서만 띄우려고** 본다.
+  /// 데스크톱은 안 넘겨서 늘 true 다 (거기는 어느 화면에서나 고를 수 있다).
+  final bool onHome;
 
   @override
   State<_HeaderButtons> createState() => _HeaderButtonsState();
@@ -854,6 +858,17 @@ class _HeaderButtonsState extends State<_HeaderButtons> {
               enabled: !_overlayOpen,
               onPressed: _openBarcode,
             ),
+            SizedBox(width: 10),
+          ]
+          // 바코드가 없는 대표·관리자는 그 자리가 비어 있다 — 지점 고르개를 둔다.
+          // 둘은 같이 뜰 일이 없다 (`doesFieldWork` 와 `branchScopeVisible` 이
+          // 갈라지는 값이라 한 사람에게 하나만 해당된다).
+          //
+          // **홈에서만 띄운다.** 고른 값은 모든 화면에 걸리지만, 고르는 자리는
+          // 한 군데면 된다 — 화면마다 아이콘이 떠 있으면 어느 것이 무엇에
+          // 걸리는지 헷갈린다 (예전에 업무·랭킹이 각자 갖고 있었다).
+          else if (branchScopeVisible && widget.onHome) ...[
+            BranchScopeButton(enabled: !_overlayOpen),
             SizedBox(width: 10),
           ],
           // 데스크톱은 우하단 사내톡 필이 있어 헤더 메시지 버튼을 뺀다.

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/api/client/api_exception.dart';
 import '../../core/api/staff/attendance_api.dart';
 import '../../core/api/staff/staff_api.dart';
+import '../../core/data/branch_scope.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
 import '../../core/data/staff.dart';
@@ -69,6 +70,20 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   @override
   void initState() {
     super.initState();
+    branchScope.addListener(_onBranchScope);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    branchScope.removeListener(_onBranchScope);
+    super.dispose();
+  }
+
+  /// 헤더에서 지점을 바꿨다 — 대표 화면의 오늘 판·달력을 그 지점으로 다시 받는다
+  void _onBranchScope() {
+    if (!mounted) return;
+    setState(() => _loading = true);
     _load();
   }
 

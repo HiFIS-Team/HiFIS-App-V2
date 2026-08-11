@@ -1,4 +1,3 @@
-import 'package:cupertino_native/cupertino_native.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -13,13 +12,10 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
-import '../../core/util/sf_symbols.dart';
 import '../../core/widgets/display/avatar.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/feedback/delayed_spinner.dart';
 import '../../core/widgets/feedback/empty_card.dart';
-import '../../core/widgets/glass/glass_icon_button.dart';
-import '../../core/widgets/glass/glass_menu.dart';
 import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/nav/desktop_header.dart';
@@ -81,13 +77,14 @@ class _RankingScreenState extends State<RankingScreen> {
   }
 
   /// 폰에서 고른 지점 — 폰은 머리말 왼쪽에 고르개가 그대로 있다
-  String _phoneBranch = _allBranches;
-
   /// 보고 있는 지점
   ///
-  /// **PC 는 헤더의 지점 아이콘이 정한다** (조직도·업무와 같은 값).
-  /// 폰에는 그 헤더가 없어서 화면이 제 고르개를 그대로 쓴다.
-  String get _branch => isDesktop ? branchScopeName : _phoneBranch;
+  /// **셸 헤더의 지점 아이콘 하나가 정한다** (조직도·업무·근태와 같은 값).
+  /// 예전에는 폰이 이 화면 왼쪽 위에 고르개를 따로 갖고 있었는데, 화면마다
+  /// 있으면 어느 것이 무엇에 걸리는지 헷갈려서 한 곳으로 모았다.
+  ///
+  /// 고르개는 MASTER·ADMIN 에게만 있다 — 나머지는 늘 '전 지점' 이다.
+  String get _branch => branchScopeName;
 
   _Metric get _metric => _Metric.values[_tab];
 
@@ -247,13 +244,6 @@ class _RankingScreenState extends State<RankingScreen> {
     if (!isDesktop) {
       return PhoneListScaffold(
         title: '랭킹',
-        // 고를 지점이 하나뿐이면 안 그린다 (지점 없는 사람·명단을 못 받았을 때)
-        leading: _branchChoices.length > 1
-            ? _PhoneBranchFilter(
-                selected: _branch,
-                onSelect: (branch) => setState(() => _phoneBranch = branch),
-              )
-            : null,
         filter: _PhoneTabs(
           selected: _tab,
           onSelect: (i) => setState(() => _tab = i),

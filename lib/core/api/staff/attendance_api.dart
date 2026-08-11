@@ -296,10 +296,11 @@ class AttendanceApi {
   /// [month]는 `2026-08` 꼴. 하루마다 상태별로 누가 그랬는지 이름이 온다.
   static Future<List<AttendanceRosterDay>> roster({
     required String month,
+    String? branchId,
   }) async {
     final rows = await _client.getList(
       '/attendance/calendar/all',
-      query: {'month': month},
+      query: {'month': month, 'branchId': ?branchId},
     );
     return [
       for (final row in rows)

@@ -247,7 +247,7 @@ Future<void> _loadAttendance() async {
     // 대표 화면의 '오늘 근무' 판 — 명단에 오늘 판정이 얹혀 온다
     if (_isBoss) StaffApi.list() else Future.value(const <Employee>[]),
     if (_isBoss)
-      AttendanceApi.roster(month: thisMonth)
+      AttendanceApi.roster(month: thisMonth, branchId: branchScopeId)
     else
       Future.value(const <AttendanceRosterDay>[]),
   ]);
@@ -283,9 +283,15 @@ Future<void> _loadAttendance() async {
     ..clear()
     // 대표·관리자는 출퇴근을 안 찍는다 — 세면 근무시간이 지나는 순간
     // **매일 결근**으로 선다. 전사 달력도 서버가 같은 기준으로 빼 준다.
+    //
+    // 헤더에서 지점을 골랐으면 그 지점만 센다 — 달력은 서버가 걸러 주는데
+    // 명단(`/employees`)은 전사로 와서 여기서 맞춘다.
     ..addAll(
       staff.where(
-        (person) => person.role != Role.master && person.role != Role.admin,
+        (person) =>
+            person.role != Role.master &&
+            person.role != Role.admin &&
+            (branchScopeId == null || person.branchId == branchScopeId),
       ),
     );
 
@@ -308,7 +314,10 @@ Map<AttendanceStatus, List<String>> _rosterOf(DateTime date) {
 /// 대표 달력이 보고 있는 달의 전사 기록을 받아 둔다
 Future<void> _loadRoster(String month) async {
   if (!_isBoss || _roster.containsKey(month)) return;
-  _roster[month] = await AttendanceApi.roster(month: month);
+  _roster[month] = await AttendanceApi.roster(
+    month: month,
+    branchId: branchScopeId,
+  );
 }
 
 /// 오늘 이 상태인 사람들 — 대표 화면의 '오늘 근무' 판이 쓴다

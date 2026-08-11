@@ -138,36 +138,11 @@ Future<void> _loadRanking() async {
     ..addAll([for (final row in rows) _Ranker.fromRow(row)]);
 }
 
-/// 지점 필터 — 맨 앞은 모든 지점을 함께 보는 '전 지점'
+/// '전 지점' — 셸 헤더 고르개가 안 걸렸을 때의 값 ([branchScopeName])
 ///
-/// **HQ는 안 세운다.** 지점이 아니라 전사인데 서버가 하필 `전 지점` 이라고
-/// 불러서, 안 빼면 목록에 '전 지점'이 **두 번** 선다 (맨 앞 항목과 HQ).
-/// HQ 소속인 사람의 실적은 '전 지점'에서 같이 보인다 — 조직도·업무 필터와 같은 기준이다.
+/// HQ 지점 이름과 **같은 글자**다. HQ 소속(MASTER·ADMIN)인 사람의 실적은
+/// 어차피 랭킹에 안 오르므로 둘이 부딪칠 일이 없다.
 const _allBranches = '전 지점';
-List<String> get _branches => [
-  _allBranches,
-  ...{
-    for (final r in _rankers)
-      if (r.branch.isNotEmpty && r.branch != _allBranches) r.branch,
-  },
-];
-
-/// 폰 지점 고르개에 세울 목록 — **권한마다 다르다**
-///
-/// - **MASTER·ADMIN** 전체 + 모든 지점. 어느 지점이 잘하고 있는지 보는 자리다.
-/// - **MEMBER·MANAGER** 전체 + 본인 지점 둘뿐. 남의 지점 순위는 상관이 없다.
-///
-/// 지점을 고르면 그 지점 사람들끼리 **다시 줄 선다** ([_pool] → [_entries]).
-/// 전체에서 2등이던 화순 트레이너가 화순을 고르면 1등으로 나오는 식이다.
-///
-/// 고를 것이 하나뿐이면(지점이 없는 사람) 화면이 고르개를 아예 안 그린다.
-List<String> get _branchChoices {
-  if (myRole == Role.master || myRole == Role.admin) return _branches;
-  final mine = StaffDirectory.instance.branchName(currentUser?.branchId);
-  // HQ 소속은 지점 이름이 하필 '전 지점'이라 맨 위 항목과 글자가 겹친다
-  if (mine.isEmpty || mine == _allBranches) return const [_allBranches];
-  return [_allBranches, mine];
-}
 
 /// 시상대 색 — 위(밝은 쪽), 아래(진한 쪽)
 ///
