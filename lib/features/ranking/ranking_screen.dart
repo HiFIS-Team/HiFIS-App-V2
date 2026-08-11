@@ -12,6 +12,7 @@ import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
 import '../../core/util/sf_symbols.dart';
 import '../../core/widgets/display/avatar.dart';
@@ -133,26 +134,26 @@ class _RankingScreenState extends State<RankingScreen> {
   /// 종합 탭에서만 사람을 누를 수 있다 — 다른 탭은 예전 그대로다
   bool get _canPick => _metric == _Metric.overall;
 
-  void _pick(_Ranker ranker) {
-    if (!isDesktop) {
-      showModalBottomSheet<void>(
-        context: context,
-        backgroundColor: Colors.transparent,
-        builder: (_) => SafeArea(
-          top: false,
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
-            child: _ScoreBreakdown(ranker: ranker),
-          ),
-        ),
-      );
-      return;
-    }
-    // PC 는 순위표 옆에 판을 편다. 같은 사람을 다시 누르면 접는다
-    setState(() => _pickedId = _pickedId == ranker.id ? null : ranker.id);
+  /// 같은 사람을 다시 누르면 접는다 — PC 는 순위표 옆 판, 폰은 아래 바다
+  void _pick(_Ranker ranker) =>
+      setState(() => _pickedId = _pickedId == ranker.id ? null : ranker.id);
+
+  /// 내려가는 동안 보여줄 마지막 사람
+  ///
+  /// 바가 미끄러져 내려가는 중에도 안이 채워져 있어야 한다. `_pickedId` 만
+  /// 보면 접는 순간 내용이 통째로 사라져서 빈 칸이 내려간다.
+  _Ranker? _lastPicked;
+
+  /// 지금 목록에 있는, 내역을 연 사람 (지점·탭을 옮겼으면 null 이다)
+  _Ranker? _pickedIn(List<_Entry> entries) {
+    if (!_canPick) return null;
+    return entries
+        .where((e) => e.ranker.id == _pickedId)
+        .map((e) => e.ranker)
+        .firstOrNull;
   }
 
-  List<Widget> _body(List<_Entry> entries) {
+  List<Widget> _body(List<_Entry> entries, _Ranker? picked) {
     final top = entries.take(3).toList();
     final rest = entries.skip(3).toList();
     final podium = _Podium(
@@ -161,14 +162,6 @@ class _RankingScreenState extends State<RankingScreen> {
       big: !isDesktop,
       onPick: _canPick ? _pick : null,
     );
-
-    // 열어 둔 사람이 지금 목록에 없으면(지점·탭을 옮겼다) 판을 접는다
-    final picked = !_canPick
-        ? null
-        : entries
-              .where((e) => e.ranker.id == _pickedId)
-              .map((e) => e.ranker)
-              .firstOrNull;
 
     // 대표·관리자는 실적이 없어 '내 순위'가 늘 비어 있다.
     // 그 자리에 누가 누구를 앞질렀는지를 대신 놓는다.
@@ -210,7 +203,7 @@ class _RankingScreenState extends State<RankingScreen> {
       ],
       SizedBox(height: isDesktop ? 16 : 12),
       // 종합에서 사람을 고르면 PC 는 순위표 옆에 점수 내역을 편다.
-      // 폰은 시트로 뜨므로 목록 폭이 안 바뀐다.
+      // 폰은 아래에서 바가 올라오므로 목록 폭이 안 바뀐다.
       if (picked != null && isDesktop)
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -243,6 +236,8 @@ class _RankingScreenState extends State<RankingScreen> {
   @override
   Widget build(BuildContext context) {
     final entries = _entries;
+    final picked = _pickedIn(entries);
+    if (picked != null) _lastPicked = picked;
 
     if (!isDesktop) {
       return PhoneListScaffold(
@@ -258,12 +253,17 @@ class _RankingScreenState extends State<RankingScreen> {
           selected: _tab,
           onSelect: (i) => setState(() => _tab = i),
         ),
+        bottomPanel: _BreakdownBar(
+          ranker: picked ?? _lastPicked,
+          shown: picked != null,
+          onClose: () => setState(() => _pickedId = null),
+        ),
         children: [
           PaneTransition(
             step: _tab,
             child: entries.isEmpty
                 ? EmptyCard(icon: CupertinoIcons.rosette, text: '집계된 실적이 없어요')
-                : Column(children: _body(entries)),
+                : Column(children: _body(entries, picked)),
           ),
         ],
       );
@@ -289,7 +289,7 @@ class _RankingScreenState extends State<RankingScreen> {
               step: _tab,
               child: entries.isEmpty
                   ? EmptyCard(icon: CupertinoIcons.rosette, text: '집계된 실적이 없어요')
-                  : Column(children: _body(entries)),
+                  : Column(children: _body(entries, picked)),
             ),
           ],
         ),

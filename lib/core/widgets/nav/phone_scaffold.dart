@@ -43,6 +43,7 @@ class PhoneListScaffold extends StatefulWidget {
     this.filter,
     this.onCreate,
     this.leading,
+    this.bottomPanel,
   });
 
   final String title;
@@ -62,6 +63,12 @@ class PhoneListScaffold extends StatefulWidget {
   /// 좌측 상단에 놓을 다른 버튼 (필터 등) — [onCreate] 와 같은 자리다.
   /// 만들기 버튼이 없는 화면에서 쓴다 (랭킹 지점 필터).
   final Widget? leading;
+
+  /// 화면 아래에 얹는 판 — 목록 위로 올라온다 (랭킹 점수 내역)
+  ///
+  /// **모달이 아니다.** 뒤가 어두워지지 않고 목록도 그대로 스크롤된다.
+  /// 자기 위치와 오르내림은 넘기는 위젯이 정한다.
+  final Widget? bottomPanel;
 
   @override
   State<PhoneListScaffold> createState() => _PhoneListScaffoldState();
@@ -190,6 +197,7 @@ class _PhoneListScaffoldState extends State<PhoneListScaffold> {
                 child: leading,
               ),
             ),
+          ?widget.bottomPanel,
         ],
       ),
     );
