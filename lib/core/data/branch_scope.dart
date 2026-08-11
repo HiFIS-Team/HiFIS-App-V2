@@ -17,7 +17,10 @@ import 'staff_directory.dart';
 /// 지점 필터에서 '전 지점'을 가리키는 이름
 ///
 /// 조직도·랭킹이 이름으로 걸러서 그 화면들이 쓰는 값과 같아야 한다.
-const allBranchesLabel = '전체';
+///
+/// **서버의 HQ 지점 이름과 같은 값이다** (둘 다 `전 지점`). HQ 는 필터에서
+/// 빼기 때문에 한 줄에 두 개가 서지는 않는다.
+const allBranchesLabel = '전 지점';
 
 /// 고른 지점 id — **null 이면 전 지점**
 ///

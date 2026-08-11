@@ -35,8 +35,8 @@ class _BranchFilterState extends State<_BranchFilter> {
 
   /// 세울 지점 — 조직도 필터와 같은 기준
   ///
-  /// **본사(HQ)는 안 세운다.** 지점이 아니라 전사이고, 이름이 하필 `전체` 라
-  /// 맨 위 '전체'와 글자가 겹친다. HQ 소속인 사람의 기록은 '전체'에서 보인다.
+  /// **HQ는 안 세운다.** 지점이 아니라 전사이고, 이름이 하필 `전 지점` 이라
+  /// 맨 위 '전 지점'과 글자가 겹친다. HQ 소속인 사람의 기록은 '전 지점'에서 보인다.
   List<Branch> get _choices {
     final directory = StaffDirectory.instance;
     return [...directory.branches.where((branch) => !branch.isHq)]..sort(
@@ -80,7 +80,7 @@ class _BranchFilterState extends State<_BranchFilter> {
         // 네이티브 메뉴에는 체크마크를 못 단다 — 패키지가 `UIAction.state` 를
         // 안 넘긴다. 그래서 고른 줄은 **아이콘 자리**가 체크로 바뀐다
         CNPopupMenuItem(
-          label: '전체',
+          label: allBranchesLabel,
           icon: CNSymbol(
             widget.branchId == null ? 'checkmark' : 'square.grid.2x2',
           ),
@@ -113,7 +113,7 @@ class _BranchFilterState extends State<_BranchFilter> {
         GlassMenuItem(
           // null 은 '안 골랐다'와 구분이 안 돼서 전체에 따로 값을 준다
           value: _allBranches,
-          label: '전체',
+          label: allBranchesLabel,
           icon: CupertinoIcons.square_grid_2x2,
           selected: widget.branchId == null,
         ),

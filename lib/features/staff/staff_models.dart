@@ -225,11 +225,11 @@ int _byRoleThenBranch(_Member a, _Member b) {
   return a.name.compareTo(b.name);
 }
 
-/// 지점 필터 목록 — 맨 앞은 모든 지점을 함께 보는 '전체'
+/// 지점 필터 목록 — 맨 앞은 모든 지점을 함께 보는 '전 지점'
 ///
-/// **본사(HQ)는 세우지 않는다.** 지점이 아니라 전사라서 고를 대상이 아니다.
+/// **HQ는 세우지 않는다.** 지점이 아니라 전사라서 고를 대상이 아니다.
 /// 거기 소속인 MASTER·ADMIN 은 어느 지점을 골라도 보인다 ([_inBranch]).
-const _allBranches = '전체';
+const _allBranches = '전 지점';
 
 List<String> get _branches {
   final directory = StaffDirectory.instance;
@@ -238,8 +238,8 @@ List<String> get _branches {
       (a, b) =>
           directory.branchRank(a.id).compareTo(directory.branchRank(b.id)),
     );
-  // **이름으로 한 번 더 거른다.** 서버가 HQ 를 `전체` 라고 부르는데 맨 앞의 필터
-  // 항목도 `전체` 라, `type` 판별이 한 번 새면 곧바로 `전체` 가 두 줄로 선다
+  // **이름으로 한 번 더 거른다.** 서버가 HQ 를 `전 지점` 이라고 부르는데 맨 앞의
+  // 필터 항목도 `전 지점` 이라, `type` 판별이 한 번 새면 곧바로 두 줄로 선다
   // (실제 발생 — 고르개에 `전체 23명` 이 두 개 떴다).
   final seen = <String>{_allBranches};
   return [
