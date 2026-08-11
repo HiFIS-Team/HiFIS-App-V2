@@ -14,6 +14,9 @@ enum NotificationKind {
   payroll('PAYROLL'),
   schedule('SCHEDULE'),
   ranking('RANKING'),
+  // 아래 둘은 **대표·관리자만** 받는다 (회의록 작성 · 직원 가입·퇴사)
+  meeting('MEETING'),
+  staff('STAFF'),
   other('');
 
   const NotificationKind(this.wire);

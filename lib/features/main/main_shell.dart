@@ -153,13 +153,16 @@ class _MainShellState extends State<MainShell> {
         NotificationTarget.ranking => 11,
         NotificationTarget.approval => 6,
         NotificationTarget.schedule => 3,
+        NotificationTarget.meeting => 4,
+        NotificationTarget.staff => 7,
       };
       return;
     }
 
-    // 폰에는 전자결재·일정 탭이 없다 — 갈 데가 없으면 아무 일도 안 한다
+    // 폰에는 전자결재·일정·조직도 탭이 없다 — 갈 데가 없으면 아무 일도 안 한다
     if (target == NotificationTarget.approval ||
-        target == NotificationTarget.schedule) {
+        target == NotificationTarget.schedule ||
+        target == NotificationTarget.staff) {
       return;
     }
 
@@ -171,8 +174,10 @@ class _MainShellState extends State<MainShell> {
           NotificationTarget.salary => 5,
           NotificationTarget.notice => 6,
           NotificationTarget.ranking => 7,
+          NotificationTarget.meeting => 3,
           NotificationTarget.approval => _androidTab,
           NotificationTarget.schedule => _androidTab,
+          NotificationTarget.staff => _androidTab,
         },
       );
       return;
@@ -195,8 +200,12 @@ class _MainShellState extends State<MainShell> {
         case NotificationTarget.ranking:
           _subMenu = true;
           _subIndex = 4;
+        case NotificationTarget.meeting:
+          _subMenu = false;
+          _mainIndex = 3;
         case NotificationTarget.approval:
         case NotificationTarget.schedule:
+        case NotificationTarget.staff:
           break; // 위에서 걸러진다
       }
     });

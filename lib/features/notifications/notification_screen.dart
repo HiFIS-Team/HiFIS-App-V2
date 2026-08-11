@@ -276,6 +276,8 @@ enum NotificationTarget {
   ranking,
   approval,
   schedule,
+  meeting,
+  staff,
 }
 
 /// 알림에서 열어달라고 요청한 화면 — `MainShell` 이 보고 탭을 옮긴다
@@ -321,6 +323,9 @@ NotificationTarget? _targetOf(String? link) {
     'projects' => NotificationTarget.project,
     'ranking' => NotificationTarget.ranking,
     'schedule' => NotificationTarget.schedule,
+    'meetings' => NotificationTarget.meeting,
+    // 조직도는 데스크톱에만 있다 — 폰에서는 읽음 처리만 된다
+    'staff' => NotificationTarget.staff,
     _ => null,
   };
 }
@@ -355,6 +360,8 @@ IconData _iconOf(NotificationKind kind) => switch (kind) {
   NotificationKind.payroll => Icons.payments_rounded,
   NotificationKind.schedule => Icons.event_rounded,
   NotificationKind.ranking => Icons.emoji_events_rounded,
+  NotificationKind.meeting => Icons.event_note_rounded,
+  NotificationKind.staff => Icons.badge_rounded,
   NotificationKind.other => Icons.notifications_rounded,
 };
 
@@ -363,7 +370,9 @@ Color _colorOf(NotificationKind kind) => switch (kind) {
   NotificationKind.attendance ||
   NotificationKind.notice ||
   NotificationKind.chat ||
-  NotificationKind.schedule => AppColors.primary,
+  NotificationKind.schedule ||
+  NotificationKind.meeting ||
+  NotificationKind.staff => AppColors.primary,
   NotificationKind.leave ||
   NotificationKind.project ||
   NotificationKind.ranking => AppColors.warning,
