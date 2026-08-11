@@ -263,8 +263,15 @@ class Employee {
   /// 결근 판정의 기준이라 이게 없으면 서버가 결근·휴무를 못 가른다.
   final List<int> workDays;
 
+  /// 첫 로그인에 근무 설정을 받아야 하는가
+  ///
+  /// **대표·관리자는 안 받는다** (2026-08-11 대표 결정). 출퇴근을 안 찍으니
+  /// 기준이 있어도 쓸 데가 없다 — 근태 판정에서도 이미 빠져 있다
+  /// (전사 캘린더·결근 알림, backend-gap 70번).
   bool get needsSchedule =>
-      shiftStart == null || shiftEnd == null || workDays.isEmpty;
+      role != Role.master &&
+      role != Role.admin &&
+      (shiftStart == null || shiftEnd == null || workDays.isEmpty);
 
   /// 아바타 색 — 서버가 `#RRGGBB` 로 준다
   ///
