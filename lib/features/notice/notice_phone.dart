@@ -255,3 +255,44 @@ class _NoticePageState extends State<_NoticePage> {
     );
   }
 }
+
+/// 받아오는 동안의 뼈대 — 목록 카드 자리를 미리 잡아 둔다
+///
+/// 카드 안 구성이 진짜 카드와 같다 (제목 · 미리보기 두 줄 · 작성자 줄).
+/// 개수와 안읽음 전환은 값을 알아야 그릴 수 있어서 **필터 자리만** 비워 둔다.
+class _NoticeSkeleton extends StatelessWidget {
+  _NoticeSkeleton();
+
+  @override
+  Widget build(BuildContext context) => SkeletonGroup(
+    child: PhoneListScaffold(
+      title: '공지',
+      // ModeSwitch 와 같은 높이(48) — 다 받아왔을 때 목록이 안 밀린다
+      filter: Skeleton(height: 48, radius: 14),
+      children: [
+        for (var i = 0; i < 4; i++) ...[
+          if (i > 0) SizedBox(height: 12),
+          SkeletonCard(
+            children: [
+              Skeleton(width: 180, height: 15),
+              SizedBox(height: 12),
+              Skeleton(height: 11),
+              SizedBox(height: 7),
+              Skeleton(width: 220, height: 11),
+              SizedBox(height: 16),
+              Row(
+                children: [
+                  SkeletonCircle(size: 20),
+                  SizedBox(width: 6),
+                  Skeleton(width: 110, height: 11),
+                  Spacer(),
+                  Skeleton(width: 52, height: 11),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ],
+    ),
+  );
+}

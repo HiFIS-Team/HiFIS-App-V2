@@ -26,6 +26,7 @@ import '../../core/widgets/nav/desktop_header.dart';
 import '../../core/widgets/nav/phone_scaffold.dart';
 import '../../core/widgets/nav/pane_transition.dart';
 import '../../core/widgets/input/app_button.dart';
+import '../../core/widgets/feedback/skeleton.dart';
 
 part 'attendance_models.dart';
 part 'attendance_leave.dart';
@@ -199,6 +200,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
+      if (!isDesktop) return _AttendanceSkeleton();
       return Scaffold(
         body: Center(
           child: CircularProgressIndicator(

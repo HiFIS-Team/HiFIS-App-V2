@@ -357,3 +357,97 @@ String _monthLabel(DateTime value) => '${value.year}년 ${value.month}월';
 
 /// '8월 10일'
 String _dayLabel(DateTime value) => monthDayLabel(value);
+
+/// 받아오는 동안의 뼈대 — 요약 · 신청 안내 · 추이 · 지급 내역 순서를 잡아 둔다
+///
+/// 탭 줄은 **권한으로 정해지는 것**이라 받아오기 전에도 있을지 없을지 안다.
+/// 그래서 있을 사람에게만 자리를 비워 둔다 — 다 받아왔을 때 안 밀린다.
+class _SalarySkeleton extends StatelessWidget {
+  _SalarySkeleton();
+
+  @override
+  Widget build(BuildContext context) => SkeletonGroup(
+    child: PhoneListScaffold(
+      title: '급여',
+      // SegmentedTabs 와 같은 높이(48)
+      filter: _canSeeApproval && !_isPayBoss
+          ? Skeleton(height: 48, radius: 14)
+          : null,
+      children: [
+        // 이번 달 요약 — 큰 금액 한 줄이 주인공이다
+        SkeletonCard(
+          children: [
+            Row(
+              children: [
+                Skeleton(width: 84, height: 13),
+                Spacer(),
+                Skeleton(width: 62, height: 24, radius: 12),
+              ],
+            ),
+            SizedBox(height: 14),
+            Skeleton(width: 190, height: 30, radius: 8),
+            SizedBox(height: 12),
+            Skeleton(width: 140, height: 12),
+          ],
+        ),
+        SizedBox(height: 12),
+        // 신청 안내 (대표는 결재함)
+        SkeletonCard(
+          children: [
+            Skeleton(width: 150, height: 14),
+            SizedBox(height: 12),
+            Skeleton(height: 11),
+            SizedBox(height: 16),
+            Skeleton(height: 48, radius: 14),
+          ],
+        ),
+        SizedBox(height: 12),
+        // 최근 추이 — 막대 여섯 개
+        SkeletonCard(
+          children: [
+            Skeleton(width: 96, height: 14),
+            SizedBox(height: 20),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                for (var i = 0; i < 6; i++) ...[
+                  if (i > 0) SizedBox(width: 10),
+                  Expanded(child: Skeleton(height: 40.0 + i * 12, radius: 6)),
+                ],
+              ],
+            ),
+            SizedBox(height: 10),
+            Row(
+              children: [
+                for (var i = 0; i < 6; i++) ...[
+                  if (i > 0) SizedBox(width: 10),
+                  Expanded(
+                    child: Center(child: Skeleton(width: 22, height: 10)),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+        SizedBox(height: 12),
+        // 지급 항목 — 이름과 금액이 마주 보는 줄들
+        SkeletonCard(
+          children: [
+            Skeleton(width: 72, height: 14),
+            SizedBox(height: 18),
+            for (var i = 0; i < 4; i++) ...[
+              if (i > 0) SizedBox(height: 14),
+              Row(
+                children: [
+                  Skeleton(width: 76, height: 12),
+                  Spacer(),
+                  Skeleton(width: 92, height: 12),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ],
+    ),
+  );
+}

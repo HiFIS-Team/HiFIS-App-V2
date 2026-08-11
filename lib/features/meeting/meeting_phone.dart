@@ -203,3 +203,39 @@ class _NoteScreenState extends State<_NoteScreen> {
     );
   }
 }
+
+/// 받아오는 동안의 뼈대 — 목록 카드 자리를 미리 잡아 둔다
+///
+/// 카드 안 구성이 진짜 카드와 같다 (제목 · 미리보기 두 줄 · 날짜와 참석자).
+class _MeetingSkeleton extends StatelessWidget {
+  _MeetingSkeleton();
+
+  @override
+  Widget build(BuildContext context) => SkeletonGroup(
+    child: PhoneListScaffold(
+      title: '회의록',
+      children: [
+        for (var i = 0; i < 4; i++) ...[
+          if (i > 0) SizedBox(height: 12),
+          SkeletonCard(
+            children: [
+              Skeleton(width: 160, height: 15),
+              SizedBox(height: 12),
+              Skeleton(height: 11),
+              SizedBox(height: 7),
+              Skeleton(width: 200, height: 11),
+              SizedBox(height: 16),
+              Row(
+                children: [
+                  Skeleton(width: 150, height: 11),
+                  Spacer(),
+                  SkeletonCircle(size: 22),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ],
+    ),
+  );
+}

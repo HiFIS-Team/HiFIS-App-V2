@@ -30,6 +30,7 @@ import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/nav/phone_scaffold.dart';
 import '../../core/util/when.dart';
 import '../../core/widgets/feedback/failed_card.dart';
+import '../../core/widgets/feedback/skeleton.dart';
 import '../../core/widgets/input/app_button.dart';
 import '../notifications/notification_screen.dart'
     show NotificationTarget, requestedScreen;
@@ -199,8 +200,8 @@ class _ProjectScreenState extends State<ProjectScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
+      if (!isDesktop) return _ProjectSkeleton();
       return Scaffold(
-        backgroundColor: isDesktop ? null : AppColors.background,
         body: Center(
           child: CircularProgressIndicator(
             strokeWidth: 2.4,

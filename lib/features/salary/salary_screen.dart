@@ -16,6 +16,7 @@ import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/feedback/empty_card.dart';
 import '../../core/widgets/feedback/reject_reason_dialog.dart';
+import '../../core/widgets/feedback/skeleton.dart';
 import '../../core/widgets/glass/glass_bottom_button.dart';
 import '../../core/widgets/input/app_button.dart';
 import '../../core/widgets/input/decide_buttons.dart';
@@ -180,6 +181,7 @@ class _SalaryScreenState extends State<SalaryScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading || _payslips.isEmpty) {
+      if (!isDesktop) return _SalarySkeleton();
       return Scaffold(
         body: Center(
           child: CircularProgressIndicator(

@@ -24,6 +24,7 @@ import '../../core/widgets/nav/phone_scaffold.dart';
 import '../../core/util/when.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/widgets/feedback/failed_card.dart';
+import '../../core/widgets/feedback/skeleton.dart';
 
 part 'notice_phone.dart';
 part 'notice_list.dart';
@@ -203,8 +204,8 @@ class _NoticeScreenState extends State<NoticeScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
+      if (!isDesktop) return _NoticeSkeleton();
       return Scaffold(
-        backgroundColor: isDesktop ? null : AppColors.background,
         body: Center(
           child: CircularProgressIndicator(
             strokeWidth: 2.4,

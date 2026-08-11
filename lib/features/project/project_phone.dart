@@ -233,3 +233,56 @@ class _ProjectDetailScreenState extends State<_ProjectDetailScreen> {
     );
   }
 }
+
+/// 받아오는 동안의 뼈대 — 목록 카드 자리를 미리 잡아 둔다
+///
+/// 카드 안 구성이 진짜 카드와 같다 (색 점과 이름 · D-day · 설명 ·
+/// 진행률 막대 · 참여자와 할 일 수).
+class _ProjectSkeleton extends StatelessWidget {
+  _ProjectSkeleton();
+
+  @override
+  Widget build(BuildContext context) => SkeletonGroup(
+    child: PhoneListScaffold(
+      title: '프로젝트',
+      // _PhaseTabs 와 같은 높이(44) — 다 받아왔을 때 목록이 안 밀린다
+      filter: Skeleton(height: 44, radius: 14),
+      children: [
+        for (var i = 0; i < 4; i++) ...[
+          if (i > 0) SizedBox(height: 12),
+          SkeletonCard(
+            children: [
+              Row(
+                children: [
+                  SkeletonCircle(size: 8),
+                  SizedBox(width: 8),
+                  Skeleton(width: 140, height: 15),
+                  Spacer(),
+                  Skeleton(width: 44, height: 20, radius: 10),
+                ],
+              ),
+              SizedBox(height: 10),
+              Skeleton(width: 190, height: 11),
+              SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(child: Skeleton(height: 6, radius: 3)),
+                  SizedBox(width: 10),
+                  Skeleton(width: 30, height: 11),
+                ],
+              ),
+              SizedBox(height: 14),
+              Row(
+                children: [
+                  SkeletonCircle(size: 22),
+                  Spacer(),
+                  Skeleton(width: 62, height: 11),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ],
+    ),
+  );
+}

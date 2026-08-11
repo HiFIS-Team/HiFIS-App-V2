@@ -18,6 +18,7 @@ import '../../core/util/platform.dart';
 import '../../core/util/sf_symbols.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/widgets/feedback/app_toast.dart';
+import '../../core/widgets/feedback/skeleton.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/glass/glass_menu.dart';
 import '../../core/widgets/input/app_button.dart';
@@ -434,15 +435,7 @@ class _WorkScreenState extends State<WorkScreen> {
             Padding(
               padding: EdgeInsets.symmetric(horizontal: _pad),
               child: _envLoading
-                  ? Padding(
-                      padding: EdgeInsets.symmetric(vertical: 60),
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.4,
-                          valueColor: AlwaysStoppedAnimation(AppColors.primary),
-                        ),
-                      ),
-                    )
+                  ? _ChecklistSkeleton()
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [

@@ -23,6 +23,7 @@ import '../../../core/widgets/glass/glass_bottom_button.dart';
 import '../../../core/widgets/glass/glass_icon_button.dart';
 import '../../../core/widgets/input/mode_switch.dart';
 import '../../../core/widgets/input/pressable.dart';
+import '../work_skeleton.dart';
 part 'peer_review_status.dart';
 part 'peer_review_submission.dart';
 part 'peer_review_people.dart';
@@ -154,17 +155,7 @@ class _PeerReviewSectionState extends State<PeerReviewSection> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return Padding(
-        padding: EdgeInsets.symmetric(vertical: 60),
-        child: Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 2.4,
-            valueColor: AlwaysStoppedAnimation(AppColors.primary),
-          ),
-        ),
-      );
-    }
+    if (_loading) return WorkSectionSkeleton();
 
     // 대표·관리자는 평가를 쓰지 않는다 — 누가 냈는지만 본다
     if (!_canReview) {

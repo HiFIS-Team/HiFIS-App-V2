@@ -339,3 +339,49 @@ class _LogRow extends StatelessWidget {
     );
   }
 }
+
+/// 받아오는 동안의 뼈대 — 점검 항목 칩이 앉을 자리를 잡아 둔다
+///
+/// 칩 높이(48)·간격(10)·한 줄 두 칸이 진짜 카드와 같다.
+class _ChecklistSkeleton extends StatelessWidget {
+  _ChecklistSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final columns = isDesktop ? 3 : 2;
+    return SkeletonGroup(
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.all(20),
+        decoration: AppDecorations.card(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4),
+              child: Row(
+                children: [
+                  Skeleton(width: 88, height: 13),
+                  Spacer(),
+                  Skeleton(width: 56, height: 13),
+                ],
+              ),
+            ),
+            SizedBox(height: 14),
+            for (var row = 0; row < 5; row++) ...[
+              if (row > 0) SizedBox(height: 10),
+              Row(
+                children: [
+                  for (var col = 0; col < columns; col++) ...[
+                    if (col > 0) SizedBox(width: 10),
+                    Expanded(child: Skeleton(height: 48, radius: 14)),
+                  ],
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}

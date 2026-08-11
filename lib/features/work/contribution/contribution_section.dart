@@ -21,6 +21,7 @@ import '../../../core/widgets/glass/glass_icon_button.dart';
 import '../../../core/widgets/input/pressable.dart';
 import '../../../core/widgets/input/see_all_button.dart';
 import '../../../core/util/when.dart';
+import '../work_skeleton.dart';
 part 'contribution_summary.dart';
 part 'contribution_history.dart';
 part 'contribution_grant.dart';
@@ -162,17 +163,7 @@ class _ContributionSectionState extends State<ContributionSection> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return Padding(
-        padding: EdgeInsets.symmetric(vertical: 60),
-        child: Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 2.4,
-            valueColor: AlwaysStoppedAnimation(AppColors.primary),
-          ),
-        ),
-      );
-    }
+    if (_loading) return WorkSectionSkeleton();
 
     // 폰은 기여마다 카드 하나 (다른 업무 목록과 같은 결).
     // 데스크톱은 2단 화면이라 카드가 과해서 기존 줄 목록을 그대로 쓴다.

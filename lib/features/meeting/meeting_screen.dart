@@ -27,6 +27,7 @@ import '../../core/widgets/nav/phone_scaffold.dart';
 import '../../core/util/when.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/widgets/feedback/failed_card.dart';
+import '../../core/widgets/feedback/skeleton.dart';
 
 part 'meeting_phone.dart';
 
@@ -152,8 +153,8 @@ class _MeetingScreenState extends State<MeetingScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
+      if (!isDesktop) return _MeetingSkeleton();
       return Scaffold(
-        backgroundColor: isDesktop ? null : AppColors.background,
         body: Center(
           child: CircularProgressIndicator(
             strokeWidth: 2.4,

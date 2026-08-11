@@ -23,6 +23,7 @@ import '../../../core/widgets/input/mode_switch.dart';
 import '../../../core/widgets/input/pressable.dart';
 import '../../../core/widgets/input/see_all_button.dart';
 import '../../../core/util/when.dart';
+import '../work_skeleton.dart';
 part 'lesson_data.dart';
 part 'lesson_cards.dart';
 part 'lesson_history.dart';
@@ -95,17 +96,7 @@ class _LessonSectionState extends State<LessonSection> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return Padding(
-        padding: EdgeInsets.symmetric(vertical: 60),
-        child: Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 2.4,
-            valueColor: AlwaysStoppedAnimation(AppColors.primary),
-          ),
-        ),
-      );
-    }
+    if (_loading) return WorkSectionSkeleton();
 
     // 상단 액션 버튼 두 개 — 폰·PC 공통. 대표·관리자는 수행자가 아니라 안 그린다
     final actions = _viewOnly

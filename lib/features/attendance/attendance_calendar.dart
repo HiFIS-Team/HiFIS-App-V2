@@ -602,3 +602,106 @@ class _WeekRow extends StatelessWidget {
     );
   }
 }
+
+/// 받아오는 동안의 뼈대 — 요약 · 월차 잔여 · 달력 순서를 그대로 잡아 둔다
+///
+/// 달력 칸 높이(62)와 카드 안쪽 여백이 진짜 달력과 같다. 요청이 일곱 개라
+/// 첫 로딩이 제일 긴 화면이어서, 여기가 비어 있으면 유난히 오래 느껴진다.
+class _AttendanceSkeleton extends StatelessWidget {
+  _AttendanceSkeleton();
+
+  @override
+  Widget build(BuildContext context) => SkeletonGroup(
+    child: PhoneListScaffold(
+      title: '근태·월차',
+      children: [
+        // 이번 달 요약
+        SkeletonCard(
+          children: [
+            Skeleton(width: 96, height: 14),
+            SizedBox(height: 18),
+            Row(
+              children: [
+                for (var i = 0; i < 4; i++) ...[
+                  if (i > 0) SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Skeleton(width: 34, height: 20),
+                        SizedBox(height: 8),
+                        Skeleton(width: 44, height: 11),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+        SizedBox(height: 12),
+        // 남은 월차
+        SkeletonCard(
+          children: [
+            Row(
+              children: [
+                Skeleton(width: 72, height: 14),
+                Spacer(),
+                Skeleton(width: 76, height: 34, radius: 10),
+              ],
+            ),
+            SizedBox(height: 16),
+            Skeleton(height: 8, radius: 4),
+          ],
+        ),
+        SizedBox(height: 12),
+        // 달력 — 칸 높이 62 는 _MonthCalendar 와 같은 값이다
+        Container(
+          width: double.infinity,
+          padding: EdgeInsets.fromLTRB(14, 18, 14, 14),
+          decoration: AppDecorations.card(),
+          child: Column(
+            children: [
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 6),
+                child: Row(
+                  children: [
+                    SkeletonCircle(size: 18),
+                    SizedBox(width: 10),
+                    Skeleton(width: 96, height: 16),
+                    SizedBox(width: 10),
+                    SkeletonCircle(size: 18),
+                    Spacer(),
+                  ],
+                ),
+              ),
+              SizedBox(height: 16),
+              Row(
+                children: [
+                  for (var i = 0; i < 7; i++)
+                    Expanded(
+                      child: Center(child: Skeleton(width: 12, height: 9)),
+                    ),
+                ],
+              ),
+              SizedBox(height: 8),
+              for (var row = 0; row < 5; row++)
+                Row(
+                  children: [
+                    for (var col = 0; col < 7; col++)
+                      Expanded(
+                        child: SizedBox(
+                          height: 62,
+                          child: Center(
+                            child: Skeleton(width: 22, height: 22, radius: 8),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
