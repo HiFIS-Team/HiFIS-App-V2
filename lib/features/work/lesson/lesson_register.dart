@@ -25,6 +25,12 @@ class _RegisterScreenState extends State<_RegisterScreen> {
   /// 요율(50%)로 잡힌다. 비워 두면 트레이너 몫이 줄어든다.
   Member? _referrer;
 
+  /// 어떻게 알고 왔나 — **신규 등록에만 받는다.**
+  ///
+  /// 블로그·인스타·OT→PT 면 서버가 담당 트레이너에게 5점을 붙인다.
+  /// 재등록은 처음 올 때 이미 정해진 값이라 다시 안 묻는다.
+  VisitPath? _visitPath;
+
   bool _saving = false;
 
   @override
@@ -63,7 +69,9 @@ class _RegisterScreenState extends State<_RegisterScreen> {
   bool get _complete =>
       (_renew
           ? _selected != null
-          : _name.text.trim().isNotEmpty && _phone.text.trim().isNotEmpty) &&
+          : _name.text.trim().isNotEmpty &&
+                _phone.text.trim().isNotEmpty &&
+                _visitPath != null) &&
       _roundCount > 0 &&
       _paymentWon > 0;
 
@@ -85,6 +93,7 @@ class _RegisterScreenState extends State<_RegisterScreen> {
     } else {
       if (_name.text.trim().isEmpty) return '성함을 입력해주세요';
       if (_phone.text.trim().isEmpty) return '연락처를 입력해주세요';
+      if (_visitPath == null) return '방문 경로를 골라주세요';
     }
     if (_roundCount <= 0) return '회차를 입력해주세요';
     if (_paymentWon <= 0) return '결제액을 입력해주세요';
@@ -132,6 +141,7 @@ class _RegisterScreenState extends State<_RegisterScreen> {
           branchId: me.branchId,
           ownerTrainerId: me.id,
           referrerMemberId: _referrer?.id,
+          visitPath: _visitPath,
           type: RegistrationType.newMember,
           totalSessions: _roundCount,
           pricePaid: _paymentWon,
@@ -198,6 +208,10 @@ class _RegisterScreenState extends State<_RegisterScreen> {
                                     _FormField(controller: _phone, hint: ''),
                                     SizedBox(height: 8),
                                     _PickerField(label: '', value: null),
+                                    // 신규 탭에 방문 경로가 생겨서 여기도
+                                    // 같이 늘려야 등록권 위치가 안 어긋난다
+                                    SizedBox(height: 16),
+                                    _VisitPathPicker(value: null),
                                   ],
                                 ),
                               ),
@@ -312,6 +326,11 @@ class _RegisterScreenState extends State<_RegisterScreen> {
                             ),
                           ),
                         ],
+                        SizedBox(height: 16),
+                        _VisitPathPicker(
+                          value: _visitPath,
+                          onPick: (path) => setState(() => _visitPath = path),
+                        ),
                         SizedBox(height: 24),
                       ],
                       Padding(
@@ -642,6 +661,62 @@ class _FormField extends StatelessWidget {
 }
 
 /// 눌러서 고르는 칸 — 입력 칸과 같은 모양이라 폼에서 줄이 맞는다
+/// 방문 경로 고르개 — 다섯 중 하나를 반드시 고른다
+///
+/// 칩으로 늘어놓는다. 다섯 개뿐이라 한눈에 다 보이고, 필수 값이라
+/// 시트를 여는 한 단계를 더 두지 않는 게 낫다.
+///
+/// [onPick] 이 없으면 **눌리지 않는다** — 재등록 탭에서 높이만 맞추려고
+/// 투명하게 깔 때 쓴다.
+class _VisitPathPicker extends StatelessWidget {
+  _VisitPathPicker({required this.value, this.onPick});
+
+  final VisitPath? value;
+  final ValueChanged<VisitPath>? onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 4),
+          child: Text('방문 경로', style: AppTextStyles.label),
+        ),
+        SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final path in VisitPath.values)
+              Pressable(
+                onTap: onPick == null ? () {} : () => onPick!(path),
+                scale: 0.96,
+                child: AnimatedContainer(
+                  duration: Duration(milliseconds: 140),
+                  padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: path == value ? AppColors.primary : AppColors.gray50,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    path.label,
+                    style: AppTextStyles.body2.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: path == value
+                          ? AppColors.surface
+                          : AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
 class _PickerField extends StatelessWidget {
   _PickerField({
     required this.label,

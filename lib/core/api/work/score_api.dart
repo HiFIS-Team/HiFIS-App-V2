@@ -47,6 +47,9 @@ class RankingRow {
     required this.care,
     required this.lessons,
     required this.lessonScore,
+    required this.blogScore,
+    required this.instaScore,
+    required this.otptScore,
     required this.lastRank,
   });
 
@@ -66,6 +69,9 @@ class RankingRow {
     care: json['care'] as int? ?? 0,
     lessons: json['lessons'] as int? ?? 0,
     lessonScore: json['lessonScore'] as int? ?? 0,
+    blogScore: json['blogScore'] as int? ?? 0,
+    instaScore: json['instaScore'] as int? ?? 0,
+    otptScore: json['otptScore'] as int? ?? 0,
     lastRank: [
       for (final r in (json['lastRank'] as List<dynamic>? ?? const []))
         r as int,
@@ -98,7 +104,18 @@ class RankingRow {
   final int lessons;
   final int lessonScore;
 
+  /// 방문 경로로 붙은 유입 점수 — 회원 등록 한 건에 5점씩
+  ///
+  /// 워크인·지인소개는 점수가 없어서 칸도 없다. 셋을 따로 두는 건
+  /// 점수 내역이 '블로그 10 · 인스타 5' 처럼 갈라서 보여주기 때문이다.
+  final int blogScore;
+  final int instaScore;
+  final int otptScore;
+
   /// 지난달 순위 — [매출, 친절, 프로젝트, 환경, 수업, 종합]. **0 이면 순위 없음**
+  ///
+  /// **방문 경로는 여기 없다** — 종합 점수에는 들어가지만 랭킹 탭으로는
+  /// 안 센다 (칸을 늘리면 종합의 자리가 밀린다).
   final List<int> lastRank;
 }
 

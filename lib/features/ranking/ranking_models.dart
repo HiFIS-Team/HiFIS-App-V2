@@ -46,6 +46,9 @@ class _Ranker {
     required this.care,
     required this.lessons,
     required this.lessonScore,
+    required this.blogScore,
+    required this.instaScore,
+    required this.otptScore,
     required this.lastRank,
   });
 
@@ -66,6 +69,9 @@ class _Ranker {
     care: row.care,
     lessons: row.lessons,
     lessonScore: row.lessonScore,
+    blogScore: row.blogScore,
+    instaScore: row.instaScore,
+    otptScore: row.otptScore,
     lastRank: row.lastRank,
   );
 
@@ -99,6 +105,14 @@ class _Ranker {
   /// 이번 달 수행한 수업(세션) 개수와 그것으로 쌓인 점수
   final int lessons;
   final int lessonScore;
+
+  /// 방문 경로로 붙은 유입 점수 — 회원 등록 한 건에 5점씩
+  ///
+  /// 워크인·지인소개는 점수가 없어서 칸도 없다. 종합 점수에는 셋을 합쳐
+  /// 한 항목으로 들어가고, 점수 내역에서는 갈라서 보여준다.
+  final int blogScore;
+  final int instaScore;
+  final int otptScore;
 
   /// 지난달 순위 — [_Metric] 순서대로 (0이면 지난달엔 순위가 없었다)
   final List<int> lastRank;

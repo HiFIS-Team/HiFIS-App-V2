@@ -10,6 +10,8 @@ class _RankList extends StatelessWidget {
     required this.entries,
     required this.metric,
     required this.startsAt,
+    this.onPick,
+    this.picked,
   });
 
   final List<_Entry> entries;
@@ -17,6 +19,12 @@ class _RankList extends StatelessWidget {
 
   /// 목록이 몇 위부터 시작하는지 (머리말에 쓴다)
   final int startsAt;
+
+  /// 줄을 누르면 점수 내역을 연다 — **종합 탭에서만 들어온다**
+  final void Function(_Ranker ranker)? onPick;
+
+  /// 지금 내역이 열려 있는 사람 (그 줄을 눌린 상태로 둔다)
+  final String? picked;
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +50,12 @@ class _RankList extends StatelessWidget {
                 padding: EdgeInsets.symmetric(horizontal: 10),
                 child: Container(height: 1, color: AppColors.divider),
               ),
-            _RankRow(entry: entries[i], metric: metric),
+            _RankRow(
+              entry: entries[i],
+              metric: metric,
+              onPick: onPick,
+              picked: picked == entries[i].ranker.id,
+            ),
           ],
         ],
       ),
@@ -51,20 +64,47 @@ class _RankList extends StatelessWidget {
 }
 
 class _RankRow extends StatelessWidget {
-  _RankRow({required this.entry, required this.metric});
+  _RankRow({
+    required this.entry,
+    required this.metric,
+    this.onPick,
+    this.picked = false,
+  });
 
   final _Entry entry;
   final _Metric metric;
 
+  /// 있으면 줄이 눌린다 (종합 탭)
+  final void Function(_Ranker ranker)? onPick;
+
+  /// 지금 이 사람의 점수 내역이 열려 있는가
+  final bool picked;
+
   @override
   Widget build(BuildContext context) {
     final mine = entry.ranker.isMe;
+    final row = _row(mine);
+    // 누를 수 없는 탭에서는 예전 그대로 — 누름 효과도 안 생긴다
+    if (onPick == null) return row;
+    return Pressable(
+      onTap: () => onPick!(entry.ranker),
+      scale: 0.995,
+      child: row,
+    );
+  }
 
+  Widget _row(bool mine) {
     return Container(
       height: 56,
       padding: EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        color: mine ? AppColors.primaryLight : Colors.transparent,
+        // 내역을 연 줄은 회색 면으로 어디를 눌렀는지 남긴다
+        // (내 줄의 파란 면이 우선이다 — 내 자리를 잃으면 안 된다)
+        color: mine
+            ? AppColors.primaryLight
+            : picked
+            ? AppColors.gray50
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(

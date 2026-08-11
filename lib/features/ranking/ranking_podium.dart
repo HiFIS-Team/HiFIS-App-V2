@@ -6,13 +6,24 @@ part of 'ranking_screen.dart';
 
 /// TOP 3 시상대 — 가운데가 1위, 받침대 높이로 등수를 보여준다
 class _Podium extends StatelessWidget {
-  _Podium({required this.top, required this.metric, this.big = false});
+  _Podium({
+    required this.top,
+    required this.metric,
+    this.big = false,
+    this.onPick,
+  });
 
   final List<_Entry> top;
   final _Metric metric;
 
   /// 폰은 이 화면의 주인공이라 카드 없이 크게 세운다
   final bool big;
+
+  /// 시상대를 누르면 점수 내역을 연다 — **종합 탭에서만 들어온다**
+  ///
+  /// 1~3위는 순위표(4위부터)에 없어서, 여기가 없으면 상위 세 명의 내역을
+  /// 볼 길이 아예 없다.
+  final void Function(_Ranker ranker)? onPick;
 
   /// 2위 · 1위 · 3위 순서로 세워야 1위가 가운데에 온다
   List<_Entry?> get _order => [
@@ -30,7 +41,14 @@ class _Podium extends StatelessWidget {
           Expanded(
             child: entry == null
                 ? SizedBox()
-                : _Step(entry: entry, metric: metric, big: big),
+                : onPick == null
+                // 누를 수 없는 탭에서는 예전 그대로 — 누름 효과도 안 생긴다
+                ? _Step(entry: entry, metric: metric, big: big)
+                : Pressable(
+                    onTap: () => onPick!(entry.ranker),
+                    scale: 0.97,
+                    child: _Step(entry: entry, metric: metric, big: big),
+                  ),
           ),
       ],
     );

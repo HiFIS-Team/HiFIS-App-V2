@@ -33,6 +33,7 @@ part 'ranking_overtake.dart';
 part 'ranking_myrank.dart';
 part 'ranking_podium.dart';
 part 'ranking_table.dart';
+part 'ranking_breakdown.dart';
 
 /// 랭킹 화면
 ///
@@ -123,10 +124,51 @@ class _RankingScreenState extends State<RankingScreen> {
     onSelect: (i) => setState(() => _tab = i),
   );
 
+  /// 점수 내역이 열려 있는 사람 — **종합 탭에서만** 채워진다
+  ///
+  /// 사람 id 로 들고 있는다. 객체로 들면 목록을 다시 받았을 때 옛 인스턴스가
+  /// 남아 값이 안 갱신된다.
+  String? _pickedId;
+
+  /// 종합 탭에서만 사람을 누를 수 있다 — 다른 탭은 예전 그대로다
+  bool get _canPick => _metric == _Metric.overall;
+
+  void _pick(_Ranker ranker) {
+    if (!isDesktop) {
+      showModalBottomSheet<void>(
+        context: context,
+        backgroundColor: Colors.transparent,
+        builder: (_) => SafeArea(
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+            child: _ScoreBreakdown(ranker: ranker),
+          ),
+        ),
+      );
+      return;
+    }
+    // PC 는 순위표 옆에 판을 편다. 같은 사람을 다시 누르면 접는다
+    setState(() => _pickedId = _pickedId == ranker.id ? null : ranker.id);
+  }
+
   List<Widget> _body(List<_Entry> entries) {
     final top = entries.take(3).toList();
     final rest = entries.skip(3).toList();
-    final podium = _Podium(top: top, metric: _metric, big: !isDesktop);
+    final podium = _Podium(
+      top: top,
+      metric: _metric,
+      big: !isDesktop,
+      onPick: _canPick ? _pick : null,
+    );
+
+    // 열어 둔 사람이 지금 목록에 없으면(지점·탭을 옮겼다) 판을 접는다
+    final picked = !_canPick
+        ? null
+        : entries
+              .where((e) => e.ranker.id == _pickedId)
+              .map((e) => e.ranker)
+              .firstOrNull;
 
     // 대표·관리자는 실적이 없어 '내 순위'가 늘 비어 있다.
     // 그 자리에 누가 누구를 앞질렀는지를 대신 놓는다.
@@ -167,9 +209,36 @@ class _RankingScreenState extends State<RankingScreen> {
         myCard,
       ],
       SizedBox(height: isDesktop ? 16 : 12),
-      _RankList(entries: rest, metric: _metric, startsAt: top.length + 1),
+      // 종합에서 사람을 고르면 PC 는 순위표 옆에 점수 내역을 편다.
+      // 폰은 시트로 뜨므로 목록 폭이 안 바뀐다.
+      if (picked != null && isDesktop)
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(flex: 2, child: _rankList(rest, top.length + 1, picked)),
+            SizedBox(width: 16),
+            SizedBox(
+              width: 268,
+              child: _ScoreBreakdown(
+                ranker: picked,
+                onClose: () => setState(() => _pickedId = null),
+              ),
+            ),
+          ],
+        )
+      else
+        _rankList(rest, top.length + 1, picked),
     ];
   }
+
+  Widget _rankList(List<_Entry> rest, int startsAt, _Ranker? picked) =>
+      _RankList(
+        entries: rest,
+        metric: _metric,
+        startsAt: startsAt,
+        onPick: _canPick ? _pick : null,
+        picked: picked?.id,
+      );
 
   @override
   Widget build(BuildContext context) {

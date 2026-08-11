@@ -37,6 +37,33 @@ enum RegistrationStatus {
       );
 }
 
+/// 회원이 어떻게 알고 왔나 — 서버 `VisitPath`
+///
+/// **뒤 셋만 담당 트레이너에게 5점이 붙는다.** 워크인·지인소개는 직원이
+/// 끌어온 것이 아니라서 뺀다 (점수는 서버가 등록할 때 한 번 매긴다).
+enum VisitPath {
+  walkIn('WALK_IN', '워크인'),
+  referral('REFERRAL', '지인소개'),
+  blog('BLOG', '블로그'),
+  instagram('INSTAGRAM', '인스타'),
+  otToPt('OT_TO_PT', 'OT → PT');
+
+  const VisitPath(this.wire, this.label);
+
+  final String wire;
+  final String label;
+
+  /// 모르는 값·빈 값은 **null** — 이 칸이 생기기 전 회원이 그렇다.
+  /// 아무 값으로나 떨어뜨리면 안 물어본 경로가 사실처럼 남는다.
+  static VisitPath? parse(String? value) {
+    if (value == null) return null;
+    for (final path in VisitPath.values) {
+      if (path.wire == value) return path;
+    }
+    return null;
+  }
+}
+
 /// 센터 회원 (서버 `MemberOut`)
 class Member {
   Member({
@@ -47,6 +74,7 @@ class Member {
     required this.ownerTrainerId,
     required this.registeredAt,
     this.referrerMemberId,
+    this.visitPath,
     this.memo,
   });
 
@@ -58,6 +86,7 @@ class Member {
     ownerTrainerId: json['ownerTrainerId'] as String,
     registeredAt: DateTime.parse(json['registeredAt'] as String).toLocal(),
     referrerMemberId: json['referrerMemberId'] as String?,
+    visitPath: VisitPath.parse(json['visitPath'] as String?),
     memo: json['memo'] as String?,
   );
 
@@ -71,6 +100,9 @@ class Member {
 
   /// 소개한 회원 — 이름이 아니라 회원 id 다
   final String? referrerMemberId;
+
+  /// 어떻게 알고 왔나 — **이 칸이 생기기 전에 등록된 회원은 null 이다**
+  final VisitPath? visitPath;
 
   final DateTime registeredAt;
   final String? memo;
@@ -261,6 +293,7 @@ class MemberApi {
     required String branchId,
     required String ownerTrainerId,
     String? referrerMemberId,
+    VisitPath? visitPath,
     String? memo,
     RegistrationType? type,
     int? totalSessions,
@@ -275,6 +308,7 @@ class MemberApi {
         'branchId': branchId,
         'ownerTrainerId': ownerTrainerId,
         'referrerMemberId': ?referrerMemberId,
+        'visitPath': ?visitPath?.wire,
         'memo': ?memo,
         if (totalSessions != null)
           'registration': {
