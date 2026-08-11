@@ -51,6 +51,18 @@ const phoneCardBody = 154.0;
 /// 폰 홈 카드에 세우는 줄 수 — 네 장이 같아야 나란히 놓았을 때 안 어긋난다
 const phoneCardRows = 3;
 
+/// PC 홈 카드 **한 쌍**의 최소 높이 — 안이 비어도 네모가 안 줄어든다
+///
+/// PC 는 네 장을 두 장씩 두 줄로 놓고 `IntrinsicHeight` 로 높이를 맞춘다.
+/// 그래서 **한 쌍이 둘 다 비면 그 줄이 통째로 쪼그라든다** — 개발 서버에서는
+/// 값이 있어 안 보이다가 앱을 깔고 보니 확 줄어 있었다 (실제로 겪었다).
+///
+/// 값은 네 줄이 다 찼을 때의 높이다 — 카드 여백 40 · 머리말 24 ·
+/// 머리말 아래 14 · 줄 42×4 + 줄 사이 14×3.
+///
+/// **최소값이라 줄이 더 많으면 카드는 따라 커진다** ([phoneCardBody] 와 같은 뜻).
+const desktopCardPair = 290.0;
+
 /// 홈 화면 — 모든 직원이 처음 보는 화면
 ///
 /// 오늘 근무는 `/me/home` 에서 온다. 지점 집계인 `/dashboard` 와 달리
@@ -214,18 +226,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 // 두 칸으로 놓는다.
                 if (myRole == Role.master || myRole == Role.admin) ...[
                   if (desktop)
-                    IntrinsicHeight(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Expanded(child: _InboxCard(onOpen: widget.onOpen)),
-                          SizedBox(width: 16),
-                          Expanded(
-                            child: _TodayStaffCard(
-                              onOpenAll: widget.onOpenAttendance,
+                    ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: desktopCardPair),
+                      child: IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(child: _InboxCard(onOpen: widget.onOpen)),
+                            SizedBox(width: 16),
+                            Expanded(
+                              child: _TodayStaffCard(
+                                onOpenAll: widget.onOpenAttendance,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     )
                   else ...[
@@ -237,26 +252,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   _HeroStatusCard(attendance: _summary?.attendance),
                 SizedBox(height: 16),
                 if (desktop)
-                  // 두 카드의 높이를 큰 쪽에 맞춰 같게 만든다
-                  IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          child: _ProjectsCard(
-                            count: 5,
-                            onOpenAll: widget.onOpenProjects,
-                            onChanged: _refresh,
+                  // 두 카드의 높이를 큰 쪽에 맞추고, 둘 다 비어도 안 줄어들게 한다
+                  ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: desktopCardPair),
+                    child: IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: _ProjectsCard(
+                              count: 5,
+                              onOpenAll: widget.onOpenProjects,
+                              onChanged: _refresh,
+                            ),
                           ),
-                        ),
-                        SizedBox(width: 16),
-                        Expanded(
-                          child: _NoticeCard(
-                            onOpenAll: widget.onOpenNotices,
-                            onChanged: _refresh,
+                          SizedBox(width: 16),
+                          Expanded(
+                            child: _NoticeCard(
+                              onOpenAll: widget.onOpenNotices,
+                              onChanged: _refresh,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   )
                 else ...[
