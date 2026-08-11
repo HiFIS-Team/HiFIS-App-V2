@@ -204,21 +204,55 @@ class _AndroidTabBarState extends State<AndroidTabBar>
               ),
             ],
           ),
-          child: Transform.rotate(
-            // 펼쳐질 때 살짝 돌면서 X로 바뀐다
-            angle: _controller.value * math.pi * 0.25,
-            child: _controller.value > 0.5
-                ? Icon(Icons.close_rounded, size: 24, color: Colors.white)
-                : Text(
-                    '전체',
-                    style: AppTextStyles.label.copyWith(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-          ),
+          child: _centerFace(),
         ),
+      ),
+    );
+  }
+
+  /// 가운데 버튼 속 얼굴 — '전체' 가 작아지며 빠지고 더하기가 커지며 들어온다
+  ///
+  /// **둘을 겹쳐서 같이 움직인다.** 예전에는 `value > 0.5` 로 글자와 X 를
+  /// 딱 바꿔치기해서 중간이 없었다 — 반원은 부드럽게 펼쳐지는데 가운데만
+  /// 툭 끊겼다.
+  ///
+  /// 45° 돌면 더하기가 그대로 X 가 되므로 아이콘을 따로 두지 않는다
+  /// (닫기 표시는 그대로 남는다).
+  Widget _centerFace() {
+    final t = _controller.value.clamp(0.0, 1.0);
+
+    // 글자는 앞쪽 절반에서 빠지고, 더하기는 뒤쪽 절반에서 들어온다.
+    // 겹치는 구간을 조금 둬야 빈 순간 없이 이어진다.
+    final outOpacity = (1 - t / 0.55).clamp(0.0, 1.0);
+    final inOpacity = ((t - 0.35) / 0.45).clamp(0.0, 1.0);
+
+    return Transform.rotate(
+      angle: t * math.pi * 0.25,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Opacity(
+            opacity: outOpacity,
+            child: Transform.scale(
+              scale: 1 - t * 0.45,
+              child: Text(
+                '전체',
+                style: AppTextStyles.label.copyWith(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+          Opacity(
+            opacity: inOpacity,
+            child: Transform.scale(
+              scale: 0.55 + inOpacity * 0.45,
+              child: Icon(Icons.add_rounded, size: 24, color: Colors.white),
+            ),
+          ),
+        ],
       ),
     );
   }
