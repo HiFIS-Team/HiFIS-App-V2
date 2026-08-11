@@ -62,12 +62,13 @@ class AppDelegate: FlutterAppDelegate, UNUserNotificationCenterDelegate {
       }
   }
 
+  // **`super` 를 부르지 않는다.** macOS 의 `FlutterAppDelegate` 는 이 둘을
+  // 구현하지 않아서, 부르면 실행 중에 `unrecognized selector` 로 앱이 죽는다
+  // (컴파일은 통과한다 — 실제로 겪었다). iOS 는 UIKit 쪽이 구현하고 있어 다르다.
   override func application(
     _ application: NSApplication,
     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
   ) {
-    super.application(
-      application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
     let token = deviceToken.map { String(format: "%02x", $0) }.joined()
     pushChannel?.invokeMethod(
       "onToken",
@@ -79,7 +80,6 @@ class AppDelegate: FlutterAppDelegate, UNUserNotificationCenterDelegate {
     _ application: NSApplication,
     didFailToRegisterForRemoteNotificationsWithError error: Error
   ) {
-    super.application(application, didFailToRegisterForRemoteNotificationsWithError: error)
     NSLog("푸시 등록 실패: \(error.localizedDescription)")
   }
 
