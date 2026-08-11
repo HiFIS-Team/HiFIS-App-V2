@@ -17,6 +17,7 @@ void showPhotoViewer(
   required String title,
   required DateTime time,
 }) {
+  photoViewerOpen.value = true;
   Navigator.push<void>(
     context,
     PageRouteBuilder<void>(
@@ -30,8 +31,17 @@ void showPhotoViewer(
       transitionsBuilder: (_, animation, _, child) =>
           FadeTransition(opacity: animation, child: child),
     ),
-  );
+  ).whenComplete(() => photoViewerOpen.value = false);
 }
+
+/// 사진 크게 보기가 떠 있는지 — **대화방 헤더의 글래스 버튼을 끄는 데 쓴다**
+///
+/// 뷰어의 닫기 `<` 와 헤더의 `<` 가 화면에서 같은 자리에 겹친다. 글래스는
+/// 애플에서 네이티브 버튼이라 **눌림 효과가 검은 배경 위로 그려져서**,
+/// 닫기를 누를 때 밑의 헤더 버튼까지 눌리며 흰 글래스가 번져 올라온다
+/// (실제 발생). 떠 있는 동안 헤더 버튼을 `enabled: false` 로 둬서 막는다 —
+/// 모양은 그대로고 터치만 안 먹는다 (main_shell 의 오버레이 처리와 같은 방법).
+final photoViewerOpen = ValueNotifier<bool>(false);
 
 class _PhotoViewer extends StatefulWidget {
   _PhotoViewer({

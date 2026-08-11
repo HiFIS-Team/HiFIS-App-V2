@@ -719,9 +719,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               padding: EdgeInsets.only(top: 8, left: 16, right: 16),
               child: Row(
                 children: [
-                  GlassIconButton(
-                    symbol: 'chevron.backward',
-                    onPressed: () => Navigator.pop(context),
+                  // 사진 크게 보기가 떠 있는 동안은 터치를 안 받는다 —
+                  // 뷰어의 닫기 `<` 와 자리가 겹쳐서 같이 눌린다
+                  // (chat_photo_viewer.dart 의 photoViewerOpen 참고)
+                  ValueListenableBuilder<bool>(
+                    valueListenable: photoViewerOpen,
+                    builder: (_, open, _) => GlassIconButton(
+                      symbol: 'chevron.backward',
+                      enabled: !open,
+                      onPressed: () => Navigator.pop(context),
+                    ),
                   ),
                   SizedBox(width: 4),
                   // 이름 영역 탭 → 채팅방 상세로 이동
