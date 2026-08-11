@@ -15,7 +15,6 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/display/avatar.dart';
 import '../../core/widgets/display/page_numbers.dart';
 import '../../core/widgets/feedback/app_toast.dart';
-import '../../core/widgets/feedback/delayed_spinner.dart';
 import '../../core/widgets/feedback/empty_card.dart';
 import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/input/pressable.dart';
@@ -26,6 +25,7 @@ import 'panels/anomaly_panel.dart';
 import 'panels/chat_audit_panel.dart';
 import 'panels/performance_panel.dart';
 import '../../core/util/when.dart';
+import '../../core/widgets/feedback/skeleton.dart';
 part 'monitoring_grass.dart';
 part 'monitoring_summary.dart';
 part 'monitoring_top.dart';
@@ -309,7 +309,28 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
         height: (MediaQuery.sizeOf(context).height - 300).clamp(420.0, 1000.0),
       );
     }
-    if (_loading) return DelayedSpinner();
+    if (_loading) {
+      return SkeletonGroup(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SkeletonCard(
+              padding: EdgeInsets.all(20),
+              children: [
+                Skeleton(width: 110, height: 14),
+                SizedBox(height: 18),
+                Skeleton(height: 96, radius: 12),
+              ],
+            ),
+            SizedBox(height: 16),
+            SkeletonCard(
+              padding: EdgeInsets.all(20),
+              children: [SkeletonRows(rows: 7, trailing: 72)],
+            ),
+          ],
+        ),
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

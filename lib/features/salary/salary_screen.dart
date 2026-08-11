@@ -182,13 +182,48 @@ class _SalaryScreenState extends State<SalaryScreen> {
   Widget build(BuildContext context) {
     if (_loading || _payslips.isEmpty) {
       if (!isDesktop) return _SalarySkeleton();
-      return Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 2.4,
-            valueColor: AlwaysStoppedAnimation(AppColors.primary),
+      return SkeletonDesktopPage(
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: SkeletonCard(
+                  padding: EdgeInsets.all(20),
+                  children: [
+                    Skeleton(width: 84, height: 13),
+                    SizedBox(height: 14),
+                    Skeleton(width: 190, height: 30, radius: 8),
+                    SizedBox(height: 12),
+                    Skeleton(width: 140, height: 12),
+                  ],
+                ),
+              ),
+              SizedBox(width: 16),
+              Expanded(
+                child: SkeletonCard(
+                  padding: EdgeInsets.all(20),
+                  children: [
+                    Skeleton(width: 120, height: 13),
+                    SizedBox(height: 14),
+                    Skeleton(height: 11),
+                    SizedBox(height: 16),
+                    Skeleton(height: 48, radius: 14),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ),
+          SizedBox(height: 16),
+          SkeletonCard(
+            padding: EdgeInsets.all(20),
+            children: [
+              Skeleton(width: 72, height: 14),
+              SizedBox(height: 18),
+              SkeletonRows(rows: 5, avatar: 0, trailing: 92),
+            ],
+          ),
+        ],
       );
     }
 

@@ -19,6 +19,7 @@ import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/input/app_button.dart';
 import '../../core/theme/app_shadows.dart';
+import '../../core/widgets/feedback/skeleton.dart';
 
 part 'document_models.dart';
 part 'document_sidebar.dart';
@@ -677,14 +678,7 @@ class _DocumentScreenState extends State<DocumentScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 2.4,
-            valueColor: AlwaysStoppedAnimation(AppColors.primary),
-          ),
-        ),
-      );
+      return SkeletonTwoPane(rows: 7, filter: false);
     }
 
     final items = _visible;

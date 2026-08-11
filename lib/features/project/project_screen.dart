@@ -201,14 +201,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
   Widget build(BuildContext context) {
     if (_loading) {
       if (!isDesktop) return _ProjectSkeleton();
-      return Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 2.4,
-            valueColor: AlwaysStoppedAnimation(AppColors.primary),
-          ),
-        ),
-      );
+      return SkeletonTwoPane(rows: 5);
     }
 
     final list = _visible;

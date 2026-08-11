@@ -330,16 +330,27 @@ class _MonthPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 106,
-      alignment: Alignment.center,
-      decoration: AppDecorations.card(),
-      child: SizedBox(
-        width: 18,
-        height: 18,
-        child: CircularProgressIndicator(
-          strokeWidth: 2,
-          valueColor: AlwaysStoppedAnimation(AppColors.gray300),
+    return SkeletonGroup(
+      child: Container(
+        height: 106,
+        padding: EdgeInsets.all(20),
+        decoration: AppDecorations.card(),
+        child: Row(
+          children: [
+            for (var i = 0; i < 3; i++) ...[
+              if (i > 0) SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Skeleton(width: 34, height: 20),
+                    SizedBox(height: 8),
+                    Skeleton(width: 44, height: 11),
+                  ],
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );

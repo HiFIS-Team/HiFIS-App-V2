@@ -217,12 +217,7 @@ class _InboxCardState extends State<_InboxCard> {
     final Widget body;
     final bool centered = _loading || rows.isEmpty;
     if (_loading) {
-      body = Center(
-        child: CircularProgressIndicator(
-          strokeWidth: 2.4,
-          valueColor: AlwaysStoppedAnimation(AppColors.primary),
-        ),
-      );
+      body = SkeletonGroup(child: SkeletonRows(rows: 3, trailing: 56));
     } else if (rows.isEmpty) {
       // 결재함이 비었다는 뜻이라 월차·급여 결재함과 같은 쟁반 아이콘을 쓴다
       body = Center(

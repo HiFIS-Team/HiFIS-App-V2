@@ -122,3 +122,54 @@ class _DocDetailScreenState extends State<_DocDetailScreen> {
     ),
   );
 }
+
+/// 받아오는 동안의 뼈대 — 상태 탭과 결재 카드 자리를 잡아 둔다
+class _ApprovalSkeleton extends StatelessWidget {
+  _ApprovalSkeleton();
+
+  @override
+  Widget build(BuildContext context) => SkeletonGroup(
+    child: PhoneDetailScaffold(
+      title: '전자결재',
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          PhoneDetailScaffold.topPadding,
+          20,
+          bottomBarInset(context),
+        ),
+        children: [
+          // _StateTabs 와 같은 높이(44)
+          Skeleton(height: 44, radius: 14),
+          SizedBox(height: 16),
+          for (var i = 0; i < 4; i++) ...[
+            if (i > 0) SizedBox(height: 12),
+            SkeletonCard(
+              children: [
+                Row(
+                  children: [
+                    Skeleton(width: 52, height: 20, radius: 10),
+                    SizedBox(width: 8),
+                    Skeleton(width: 120, height: 14),
+                    Spacer(),
+                    Skeleton(width: 40, height: 11),
+                  ],
+                ),
+                SizedBox(height: 12),
+                Skeleton(width: 200, height: 11),
+                SizedBox(height: 14),
+                Row(
+                  children: [
+                    SkeletonCircle(size: 22),
+                    SizedBox(width: 8),
+                    Skeleton(width: 96, height: 11),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    ),
+  );
+}

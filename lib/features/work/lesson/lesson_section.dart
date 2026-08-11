@@ -24,6 +24,7 @@ import '../../../core/widgets/input/pressable.dart';
 import '../../../core/widgets/input/see_all_button.dart';
 import '../../../core/util/when.dart';
 import '../work_skeleton.dart';
+import '../../../core/widgets/feedback/skeleton.dart';
 part 'lesson_data.dart';
 part 'lesson_cards.dart';
 part 'lesson_history.dart';

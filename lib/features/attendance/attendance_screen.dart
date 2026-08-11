@@ -201,13 +201,67 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   Widget build(BuildContext context) {
     if (_loading) {
       if (!isDesktop) return _AttendanceSkeleton();
-      return Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 2.4,
-            valueColor: AlwaysStoppedAnimation(AppColors.primary),
+      return SkeletonDesktopPage(
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 3,
+                child: SkeletonCard(
+                  padding: EdgeInsets.all(20),
+                  children: [
+                    Skeleton(width: 96, height: 14),
+                    SizedBox(height: 18),
+                    SkeletonRows(rows: 2, avatar: 0, trailing: 56),
+                  ],
+                ),
+              ),
+              SizedBox(width: 16),
+              Expanded(
+                flex: 2,
+                child: SkeletonCard(
+                  padding: EdgeInsets.all(20),
+                  children: [
+                    Skeleton(width: 72, height: 14),
+                    SizedBox(height: 18),
+                    SkeletonRows(rows: 2, avatar: 0, trailing: 56),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ),
+          SizedBox(height: 16),
+          SkeletonCard(
+            padding: EdgeInsets.fromLTRB(14, 18, 14, 14),
+            children: [
+              Row(
+                children: [
+                  SkeletonCircle(size: 18),
+                  SizedBox(width: 10),
+                  Skeleton(width: 110, height: 18),
+                  SizedBox(width: 10),
+                  SkeletonCircle(size: 18),
+                ],
+              ),
+              SizedBox(height: 20),
+              for (var row = 0; row < 5; row++)
+                Row(
+                  children: [
+                    for (var col = 0; col < 7; col++)
+                      Expanded(
+                        child: SizedBox(
+                          height: 84,
+                          child: Center(
+                            child: Skeleton(width: 26, height: 26, radius: 8),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+            ],
+          ),
+        ],
       );
     }
 

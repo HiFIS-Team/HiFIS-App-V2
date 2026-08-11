@@ -205,14 +205,7 @@ class _NoticeScreenState extends State<NoticeScreen> {
   Widget build(BuildContext context) {
     if (_loading) {
       if (!isDesktop) return _NoticeSkeleton();
-      return Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 2.4,
-            valueColor: AlwaysStoppedAnimation(AppColors.primary),
-          ),
-        ),
-      );
+      return SkeletonTwoPane(rows: 6);
     }
 
     final list = _visible;

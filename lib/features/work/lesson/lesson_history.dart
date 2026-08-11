@@ -121,12 +121,9 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen> {
                 Container(height: 1, color: AppColors.gray100),
                 if (_loading)
                   Padding(
-                    padding: EdgeInsets.fromLTRB(24, 40, 24, 44),
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.4,
-                        valueColor: AlwaysStoppedAnimation(AppColors.primary),
-                      ),
+                    padding: EdgeInsets.fromLTRB(24, 24, 24, 24),
+                    child: SkeletonGroup(
+                      child: SkeletonRows(rows: 5, trailing: 56),
                     ),
                   )
                 else if (sorted.isEmpty)

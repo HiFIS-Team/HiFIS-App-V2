@@ -328,13 +328,10 @@ class _ApprovalTabState extends State<_ApprovalTab> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return Padding(
-        padding: EdgeInsets.symmetric(vertical: 60),
-        child: Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 2.4,
-            valueColor: AlwaysStoppedAnimation(AppColors.primary),
-          ),
+      return SkeletonGroup(
+        child: SkeletonCard(
+          padding: EdgeInsets.all(20),
+          children: [SkeletonRows(rows: 5, trailing: 84)],
         ),
       );
     }

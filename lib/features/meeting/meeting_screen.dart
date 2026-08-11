@@ -154,14 +154,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
   Widget build(BuildContext context) {
     if (_loading) {
       if (!isDesktop) return _MeetingSkeleton();
-      return Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 2.4,
-            valueColor: AlwaysStoppedAnimation(AppColors.primary),
-          ),
-        ),
-      );
+      return SkeletonTwoPane(rows: 6, filter: false);
     }
 
     final list = _sorted;

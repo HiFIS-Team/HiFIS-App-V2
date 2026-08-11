@@ -86,6 +86,63 @@ class SkeletonCard extends StatelessWidget {
   );
 }
 
+/// 줄이 늘어선 목록 뼈대 — 아바타 · 두 줄 · 오른쪽 값
+///
+/// 사람이나 문서가 줄줄이 서는 자리(알림·전자결재·조직도·문서함·초대키)가
+/// 다 같은 짜임이라 하나로 쓴다. 카드 껍데기는 두르지 않으므로 필요하면
+/// [SkeletonCard] 안에 넣는다.
+class SkeletonRows extends StatelessWidget {
+  SkeletonRows({
+    super.key,
+    this.rows = 5,
+    this.avatar = 32,
+    this.gap = 18,
+    this.trailing = 44,
+  });
+
+  final int rows;
+
+  /// 왼쪽 동그라미 지름 — 0 이면 안 그린다 (문서함처럼 아이콘이 없는 목록)
+  final double avatar;
+  final double gap;
+
+  /// 오른쪽 끝 값의 폭 — 0 이면 안 그린다
+  final double trailing;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      for (var i = 0; i < rows; i++) ...[
+        if (i > 0) SizedBox(height: gap),
+        Row(
+          children: [
+            if (avatar > 0) ...[
+              SkeletonCircle(size: avatar),
+              SizedBox(width: 12),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 줄마다 길이를 조금씩 달리해서 진짜 글처럼 보이게 한다
+                  Skeleton(width: 132.0 + (i % 3) * 26, height: 12),
+                  SizedBox(height: 7),
+                  Skeleton(width: 78.0 + (i % 2) * 30, height: 10),
+                ],
+              ),
+            ),
+            if (trailing > 0) ...[
+              SizedBox(width: 10),
+              Skeleton(width: trailing, height: 12),
+            ],
+          ],
+        ),
+      ],
+    ],
+  );
+}
+
 /// 반짝임을 굴리는 껍데기 — 뼈대를 쓰는 화면을 이걸로 감싼다
 ///
 /// 컨트롤러가 **화면당 하나**라 뼈대가 몇 개든 같은 박자로 흐른다.
@@ -155,5 +212,78 @@ LinearGradient _sweep(double at) {
       at.clamp(0.0, 1.0),
       (at + _halo).clamp(0.0, 1.0),
     ],
+  );
+}
+
+/// PC 한 장 화면 뼈대 — 머리말(제목·한 줄 설명) + 본문
+///
+/// 근태·급여·조직도·모니터링처럼 `DesktopHeader` 아래로 카드가 쌓이는 화면이
+/// 다 같은 여백(24·64·32)을 쓴다.
+class SkeletonDesktopPage extends StatelessWidget {
+  SkeletonDesktopPage({super.key, required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => SkeletonGroup(
+    child: Scaffold(
+      body: SafeArea(
+        bottom: false,
+        child: ListView(
+          padding: EdgeInsets.fromLTRB(24, 64, 24, 32),
+          children: [
+            Skeleton(width: 150, height: 30, radius: 8),
+            SizedBox(height: 10),
+            Skeleton(width: 250, height: 13),
+            SizedBox(height: 22),
+            ...children,
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+/// PC 2단 화면 뼈대 — 좌측 320 목록 + 우측 상세
+///
+/// 공지·회의록·프로젝트·전자결재·문서함이 다 같은 틀이다.
+/// 상세 쪽은 아직 고른 것이 없는 상태라 **비워 둔다** — 진짜 화면도
+/// 그때는 안내만 있다.
+class SkeletonTwoPane extends StatelessWidget {
+  SkeletonTwoPane({super.key, this.rows = 6, this.filter = true});
+
+  final int rows;
+
+  /// 목록 위 필터 줄이 있는 화면인지 (공지·프로젝트·전자결재)
+  final bool filter;
+
+  @override
+  Widget build(BuildContext context) => SkeletonGroup(
+    child: Scaffold(
+      body: Row(
+        children: [
+          SizedBox(
+            width: 320,
+            child: ColoredBox(
+              color: AppColors.surface,
+              child: ListView(
+                padding: EdgeInsets.fromLTRB(20, 64, 20, 20),
+                children: [
+                  Skeleton(width: 96, height: 24, radius: 8),
+                  SizedBox(height: 16),
+                  if (filter) ...[
+                    Skeleton(height: 40, radius: 12),
+                    SizedBox(height: 16),
+                  ],
+                  SkeletonRows(rows: rows, avatar: 0, trailing: 0, gap: 22),
+                ],
+              ),
+            ),
+          ),
+          Container(width: 1, color: AppColors.gray100),
+          Expanded(child: SizedBox()),
+        ],
+      ),
+    ),
   );
 }

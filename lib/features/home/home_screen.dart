@@ -32,6 +32,7 @@ import '../notice/notice_screen.dart';
 import '../notifications/notification_screen.dart';
 import '../project/project_screen.dart';
 import '../schedule/schedule_screen.dart';
+import '../../core/widgets/feedback/skeleton.dart';
 part 'home_inbox.dart';
 part 'home_staff.dart';
 part 'home_status.dart';

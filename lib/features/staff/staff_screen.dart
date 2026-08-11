@@ -32,6 +32,7 @@ import '../messages/chat_store.dart';
 import '../../core/util/when.dart';
 import '../../core/widgets/nav/pane_transition.dart';
 import '../../core/widgets/feedback/failed_card.dart';
+import '../../core/widgets/feedback/skeleton.dart';
 
 part 'staff_manage.dart';
 part 'staff_models.dart';
@@ -216,13 +217,15 @@ class _StaffScreenState extends State<StaffScreen> {
     if (!isDesktop) return PlaceholderScreen(emoji: '👥', title: '직원');
 
     if (_loading) {
-      return Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 2.4,
-            valueColor: AlwaysStoppedAnimation(AppColors.primary),
+      return SkeletonDesktopPage(
+        children: [
+          Skeleton(height: 40, radius: 12),
+          SizedBox(height: 16),
+          SkeletonCard(
+            padding: EdgeInsets.all(20),
+            children: [SkeletonRows(rows: 8, avatar: 40, trailing: 64)],
           ),
-        ),
+        ],
       );
     }
 

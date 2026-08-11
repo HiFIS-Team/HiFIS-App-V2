@@ -449,15 +449,7 @@ class _InviteKeyScreenState extends State<_InviteKeyScreen> {
           ),
           SizedBox(height: 20),
           if (_loading)
-            Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 40),
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.4,
-                  valueColor: AlwaysStoppedAnimation(AppColors.primary),
-                ),
-              ),
-            )
+            SkeletonGroup(child: SkeletonRows(rows: 3, avatar: 0, trailing: 64))
           else ...[
             _SectionHeader(title: '쓸 수 있는 키', count: usable.length),
             SizedBox(height: 12),

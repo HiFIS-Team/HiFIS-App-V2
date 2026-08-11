@@ -26,6 +26,7 @@ import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/nav/phone_scaffold.dart';
 import '../../core/util/when.dart';
+import '../../core/widgets/feedback/skeleton.dart';
 part 'approval_list.dart';
 part 'approval_detail.dart';
 part 'approval_phone.dart';
@@ -213,14 +214,7 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 2.4,
-            valueColor: AlwaysStoppedAnimation(AppColors.primary),
-          ),
-        ),
-      );
+      return isDesktop ? SkeletonTwoPane(rows: 6) : _ApprovalSkeleton();
     }
 
     final list = _visible;

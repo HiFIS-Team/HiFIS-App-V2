@@ -13,6 +13,7 @@ import '../project/project_screen.dart' show requestedProjectId;
 import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/feedback/failed_card.dart';
+import '../../core/widgets/feedback/skeleton.dart';
 
 /// 알림 화면
 ///
@@ -168,13 +169,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 ),
                 SizedBox(height: 20),
                 if (_loading)
-                  Padding(
-                    padding: EdgeInsets.only(top: 40),
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.4,
-                        valueColor: AlwaysStoppedAnimation(AppColors.primary),
-                      ),
+                  SkeletonGroup(
+                    child: SkeletonCard(
+                      padding: EdgeInsets.all(20),
+                      children: [SkeletonRows(rows: 6, trailing: 36)],
                     ),
                   )
                 else if (shown.isEmpty)
