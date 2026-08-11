@@ -11,41 +11,43 @@ part of 'project_screen.dart';
 // 안 닫고 나가면 다음에 또 그만큼 쌓인다. 제일 급한 것 하나만 낸다.
 // ---------------------------------------------------------------------------
 
-/// 며칠 남았을 때부터 띄울지 — 이 안에 들면 대상이다
+/// 얼마나 자주 띄울지 — **마감이 가까울수록 자주** (2026-08-11 결정)
 ///
-/// 서버 푸시는 남은 날이 며칠이든 매일 보내는데(`project_due_soon`), 모달까지
-/// 그러면 한 달 남은 프로젝트로도 매일 뜬다. 눈앞의 것만 짚는다.
-const _dueModalWithin = 7;
-
-/// X 를 눌러 닫은 프로젝트 — 기기에 남는다
+/// | 남은 날 | 언제 |
+/// |---|---|
+/// | 4일 이상 | 그날 **처음 켤 때 한 번** |
+/// | 3 · 2 · 1일 | **접속 3번마다 한 번** |
+/// | 당일 · 지남 | **켤 때마다** |
 ///
-/// **영영 안 뜨는 게 아니라 그 회차만 접는다** (2026-08-06 결정).
-/// 서버가 알림을 다시 보낼 때가 되면 모달도 다시 떠야 한다.
-const _dueDismissKey = 'project_due_dismissed';
+/// 예전에는 7일 안쪽만 대상이었고 X 를 누르면 그 회차를 접었다.
+/// 이제 **프로젝트가 만들어진 날부터** 담당자에게 뜨고, 접는 버튼 대신
+/// 남은 날이 잦기를 정한다 — 급해질수록 저절로 자주 뜬다.
+const _dueEveryOpen = 0; // 당일·초과: 켤 때마다
+const _dueEveryThird = 3; // 1~3일: 접속 3번마다
+const _dueSoonFrom = 3; // 며칠 남았을 때부터 '임박'인지
 
-/// 지금이 몇 번째 알림 회차인지 — **서버 리마인더 주기와 같게 잡는다**
+/// 프로젝트별로 마지막에 띄운 날과 그 뒤 접속 횟수 — 기기에 남는다
+const _dueSeenKey = 'project_due_seen';
+
+/// 한 프로젝트에 대해 기억하는 것
 ///
-/// - 마감 전 : 서버가 매일 09시에 한 번 → 닫으면 그날만 접히고 **다음 날 다시**
-/// - 마감 당일 : 매시간 → 닫으면 그 시간만 접히고 **다음 시간에 다시**
-/// - 마감 초과 : 서버는 1회지만 모달은 **날마다** 다시 짚는다 (제일 급한 것이라)
-String _windowOf(_Project project, DateTime now) {
-  final day = '${now.year}-${now.month}-${now.day}';
-  return _daysLeft(project, now) == 0 ? '$day/${now.hour}' : day;
-}
+/// [day] 는 마지막으로 띄운 날(`2026-8-11`), [opens] 는 그 뒤로 앱을 켠 횟수다.
+typedef _DueSeen = ({String day, int opens});
 
-/// 프로젝트 + 마감일 + 회차
-///
-/// 마감일을 넣는 이유는 기한 연장이 승인돼 마감이 밀리면 **새 마감을 새로
-/// 알려 줘야** 하기 때문이다 — 키가 달라져서 저절로 다시 뜬다.
-String _dismissKeyOf(_Project project, DateTime now) =>
-    '${project.id}@${project.due.toIso8601String().substring(0, 10)}'
-    '#${_windowOf(project, now)}';
-
-/// 이번 실행에서 이미 띄웠는지 — 탭을 옮길 때마다 다시 뜨지 않게 한다
+/// 이번 실행에서 이미 판단했는지 — 탭을 옮길 때마다 다시 뜨지 않게 한다
 bool _dueModalShown = false;
 
 /// 로그아웃할 때 되돌린다 (다음 사람이 켜면 다시 판단해야 한다)
 void resetProjectDueModal() => _dueModalShown = false;
+
+/// 프로젝트 + 마감일
+///
+/// 마감일을 넣는 이유는 기한 연장이 승인돼 마감이 밀리면 **새 마감을 새로**
+/// 알려 줘야 하기 때문이다 — 키가 달라져서 계수가 처음부터 다시 센다.
+String _dueKeyOf(_Project project) =>
+    '${project.id}@${project.due.toIso8601String().substring(0, 10)}';
+
+String _dayOf(DateTime now) => '${now.year}-${now.month}-${now.day}';
 
 /// 앱을 열 때 마감 임박 프로젝트를 한 장 띄운다
 ///
@@ -58,48 +60,94 @@ Future<void> showProjectDueModal(BuildContext context) async {
   if (!context.mounted) return;
 
   final now = DateTime.now();
+  final today = _dayOf(now);
   final prefs = await SharedPreferences.getInstance();
-  final dismissed = prefs.getStringList(_dueDismissKey) ?? const <String>[];
-  final target = _mostUrgent(dismissed, now);
-  if (target == null || !context.mounted) return;
+  final seen = _readSeen(prefs);
 
-  final closed = await showAppDialog<bool>(
-    context,
-    (_) => _ProjectDueDialog(project: target),
-  );
-  // **X 를 눌렀을 때만** 접는다. 바깥을 눌러 닫거나 프로젝트를 열어 본 것은
-  // '봤다'로 안 친다 — 다음에 열 때 다시 짚어 준다.
-  if (closed != true) return;
-  final key = _dismissKeyOf(target, now);
-  // **지난 회차 기록은 버린다** — 안 버리면 목록이 끝없이 길어지고,
-  // 어차피 회차가 지나면 다시 떠야 하는 것들이라 들고 있을 이유가 없다
-  final today = '${now.year}-${now.month}-${now.day}';
-  await prefs.setStringList(_dueDismissKey, [
-    // 회차는 `#날짜` 또는 `#날짜/시` 라 끝이거나 뒤에 `/` 가 온다.
-    // `contains` 만 쓰면 `#2026-8-1` 이 `#2026-8-10` 에도 걸린다
-    ...dismissed.where(
-      (k) => k != key && (k.endsWith('#$today') || k.contains('#$today/')),
-    ),
-    key,
-  ]);
+  // 접속 1회 — 대상마다 계수를 올리고, 이번에 띄울 자격이 된 것을 모은다
+  final next = <String, _DueSeen>{};
+  final ready = <_Project>[];
+  for (final project in _dueTargets()) {
+    final key = _dueKeyOf(project);
+    final before = seen[key];
+    if (_shouldShow(project, before, now)) {
+      ready.add(project);
+      next[key] = before ?? (day: '', opens: 0);
+    } else {
+      // 못 띄운 회차도 접속 횟수는 쌓인다 — 그래야 3번째에 뜬다
+      next[key] = (day: before?.day ?? '', opens: (before?.opens ?? 0) + 1);
+    }
+  }
+
+  // 제일 급한 것 하나 — 마감이 가까운 순
+  ready.sort((a, b) => _daysLeft(a, now).compareTo(_daysLeft(b, now)));
+  final target = ready.firstOrNull;
+  // **띄운 것만** 계수를 되돌린다. 나머지는 자격이 됐어도 화면에 안 났으니
+  // 다음 번에 그대로 뜬다
+  if (target != null) next[_dueKeyOf(target)] = (day: today, opens: 0);
+  await _writeSeen(prefs, next);
+
+  if (target == null || !context.mounted) return;
+  await showAppDialog<void>(context, (_) => _ProjectDueDialog(project: target));
 }
 
-/// 제일 급한 프로젝트 하나 — 없으면 null
+/// 모달 대상 — **내가 참여한**, 아직 안 끝난 프로젝트
 ///
-/// 누락이 제일 급하고, 그다음이 마감일이 가까운 순이다.
-_Project? _mostUrgent(List<String> dismissed, DateTime now) {
-  final candidates = <_Project>[
+/// 남은 날 제한이 없다. 만들어진 날부터 마감까지 계속 대상이고,
+/// 잦기는 [_shouldShow] 가 정한다.
+List<_Project> _dueTargets() {
+  final me = currentUser?.id;
+  return [
     for (final project in _projects)
       if (project.id != null &&
           project.phase != _Phase.done &&
-          _daysLeft(project, now) <= _dueModalWithin &&
-          !dismissed.contains(_dismissKeyOf(project, now)))
+          (me == null || project.memberIds.contains(me)))
         project,
   ];
-  if (candidates.isEmpty) return null;
-  candidates.sort((a, b) => _daysLeft(a, now).compareTo(_daysLeft(b, now)));
-  return candidates.first;
 }
+
+/// 이번 접속에 띄울 차례인가
+bool _shouldShow(_Project project, _DueSeen? seen, DateTime now) {
+  final days = _daysLeft(project, now);
+  // 당일·초과 — 켤 때마다
+  if (days <= _dueEveryOpen) return true;
+  // 처음 보는 프로젝트는 바로 한 번 짚는다
+  if (seen == null) return true;
+  // 1~3일 — 접속 3번마다
+  if (days <= _dueSoonFrom) return seen.opens + 1 >= _dueEveryThird;
+  // 그 밖 — 그날 아직 안 띄웠으면
+  return seen.day != _dayOf(now);
+}
+
+Map<String, _DueSeen> _readSeen(SharedPreferences prefs) {
+  final raw = prefs.getString(_dueSeenKey);
+  if (raw == null || raw.isEmpty) return {};
+  try {
+    final decoded = jsonDecode(raw) as Map<String, dynamic>;
+    return {
+      for (final e in decoded.entries)
+        if (e.value case final Map<String, dynamic> v)
+          e.key: (
+            day: v['day'] as String? ?? '',
+            opens: v['opens'] as int? ?? 0,
+          ),
+    };
+  } catch (_) {
+    // 저장된 모양이 옛것이면 버린다 — 알림 잦기라 잃어도 그만이다
+    return {};
+  }
+}
+
+/// **지금 대상인 것만 남긴다** — 끝났거나 마감이 밀린 프로젝트의 옛 계수를
+/// 안 지우면 목록이 끝없이 길어진다
+Future<void> _writeSeen(SharedPreferences prefs, Map<String, _DueSeen> state) =>
+    prefs.setString(
+      _dueSeenKey,
+      jsonEncode({
+        for (final e in state.entries)
+          e.key: {'day': e.value.day, 'opens': e.value.opens},
+      }),
+    );
 
 /// 마감까지 남은 날 — 지났으면 음수 (날짜만 보고 시각은 안 본다)
 int _daysLeft(_Project project, DateTime today) => DateTime(
@@ -108,71 +156,184 @@ int _daysLeft(_Project project, DateTime today) => DateTime(
   project.due.day,
 ).difference(DateTime(today.year, today.month, today.day)).inDays;
 
-/// 마감 임박 모달 — 닫으면 `true`(X), 그 외에는 null
+/// 마감 임박 모달
 class _ProjectDueDialog extends StatelessWidget {
   _ProjectDueDialog({required this.project});
 
   final _Project project;
 
-  /// `9월 이벤트 프로젝트 마감기한이 3일 남았습니다`
-  String get _line {
-    final days = _daysLeft(project, DateTime.now());
-    if (days < 0) return '${project.name} 프로젝트 마감기한이 지났습니다';
-    if (days == 0) return '${project.name} 프로젝트 마감기한이 오늘입니다';
-    return '${project.name} 프로젝트 마감기한이 $days일 남았습니다';
+  int get _days => _daysLeft(project, DateTime.now());
+
+  /// 배지에 크게 찍는 말 — `D-3` · `D-DAY` · `D+2`
+  String get _dday {
+    final days = _days;
+    if (days == 0) return 'D-DAY';
+    if (days < 0) return 'D+${-days}';
+    return 'D-$days';
   }
+
+  String get _title {
+    final days = _days;
+    if (days < 0) return '마감이 지났어요';
+    if (days == 0) return '오늘이 마감이에요';
+    if (days <= _dueSoonFrom) return '마감이 얼마 안 남았어요';
+    return '마감이 다가와요';
+  }
+
+  String get _sub {
+    final days = _days;
+    if (days < 0) return '${-days}일 지났어요. 지금 확인해 주세요';
+    if (days == 0) return '오늘 안에 마무리해 주세요';
+    return '$days일 뒤 마감이에요';
+  }
+
+  /// 급할수록 붉게 — 당일부터는 빨강, 임박은 주황, 그 밖은 프로젝트 색
+  Color get _tone {
+    final days = _days;
+    if (days <= 0) return AppColors.error;
+    if (days <= _dueSoonFrom) return AppColors.warning;
+    return project.color;
+  }
+
+  String get _dueLabel =>
+      '${project.due.year}년 ${project.due.month}월 ${project.due.day}일';
 
   @override
   Widget build(BuildContext context) {
+    final tone = _tone;
+    final percent = (project.progress * 100).round();
+
     return Container(
-      width: dialogWidth(context, 340),
-      padding: EdgeInsets.fromLTRB(22, 18, 18, 20),
+      width: dialogWidth(context, 320),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: project.color,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              SizedBox(width: 8),
-              Expanded(child: Text('마감이 다가와요', style: AppTextStyles.title3)),
-              Pressable(
-                onTap: () => Navigator.pop(context, true),
-                scale: 0.9,
-                child: Padding(
-                  padding: EdgeInsets.all(4),
-                  child: Icon(
-                    CupertinoIcons.xmark,
-                    size: 18,
-                    color: AppColors.gray500,
+          // 머리 — 급한 정도를 색 면으로 먼저 보여준다
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.fromLTRB(22, 22, 22, 20),
+            color: tone.withValues(alpha: 0.10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: tone,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    _dday,
+                    style: AppTextStyles.label.copyWith(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.surface,
+                    ),
                   ),
                 ),
-              ),
-            ],
+                SizedBox(height: 12),
+                Text(
+                  _title,
+                  style: AppTextStyles.title2.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(_sub, style: AppTextStyles.body2.copyWith(color: tone)),
+              ],
+            ),
           ),
-          SizedBox(height: 12),
-          Text(_line, style: AppTextStyles.body2),
-          SizedBox(height: 18),
-          AppButton(
-            label: '프로젝트 보기',
-            filled: true,
-            onTap: () {
-              // 닫기(X)가 아니라 이동이다 — 다음에 열 때 다시 뜬다
-              Navigator.pop(context);
-              requestedProjectId.value = project.id;
-              requestedScreen.value = NotificationTarget.project;
-            },
+          Padding(
+            padding: EdgeInsets.fromLTRB(22, 18, 22, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: project.color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        project.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.body1.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 12),
+                // 얼마나 했는지 — 급한 정도만 보여주면 판단이 안 선다
+                Row(
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: LinearProgressIndicator(
+                          value: project.progress.clamp(0.0, 1.0),
+                          minHeight: 6,
+                          backgroundColor: AppColors.gray100,
+                          valueColor: AlwaysStoppedAnimation(project.color),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 10),
+                    Text(
+                      '$percent%',
+                      style: AppTextStyles.caption.copyWith(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 8),
+                Text(
+                  '마감 $_dueLabel',
+                  style: AppTextStyles.caption.copyWith(fontSize: 12),
+                ),
+                SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: AppButton(
+                        label: '나중에',
+                        onTap: () => Navigator.pop(context),
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      flex: 2,
+                      child: AppButton(
+                        label: '프로젝트 보기',
+                        filled: true,
+                        onTap: () {
+                          Navigator.pop(context);
+                          requestedProjectId.value = project.id;
+                          requestedScreen.value = NotificationTarget.project;
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
       ),
