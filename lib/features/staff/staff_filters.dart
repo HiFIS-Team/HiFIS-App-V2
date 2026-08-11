@@ -273,7 +273,7 @@ class _ViewToggle extends StatelessWidget {
         child: Icon(
           icon,
           size: 17,
-          color: selected ? AppColors.textPrimary : AppColors.gray500,
+          color: selected ? AppColors.primary : AppColors.gray500,
         ),
       ),
     );

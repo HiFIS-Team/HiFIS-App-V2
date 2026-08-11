@@ -159,7 +159,7 @@ class _StateTabs extends StatelessWidget {
                       style: AppTextStyles.body2.copyWith(
                         fontSize: 13,
                         color: state == selected
-                            ? AppColors.textPrimary
+                            ? AppColors.primary
                             : (phone ? AppColors.gray600 : AppColors.gray500),
                         fontWeight: state == selected
                             ? FontWeight.w700

@@ -400,7 +400,7 @@ class _PhaseTabs extends StatelessWidget {
                       style: AppTextStyles.body2.copyWith(
                         fontSize: 13,
                         color: phase == selected
-                            ? AppColors.textPrimary
+                            ? AppColors.primary
                             : AppColors.gray600,
                         fontWeight: phase == selected
                             ? FontWeight.w700

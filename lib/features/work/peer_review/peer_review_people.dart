@@ -104,7 +104,7 @@ class _FilterTabs extends StatelessWidget {
                       style: AppTextStyles.body2.copyWith(
                         fontSize: 13,
                         color: filter == selected
-                            ? AppColors.textPrimary
+                            ? AppColors.primary
                             : AppColors.gray600,
                         fontWeight: filter == selected
                             ? FontWeight.w700

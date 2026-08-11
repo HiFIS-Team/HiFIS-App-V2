@@ -32,7 +32,7 @@ class _WorkTab extends StatelessWidget {
       maxLines: 1,
       style: AppTextStyles.body2.copyWith(
         fontSize: 14,
-        color: selected ? AppColors.textPrimary : AppColors.gray500,
+        color: selected ? AppColors.primary : AppColors.gray500,
         fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
       ),
     );

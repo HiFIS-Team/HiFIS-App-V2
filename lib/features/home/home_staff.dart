@@ -58,11 +58,9 @@ class _TodayStaffCard extends StatelessWidget {
           SizedBox(height: 14),
           if (rows.isEmpty && isDesktop)
             // 옆 카드에 높이를 맞추느라 늘어난 자리 — 안내를 가운데에 놓는다
-            Expanded(child: _EmptyRoster())
+            Expanded(child: Center(child: _EmptyRoster()))
           else if (rows.isEmpty)
-            // 여기가 비는 건 명단을 못 받은 것이라 빈 목록과 다르다 —
-            // 아이콘 카드 대신 사정을 적어 준다
-            _EmptyRoster()
+            _CardBody(child: Center(child: _EmptyRoster()))
           else
             _CardBody(child: _StackedRows(rows: rows)),
         ],
@@ -137,15 +135,16 @@ class _StaffRow extends StatelessWidget {
 }
 
 /// 명단을 못 받았을 때 — **빈 목록이 아니라 사정이 있는 것**이라 문구로 알린다
+/// 명단을 못 받았을 때 — 프로젝트·공지의 빈 상태와 같은 모양을 쓴다
+///
+/// 예전에는 글 한 줄만 놓았다. 옆에 선 카드들은 아이콘 있는 빈 상태라
+/// 한 장만 글자만 떠 있어서 비어 있다기보다 덜 그려진 것처럼 보였다.
 class _EmptyRoster extends StatelessWidget {
   @override
-  Widget build(BuildContext context) => ConstrainedBox(
-    constraints: BoxConstraints(minHeight: isDesktop ? 0 : phoneCardBody),
-    child: Center(
-      child: Text(
-        '명단을 아직 못 받았어요',
-        style: AppTextStyles.body2.copyWith(color: AppColors.textTertiary),
-      ),
-    ),
+  Widget build(BuildContext context) => EmptyCard(
+    icon: Icons.people_rounded,
+    text: '명단을 아직 못 받았어요',
+    // 이미 카드 안이라 면을 한 겹 더 두르지 않는다
+    framed: false,
   );
 }

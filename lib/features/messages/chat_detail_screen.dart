@@ -551,7 +551,7 @@ class _ShareTab extends StatelessWidget {
             Text(
               label,
               style: AppTextStyles.body2.copyWith(
-                color: selected ? AppColors.textPrimary : AppColors.gray500,
+                color: selected ? AppColors.primary : AppColors.gray500,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
               ),
             ),
