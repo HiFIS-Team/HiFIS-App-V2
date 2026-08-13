@@ -10,11 +10,18 @@ import 'staff_directory.dart';
 /// 아바타 색은 사내톡·동료 평가·프로젝트에서 같은 사람이 같은 색으로 보이도록
 /// 여기 한 곳에서만 정한다. 실제 데이터 연동 시 이 목록을 서버 값으로 교체한다.
 class Staff {
-  const Staff(this.name, this.role, this.color);
+  const Staff(this.name, this.role, this.color, {this.imageUrl});
 
   final String name;
   final String role;
   final Color color;
+
+  /// 프로필 사진 주소 — 없으면 null (첫 글자 동그라미로 떨어진다)
+  ///
+  /// 색과 **같은 길로** 둔다. 아바타를 그리는 자리가 56곳인데 사진을 넘겨주는
+  /// 쪽은 4곳뿐이라, 랭킹·사내톡·프로젝트에서는 사진이 안 나왔다.
+  /// 여기 담아 두면 [Avatar] 가 이름만 받고도 찾아 쓴다.
+  final String? imageUrl;
 }
 
 /// 로그인한 사람의 이름
@@ -44,6 +51,7 @@ List<Staff> get staffList {
         employee.name,
         employee.rank.label,
         employee.color ?? avatarColorFor(employee.name),
+        imageUrl: employee.avatarImageUrl,
       ),
   ];
 }

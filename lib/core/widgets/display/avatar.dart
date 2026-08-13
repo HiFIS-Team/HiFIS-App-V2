@@ -4,27 +4,31 @@ import '../../data/staff.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 
-/// 이름 첫 글자 동그라미 — 색은 직원 명단에서 가져온다
+/// 이름 첫 글자 동그라미 — 색과 사진을 직원 명단에서 가져온다
 ///
-/// [imageUrl] 이 있으면 프로필 사진을 대신 그린다. 사진을 못 받아오면
-/// 첫 글자 동그라미로 떨어지므로, 로딩 중이나 서명 만료 때도 자리가 안 빈다.
+/// [imageUrl] 을 안 주면 **이름으로 명단에서 찾는다** (색과 같은 길이다).
+/// 아바타를 그리는 자리가 56곳인데 사진을 넘겨주던 곳은 4곳뿐이라,
+/// 조직도 말고는 사진이 안 나왔다 — 그래서 여기서 찾게 했다.
+///
+/// 사진을 못 받아오면 첫 글자 동그라미로 떨어지므로, 로딩 중이나
+/// 서명 만료 때도 자리가 안 빈다.
 class Avatar extends StatelessWidget {
   Avatar({super.key, required this.name, this.size = 24, this.imageUrl});
 
   final String name;
   final double size;
+
+  /// 명단에 없는 사람(초대 전 등)을 그릴 때만 직접 준다
   final String? imageUrl;
 
   @override
   Widget build(BuildContext context) {
+    final person = staffOf(name);
     final initial = Container(
       width: size,
       height: size,
       alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: staffOf(name).color,
-        shape: BoxShape.circle,
-      ),
+      decoration: BoxDecoration(color: person.color, shape: BoxShape.circle),
       child: Text(
         name.characters.first,
         style: TextStyle(
@@ -36,7 +40,7 @@ class Avatar extends StatelessWidget {
       ),
     );
 
-    final url = imageUrl;
+    final url = imageUrl ?? person.imageUrl;
     if (url == null || url.isEmpty) return initial;
 
     return ClipOval(
