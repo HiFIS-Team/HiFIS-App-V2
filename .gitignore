@@ -68,6 +68,9 @@ unlinked_spec.ds
 **/android/**/GeneratedPluginRegistrant.java
 **/android/key.properties
 *.jks
+# FCM — Firebase 콘솔에서 받는 설정 파일. 앱 식별자·API 키가 들어 있어서
+# 레포에 안 둔다 (키스토어와 같은 취급). 없으면 안드로이드 빌드가 안 된다.
+**/android/app/google-services.json
 
 # iOS/XCode related
 **/ios/**/*.mode1v3

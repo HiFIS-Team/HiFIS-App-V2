@@ -3,20 +3,22 @@ import 'package:flutter/services.dart';
 
 import '../api/home/notification_api.dart';
 import '../data/current_user.dart';
-import 'sf_symbols.dart';
 
 /// 푸시 알림 — 앱이 꺼져 있어도 폰에 뜨는 그것
 ///
 /// 앱 안 알림함(`/notifications`)과 **다른 길이다.** 저쪽은 앱을 열어야 보이고
 /// 이건 잠금화면에 뜬다. 서버는 알림을 만들 때 둘 다 태운다.
 ///
-/// **애플만 된다** (`isApple`). APNs 는 애플 전용이라 안드로이드는 FCM 을 따로
-/// 얹어야 한다 — 그때까지 안드로이드는 앱 안 알림함만 쓴다. 윈도우도 없다.
+/// **애플·안드로이드 셋 다 된다.** 윈도우는 없다.
+///
+/// 보내는 길은 플랫폼마다 다른데(애플은 APNs 직접, 안드로이드는 FCM) **앱은
+/// 그 차이를 모른다** — 네이티브 쪽이 같은 채널 규약을 쓰고, 어느 길로 보낼지는
+/// 서버가 기기 토큰에 붙은 `platform` 을 보고 정한다.
 ///
 /// 도는 순서
 ///
 /// ```
-/// 로그인  →  register()  →  (네이티브) 권한 묻고 애플에 등록
+/// 로그인  →  register()  →  (네이티브) 권한 묻고 토큰 받기
 ///                        →  onToken  →  POST /push/devices
 /// 알림 누름  →  (네이티브) onTap  →  그 화면으로 이동
 /// 로그아웃  →  unregister()  →  DELETE /push/devices/{token}
@@ -46,13 +48,12 @@ class PushGuard {
   /// 어디서 실패해도 앱은 그대로 돌아간다 — 푸시가 안 올 뿐이고 앱 안
   /// 알림함은 살아 있다.
   static Future<void> register() async {
-    if (!isApple) return;
     _wire();
     try {
       await _channel.invokeMethod<void>('ready');
       await _channel.invokeMethod<bool>('register');
     } on MissingPluginException {
-      // 아직 네이티브가 안 붙은 플랫폼
+      // 네이티브가 없는 플랫폼 — 윈도우가 여기로 떨어진다 (푸시가 안 올 뿐이다)
     } catch (error) {
       debugPrint('푸시 등록 요청 실패: $error');
     }

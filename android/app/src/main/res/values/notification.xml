@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- FCM 알림에 쓰는 값들 (AndroidManifest 의 meta-data 가 가리킨다) -->
+<resources>
+    <!-- 알림 아이콘 뒤에 깔리는 색 — 앱 포인트 컬러(AppColors.primary)와 같다 -->
+    <color name="notification_color">#3182F6</color>
+
+    <!-- 채널 — 사용자가 설정에서 보는 이름이다. 하나로 두고 안 나눈다:
+         근태·프로젝트·사내톡을 따로 끄고 싶다는 이야기가 나오면 그때 나눈다 -->
+    <string name="notification_channel_id" translatable="false">hifis_default</string>
+    <string name="notification_channel_name">HiFIS 알림</string>
+</resources>

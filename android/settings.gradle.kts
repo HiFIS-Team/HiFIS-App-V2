@@ -25,6 +25,9 @@ plugins {
     // 두 패키지 모두 최신이라 올려서 풀 수 없으므로 AGP를 8.x에 묶어둔다.
     id("com.android.application") version "8.13.0" apply false
     id("org.jetbrains.kotlin.android") version "2.3.20" apply false
+    // FCM — google-services.json 을 읽어 Firebase 설정을 빌드에 심는다.
+    // **안드로이드에만 붙는다** (애플은 APNs 를 직접 친다).
+    id("com.google.gms.google-services") version "4.5.0" apply false
 }
 
 include(":app")
