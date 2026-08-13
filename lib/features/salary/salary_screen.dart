@@ -27,6 +27,7 @@ import '../../core/widgets/nav/desktop_header.dart';
 import '../../core/widgets/nav/phone_scaffold.dart';
 import '../../core/util/when.dart';
 import '../../core/widgets/nav/pane_transition.dart';
+import '../../core/util/screen_refresh.dart';
 
 part 'salary_models.dart';
 part 'salary_form.dart';
@@ -44,7 +45,7 @@ class SalaryScreen extends StatefulWidget {
   State<SalaryScreen> createState() => _SalaryScreenState();
 }
 
-class _SalaryScreenState extends State<SalaryScreen> {
+class _SalaryScreenState extends State<SalaryScreen> with ScreenRefresh<SalaryScreen> {
   bool _loading = true;
 
   /// 0 = 내 급여, 1 = 결재. 결재함을 볼 수 없는 사람에게는 탭 자체가 없다
@@ -60,6 +61,10 @@ class _SalaryScreenState extends State<SalaryScreen> {
 
   Payslip? get _target =>
       _inbox.isEmpty ? null : _inbox[_inboxIndex.clamp(0, _inbox.length - 1)];
+
+  /// 탭에 다시 들어오거나 앱이 다시 앞으로 나왔을 때 조용히 다시 받는다
+  @override
+  Future<void> onScreenRefresh() => _load();
 
   @override
   void initState() {

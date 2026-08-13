@@ -28,6 +28,7 @@ import '../../core/util/when.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/widgets/feedback/failed_card.dart';
 import '../../core/widgets/feedback/skeleton.dart';
+import '../../core/util/screen_refresh.dart';
 
 part 'meeting_phone.dart';
 
@@ -46,13 +47,17 @@ class MeetingScreen extends StatefulWidget {
   State<MeetingScreen> createState() => _MeetingScreenState();
 }
 
-class _MeetingScreenState extends State<MeetingScreen> {
+class _MeetingScreenState extends State<MeetingScreen> with ScreenRefresh<MeetingScreen> {
   _Note? _selected;
 
   /// 새로 만든 회의록은 바로 편집 모드로 연다
   bool _startEditing = false;
 
   bool _loading = !_notesLoaded;
+
+  /// 탭에 다시 들어오거나 앱이 다시 앞으로 나왔을 때 조용히 다시 받는다
+  @override
+  Future<void> onScreenRefresh() => _load();
 
   @override
   void initState() {

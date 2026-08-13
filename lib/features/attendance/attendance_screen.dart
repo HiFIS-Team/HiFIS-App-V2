@@ -28,6 +28,7 @@ import '../../core/widgets/nav/phone_scaffold.dart';
 import '../../core/widgets/nav/pane_transition.dart';
 import '../../core/widgets/input/app_button.dart';
 import '../../core/widgets/feedback/skeleton.dart';
+import '../../core/util/screen_refresh.dart';
 
 part 'attendance_models.dart';
 part 'attendance_leave.dart';
@@ -47,7 +48,7 @@ class AttendanceScreen extends StatefulWidget {
   State<AttendanceScreen> createState() => _AttendanceScreenState();
 }
 
-class _AttendanceScreenState extends State<AttendanceScreen> {
+class _AttendanceScreenState extends State<AttendanceScreen> with ScreenRefresh<AttendanceScreen> {
   /// 달력이 보고 있는 달
   late DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
 
@@ -66,6 +67,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   /// 첫 로딩 — 받아오기 전에는 빈 달력 대신 로딩을 보여준다
   bool _loading = true;
+
+  /// 탭에 다시 들어오거나 앱이 다시 앞으로 나왔을 때 조용히 다시 받는다
+  @override
+  Future<void> onScreenRefresh() => _load();
 
   @override
   void initState() {

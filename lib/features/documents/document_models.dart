@@ -195,8 +195,11 @@ DocScope? _treeScope;
 ///
 /// 폴더·문서를 한 번에 받아서 `parentId`·`folderId` 로 이어 붙인다.
 /// 폴더마다 문서를 따로 받으면 폴더 수만큼 요청이 나간다.
-Future<void> _loadTree() async {
-  if (_treeScope == _scope) return;
+/// [force] 는 **같은 갈래를 다시 받을 때** 쓴다 — 화면이 다시 보일 때
+/// 남이 올린 문서를 반영하는 자리다 (`ScreenRefresh`). 트리가 통째로
+/// 새로 만들어지므로 부르는 쪽이 열어 둔 폴더를 id 로 다시 찾아야 한다.
+Future<void> _loadTree({bool force = false}) async {
+  if (!force && _treeScope == _scope) return;
   final folders = DocumentApi.folders(_scope);
   final documents = DocumentApi.documents(_scope);
   _buildTree(await folders, await documents);

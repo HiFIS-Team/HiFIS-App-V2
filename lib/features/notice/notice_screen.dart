@@ -25,6 +25,7 @@ import '../../core/util/when.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/widgets/feedback/failed_card.dart';
 import '../../core/widgets/feedback/skeleton.dart';
+import '../../core/util/screen_refresh.dart';
 
 part 'notice_phone.dart';
 part 'notice_list.dart';
@@ -47,7 +48,7 @@ class NoticeScreen extends StatefulWidget {
   State<NoticeScreen> createState() => _NoticeScreenState();
 }
 
-class _NoticeScreenState extends State<NoticeScreen> {
+class _NoticeScreenState extends State<NoticeScreen> with ScreenRefresh<NoticeScreen> {
   /// true면 안 읽은 공지만
   bool _unreadOnly = false;
 
@@ -58,6 +59,10 @@ class _NoticeScreenState extends State<NoticeScreen> {
 
   /// 첫 진입에만 스피너를 돌린다 — 탭을 다시 열 때는 받아둔 목록을 바로 그린다
   bool _loading = !_noticesLoaded;
+
+  /// 탭에 다시 들어오거나 앱이 다시 앞으로 나왔을 때 조용히 다시 받는다
+  @override
+  Future<void> onScreenRefresh() => _load();
 
   @override
   void initState() {

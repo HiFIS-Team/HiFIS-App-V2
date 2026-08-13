@@ -33,6 +33,7 @@ import '../../core/util/when.dart';
 import '../../core/widgets/nav/pane_transition.dart';
 import '../../core/widgets/feedback/failed_card.dart';
 import '../../core/widgets/feedback/skeleton.dart';
+import '../../core/util/screen_refresh.dart';
 
 part 'staff_manage.dart';
 part 'staff_models.dart';
@@ -62,7 +63,7 @@ class StaffScreen extends StatefulWidget {
   State<StaffScreen> createState() => _StaffScreenState();
 }
 
-class _StaffScreenState extends State<StaffScreen> {
+class _StaffScreenState extends State<StaffScreen> with ScreenRefresh<StaffScreen> {
   String _query = '';
   String _rank = _allRanks;
 
@@ -79,6 +80,10 @@ class _StaffScreenState extends State<StaffScreen> {
   bool _grid = true;
 
   bool _loading = !_staffLoaded;
+
+  /// 탭에 다시 들어오거나 앱이 다시 앞으로 나왔을 때 조용히 다시 받는다
+  @override
+  Future<void> onScreenRefresh() => _load();
 
   @override
   void initState() {

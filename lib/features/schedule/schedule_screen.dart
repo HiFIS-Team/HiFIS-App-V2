@@ -22,6 +22,7 @@ import '../../core/util/layout.dart';
 import '../../core/widgets/glass/glass_bottom_button.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/nav/phone_scaffold.dart';
+import '../../core/util/screen_refresh.dart';
 part 'schedule_phone.dart';
 part 'schedule_day.dart';
 part 'schedule_form.dart';
@@ -44,7 +45,7 @@ class ScheduleScreen extends StatefulWidget {
   State<ScheduleScreen> createState() => _ScheduleScreenState();
 }
 
-class _ScheduleScreenState extends State<ScheduleScreen> {
+class _ScheduleScreenState extends State<ScheduleScreen> with ScreenRefresh<ScheduleScreen> {
   /// 보고 있는 달 (1일로 맞춰 둔다) — PC 달력이 쓴다
   late DateTime _month = _monthOf(DateTime.now());
 
@@ -61,6 +62,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   /// 받아야 하는 달 — 폰은 보고 있는 주가 낀 달이다
   DateTime get _visibleMonth => isDesktop ? _month : _monthOf(_week);
+
+  /// 탭에 다시 들어오거나 앱이 다시 앞으로 나왔을 때 조용히 다시 받는다
+  @override
+  Future<void> onScreenRefresh() => _load();
 
   @override
   void initState() {

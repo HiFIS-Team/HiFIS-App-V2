@@ -28,6 +28,7 @@ import 'lesson/lesson_section.dart';
 import 'peer_review/peer_review_section.dart';
 import 'praise/praise_section.dart';
 import '../../core/widgets/nav/pane_transition.dart';
+import '../../core/util/screen_refresh.dart';
 part 'work_tabs.dart';
 part 'work_checklist.dart';
 part 'work_history.dart';
@@ -54,7 +55,7 @@ class WorkScreen extends StatefulWidget {
   State<WorkScreen> createState() => _WorkScreenState();
 }
 
-class _WorkScreenState extends State<WorkScreen> {
+class _WorkScreenState extends State<WorkScreen> with ScreenRefresh<WorkScreen> {
   int _tab = 0;
 
   /// 환경정비 항목과 배점 — 지점마다 다르다
@@ -74,6 +75,10 @@ class _WorkScreenState extends State<WorkScreen> {
   /// 고르개는 MASTER·ADMIN 에게만 있고, 나머지는 늘 null 이다.
   /// 그 둘은 서버가 본인 지점으로 고정하므로 null 이 곧 '내 지점'이 된다.
   String? get _branch => branchScopeId;
+
+  /// 탭에 다시 들어오거나 앱이 다시 앞으로 나왔을 때 조용히 다시 받는다
+  @override
+  Future<void> onScreenRefresh() => _loadEnv();
 
   @override
   void initState() {

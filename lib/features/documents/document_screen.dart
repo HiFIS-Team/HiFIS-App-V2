@@ -20,6 +20,7 @@ import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/input/app_button.dart';
 import '../../core/theme/app_shadows.dart';
 import '../../core/widgets/feedback/skeleton.dart';
+import '../../core/util/screen_refresh.dart';
 
 part 'document_models.dart';
 part 'document_sidebar.dart';
@@ -44,7 +45,8 @@ class DocumentScreen extends StatefulWidget {
   State<DocumentScreen> createState() => _DocumentScreenState();
 }
 
-class _DocumentScreenState extends State<DocumentScreen> {
+class _DocumentScreenState extends State<DocumentScreen>
+    with ScreenRefresh<DocumentScreen> {
   /// 지금 열려 있는 폴더까지의 경로 (첫 칸은 항상 최상위)
   final List<_Item> _path = [_root];
 
@@ -95,6 +97,53 @@ class _DocumentScreenState extends State<DocumentScreen> {
       if (mounted) AppToast.show(context, messageOf(error));
     }
     if (mounted) setState(() => _loading = false);
+  }
+
+  /// 탭에 다시 들어오거나 앱이 다시 앞으로 나왔을 때 조용히 다시 받는다
+  ///
+  /// 다른 화면은 목록만 갈아끼우면 되는데 **여기는 트리를 새로 만든다.**
+  /// [_Item] 이 통째로 새 객체가 되므로 열어 둔 폴더([_path])·고른 항목·
+  /// 펼쳐 둔 폴더가 옛 객체를 가리킨 채 남는다 — 그대로 두면 폴더 안이
+  /// 빈 것처럼 보인다. id 로 같은 자리를 다시 찾아 이어 붙인다.
+  @override
+  Future<void> onScreenRefresh() async {
+    final openIds = [for (final item in _path.skip(1)) item.id];
+    final selectedId = _selected?.id;
+    final expandedIds = {for (final item in _expanded) item.id};
+
+    try {
+      await _loadTree(force: true);
+    } catch (_) {
+      return; // 조용히 다시 받는 자리라 실패해도 알리지 않는다 (보던 것이 그대로 남는다)
+    }
+    if (!mounted) return;
+
+    setState(() {
+      // 열어 둔 폴더를 위에서부터 다시 따라간다 — 지워진 폴더에서 멈춘다
+      _path.removeRange(1, _path.length);
+      for (final id in openIds) {
+        final next = _path.last.children?.where((c) => c.id == id).firstOrNull;
+        if (next == null) break;
+        _path.add(next);
+      }
+
+      final here = _current.children ?? const <_Item>[];
+      _selected = here.where((c) => c.id == selectedId).firstOrNull;
+
+      final byId = <String, _Item>{};
+      void walk(_Item folder) {
+        for (final child in folder.children ?? const <_Item>[]) {
+          if (!child.isFolder) continue;
+          byId[child.id] = child;
+          walk(child);
+        }
+      }
+
+      walk(_root);
+      _expanded
+        ..clear()
+        ..addAll(expandedIds.map((id) => byId[id]).whereType<_Item>());
+    });
   }
 
   _Item get _current => _path.last;

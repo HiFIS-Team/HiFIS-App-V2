@@ -35,6 +35,7 @@ import '../../core/widgets/input/app_button.dart';
 import '../notifications/notification_screen.dart'
     show NotificationTarget, requestedScreen;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/util/screen_refresh.dart';
 
 part 'project_comments.dart';
 part 'project_phone.dart';
@@ -59,7 +60,7 @@ class ProjectScreen extends StatefulWidget {
   State<ProjectScreen> createState() => _ProjectScreenState();
 }
 
-class _ProjectScreenState extends State<ProjectScreen> {
+class _ProjectScreenState extends State<ProjectScreen> with ScreenRefresh<ProjectScreen> {
   /// 보고 있는 단계 (진행 중 / 완료 / 누락)
   _Phase _phase = _Phase.running;
 
@@ -68,6 +69,10 @@ class _ProjectScreenState extends State<ProjectScreen> {
 
   /// 첫 진입에만 스피너를 돌린다 — 탭을 다시 열 때는 받아둔 목록을 바로 그린다
   bool _loading = !_projectsLoaded;
+
+  /// 탭에 다시 들어오거나 앱이 다시 앞으로 나왔을 때 조용히 다시 받는다
+  @override
+  Future<void> onScreenRefresh() => _load();
 
   @override
   void initState() {

@@ -22,6 +22,7 @@ import '../../core/widgets/nav/desktop_header.dart';
 import '../../core/widgets/nav/phone_scaffold.dart';
 import '../../core/util/when.dart';
 import '../../core/widgets/nav/pane_transition.dart';
+import '../../core/util/screen_refresh.dart';
 
 part 'ranking_models.dart';
 part 'ranking_pickers.dart';
@@ -45,9 +46,13 @@ class RankingScreen extends StatefulWidget {
   State<RankingScreen> createState() => _RankingScreenState();
 }
 
-class _RankingScreenState extends State<RankingScreen> {
+class _RankingScreenState extends State<RankingScreen> with ScreenRefresh<RankingScreen> {
   /// 고른 항목 ([_Metric] 순서)
   int _tab = 0;
+
+  /// 탭에 다시 들어오거나 앱이 다시 앞으로 나왔을 때 조용히 다시 받는다
+  @override
+  Future<void> onScreenRefresh() => _load();
 
   @override
   void initState() {

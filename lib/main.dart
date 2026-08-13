@@ -7,6 +7,7 @@ import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'core/util/capture_guard.dart';
 import 'core/util/platform.dart';
+import 'core/util/screen_refresh.dart';
 import 'core/widgets/feedback/app_loading.dart';
 import 'features/auth/auth_screen.dart';
 import 'features/auth/auth_session.dart';
@@ -55,6 +56,11 @@ class _HiFISAppState extends State<HiFISApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // 다시 앞으로 나왔다 — 보고 있는 화면이 데이터를 다시 받는다 (ScreenRefresh).
+    // **프라이버시 커버보다 먼저 본다** — 커버는 모바일 전용이라 아래에서
+    // 데스크톱을 걸러내는데, 다시 받는 것은 네 플랫폼 다 필요하다.
+    if (state == AppLifecycleState.resumed) appResumed.value++;
+
     // 데스크톱에서는 창이 포커스만 잃어도 inactive가 되어 커버가 덮이므로
     // (앱이 멈춘 것처럼 보인다) 프라이버시 커버를 모바일에서만 쓴다
     if (isDesktop) return;
