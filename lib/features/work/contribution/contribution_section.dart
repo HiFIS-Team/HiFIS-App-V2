@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../core/api/client/api_exception.dart';
 import '../../../core/api/work/contribution_api.dart';
 import '../../../core/api/work/score_api.dart';
+import '../../../core/data/branch_scope.dart';
 import '../../../core/data/current_user.dart';
 import '../../../core/data/employee.dart';
 import '../../../core/data/staff.dart';
@@ -46,14 +47,33 @@ class ContributionSection extends StatefulWidget {
 class _ContributionSectionState extends State<ContributionSection> {
   bool _loading = true;
 
-  /// 이번 달 내 기여 (부여 + 자동)
+  /// 화면에 그리는 목록 — 받아 둔 것을 지점 필터까지 걸러 세운 결과
   List<_Contribution> _items = const [];
+
+  /// 받아 둔 원본 — 지점을 바꿀 때 다시 요청하지 않으려고 들고 있는다
+  List<ContributionGrant> _received = const [];
+  List<ContributionGrant> _given = const [];
+  List<ScoreEvent> _events = const [];
 
   @override
   void initState() {
     super.initState();
+    branchScope.addListener(_onBranchScope);
     _load();
   }
+
+  @override
+  void dispose() {
+    branchScope.removeListener(_onBranchScope);
+    super.dispose();
+  }
+
+  /// 헤더에서 지점을 바꿨다 — 받아 둔 것만 다시 거른다 (요청은 안 나간다)
+  void _onBranchScope() {
+    if (mounted) setState(_rebuild);
+  }
+
+  void _rebuild() => _items = _merge(_received, _given, _events);
 
   /// 받는 쪽이 아니라 **주는 쪽만** 보는 사람인가 — 대표·관리자
   ///
@@ -78,20 +98,27 @@ class _ContributionSectionState extends State<ContributionSection> {
       final receivedRequest = _givenOnly
           ? Future.value(noGrants)
           : ContributionApi.list(employeeId: me.id, period: period);
-      // 자동으로 쌓인 점수는 받는 쪽에만 있다 — 주는 목록에는 낄 자리가 없다
-      final eventRequest = _givenOnly
-          ? Future.value(const <ScoreEvent>[])
-          : ScoreApi.events(
-              employeeId: me.id,
-              category: ScoreCategory.contrib,
-              period: period,
-            );
+      // 자동으로 쌓인 점수 — **대표·관리자는 전 직원 것을 본다** (2026-08-13 결정).
+      //
+      // 근무 외 출근 점수는 사람이 주는 게 아니라 스캔이 붙여서, 예전에는
+      // "누가 받았는지"를 볼 자리가 아무 데도 없었다. 본인만 자기 것을 봤다.
+      // [employeeId] 를 안 주면 서버가 볼 수 있는 만큼 다 준다 (그 둘은 전 지점).
+      // 지점 고르개는 **앱이 건다** — 서버 스코프는 권한에서 나오는 값이라
+      // 헤더에서 고른 지점과 다르다.
+      final eventRequest = ScoreApi.events(
+        employeeId: _givenOnly ? null : me.id,
+        category: ScoreCategory.contrib,
+        period: period,
+      );
       final given = await givenRequest;
       final received = await receivedRequest;
       final events = await eventRequest;
       if (!mounted) return;
       setState(() {
-        _items = _merge(received, given, events);
+        _received = received;
+        _given = given;
+        _events = events;
+        _rebuild();
         _loading = false;
       });
     } catch (error) {
@@ -106,11 +133,16 @@ class _ContributionSectionState extends State<ContributionSection> {
   /// 부여분은 `/contributions` 에 항목 종류가 있고, 자동분은 점수 원장에만
   /// 있으므로 원장에서 **사람이 준 게 아닌 것**만 골라 붙인다.
   /// 둘을 다 원장에서 뽑으면 아이디어인지 목표 업무인지 알 수 없다.
+  ///
+  /// 대표·관리자가 볼 때는 자동분이 **남의 것도 섞여 오므로** 지점 고르개로
+  /// 거르고 받은 사람 이름을 붙인다. 본인 것만 보는 사람은 예전 그대로다.
   static List<_Contribution> _merge(
     List<ContributionGrant> received,
     List<ContributionGrant> given,
     List<ScoreEvent> events,
   ) {
+    final scope = branchScopeId;
+    final me = currentUser?.id;
     return [
       for (final grant in received)
         _Contribution(
@@ -131,12 +163,16 @@ class _ContributionSectionState extends State<ContributionSection> {
           given: true,
         ),
       for (final event in events)
-        if (event.automatic)
+        if (event.automatic && (scope == null || event.branchId == scope))
           _Contribution(
             kind: _autoKindOf(event),
             title: event.reason ?? _autoKindOf(event).label,
             points: event.points,
             date: event.createdAt,
+            // 내 것에는 이름을 안 붙인다 — 내 화면에서 내 이름을 부를 이유가 없다
+            person: event.employeeId == me
+                ? null
+                : StaffDirectory.instance.byId(event.employeeId)?.name,
           ),
     ]..sort((a, b) => b.date.compareTo(a.date));
   }
@@ -278,14 +314,13 @@ class _Contribution {
   final DateTime date;
 
   /// 상대 이름 — 받은 것은 **준 사람**, 준 것은 **받은 사람**.
-  /// 자동으로 쌓인 점수는 상대가 없어서 비어 있다.
+  ///
+  /// 자동으로 쌓인 점수는 준 사람이 없어서 보통 비어 있는데, **대표·관리자가
+  /// 남의 것을 볼 때는 받은 사람**이 들어간다 (누가 받았는지가 그 화면의 요점이다).
   final String? person;
 
   /// 내가 준 것인가 — 점장은 준 것과 받은 것을 한 목록에서 본다
   final bool given;
-
-  /// 사람이 준 게 아니라 기록에서 자동으로 들어온 점수인가
-  bool get automatic => person == null;
 
   /// 카드 한 줄의 상대 표시 — 조사로 방향을 가른다
   String? get personLabel => person == null

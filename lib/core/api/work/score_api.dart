@@ -50,6 +50,7 @@ class RankingRow {
     required this.blogScore,
     required this.instaScore,
     required this.otptScore,
+    required this.contribScore,
     required this.ledger,
     required this.salesScore,
     required this.overall,
@@ -75,6 +76,7 @@ class RankingRow {
     blogScore: json['blogScore'] as int? ?? 0,
     instaScore: json['instaScore'] as int? ?? 0,
     otptScore: json['otptScore'] as int? ?? 0,
+    contribScore: json['contribScore'] as int? ?? 0,
     ledger: json['ledger'] as int? ?? 0,
     salesScore: json['salesScore'] as int? ?? 0,
     overall: json['overall'] as int? ?? 0,
@@ -117,6 +119,12 @@ class RankingRow {
   final int blogScore;
   final int instaScore;
   final int otptScore;
+
+  /// 센터 기여도 — 근무 외 출근 자동 점수 + 아이디어·목표 업무 부여분
+  ///
+  /// **랭킹 탭은 없다.** 종합 탭에서 사람을 누르면 뜨는 점수 내역에만 줄로
+  /// 나온다 — 원래 종합에는 들어가는데 안 내보내서 내역 합이 종합과 안 맞았다.
+  final int contribScore;
 
   /// 그 달 쌓은 점수 합 — 카테고리별로 음수는 0 으로 자른 뒤 더한 값
   final int ledger;

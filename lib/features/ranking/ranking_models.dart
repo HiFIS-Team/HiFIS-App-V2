@@ -51,6 +51,7 @@ class _Ranker {
     required this.blogScore,
     required this.instaScore,
     required this.otptScore,
+    required this.contribScore,
     required this.overall,
     required this.lastRank,
   });
@@ -75,6 +76,7 @@ class _Ranker {
     blogScore: row.blogScore,
     instaScore: row.instaScore,
     otptScore: row.otptScore,
+    contribScore: row.contribScore,
     overall: row.overall,
     lastRank: row.lastRank,
   );
@@ -117,6 +119,11 @@ class _Ranker {
   final int blogScore;
   final int instaScore;
   final int otptScore;
+
+  /// 센터 기여도 — 근무 외 출근 자동 점수와 아이디어·목표 업무 부여분
+  ///
+  /// **랭킹 탭은 없다** — 점수 내역에만 줄로 뜬다.
+  final int contribScore;
 
   /// 종합 점수 — **서버가 더한 값을 그대로 쓴다**
   ///

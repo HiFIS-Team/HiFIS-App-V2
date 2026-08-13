@@ -9,9 +9,14 @@ typedef _BreakdownLine = ({String label, int score, String note});
 
 /// 한 사람이 항목별로 몇 점을 받았는지
 ///
-/// **매출은 점수가 아니라 금액이다.** 종합은 항목마다 1등을 100점으로 두고
-/// 환산해 평균 내는 값이라 여기서 항목 점수를 더해도 종합이 안 나온다 —
-/// 그래서 합계 줄을 두지 않는다.
+/// **매출 줄만 점수가 아니라 금액이다.** 나머지 줄을 다 더하면 종합이 되고,
+/// 매출은 **말일에** 점수로 환산돼(만원 단위 × 0.25) 거기 얹힌다. 그래서
+/// 월중에는 `점수 줄 합 = 종합`, 말일 뒤에는 `+ 매출 점수`다.
+///
+/// 합계 줄은 두지 않는다 — 매출만 단위가 달라서 한 칸에 못 담는다.
+///
+/// **기여도 줄은 탭이 없다.** 종합에는 원래 들어가고 있었는데 서버가 따로
+/// 안 내보내서 내역 합이 종합과 안 맞았다 (근무 외 출근 자동 10점이 여기다).
 List<_BreakdownLine> _breakdownOf(_Ranker r) => [
   (
     label: '매출',
@@ -26,6 +31,7 @@ List<_BreakdownLine> _breakdownOf(_Ranker r) => [
   ),
   (label: '환경정비', score: r.careScore, note: '${r.care}회'),
   (label: '수업', score: r.lessonScore, note: '${r.lessons}개'),
+  (label: '기여도', score: r.contribScore, note: '근무 외 출근 · 부여'),
   (label: '블로그', score: r.blogScore, note: '${r.blogScore ~/ 5}명'),
   (label: '인스타', score: r.instaScore, note: '${r.instaScore ~/ 5}명'),
   (label: 'OT → PT', score: r.otptScore, note: '${r.otptScore ~/ 5}명'),
