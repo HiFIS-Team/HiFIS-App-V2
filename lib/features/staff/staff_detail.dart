@@ -132,9 +132,18 @@ class _MemberDetailState extends State<_MemberDetail> {
               ('직급', member.role),
               ('권한', member.permission.label),
               ('상태', member.employment.label),
-              if (member.joined case final at?) ('입사일', _date(at)),
+              if (member.joined case final at?) ('가입일', _date(at)),
               if (member.resigned case final at?) ('퇴사일', _date(at)),
-              if (member.active && member.joined != null) ('근속', member.career),
+              // 아직 한 번도 안 들어온 사람은 그 사실이 보여야 한다 —
+              // 계정만 만들어 두고 앱을 안 깐 사람을 여기서 가린다
+              if (member.active)
+                (
+                  '첫 접속일',
+                  switch (member.firstLogin) {
+                    final at? => _date(at),
+                    _ => '없음',
+                  },
+                ),
               // 서버가 전화번호를 안 채워 주는 사람이 많다 (backend-gap.md 2·46번)
               ('전화번호', member.phone.isEmpty ? '없음' : member.phone),
               ('이메일', member.email),

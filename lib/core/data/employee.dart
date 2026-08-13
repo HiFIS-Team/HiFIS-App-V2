@@ -159,6 +159,7 @@ class Employee {
     this.joinedAt,
     this.resignedAt,
     this.lastActiveAt,
+    this.firstLoginAt,
     this.todayStatus,
     this.shiftStart,
     this.shiftEnd,
@@ -184,6 +185,7 @@ class Employee {
     joinedAt: _date(json['joinedAt']),
     resignedAt: _date(json['resignedAt']),
     lastActiveAt: _date(json['lastActiveAt']),
+    firstLoginAt: _date(json['firstLoginAt']),
     todayStatus: AttendanceStatus.parseOrNull(
       json['todayAttendanceStatus'] as String?,
     ),
@@ -226,7 +228,7 @@ class Employee {
   /// 정규직인가 알바인가 — 조직도 가운데 탭과 급여 계산이 이 값을 본다
   final EmploymentType employmentType;
 
-  /// 입사일 — 근속 계산에 쓴다
+  /// 가입한 시각 — 계정을 만든 때다 (프로필 상세의 '가입일')
   final DateTime? joinedAt;
 
   /// 퇴사한 시각 — [status] 가 `RESIGNED` 일 때만 값이 있다
@@ -236,6 +238,13 @@ class Employee {
 
   /// 마지막으로 앱을 쓴 시각. **출근 여부가 아니다**
   final DateTime? lastActiveAt;
+
+  /// 처음 로그인한 시각 — null 이면 **가입만 하고 아직 안 들어온 사람**이다
+  ///
+  /// 서버가 첫 로그인에 한 번 찍고 그 뒤로는 안 바꾼다. 이 컬럼이 생기기 전에
+  /// 들어온 사람은 접속 기록에서 채웠는데, 그 기록은 90일 뒤 파기되므로
+  /// 그보다 오래된 사람은 비어 있다.
+  final DateTime? firstLoginAt;
 
   /// 오늘 근태 판정 — **null 이면 '출근 전'**
   ///

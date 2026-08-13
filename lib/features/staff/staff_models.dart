@@ -99,6 +99,9 @@ class _Member {
   String get email => source.email;
 
   DateTime? get joined => source.joinedAt;
+
+  /// 처음 들어온 때 — null 이면 가입만 하고 아직 안 들어왔다
+  DateTime? get firstLogin => source.firstLoginAt;
   DateTime? get resigned => source.resignedAt;
 
   /// 상태 메시지 (예: 14시까지 외근)
@@ -112,7 +115,7 @@ class _Member {
 
   /// 재직 중인가 — **알바도 포함**이다
   ///
-  /// 탭만 갈릴 뿐 일하는 사람이라, 근무중 인원수·근태 요약·근속에 다 들어간다.
+  /// 탭만 갈릴 뿐 일하는 사람이라, 근무중 인원수·근태 요약에 다 들어간다.
   bool get active => employment != _Employment.left;
 
   /// 지금 상태 — 스스로 고른 값이 먼저고, 없으면 서버의 오늘 판정을 따른다
@@ -136,20 +139,6 @@ class _Member {
       _ => _Status.off,
     },
   };
-
-  /// '3년 4개월' — 한 해가 안 됐으면 개월만
-  String get career {
-    final start = joined;
-    if (start == null) return '-';
-    final now = DateTime.now();
-    var months = (now.year - start.year) * 12 + now.month - start.month;
-    if (now.day < start.day) months--;
-    if (months < 0) months = 0;
-    if (months < 12) return '$months개월';
-    final years = months ~/ 12;
-    final rest = months % 12;
-    return rest == 0 ? '$years년' : '$years년 $rest개월';
-  }
 }
 
 /// 화면이 쓰는 명단
