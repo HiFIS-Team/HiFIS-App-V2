@@ -50,6 +50,9 @@ class RankingRow {
     required this.blogScore,
     required this.instaScore,
     required this.otptScore,
+    required this.ledger,
+    required this.salesScore,
+    required this.overall,
     required this.lastRank,
   });
 
@@ -72,6 +75,9 @@ class RankingRow {
     blogScore: json['blogScore'] as int? ?? 0,
     instaScore: json['instaScore'] as int? ?? 0,
     otptScore: json['otptScore'] as int? ?? 0,
+    ledger: json['ledger'] as int? ?? 0,
+    salesScore: json['salesScore'] as int? ?? 0,
+    overall: json['overall'] as int? ?? 0,
     lastRank: [
       for (final r in (json['lastRank'] as List<dynamic>? ?? const []))
         r as int,
@@ -111,6 +117,20 @@ class RankingRow {
   final int blogScore;
   final int instaScore;
   final int otptScore;
+
+  /// 그 달 쌓은 점수 합 — 카테고리별로 음수는 0 으로 자른 뒤 더한 값
+  final int ledger;
+
+  /// 매출 점수 — 만원 단위 × 0.25. **말일부터** 붙고 그 전에는 0 이다
+  final int salesScore;
+
+  /// 종합 = [ledger] + [salesScore]
+  ///
+  /// **서버가 더한 값을 그대로 쓴다.** 예전에는 앱이 항목마다 1등 대비 %로
+  /// 환산해 평균을 냈는데, 그러면 한 항목에서 압도적 1등을 해도 종합이 20점
+  /// 천장이었다 (환경정비 133점인데 종합 20점). 2026-08-13 대표 결정으로
+  /// 쌓은 점수를 그대로 더한다.
+  final int overall;
 
   /// 지난달 순위 — [매출, 친절, 프로젝트, 환경, 수업, 종합]. **0 이면 순위 없음**
   ///

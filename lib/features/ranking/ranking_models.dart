@@ -3,8 +3,10 @@ part of 'ranking_screen.dart';
 /// 랭킹 항목
 ///
 /// 화면에 찍히는 단위가 항목마다 다르다 — 매출은 **금액**, 수업은 **개수**,
-/// 친절·프로젝트·환경정비는 **점수 원장 합**이다. 종합은 나머지 다섯을
-/// 100점으로 환산해 평균 낸 값이라 항상 맨 뒤에 둔다.
+/// 친절·프로젝트·환경정비는 **점수 원장 합**이다.
+///
+/// 종합은 **그 달 쌓은 점수를 그대로 더한 값**이라 항상 맨 뒤에 둔다.
+/// 매출만 단위가 달라서 서버가 점수로 바꿔(만원 단위 × 0.25) **말일에** 얹는다.
 enum _Metric {
   revenue('매출', '매출', 'revenue'),
   kindness('친절 점수', '친절', 'kindness'),
@@ -49,6 +51,7 @@ class _Ranker {
     required this.blogScore,
     required this.instaScore,
     required this.otptScore,
+    required this.overall,
     required this.lastRank,
   });
 
@@ -72,6 +75,7 @@ class _Ranker {
     blogScore: row.blogScore,
     instaScore: row.instaScore,
     otptScore: row.otptScore,
+    overall: row.overall,
     lastRank: row.lastRank,
   );
 
@@ -108,11 +112,17 @@ class _Ranker {
 
   /// 방문 경로로 붙은 유입 점수 — 회원 등록 한 건에 5점씩
   ///
-  /// 워크인·지인소개는 점수가 없어서 칸도 없다. 종합 점수에는 셋을 합쳐
-  /// 한 항목으로 들어가고, 점수 내역에서는 갈라서 보여준다.
+  /// 워크인·지인소개는 점수가 없어서 칸도 없다. 종합에는 쌓인 점수가 그대로
+  /// 들어가고, 점수 내역에서는 셋을 갈라서 보여준다.
   final int blogScore;
   final int instaScore;
   final int otptScore;
+
+  /// 종합 점수 — **서버가 더한 값을 그대로 쓴다**
+  ///
+  /// 그 달 쌓은 점수 합에 매출 점수(만원 단위 × 0.25)를 얹은 값이다.
+  /// 매출 점수는 **말일부터** 붙으므로 월중에는 매출이 종합에 안 들어간다.
+  final int overall;
 
   /// 지난달 순위 — [_Metric] 순서대로 (0이면 지난달엔 순위가 없었다)
   final List<int> lastRank;
@@ -174,7 +184,7 @@ class _Entry {
   final String note;
 }
 
-/// 항목별 값 — 종합만 다른 사람 실적이 있어야 계산된다
+/// 항목별 값 — 종합은 서버가 더해 준 값을 그대로 쓴다
 double _valueOf(_Ranker r, _Metric metric, List<_Ranker> pool) =>
     switch (metric) {
       _Metric.revenue => r.revenue.toDouble(),
@@ -182,30 +192,8 @@ double _valueOf(_Ranker r, _Metric metric, List<_Ranker> pool) =>
       _Metric.project => r.projectScore.toDouble(),
       _Metric.care => r.careScore.toDouble(),
       _Metric.lesson => r.lessons.toDouble(),
-      _Metric.overall => _overall(r, pool),
+      _Metric.overall => r.overall.toDouble(),
     };
-
-/// 종합 점수 — 항목마다 1등을 100점으로 두고 상대 위치를 평균 낸다.
-///
-/// 매출은 원, 수업은 개수처럼 단위가 제각각이라 그냥 더할 수 없다.
-/// 같은 지점 안에서 각자 1등 대비 몇 %인지로 바꾼 뒤 평균을 낸다.
-double _overall(_Ranker r, List<_Ranker> pool) {
-  const parts = [
-    _Metric.revenue,
-    _Metric.kindness,
-    _Metric.project,
-    _Metric.care,
-    _Metric.lesson,
-  ];
-  var sum = 0.0;
-  for (final part in parts) {
-    final top = pool
-        .map((other) => _valueOf(other, part, pool))
-        .fold(0.0, (a, b) => a > b ? a : b);
-    if (top > 0) sum += _valueOf(r, part, pool) / top * 100;
-  }
-  return sum / parts.length;
-}
 
 /// 값 아래 붙는 근거 한 줄
 String _noteOf(_Ranker r, _Metric metric) => switch (metric) {
@@ -214,7 +202,7 @@ String _noteOf(_Ranker r, _Metric metric) => switch (metric) {
   _Metric.project => '${r.projectDone} / ${r.projectTotal}건',
   _Metric.care => '이번 달 ${r.care}회',
   _Metric.lesson => '${r.lessonScore}점',
-  _Metric.overall => '5개 항목 평균',
+  _Metric.overall => '쌓은 점수 합',
 };
 
 /// 순위표에 찍히는 값 — 항목마다 단위가 다르다
