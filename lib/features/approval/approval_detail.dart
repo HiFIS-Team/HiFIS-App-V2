@@ -75,7 +75,7 @@ class _DocDetail extends StatelessWidget {
           children: [
             Avatar(name: doc.writer, size: 22),
             SizedBox(width: 8),
-            // 이름·직급·날짜가 이어져서 폰 폭을 넘긴다 — 말줄임으로 자른다
+            // 이름·직군·날짜가 이어져서 폰 폭을 넘긴다 — 말줄임으로 자른다
             Expanded(
               child: Text(
                 '${doc.writer} ${_rankOf(doc.writerId)} · ${_date(doc.date)} 신청',

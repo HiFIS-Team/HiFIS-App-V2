@@ -48,7 +48,7 @@ part 'staff_detail.dart';
 /// (근무중·회의중·외출…)가 보이고, 카드를 누르면 연락처와 이번 달 근태
 /// 요약이 뜬다. 폰은 아직 진입점이 없어 PC를 먼저 만든다.
 ///
-/// 사람은 직급으로 나눈다 — 누구를 찾을 때 먼저 떠올리는 기준이다.
+/// 사람은 직군으로 나눈다 — 누구를 찾을 때 먼저 떠올리는 기준이다.
 /// 시스템 권한(MASTER·ADMIN·MEMBER)은 찾는 기준이 아니라서 배지로만 붙인다.
 ///
 /// 명단은 `/employees`, 지점 이름은 `/branches` 로 채운다 ([_loadStaff]).
@@ -100,7 +100,7 @@ class _StaffScreenState extends State<StaffScreen> with ScreenRefresh<StaffScree
 
   /// 헤더에서 지점을 바꿨다
   ///
-  /// 직급 필터를 같이 되돌린다 — 그 지점에 없는 직급이 걸린 채로 남으면
+  /// 직군 필터를 같이 되돌린다 — 그 지점에 없는 직군이 걸린 채로 남으면
   /// 지점을 옮기자마자 빈 화면이 된다 (고르개가 이 화면에 있을 때와 같은 규칙).
   void _onBranchScope() {
     if (mounted) setState(() => _rank = _allRanks);
@@ -128,7 +128,7 @@ class _StaffScreenState extends State<StaffScreen> with ScreenRefresh<StaffScree
 
   _Employment get _employment => _Employment.values[_tab];
 
-  /// 지점 + 재직 상태까지만 걸러낸 명단 (직급 칩 인원 수의 기준)
+  /// 지점 + 재직 상태까지만 걸러낸 명단 (직군 칩 인원 수의 기준)
   List<_Member> get _scoped => _members
       .where((m) => _inBranch(m, _branch) && m.employment == _employment)
       .toList();
@@ -140,7 +140,7 @@ class _StaffScreenState extends State<StaffScreen> with ScreenRefresh<StaffScree
       final group = _rankGroupOf(_rank);
       if (group != null && !group.has(m.rank)) return false;
       if (query.isEmpty) return true;
-      // 이름·직급·이메일 아무 데나 걸리면 보여준다
+      // 이름·직군·이메일 아무 데나 걸리면 보여준다
       return m.name.contains(query) ||
           m.role.contains(query) ||
           m.email.toLowerCase().contains(query.toLowerCase());
@@ -163,7 +163,7 @@ class _StaffScreenState extends State<StaffScreen> with ScreenRefresh<StaffScree
     AppToast.show(context, '$label을 복사했어요');
   }
 
-  /// 직급으로 나누지 않고 한 판에 쭉 나열한다.
+  /// 직군으로 나누지 않고 한 판에 쭉 나열한다.
   /// 머리말은 지금 무엇을 보고 있는지 알려주므로 전체일 때도 붙인다.
   List<Widget> _body(List<_Member> list) => [
     _SectionHeader(title: _rank, count: list.length),
@@ -248,7 +248,7 @@ class _StaffScreenState extends State<StaffScreen> with ScreenRefresh<StaffScree
               // 지점 고르개는 헤더의 지점 아이콘으로 옮겼다 — 업무·랭킹과 같은
               // 값을 보므로 화면마다 두지 않는다 (core/data/branch_scope.dart)
               trailing: _canManageStaff
-                  // 신규 입사자의 지점·직급은 초대키가 정한다 (staff_manage.dart)
+                  // 신규 입사자의 지점·직군은 초대키가 정한다 (staff_manage.dart)
                   ? _InviteButton(onTap: _openInvites)
                   : null,
             ),
@@ -277,7 +277,7 @@ class _StaffScreenState extends State<StaffScreen> with ScreenRefresh<StaffScree
               ],
             ),
             SizedBox(height: 10),
-            // 직급 필터와 검색·보기 전환을 한 줄에 — 고르는 일이 한자리에 모인다
+            // 직군 필터와 검색·보기 전환을 한 줄에 — 고르는 일이 한자리에 모인다
             Row(
               children: [
                 Expanded(

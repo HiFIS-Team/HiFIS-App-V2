@@ -82,7 +82,7 @@ class _Ranker {
   final String id;
   final String name;
 
-  /// 직급 — 이름 아래 붙는다
+  /// 직군 — 이름 아래 붙는다
   final String team;
 
   /// 소속 지점 이름 (지점 필터가 이 값을 쓴다)

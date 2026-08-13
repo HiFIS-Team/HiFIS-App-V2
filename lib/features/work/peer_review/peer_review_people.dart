@@ -123,7 +123,7 @@ class _FilterTabs extends StatelessWidget {
 
 /// 폰 목록 카드 — 프로젝트 카드와 같은 결로 사람 하나에 카드 하나
 ///
-/// 아바타·이름·상태 배지 / 직급 / 별점 요약. 아직 안 한 사람은 빈 별이라
+/// 아바타·이름·상태 배지 / 직군 / 별점 요약. 아직 안 한 사람은 빈 별이라
 /// **무엇이 남았는지가 한눈에 보인다.**
 ///
 /// 데스크톱은 [_PersonTile] — 조직도 카드와 같은 틀이다.
@@ -282,7 +282,7 @@ class _Chip extends StatelessWidget {
 /// 평가 대상 한 칸 (PC) — 조직도 카드와 같은 틀
 ///
 /// **보여주는 값은 [_PersonRow] 와 같다** — 아바타(끝낸 사람은 흐리게) ·
-/// 이름 · `나` 배지 · 직급/완료 문구 · 끝의 체크. 틀만 조직도 카드로 바꿨다.
+/// 이름 · `나` 배지 · 직군/완료 문구 · 끝의 체크. 틀만 조직도 카드로 바꿨다.
 class _PersonTile extends StatelessWidget {
   _PersonTile({
     required this.person,

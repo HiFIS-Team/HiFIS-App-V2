@@ -77,7 +77,7 @@ Future<void> _loadNotices() async {
 
 /// 서버 공지 → 화면 모델
 ///
-/// 서버는 작성자를 uuid 로 주는데 화면은 이름으로 아바타·직급을 찾는다.
+/// 서버는 작성자를 uuid 로 주는데 화면은 이름으로 아바타·직군을 찾는다.
 /// 명단에 없으면(퇴사자 등) uuid 대신 빈 이름을 두어 아바타만 회색으로 뜬다.
 _Notice _fromServer(Notice row) {
   final author = StaffDirectory.instance.byId(row.authorId);

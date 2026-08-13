@@ -157,7 +157,7 @@ class _ReceivedScreen extends StatelessWidget {
   }
 }
 
-/// 제출 현황 한 줄 — 이름·직급과 낸 건수 (**폰 전용**)
+/// 제출 현황 한 줄 — 이름·직군과 낸 건수 (**폰 전용**)
 ///
 /// 누름은 이 줄을 감싼 카드([_SubmissionTile])가 받는다.
 /// PC 는 [_SubmissionCardTile] — 조직도 카드와 같은 틀이다.

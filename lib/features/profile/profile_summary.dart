@@ -60,7 +60,7 @@ class _ProfileSummaryCard extends StatelessWidget {
               ),
               Expanded(
                 child: _SummaryField(
-                  label: '직급',
+                  label: '직군',
                   value: currentUser?.rank.label ?? '-',
                 ),
               ),
@@ -71,7 +71,7 @@ class _ProfileSummaryCard extends StatelessWidget {
             children: [
               Expanded(
                 // 팀 대신 업무 상태를 띄운다 — 팀은 안 쓰기로 해서 (조직도도
-                // 직급으로 가른다) 이 칸이 늘 '-' 로 비어 있었다.
+                // 직군으로 가른다) 이 칸이 늘 '-' 로 비어 있었다.
                 // 상태는 본인이 아래 고르개에서 바꾸는 값이라 여기서 바로 확인된다.
                 child: _SummaryField(
                   label: '상태',

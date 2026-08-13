@@ -8,7 +8,7 @@ part of 'staff_screen.dart';
 class _MyCard extends StatelessWidget {
   _MyCard({required this.branch});
 
-  /// 보고 있는 지점 — 동료·직급 수를 이 지점 기준으로 센다
+  /// 보고 있는 지점 — 동료·직군 수를 이 지점 기준으로 센다
   final String branch;
 
   @override
@@ -79,7 +79,7 @@ class _MyCard extends StatelessWidget {
                   ),
                   _count('동료', here.where((m) => !m.isMe).length),
                   _divider(),
-                  _count('직급', ranks),
+                  _count('직군', ranks),
                   _divider(),
                   _count('근무중', working, color: AppColors.success),
                 ],

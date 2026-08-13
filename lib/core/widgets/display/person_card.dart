@@ -5,7 +5,7 @@
 /// 원래 보여주던 값만** 아래에 담는다.
 ///
 /// **조직도 카드의 이메일·근무 상태·메시지·복사 버튼은 안 들어온다.**
-/// 그건 조직도가 하는 일이고, 여기서는 틀과 아바타·이름·직급까지만 같다.
+/// 그건 조직도가 하는 일이고, 여기서는 틀과 아바타·이름·직군까지만 같다.
 ///
 /// PC 전용이다 — 폰은 화면마다 이미 제 카드를 갖고 있다.
 library;
@@ -36,7 +36,7 @@ class PersonCard extends StatefulWidget {
 
   final String name;
 
-  /// 이름 아래 한 줄 — 직급처럼 그 사람을 가리키는 값
+  /// 이름 아래 한 줄 — 직군처럼 그 사람을 가리키는 값
   final String? subtitle;
   final Color? subtitleColor;
   final FontWeight? subtitleWeight;

@@ -161,7 +161,7 @@ class _SubmissionCard extends StatelessWidget {
 /// 제출 현황 한 칸 (PC) — 조직도 카드와 같은 틀
 ///
 /// **보여주는 값은 [_SubmissionRow] 와 같다** — 아바타(다 낸 사람은 흐리게) ·
-/// 이름 · 직급 · `0 / 13건` · 끝의 체크. 틀만 조직도 카드로 바꿨다.
+/// 이름 · 직군 · `0 / 13건` · 끝의 체크. 틀만 조직도 카드로 바꿨다.
 class _SubmissionCardTile extends StatelessWidget {
   _SubmissionCardTile({required this.row, required this.onTap});
 

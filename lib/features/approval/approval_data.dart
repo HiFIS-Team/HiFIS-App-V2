@@ -218,7 +218,7 @@ String _nameOf(String? id) {
   return name == null || name.isEmpty ? '알 수 없음' : name;
 }
 
-/// uuid → 직급 라벨. 이름 옆에 붙인다
+/// uuid → 직군 라벨. 이름 옆에 붙인다
 String _rankOf(String? id) {
   if (id == null) return '';
   return StaffDirectory.instance.byId(id)?.rank.label ?? '';

@@ -166,7 +166,7 @@ class _RankChips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // 탭을 옮길 때마다 칩이 늘었다 줄었다 하면 자리를 못 외운다.
-    // 직급은 항상 같은 자리에 두고, 아무도 없으면 0으로 알린다.
+    // 직군은 항상 같은 자리에 두고, 아무도 없으면 0으로 알린다.
     //
     // **접지 않고 가로로 민다.** 사이드바에 마우스를 올리면 폭이 160 줄어드는데,
     // 접히게 두면 마지막 칩만 아랫줄로 내려가고 옆 검색창 밑에 구멍이 남는다.
@@ -183,7 +183,7 @@ class _RankChips extends StatelessWidget {
               builder: (context) {
                 final count = _countOf(rank);
                 final on = rank == selected;
-                // 비어 있는 직급은 눌러도 볼 게 없어 한 톤 흐리게 둔다
+                // 비어 있는 직군은 눌러도 볼 게 없어 한 톤 흐리게 둔다
                 final empty = count == 0 && !on;
 
                 return Pressable(

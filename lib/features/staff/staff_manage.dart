@@ -65,7 +65,7 @@ class _InviteButton extends StatelessWidget {
   }
 }
 
-/// 직원 한 명의 지점·직급·권한을 바꾸는 화면
+/// 직원 한 명의 지점·직군·권한을 바꾸는 화면
 ///
 /// 프로필(본인이 고치는 것)과 나누어 둔다 — 여기 값들은 **남이 정해 주는 것**이고
 /// 서버도 다른 엔드포인트(`PATCH /employees/{id}`)를 쓴다.
@@ -150,7 +150,7 @@ class _ManageSheetState extends State<_ManageSheet> {
           ),
           SizedBox(height: 12),
           _PickerCard(
-            title: '직급',
+            title: '직군',
             note: '조직도에서 사람을 가르는 기준이에요',
             options: [for (final r in Rank.values) (r.wire, r.label)],
             selected: _rank.wire,
@@ -169,7 +169,7 @@ class _ManageSheetState extends State<_ManageSheet> {
           SizedBox(height: 12),
           _PickerCard(
             title: '고용 형태',
-            note: '알바는 직급과 상관없이 시급으로만 받아요',
+            note: '알바는 직군과 상관없이 시급으로만 받아요',
             options: [for (final t in EmploymentType.values) (t.wire, t.label)],
             selected: _employment.wire,
             onSelect: (wire) =>
@@ -249,7 +249,7 @@ class _ManageWho extends StatelessWidget {
 
 /// 값 하나를 고르는 카드 — 칩을 늘어놓고 하나만 켠다
 ///
-/// 고를 것이 지점 3~4개, 직급 7개, 권한 4개라 다 보이는 게 낫다.
+/// 고를 것이 지점 3~4개, 직군 7개, 권한 4개라 다 보이는 게 낫다.
 /// 목록에서 하나 고르려고 창을 또 여는 것보다 손이 덜 간다.
 class _PickerCard extends StatelessWidget {
   _PickerCard({
@@ -339,7 +339,7 @@ class _PickerCard extends StatelessWidget {
 
 /// 초대키 발급·관리 화면
 ///
-/// **신규 입사자의 지점·직급·권한은 이 키가 정한다.** 회원가입이 키에 적힌
+/// **신규 입사자의 지점·직군·권한은 이 키가 정한다.** 회원가입이 키에 적힌
 /// 값을 그대로 쓰기 때문에(`branch_id=key.branch_id`), 사람을 어느 지점으로
 /// 받을지는 여기서 결정된다.
 class _InviteKeyScreen extends StatefulWidget {
@@ -435,7 +435,7 @@ class _InviteKeyScreenState extends State<_InviteKeyScreen> {
                 ),
                 SizedBox(height: 4),
                 Text(
-                  '키를 만들 때 정한 지점·직급·권한으로 계정이 만들어져요. '
+                  '키를 만들 때 정한 지점·직군·권한으로 계정이 만들어져요. '
                   '만든 키를 새로 오는 분에게 전달하면 돼요.',
                   style: AppTextStyles.caption.copyWith(
                     color: AppColors.textTertiary,
@@ -705,7 +705,7 @@ class _InviteKeyFormState extends State<_InviteKeyForm> {
           ),
           SizedBox(height: 12),
           _PickerCard(
-            title: '직급',
+            title: '직군',
             note: '나중에 조직도에서 바꿀 수 있어요',
             options: [for (final r in Rank.values) (r.wire, r.label)],
             selected: _rank.wire,
@@ -724,10 +724,10 @@ class _InviteKeyFormState extends State<_InviteKeyForm> {
           SizedBox(height: 12),
           // 고용 형태는 **여기서만** 정할 수 있다 — 키에 박혀서 가입할 때 그대로
           // 붙는다. 들어온 뒤 정규직으로 올리는 건 인사 정보 변경 쪽이라,
-          // 그 화면과 같은 순서(지점·직급·권한·고용 형태)로 둔다.
+          // 그 화면과 같은 순서(지점·직군·권한·고용 형태)로 둔다.
           _PickerCard(
             title: '고용 형태',
-            note: '알바는 직급과 상관없이 시급으로만 받아요',
+            note: '알바는 직군과 상관없이 시급으로만 받아요',
             options: [for (final t in EmploymentType.values) (t.wire, t.label)],
             selected: _employment.wire,
             onSelect: (wire) =>

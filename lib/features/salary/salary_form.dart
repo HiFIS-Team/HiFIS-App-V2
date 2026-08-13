@@ -28,7 +28,7 @@ class _PayslipFormState extends State<_PayslipForm> {
 
   /// 고칠 수 있는 두 줄 — 자동 집계가 빠뜨린 수업을 여기서 바로잡는다
   ///
-  /// **기본급은 없다.** 직급 정책에서 나오는 값이라 본인이 정할 것이 아니다.
+  /// **기본급은 없다.** 직군 정책에서 나오는 값이라 본인이 정할 것이 아니다.
   /// 서버가 `canAdjust` 로 열어 준 사람에게만 입력칸이 된다 (알바·FC 는 제외).
   late final _newAmount = TextEditingController(
     text: _amount(widget.payslip.autoNew),

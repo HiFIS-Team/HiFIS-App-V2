@@ -61,7 +61,7 @@ class _PayItem {
 
 /// 한 달치 급여 명세서
 ///
-/// 금액은 전부 서버가 계산한다. 직급 정책·인센티브 요율이 서버에 있어서
+/// 금액은 전부 서버가 계산한다. 직군 정책·인센티브 요율이 서버에 있어서
 /// 앱이 따로 곱하면 실지급액과 어긋난다.
 ///
 /// [source]가 null이면 아직 산출 전인 달이다 (목록 응답에서 빠져 있다).
@@ -122,7 +122,7 @@ class _Payslip {
       _live?.incentiveRenewal ??
       0;
 
-  /// 기본급 — 신청서에서 못 고친다 (직급 정책에서 나온다)
+  /// 기본급 — 신청서에서 못 고친다 (직군 정책에서 나온다)
   int get baseSalary => source?.baseSalary ?? 0;
 
   /// 본인이 커미션을 고쳐서 낸 명세서인가 — 결재 화면이 차이를 보여준다
@@ -130,8 +130,8 @@ class _Payslip {
 
   /// 신청서에서 커미션을 고칠 수 있는 사람인가 — **서버가 정한다**
   ///
-  /// 알바(시급제)와 커미션 요율이 0인 직급(FC)은 고칠 자리가 없다.
-  /// 앱이 직급으로 따로 판정하면 요율이 바뀔 때 어긋나서, 못 고치는 사람에게
+  /// 알바(시급제)와 커미션 요율이 0인 직군(FC)은 고칠 자리가 없다.
+  /// 앱이 직군으로 따로 판정하면 요율이 바뀔 때 어긋나서, 못 고치는 사람에게
   /// 칸이 열리고 제출에서 400 이 난다.
   bool get canAdjust => _accrued?.canAdjust ?? false;
 
@@ -211,7 +211,7 @@ class _Payslip {
   /// 각주를 보여줄 달인가 — 산출된 달과 진행 중인 주기
   bool get hasPayNote => source != null || _live != null;
 
-  /// 공제 항목 (4대 보험·세금) — 서버가 직급·공제 방식에 따라 계산한다
+  /// 공제 항목 (4대 보험·세금) — 서버가 직군·공제 방식에 따라 계산한다
   List<_PayItem> get deductions => [
     for (final line in source?.deductions ?? const <DeductionLine>[])
       _PayItem(line.label, line.amount),

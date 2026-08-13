@@ -63,7 +63,7 @@ class _MemberDetailState extends State<_MemberDetail> {
     AppToast.show(context, '$label을 복사했어요');
   }
 
-  /// 지점·직급·권한 바꾸기 (MASTER·ADMIN 만)
+  /// 지점·직군·권한 바꾸기 (MASTER·ADMIN 만)
   Future<void> _manage() async {
     final saved = await showFullPage<Employee>(
       context,
@@ -123,13 +123,13 @@ class _MemberDetailState extends State<_MemberDetail> {
           SizedBox(height: 12),
           _InfoCard(
             title: '기본 정보',
-            // 지점·직급·권한은 남이 정해 주는 값이라 여기서 바꾼다
+            // 지점·직군·권한은 남이 정해 주는 값이라 여기서 바꾼다
             // (본인이 바꾸는 이름·전화번호는 프로필 화면이다)
             action: _canManage(member) ? ('인사 정보 변경', _manage) : null,
             rows: [
               ('사번', member.code),
               ('지점', member.branchLabel),
-              ('직급', member.role),
+              ('직군', member.role),
               ('권한', member.permission.label),
               ('상태', member.employment.label),
               if (member.joined case final at?) ('가입일', _date(at)),

@@ -152,7 +152,7 @@ class _MemberCardState extends State<_MemberCard> {
                     ),
                   ),
                   SizedBox(width: 6),
-                  // 직급은 머리말에 이미 있으니 여기는 권한을 보여준다
+                  // 직군은 머리말에 이미 있으니 여기는 권한을 보여준다
                   _PermissionTag(permission: member.permission),
                 ],
               ),
