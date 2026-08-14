@@ -19,7 +19,7 @@ import '../../../core/util/platform.dart';
 import '../../../core/util/sf_symbols.dart';
 import '../../../core/widgets/feedback/app_dialog.dart';
 import '../../../core/widgets/feedback/app_toast.dart';
-import '../../../core/widgets/feedback/delayed_spinner.dart';
+import '../../../core/util/skeleton_delay.dart';
 import '../../../core/widgets/feedback/empty_card.dart';
 import '../../../core/widgets/glass/glass_bottom_button.dart';
 import '../../../core/widgets/glass/glass_icon_button.dart';

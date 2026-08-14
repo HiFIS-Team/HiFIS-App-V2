@@ -9,38 +9,12 @@ class _SignHistoryScreen extends StatefulWidget {
   State<_SignHistoryScreen> createState() => _SignHistoryScreenState();
 }
 
-class _SignHistoryScreenState extends State<_SignHistoryScreen> {
+class _SignHistoryScreenState extends State<_SignHistoryScreen>
+    with SkeletonDelay<_SignHistoryScreen> {
   final _search = TextEditingController();
 
   late DateTime _month;
   List<SessionSign> _rows = const [];
-
-  /// 뼈대를 **실제로 그릴지** — 첫 로딩은 바로, 다시 받을 때는 **늦을 때만**
-  ///
-  /// 받는 동안은 목록도 건수도 뼈대로 둔다 (인스타처럼 소소한 자리까지).
-  /// 다만 서버가 가까우면 값이 10ms 안에 와서, 그때마다 뼈대를 깔았다 지우면
-  /// 한두 프레임만 떴다 사라져 **오히려 깜빡인다** — [DelayedSpinner] 가 이미
-  /// 같은 사정으로 220ms 를 두고 있어서 **그 값을 그대로 쓴다.**
-  ///
-  /// 첫 로딩만 true 로 시작한다 — 그때는 보여줄 옛 목록이 없어서, 늦출 이유가
-  /// 없고 늦추면 빈 화면이 잠깐 뜬다.
-  bool _showSkeleton = true;
-
-  Timer? _skeletonTimer;
-
-  /// 받기 시작 — 220ms 를 넘기면 그때 뼈대로 바꾼다
-  void _beginLoad() {
-    _skeletonTimer?.cancel();
-    _skeletonTimer = Timer(DelayedSpinner.delay, () {
-      if (mounted) setState(() => _showSkeleton = true);
-    });
-  }
-
-  /// 다 받았다(또는 실패) — 뼈대를 걷고 예약도 취소한다
-  void _endLoad() {
-    _skeletonTimer?.cancel();
-    _showSkeleton = false;
-  }
 
   /// 고른 트레이너 — null 이면 전체
   ///
@@ -77,9 +51,8 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen> {
 
   @override
   void dispose() {
-    _skeletonTimer?.cancel();
     _search.dispose();
-    super.dispose();
+    super.dispose(); // 뼈대 타이머는 SkeletonDelay 가 걷는다
   }
 
   /// 다음 달로 못 넘어간다 — 아직 오지 않은 달이라 볼 게 없다
@@ -90,7 +63,7 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen> {
 
   Future<void> _fetch() async {
     final asked = _month;
-    setState(_beginLoad);
+    setState(beginLoad);
     try {
       final rows = await SessionSignApi.list(
         // **본 화면(`_LessonStore.load`)과 같은 규칙이다.** 예전에는 여기만
@@ -106,11 +79,11 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen> {
       if (!mounted || _month != asked) return;
       setState(() {
         _rows = _LessonStore.instance.sorted(rows);
-        _endLoad();
+        endLoad();
       });
     } catch (error) {
       if (!mounted) return;
-      setState(_endLoad); // 실패해도 뼈대에 갇히지 않게 푼다
+      setState(endLoad); // 실패해도 뼈대에 갇히지 않게 푼다
       AppToast.show(context, messageOf(error));
     }
   }
@@ -178,13 +151,13 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen> {
                   _MonthBar(
                     month: _month,
                     count: sorted.length,
-                    loading: _showSkeleton,
+                    loading: showSkeleton,
                     onPrev: () => _shiftMonth(-1),
                     // 아직 오지 않은 달은 볼 게 없으니 막는다
                     onNext: _atLatest ? null : () => _shiftMonth(1),
                   ),
                   Container(height: 1, color: AppColors.gray100),
-                  if (_showSkeleton)
+                  if (showSkeleton)
                     Padding(
                       padding: EdgeInsets.fromLTRB(24, 24, 24, 24),
                       child: SkeletonRows(rows: 5, trailing: 56),

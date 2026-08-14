@@ -132,7 +132,8 @@ class _HistoryScreen extends StatefulWidget {
   State<_HistoryScreen> createState() => _HistoryScreenState();
 }
 
-class _HistoryScreenState extends State<_HistoryScreen> {
+class _HistoryScreenState extends State<_HistoryScreen>
+    with SkeletonDelay<_HistoryScreen> {
   /// true면 전체 내역
   late bool _all = widget.initialAll;
 
@@ -146,37 +147,12 @@ class _HistoryScreenState extends State<_HistoryScreen> {
   late List<EnvTaskLog> _myLogs = widget.myLogs;
   late List<EnvTaskLog> _allLogs = widget.allLogs;
 
-  /// 뼈대를 **실제로 그릴지** — 세션 기록과 같은 규칙 (2026-08-14)
-  ///
-  /// 받는 동안은 목록도 건수도 뼈대로 둔다. 다만 서버가 가까우면 값이 10ms
-  /// 안에 와서, 그때마다 뼈대를 깔았다 지우면 한두 프레임만 떴다 사라져
-  /// **오히려 깜빡인다** — [DelayedSpinner] 가 이미 같은 사정으로 220ms 를
-  /// 두고 있어서 **그 값을 그대로 쓴다.**
-  ///
-  /// 이 화면은 열 때 부모가 오늘 기록을 이미 넘겨줘서 false 로 시작한다
-  /// (세션 기록은 스스로 받아 와서 true 로 시작한다).
-  bool _showSkeleton = false;
-
-  Timer? _skeletonTimer;
-
-  /// 받기 시작 — 220ms 를 넘기면 그때 뼈대로 바꾼다
-  void _beginLoad() {
-    _skeletonTimer?.cancel();
-    _skeletonTimer = Timer(DelayedSpinner.delay, () {
-      if (mounted) setState(() => _showSkeleton = true);
-    });
-  }
-
-  /// 다 받았다(또는 실패) — 뼈대를 걷고 예약도 취소한다
-  void _endLoad() {
-    _skeletonTimer?.cancel();
-    _showSkeleton = false;
-  }
-
+  /// 열 때 부모가 오늘 기록을 이미 넘겨줘서 뼈대 없이 시작한다
+  /// (세션 기록은 스스로 받아 와서 뼈대로 시작한다)
   @override
-  void dispose() {
-    _skeletonTimer?.cancel();
-    super.dispose();
+  void initState() {
+    super.initState();
+    skipFirstSkeleton();
   }
 
   static const _weekdays = ['월', '화', '수', '목', '금', '토', '일'];
@@ -189,7 +165,7 @@ class _HistoryScreenState extends State<_HistoryScreen> {
     if (next.isAfter(_WorkScreenState._todayDate())) return;
     setState(() {
       _date = next;
-      _beginLoad();
+      beginLoad();
     });
     try {
       final logs = await EnvApi.logs(
@@ -205,11 +181,11 @@ class _HistoryScreenState extends State<_HistoryScreen> {
           for (final log in logs)
             if (log.employeeId == currentUser?.id) log,
         ];
-        _endLoad();
+        endLoad();
       });
     } catch (error) {
       if (!mounted) return;
-      setState(_endLoad); // 실패해도 뼈대에 갇히지 않게 푼다
+      setState(endLoad); // 실패해도 뼈대에 갇히지 않게 푼다
       AppToast.show(context, messageOf(error));
     }
   }
@@ -279,7 +255,7 @@ class _HistoryScreenState extends State<_HistoryScreen> {
                         ),
                         Spacer(),
                         // 받아 오는 동안은 건수도 뼈대다 (세션 기록과 같다)
-                        if (_showSkeleton)
+                        if (showSkeleton)
                           Skeleton(width: 46, height: 12)
                         else
                           Text(
@@ -316,7 +292,7 @@ class _HistoryScreenState extends State<_HistoryScreen> {
                       ],
                     ),
                   Container(height: 1, color: AppColors.gray100),
-                  if (_showSkeleton)
+                  if (showSkeleton)
                     Padding(
                       padding: EdgeInsets.fromLTRB(24, 24, 24, 24),
                       child: SkeletonRows(rows: 5, avatar: 0, trailing: 40),
