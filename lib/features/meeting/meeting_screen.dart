@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../project/project_screen.dart';
 import '../../core/api/client/api_exception.dart';
 import '../../core/api/project/meeting_api.dart';
 import '../../core/api/project/project_api.dart';
@@ -47,7 +48,8 @@ class MeetingScreen extends StatefulWidget {
   State<MeetingScreen> createState() => _MeetingScreenState();
 }
 
-class _MeetingScreenState extends State<MeetingScreen> with ScreenRefresh<MeetingScreen> {
+class _MeetingScreenState extends State<MeetingScreen>
+    with ScreenRefresh<MeetingScreen> {
   _Note? _selected;
 
   /// 새로 만든 회의록은 바로 편집 모드로 연다
@@ -589,6 +591,70 @@ class _NoteViewState extends State<_NoteView> {
     widget.onChanged();
   }
 
+  /// 본문에서 체크박스 줄만 뽑는다 — `- [ ] 현수막 교체` → `현수막 교체`
+  ///
+  /// **회의에서 이미 체크한 것도 담는다.** 프로젝트에서는 다시 확인하고
+  /// 누르는 게 보통이라 체크 상태는 안 가져온다 (2026-08-14 결정).
+  List<String> get _checkboxes => [
+    for (final line in widget.note.body.split('\n'))
+      if (RegExp(r'^\s*[-*]\s+\[[ xX]\]\s*(.+)$').firstMatch(line)
+          case final m?)
+        m.group(1)!.trim(),
+  ];
+
+  /// 첫 문단 — 프로젝트 설명 자리에 넣는다 (체크박스·제목 줄은 뺀다)
+  String get _firstParagraph {
+    for (final line in widget.note.body.split('\n')) {
+      final text = line.trim();
+      if (text.isEmpty) continue;
+      if (text.startsWith('#') || RegExp(r'^[-*>]').hasMatch(text)) continue;
+      return text;
+    }
+    return '';
+  }
+
+  /// 회의록 → 프로젝트
+  ///
+  /// 폼을 미리 채워 열고, 만들어지면 **이 회의록을 그 프로젝트에 건다.**
+  /// 나중에 "이 프로젝트가 어느 회의에서 나왔나" 가 남는다.
+  ///
+  /// ⚠️ 거는 순간 공개 범위가 같이 좁아진다 (`scope=PROJECT`) —
+  /// 그 프로젝트 사람과 참석자만 보게 된다 (backend-gap 44).
+  Future<void> _toProject() async {
+    final note = widget.note;
+    final todos = _checkboxes;
+    // 폼을 다시 채우게 하지 않는다 — **누르면 바로 만들어진다.**
+    // 마감일·색처럼 여기서 정할 수 없는 것은 만들어진 프로젝트에서 고친다.
+    final ok = await showConfirmDialog(
+      context,
+      title: '프로젝트로 옮길까요?',
+      message:
+          '${note.title}\n'
+          '할 일 ${todos.length}개 · 참여 ${note.members.length}명 · 마감 2주 뒤',
+      confirmLabel: '옮기기',
+    );
+    if (!ok || !mounted) return;
+    final projectId = await createProjectFrom(
+      context,
+      ProjectSeed(
+        title: note.title,
+        purpose: _firstParagraph,
+        members: note.members,
+        todos: todos,
+      ),
+    );
+    if (projectId == null || !mounted) return;
+    try {
+      await MeetingApi.update(note.id!, projectId: projectId);
+      if (!mounted) return;
+      setState(() => note.projectId = projectId);
+      AppToast.show(context, '프로젝트를 만들고 이 회의록을 걸었어요');
+    } catch (error) {
+      // 프로젝트는 이미 만들어졌다 — 연결만 실패한 것이라 그렇게 알린다
+      if (mounted) AppToast.show(context, '프로젝트는 만들었는데 회의록 연결에 실패했어요');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final note = widget.note;
@@ -637,6 +703,41 @@ class _NoteViewState extends State<_NoteView> {
           SizedBox(width: 6),
         ],
         // 남이 쓴 회의록은 읽기만 한다 (서버가 작성자·관리자만 통과시킨다)
+        // 회의록을 프로젝트로 옮긴다 — **이미 걸린 회의록에는 안 뜬다**
+        // (하나의 회의록은 하나의 프로젝트. 다시 만들면 앞 연결이 끊긴다)
+        if (!_editing && note.id != null && note.projectId == null) ...[
+          Pressable(
+            onTap: _toProject,
+            scale: 0.95,
+            child: Container(
+              padding: EdgeInsets.fromLTRB(12, 8, 14, 8),
+              decoration: BoxDecoration(
+                color: AppColors.gray50,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.create_new_folder_rounded,
+                    size: 15,
+                    color: AppColors.textSecondary,
+                  ),
+                  SizedBox(width: 4),
+                  Text(
+                    '프로젝트로',
+                    style: AppTextStyles.body2.copyWith(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(width: 8),
+        ],
         if (note.canEdit)
           Pressable(
             onTap: _toggleEdit,

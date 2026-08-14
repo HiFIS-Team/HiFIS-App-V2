@@ -56,7 +56,8 @@ class ApprovalScreen extends StatefulWidget {
 /// (`NOT_A_REQUESTER`) — 눌러도 403 날 버튼은 안 낸다.
 bool get _canWrite => myRole != Role.master && myRole != Role.admin;
 
-class _ApprovalScreenState extends State<ApprovalScreen> with ScreenRefresh<ApprovalScreen> {
+class _ApprovalScreenState extends State<ApprovalScreen>
+    with ScreenRefresh<ApprovalScreen> {
   _State _filter = _State.pending;
 
   /// 고른 문서 — 목록이 갈릴 때마다 새 객체가 오므로 id 로 들고 있는다

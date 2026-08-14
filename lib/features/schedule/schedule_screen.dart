@@ -44,7 +44,8 @@ class ScheduleScreen extends StatefulWidget {
   State<ScheduleScreen> createState() => _ScheduleScreenState();
 }
 
-class _ScheduleScreenState extends State<ScheduleScreen> with ScreenRefresh<ScheduleScreen> {
+class _ScheduleScreenState extends State<ScheduleScreen>
+    with ScreenRefresh<ScheduleScreen> {
   /// 보고 있는 달 (1일로 맞춰 둔다) — PC 달력이 쓴다
   late DateTime _month = _monthOf(DateTime.now());
 

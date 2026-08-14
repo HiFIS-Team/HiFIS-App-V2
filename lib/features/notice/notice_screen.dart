@@ -48,7 +48,8 @@ class NoticeScreen extends StatefulWidget {
   State<NoticeScreen> createState() => _NoticeScreenState();
 }
 
-class _NoticeScreenState extends State<NoticeScreen> with ScreenRefresh<NoticeScreen> {
+class _NoticeScreenState extends State<NoticeScreen>
+    with ScreenRefresh<NoticeScreen> {
   /// true면 안 읽은 공지만
   bool _unreadOnly = false;
 

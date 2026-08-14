@@ -12,6 +12,57 @@ Future<_Project?> _showProjectComposer(BuildContext context) {
   return showAppDialog<_Project>(context, (context) => _ProjectComposer());
 }
 
+/// 밖에서 프로젝트를 만들 때 미리 채워 보내는 값 (지금은 회의록이 쓴다)
+class ProjectSeed {
+  const ProjectSeed({
+    this.title = '',
+    this.purpose = '',
+    this.members = const [],
+    this.todos = const [],
+  });
+
+  final String title;
+  final String purpose;
+
+  /// 참여 멤버 — **이름**이다 (폼이 아직 이름을 사람 키로 쓴다, backend-gap 10)
+  final List<String> members;
+
+  /// 할 일 — 회의록 체크박스의 글이 그대로 들어온다
+  final List<String> todos;
+}
+
+/// **회의록에서 프로젝트 만들기** — 만들어진 프로젝트 id 를 돌려준다
+///
+/// 폼을 미리 채워서 열고, 만들면 서버에 올린다. 마감일만 사람이 고른다
+/// (회의록에는 날짜 칸이 없다 — 기본값은 폼이 쓰는 2주 뒤 그대로).
+///
+/// 프로젝트 화면 밖에서 부르는 유일한 창구다. `_showProjectComposer` 와
+/// `_saveNewProject` 가 이 라이브러리 안에 있어서 여기 둔다.
+Future<String?> createProjectFrom(
+  BuildContext context,
+  ProjectSeed seed,
+) async {
+  final draft = _Project(
+    name: seed.title,
+    desc: seed.purpose,
+    start: DateTime.now(),
+    // 회의록에는 날짜 칸이 없다 — 폼이 쓰는 기본값과 같은 2주 뒤로 둔다
+    due: DateTime.now().add(Duration(days: 14)),
+    members: seed.members,
+    // 맡을 사람은 **첫 참석자**다. 아무도 없으면 만든 사람이 맡는다
+    owner: seed.members.isNotEmpty ? seed.members.first : me,
+    todos: [for (final text in seed.todos) _Todo(text: text)],
+    events: const [],
+  );
+  try {
+    final created = await _saveNewProject(draft);
+    return created.id;
+  } catch (error) {
+    if (context.mounted) AppToast.show(context, messageOf(error));
+    return null;
+  }
+}
+
 class _ProjectComposer extends StatefulWidget {
   _ProjectComposer({this.phone = false});
 

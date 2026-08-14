@@ -45,7 +45,8 @@ class SalaryScreen extends StatefulWidget {
   State<SalaryScreen> createState() => _SalaryScreenState();
 }
 
-class _SalaryScreenState extends State<SalaryScreen> with ScreenRefresh<SalaryScreen> {
+class _SalaryScreenState extends State<SalaryScreen>
+    with ScreenRefresh<SalaryScreen> {
   bool _loading = true;
 
   /// 0 = 내 급여, 1 = 결재. 결재함을 볼 수 없는 사람에게는 탭 자체가 없다
