@@ -3,16 +3,23 @@ part of 'my_task_section.dart';
 /// 적을 수 있는 글자 수 — 서버 `MyTask.content` 가 200자다
 const _contentMax = 60;
 
-/// 업무 추가 — **결재 없이 바로 들어간다**
-class _AddTaskCard extends StatefulWidget {
-  const _AddTaskCard();
+/// 업무 추가 — 오른쪽에서 밀려 들어오는 화면
+///
+/// **팝업이 아니다.** 여러 줄을 쌓아 두고 한 번에 만드는 자리라
+/// 팝업으로는 좁다 (프로젝트 만들기와 같은 방식 — `showFullPage`).
+class _AddTaskScreen extends StatefulWidget {
+  const _AddTaskScreen();
 
   @override
-  State<_AddTaskCard> createState() => _AddTaskCardState();
+  State<_AddTaskScreen> createState() => _AddTaskScreenState();
 }
 
-class _AddTaskCardState extends State<_AddTaskCard> {
+class _AddTaskScreenState extends State<_AddTaskScreen> {
   final _text = TextEditingController();
+  final _focus = FocusNode();
+
+  /// 아직 안 만든 줄들 — `추가` 를 눌러야 서버로 간다
+  final _staged = <String>[];
 
   @override
   void initState() {
@@ -23,32 +30,180 @@ class _AddTaskCardState extends State<_AddTaskCard> {
   @override
   void dispose() {
     _text.dispose();
+    _focus.dispose();
     super.dispose();
   }
 
   String get _value => _text.text.trim();
 
-  void _submit() {
+  /// 입력칸의 글을 아래 목록으로 옮긴다 — 칸을 비우고 커서를 남겨서
+  /// 엔터만 계속 눌러 여러 줄을 이어 적을 수 있다
+  void _stage() {
     if (_value.isEmpty) return;
-    Navigator.pop(context, _value);
+    setState(() {
+      _staged.add(_value);
+      _text.clear();
+    });
+    _focus.requestFocus();
   }
 
+  void _submit() {
+    // 적다 만 글도 같이 담는다 — 엔터를 안 누르고 바로 만드는 사람이 많다
+    final all = [..._staged, if (_value.isNotEmpty) _value];
+    if (all.isEmpty) return;
+    Navigator.pop(context, all);
+  }
+
+  int get _count => _staged.length + (_value.isEmpty ? 0 : 1);
+
   @override
-  Widget build(BuildContext context) => _FormCard(
-    title: '업무 추가',
-    hint: '매일 할 일을 적어주세요. 하루에 한 번씩 체크해요.',
-    confirmLabel: '추가',
-    enabled: _value.isNotEmpty,
-    onConfirm: _submit,
-    body: [
-      _Field(
-        controller: _text,
-        autofocus: true,
-        hintText: '예) 탈의실 향기 확인',
-        maxLength: _contentMax,
-        onSubmitted: (_) => _submit(),
+  Widget build(BuildContext context) {
+    final body = Container(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 22),
+      decoration: AppDecorations.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '매일 할 일을 적어주세요. 하루에 한 번씩 체크해요.',
+            style: AppTextStyles.caption.copyWith(height: 1.5),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _Field(
+                  controller: _text,
+                  focusNode: _focus,
+                  autofocus: true,
+                  hintText: '예) 탈의실 향기 확인',
+                  maxLength: _contentMax,
+                  onSubmitted: (_) => _stage(),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // 한 줄 더 적을 때 누른다 — 엔터와 같은 일을 한다
+              Pressable(
+                onTap: _stage,
+                scale: 0.94,
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: _value.isEmpty
+                        ? AppColors.gray100
+                        : AppColors.primary,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.add_rounded,
+                    size: 20,
+                    color: _value.isEmpty ? AppColors.gray400 : Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          for (var i = 0; i < _staged.length; i++) ...[
+            const SizedBox(height: 8),
+            _StagedRow(
+              text: _staged[i],
+              onRemove: () => setState(() => _staged.removeAt(i)),
+            ),
+          ],
+        ],
       ),
-    ],
+    );
+
+    if (!isDesktop) {
+      return PhoneDetailScaffold(
+        title: '업무 추가',
+        bottomBar: GlassBottomButton(
+          label: _count > 1 ? '$_count개 추가' : '추가',
+          active: _count > 0,
+          onPressed: _submit,
+        ),
+        child: ListView(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            PhoneDetailScaffold.topPadding,
+            20,
+            GlassBottomButton.inset(context),
+          ),
+          children: [body],
+        ),
+      );
+    }
+
+    // 데스크톱은 가운데 모달 — `showFullPage` 가 틀을 씌운다
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 14),
+            child: Text('업무 추가', style: AppTextStyles.title3),
+          ),
+          body,
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: AppButton(
+                  label: '취소',
+                  onTap: () => Navigator.pop(context),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: AppButton(
+                  label: _count > 1 ? '$_count개 추가' : '추가',
+                  filled: _count > 0,
+                  onTap: _submit,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 아직 안 만든 줄 — 오른쪽 X 로 뺀다
+class _StagedRow extends StatelessWidget {
+  const _StagedRow({required this.text, required this.onRemove});
+
+  final String text;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+    decoration: BoxDecoration(
+      color: AppColors.gray50,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
+      children: [
+        Expanded(child: Text(text, style: AppTextStyles.body2)),
+        Pressable(
+          onTap: onRemove,
+          scale: 0.9,
+          child: Padding(
+            padding: const EdgeInsets.all(5),
+            child: Icon(
+              CupertinoIcons.xmark,
+              size: 13,
+              color: AppColors.textTertiary,
+            ),
+          ),
+        ),
+      ],
+    ),
   );
 }
 
@@ -239,9 +394,11 @@ class _Field extends StatelessWidget {
     required this.maxLength,
     this.autofocus = false,
     this.onSubmitted,
+    this.focusNode,
   });
 
   final TextEditingController controller;
+  final FocusNode? focusNode;
   final String hintText;
   final int maxLength;
   final bool autofocus;
@@ -256,6 +413,7 @@ class _Field extends StatelessWidget {
     ),
     child: TextField(
       controller: controller,
+      focusNode: focusNode,
       autofocus: autofocus,
       maxLength: maxLength,
       style: AppTextStyles.body1,

@@ -6,13 +6,16 @@ import '../../../core/api/work/my_task_api.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/util/platform.dart';
 import '../../../core/util/screen_refresh.dart';
 import '../../../core/util/skeleton_delay.dart';
 import '../../../core/widgets/feedback/app_dialog.dart';
 import '../../../core/widgets/feedback/app_toast.dart';
 import '../../../core/widgets/feedback/skeleton.dart';
 import '../../../core/widgets/input/app_button.dart';
+import '../../../core/widgets/glass/glass_bottom_button.dart';
 import '../../../core/widgets/input/pressable.dart';
+import '../../../core/widgets/nav/phone_scaffold.dart';
 
 part 'my_task_forms.dart';
 
@@ -84,15 +87,24 @@ class _MyTaskSectionState extends State<MyTaskSection>
   }
 
   Future<void> _add() async {
-    final content = await showAppDialog<String>(
+    // 폰은 오른쪽에서 밀려 들어오고, 데스크톱은 가운데 모달이다
+    // (프로젝트 만들기·내역 전체보기와 같은 `showFullPage`)
+    final contents = await showFullPage<List<String>>(
       context,
-      (_) => const _AddTaskCard(),
+      (_) => const _AddTaskScreen(),
     );
-    if (content == null || !mounted) return;
+    if (contents == null || contents.isEmpty || !mounted) return;
     try {
-      await MyTaskApi.create(content);
+      // 여러 줄을 **한 번에** 보낸다 — 줄마다 부르면 중간에 끊겼을 때
+      // 반만 들어간 채로 화면이 닫힌다
+      await MyTaskApi.create(contents);
       await _load();
-      if (mounted) AppToast.show(context, '업무를 추가했어요');
+      if (mounted) {
+        AppToast.show(
+          context,
+          contents.length == 1 ? '업무를 추가했어요' : '업무 ${contents.length}개를 추가했어요',
+        );
+      }
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
     }
@@ -137,6 +149,20 @@ class _MyTaskSectionState extends State<MyTaskSection>
               children: [
                 Expanded(child: Text('오늘 할 일', style: AppTextStyles.label)),
                 _DoneBadge(day: day),
+                const SizedBox(width: 4),
+                // 프로젝트 목록 머리말과 같은 자리·같은 부품이다
+                Pressable(
+                  onTap: _add,
+                  scale: 0.94,
+                  pressedColor: AppColors.primaryLight,
+                  borderRadius: BorderRadius.circular(100),
+                  padding: const EdgeInsets.all(4),
+                  child: const Icon(
+                    Icons.add_rounded,
+                    size: 20,
+                    color: AppColors.primary,
+                  ),
+                ),
               ],
             ),
           ),
@@ -163,8 +189,6 @@ class _MyTaskSectionState extends State<MyTaskSection>
                     _request(day.tasks[i], MyTaskRequestType.delete),
               ),
             ],
-          const SizedBox(height: 14),
-          AppButton(label: '업무 추가', filled: true, onTap: _add),
         ],
       ),
     );
@@ -330,8 +354,6 @@ class _MyTaskSkeleton extends StatelessWidget {
         const SizedBox(height: 12),
         // 줄 간격을 실제 목록과 맞춘다 — 안 맞추면 뼈대에서 목록으로 바뀔 때 밀린다
         SkeletonRows(rows: 4, avatar: 22, gap: 20, trailing: 40),
-        const SizedBox(height: 14),
-        Skeleton(height: 48, radius: 14),
       ],
     ),
   );

@@ -171,10 +171,19 @@ class MyTaskApi {
     return MyTaskDay.fromJson(data);
   }
 
-  /// 추가 — **결재 없이 바로 들어간다**
-  static Future<MyTask> create(String content) async {
-    final data = await _client.post('/my-tasks', body: {'content': content});
-    return MyTask.fromJson(data!);
+  /// 추가 — **결재 없이 바로 들어간다.** 여러 개를 한 번에 보낸다.
+  ///
+  /// 줄마다 따로 부르면 중간에 끊겼을 때 반만 들어간 채로 화면이 닫힌다.
+  /// 서버가 한 트랜잭션으로 만든다.
+  static Future<List<MyTask>> create(List<String> contents) async {
+    final rows = await _client.postList(
+      '/my-tasks',
+      body: {'contents': contents},
+    );
+    return [
+      for (final row in rows)
+        MyTask.fromJson((row as Map).cast<String, dynamic>()),
+    ];
   }
 
   /// 오늘 했다고 표시 (멱등)
