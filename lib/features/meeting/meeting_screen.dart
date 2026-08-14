@@ -467,32 +467,22 @@ String _firstParagraphOf(String body) {
 
 /// 회의록을 프로젝트로 옮긴다
 ///
-/// 폼을 다시 채우게 하지 않는다 — **누르면 바로 만들어진다.**
-/// 마감일·색처럼 여기서 정할 수 없는 것은 만들어진 프로젝트에서 고친다.
-/// 만들어지면 **이 회의록을 그 프로젝트에 건다** — 나중에 "이 프로젝트가
+/// **채워진 프로젝트 생성 폼이 그대로 열린다** — 제목·설명·참여 멤버·할 일이
+/// 미리 들어가 있고, 마감일·색·담당만 손보면 된다. 아래 `옮기기` 를 누르면
+/// 만들어지고 **이 회의록을 그 프로젝트에 건다** — 나중에 "이 프로젝트가
 /// 어느 회의에서 나왔나" 가 남는다.
 ///
 /// **폰 헤더 버튼과 PC 제목 옆 버튼이 이 함수 하나를 부른다.** 위젯 밖에
 /// 둔 이유가 그것이다 — 폰은 헤더가 `_NoteScreen`, 본문이 `_NoteView` 라
 /// 상태를 나눠 갖고 있어서 안에 두면 한쪽에서 못 부른다.
 Future<void> _moveNoteToProject(BuildContext context, _Note note) async {
-  final todos = _checkboxesOf(note.body);
-  final ok = await showConfirmDialog(
-    context,
-    title: '프로젝트로 옮길까요?',
-    message:
-        '${note.title}\n'
-        '할 일 ${todos.length}개 · 참여 ${note.members.length}명 · 마감 2주 뒤',
-    confirmLabel: '옮기기',
-  );
-  if (!ok || !context.mounted) return;
   final projectId = await createProjectFrom(
     context,
     ProjectSeed(
       title: note.title,
       purpose: _firstParagraphOf(note.body),
       members: note.members,
-      todos: todos,
+      todos: _checkboxesOf(note.body),
     ),
   );
   if (projectId == null || !context.mounted) return;

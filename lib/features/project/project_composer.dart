@@ -1,15 +1,25 @@
 part of 'project_screen.dart';
 
 /// 새 프로젝트 만들기 — 만들면 그 프로젝트를 돌려준다
-Future<_Project?> _showProjectComposer(BuildContext context) {
+///
+/// [seed] 를 주면 칸이 미리 채워진 채로 열린다 (회의록에서 옮길 때).
+Future<_Project?> _showProjectComposer(
+  BuildContext context, {
+  ProjectSeed? seed,
+}) {
   // 폰은 팝업이 답답해서 오른쪽에서 밀려 들어오는 페이지로 연다
   if (!isDesktop) {
     return Navigator.push<_Project>(
       context,
-      CupertinoPageRoute(builder: (_) => _ProjectComposer(phone: true)),
+      CupertinoPageRoute(
+        builder: (_) => _ProjectComposer(phone: true, seed: seed),
+      ),
     );
   }
-  return showAppDialog<_Project>(context, (context) => _ProjectComposer());
+  return showAppDialog<_Project>(
+    context,
+    (context) => _ProjectComposer(seed: seed),
+  );
 }
 
 /// 밖에서 프로젝트를 만들 때 미리 채워 보내는 값 (지금은 회의록이 쓴다)
@@ -33,8 +43,8 @@ class ProjectSeed {
 
 /// **회의록에서 프로젝트 만들기** — 만들어진 프로젝트 id 를 돌려준다
 ///
-/// 폼을 미리 채워서 열고, 만들면 서버에 올린다. 마감일만 사람이 고른다
-/// (회의록에는 날짜 칸이 없다 — 기본값은 폼이 쓰는 2주 뒤 그대로).
+/// **미리 채워진 생성 폼을 그대로 연다.** 옮기기 전에 마감일·색·담당을
+/// 손볼 수 있어야 해서 확인 창 한 장으로 끝내지 않는다.
 ///
 /// 프로젝트 화면 밖에서 부르는 유일한 창구다. `_showProjectComposer` 와
 /// `_saveNewProject` 가 이 라이브러리 안에 있어서 여기 둔다.
@@ -42,18 +52,8 @@ Future<String?> createProjectFrom(
   BuildContext context,
   ProjectSeed seed,
 ) async {
-  final draft = _Project(
-    name: seed.title,
-    desc: seed.purpose,
-    start: DateTime.now(),
-    // 회의록에는 날짜 칸이 없다 — 폼이 쓰는 기본값과 같은 2주 뒤로 둔다
-    due: DateTime.now().add(Duration(days: 14)),
-    members: seed.members,
-    // 맡을 사람은 **첫 참석자**다. 아무도 없으면 만든 사람이 맡는다
-    owner: seed.members.isNotEmpty ? seed.members.first : me,
-    todos: [for (final text in seed.todos) _Todo(text: text)],
-    events: const [],
-  );
+  final draft = await _showProjectComposer(context, seed: seed);
+  if (draft == null || !context.mounted) return null;
   try {
     final created = await _saveNewProject(draft);
     return created.id;
@@ -64,18 +64,21 @@ Future<String?> createProjectFrom(
 }
 
 class _ProjectComposer extends StatefulWidget {
-  _ProjectComposer({this.phone = false});
+  _ProjectComposer({this.phone = false, this.seed});
 
   /// 폰은 팝업이 아니라 밀려 들어오는 페이지로 뜬다
   final bool phone;
+
+  /// 미리 채워 넣을 값 — null 이면 빈 폼이다 (평소 '새 프로젝트')
+  final ProjectSeed? seed;
 
   @override
   State<_ProjectComposer> createState() => _ProjectComposerState();
 }
 
 class _ProjectComposerState extends State<_ProjectComposer> {
-  final _name = TextEditingController();
-  final _desc = TextEditingController();
+  late final _name = TextEditingController(text: widget.seed?.title ?? '');
+  late final _desc = TextEditingController(text: widget.seed?.purpose ?? '');
   final _nameFocus = FocusNode();
 
   /// 기본 마감은 2주 뒤
@@ -85,13 +88,27 @@ class _ProjectComposerState extends State<_ProjectComposer> {
   ///
   /// **대표·관리자는 안 든다.** 프로젝트를 만들어 맡기는 자리라 본인이
   /// 참여자도 담당자도 아니다 (그래서 [_owner] 도 비운 채로 시작한다).
-  final _members = <String>[if (myRole.doesFieldWork) me];
+  ///
+  /// 회의록에서 왔으면 **참석자가 그대로 든다.** 본인 칩은 뺄 수 없게
+  /// 해 뒀으므로(`onTap: null`) 겹치지 않게 한 번만 넣는다.
+  late final _members = <String>[
+    if (myRole.doesFieldWork) me,
+    for (final name in widget.seed?.members ?? const <String>[])
+      if (name != me) name,
+  ];
 
   /// 만들면서 같이 등록할 할 일
-  final _todos = <_Todo>[];
+  late final _todos = <_Todo>[
+    for (final text in widget.seed?.todos ?? const <String>[])
+      _Todo(text: text),
+  ];
 
   /// 맡을 사람 — 비어 있으면 아직 안 골랐다는 뜻이다
-  String _owner = myRole.doesFieldWork ? me : '';
+  ///
+  /// 회의록에서 왔고 본인이 참여자가 아니면(대표·관리자) **첫 참석자**를 세운다
+  late String _owner = myRole.doesFieldWork
+      ? me
+      : (_members.isNotEmpty ? _members.first : '');
 
   Color _color = AppColors.primary;
 
@@ -371,6 +388,9 @@ class _ProjectComposerState extends State<_ProjectComposer> {
     );
   }
 
+  /// 확인 버튼 글자 — 회의록에서 왔으면 '옮기기' 다 (하는 일이 다르다)
+  String get _submitLabel => widget.seed == null ? '만들기' : '옮기기';
+
   /// 만들기 버튼 (데스크톱 팝업 전용 — 폰은 하단 글래스 버튼을 쓴다)
   Widget _submitButton() {
     final empty = _name.text.trim().isEmpty;
@@ -386,7 +406,7 @@ class _ProjectComposerState extends State<_ProjectComposer> {
           borderRadius: BorderRadius.circular(12),
         ),
         child: Text(
-          '만들기',
+          _submitLabel,
           style: AppTextStyles.body2.copyWith(
             color: empty ? AppColors.gray500 : Colors.white,
             fontWeight: FontWeight.w700,
@@ -406,7 +426,7 @@ class _ProjectComposerState extends State<_ProjectComposer> {
         title: '새 프로젝트',
         // 만들기는 하단 탭바 자리에 글래스 버튼으로 띄운다
         bottomBar: GlassBottomButton(
-          label: '만들기',
+          label: _submitLabel,
           active: _name.text.trim().isNotEmpty,
           onPressed: _submit,
         ),
