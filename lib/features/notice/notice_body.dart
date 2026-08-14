@@ -360,6 +360,16 @@ class _ReadCard extends StatelessWidget {
           final readCount = data?.readCount ?? notice.readCount;
           final allRead = data != null && readCount >= total && total > 0;
 
+          // 서버가 읽은 사람을 앞에 놓아 주지만, 여기서 두 덩이로 가른다
+          final read = [
+            for (final person in people)
+              if (person.read) person,
+          ];
+          final unread = [
+            for (final person in people)
+              if (!person.read) person,
+          ];
+
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -384,15 +394,56 @@ class _ReadCard extends StatelessWidget {
                     ),
                 ],
               ),
-              if (people.isNotEmpty) ...[
-                SizedBox(height: 12),
+              SizedBox(height: 12),
+              ProgressBar(
+                ratio: total == 0 ? 0 : readCount / total,
+                color: allRead ? AppColors.success : null,
+              ),
+              // 확인한 사람은 **이름까지** 보여준다 — 누가 봤는지가 알고 싶은 값이다
+              if (read.isNotEmpty) ...[
+                SizedBox(height: 18),
                 Wrap(
                   spacing: 6,
                   runSpacing: 6,
                   children: [
-                    // 서버가 읽은 사람을 앞에 놓아 준다
-                    for (final person in people)
-                      _ReaderChip(name: person.name, read: person.read),
+                    for (final person in read) _ReaderChip(name: person.name),
+                  ],
+                ),
+              ],
+              // 안 본 사람은 **아바타만** 촘촘히 — 스물이 넘어도 카드가 안 길어진다
+              if (unread.isNotEmpty) ...[
+                SizedBox(height: 18),
+                Row(
+                  children: [
+                    Text(
+                      '아직 안 봤어요',
+                      style: AppTextStyles.caption.copyWith(fontSize: 12),
+                    ),
+                    SizedBox(width: 6),
+                    Text(
+                      '${unread.length}',
+                      style: AppTextStyles.caption.copyWith(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textTertiary,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final person in unread)
+                      // 이름이 없으면 누구인지 모르니 길게 눌러 확인한다
+                      Tooltip(
+                        message: person.name,
+                        child: Opacity(
+                          opacity: 0.45,
+                          child: Avatar(name: person.name, size: 30),
+                        ),
+                      ),
                   ],
                 ),
               ],
@@ -434,44 +485,33 @@ Future<NoticeReaders> _readersOf(_Notice notice) {
       });
 }
 
-/// 확인 여부 알약 — 안 본 사람은 흐리게
+/// 확인한 사람 알약 — 안 본 사람은 아바타만 그리므로 여기 안 온다
 class _ReaderChip extends StatelessWidget {
-  _ReaderChip({required this.name, required this.read});
+  _ReaderChip({required this.name});
 
   final String name;
-  final bool read;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.fromLTRB(4, 4, 10, 4),
       decoration: BoxDecoration(
-        color: read ? AppColors.gray50 : Colors.transparent,
+        color: AppColors.gray50,
         borderRadius: BorderRadius.circular(100),
-        border: Border.all(
-          color: read ? Colors.transparent : AppColors.gray200,
-        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Opacity(
-            opacity: read ? 1 : 0.4,
-            child: Avatar(name: name, size: 22),
-          ),
+          Avatar(name: name, size: 22),
           SizedBox(width: 6),
           Text(
             name == me ? '나' : name,
             style: AppTextStyles.caption.copyWith(
               fontSize: 12,
-              color: read ? AppColors.textPrimary : AppColors.gray400,
+              color: AppColors.textPrimary,
               fontWeight: FontWeight.w600,
             ),
           ),
-          if (read) ...[
-            SizedBox(width: 4),
-            Icon(Icons.check_rounded, size: 13, color: AppColors.success),
-          ],
         ],
       ),
     );

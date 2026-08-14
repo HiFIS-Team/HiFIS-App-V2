@@ -12,6 +12,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
 import '../../core/widgets/display/avatar.dart';
+import '../../core/widgets/display/progress_bar.dart';
 import '../../core/widgets/editor/block_editor.dart';
 import '../../core/widgets/editor/markdown_view.dart';
 import '../../core/widgets/editor/reaction_row.dart';

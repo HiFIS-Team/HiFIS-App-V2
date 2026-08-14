@@ -8,6 +8,7 @@ class Pressable extends StatefulWidget {
     super.key,
     required this.onTap,
     required this.child,
+    this.onLongPress,
     this.scale = 0.96,
     this.pressedColor,
     this.borderRadius,
@@ -15,6 +16,10 @@ class Pressable extends StatefulWidget {
   });
 
   final VoidCallback onTap;
+
+  /// 꾹 누르기 — 없으면 길게 눌러도 탭과 같다 (기본 동작 그대로)
+  final VoidCallback? onLongPress;
+
   final Widget child;
 
   /// 눌렸을 때 줄어드는 배율
@@ -47,6 +52,12 @@ class _PressableState extends State<Pressable> {
         onTapUp: (_) => _setPressed(false),
         onTapCancel: () => _setPressed(false),
         onTap: widget.onTap,
+        onLongPress: widget.onLongPress == null
+            ? null
+            : () {
+                _setPressed(false);
+                widget.onLongPress!();
+              },
         child: AnimatedScale(
           scale: _pressed ? widget.scale : 1.0,
           duration: Duration(milliseconds: 120),
