@@ -159,6 +159,38 @@ class MyTaskDay {
   bool get missing => total > 0 && done < total;
 }
 
+/// 대표·관리자가 보는 사람 한 줄 (서버 `MyTaskRosterRow`)
+class MyTaskRosterRow {
+  MyTaskRosterRow({
+    required this.employeeId,
+    required this.name,
+    required this.total,
+    required this.done,
+    required this.complete,
+  });
+
+  factory MyTaskRosterRow.fromJson(Map<String, dynamic> json) =>
+      MyTaskRosterRow(
+        employeeId: json['employeeId'] as String,
+        name: json['name'] as String,
+        total: json['total'] as int? ?? 0,
+        done: json['done'] as int? ?? 0,
+        complete: json['complete'] as bool? ?? false,
+      );
+
+  final String employeeId;
+
+  /// 서버가 이름을 그대로 준다 — 명단을 못 받은 화면에서도 빈칸이 안 된다
+  final String name;
+
+  final int total;
+  final int done;
+  final bool complete;
+
+  /// 아직 안 한 것이 있는가 — 업무를 안 정한 사람은 여기 안 든다
+  bool get missing => total > 0 && done < total;
+}
+
 /// `/my-tasks` — 내 업무
 class MyTaskApi {
   MyTaskApi._();
@@ -166,9 +198,30 @@ class MyTaskApi {
   static final _client = ApiClient.instance;
 
   /// 하루치 목록 — [date] 를 비우면 오늘
-  static Future<MyTaskDay> day({String? date}) async {
-    final data = await _client.get('/my-tasks', query: {'date': ?date});
+  ///
+  /// [employeeId] 는 **대표·관리자만** 쓴다 (남의 것 보기). 그 밖이 넣으면
+  /// 서버가 조용히 본인 것을 준다.
+  static Future<MyTaskDay> day({String? date, String? employeeId}) async {
+    final data = await _client.get(
+      '/my-tasks',
+      query: {'date': ?date, 'employeeId': ?employeeId},
+    );
     return MyTaskDay.fromJson(data);
+  }
+
+  /// 오늘 누가 몇 개 중 몇 개를 했나 — **대표·관리자만** (그 밖에는 403)
+  static Future<List<MyTaskRosterRow>> roster({
+    String? date,
+    String? branchId,
+  }) async {
+    final rows = await _client.getList(
+      '/my-tasks/roster',
+      query: {'date': ?date, 'branchId': ?branchId},
+    );
+    return [
+      for (final row in rows)
+        MyTaskRosterRow.fromJson((row as Map).cast<String, dynamic>()),
+    ];
   }
 
   /// 추가 — **결재 없이 바로 들어간다.** 여러 개를 한 번에 보낸다.

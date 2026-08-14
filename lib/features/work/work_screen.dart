@@ -471,16 +471,16 @@ class _WorkScreenState extends State<WorkScreen>
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // 공통 업무 / 내 업무 — 직접 수행하는 사람에게만 뜬다.
-                        // 대표·관리자는 갈래가 하나뿐이라 바를 안 그린다.
-                        if (_canDoEnv) ...[
-                          SegmentedTabs(
-                            labels: const ['공통 업무', '내 업무'],
-                            selected: _envTab,
-                            onSelect: (i) => setState(() => _envTab = i),
-                          ),
-                          SizedBox(height: 16),
-                        ],
+                        // 라벨이 권한마다 다르다 — 대표·관리자에게 `내 업무` 는
+                        // 자기 것이 아니라 **직원들 것**이라 말이 안 맞는다.
+                        SegmentedTabs(
+                          labels: _canDoEnv
+                              ? const ['공통 업무', '내 업무']
+                              : const ['지점 업무', '개인 업무'],
+                          selected: _envTab,
+                          onSelect: (i) => setState(() => _envTab = i),
+                        ),
+                        SizedBox(height: 16),
                         // 칸을 옮기면 **아래에서 살짝 올라온다** — 회원 친절도·
                         // 랭킹·모니터링 목록바와 같은 움직임이다.
                         //
@@ -495,15 +495,16 @@ class _WorkScreenState extends State<WorkScreen>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              if (_canDoEnv)
-                                Offstage(
-                                  offstage: _envTab != 1,
-                                  child: MyTaskSection(
-                                    reloadToken: _myTaskReload,
-                                  ),
-                                ),
                               Offstage(
-                                offstage: _canDoEnv && _envTab == 1,
+                                offstage: _envTab != 1,
+                                child: _canDoEnv
+                                    ? MyTaskSection(reloadToken: _myTaskReload)
+                                    // 대표·관리자는 사람 목록을 본다 —
+                                    // 누르면 그 사람 업무가 밀려 들어온다
+                                    : MyTaskRoster(),
+                              ),
+                              Offstage(
+                                offstage: _envTab == 1,
                                 child: Column(
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,

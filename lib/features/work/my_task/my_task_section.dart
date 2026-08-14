@@ -3,6 +3,11 @@ import 'package:flutter/material.dart';
 
 import '../../../core/api/client/api_exception.dart';
 import '../../../core/api/work/my_task_api.dart';
+import '../../../core/widgets/display/progress_bar.dart';
+import '../../../core/widgets/display/avatar.dart';
+import '../../../core/util/layout.dart';
+import '../../../core/data/staff_directory.dart';
+import '../../../core/data/branch_scope.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -18,6 +23,7 @@ import '../../../core/widgets/input/pressable.dart';
 import '../../../core/widgets/nav/phone_scaffold.dart';
 
 part 'my_task_forms.dart';
+part 'my_task_roster.dart';
 
 /// 마지막으로 받아 둔 하루치 — **화면 밖에 둔다**
 ///
@@ -29,8 +35,14 @@ part 'my_task_forms.dart';
 /// 세션 안에서만 산다 — 로그아웃하면 [resetMyTaskCache].
 MyTaskDay? _cached;
 
+/// 대표·관리자가 보던 사람 목록 — 같은 이유로 화면 밖에 둔다
+List<MyTaskRosterRow> _cachedRoster = const [];
+
 /// 로그아웃할 때 비운다 — 다음 사람에게 앞사람 할 일이 보이면 안 된다
-void resetMyTaskCache() => _cached = null;
+void resetMyTaskCache() {
+  _cached = null;
+  _cachedRoster = const [];
+}
 
 /// 내 업무 추가 — **업무 화면 머리말의 `+` 가 부른다**
 ///
