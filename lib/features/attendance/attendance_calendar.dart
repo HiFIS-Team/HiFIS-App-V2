@@ -313,6 +313,10 @@ class _DayCellState extends State<_DayCell> {
                     _DayStatus.normal => _hours(day),
                     _DayStatus.late => _tag('지각', AppColors.warning),
                     _DayStatus.early => _tag('조퇴', AppColors.warning),
+                    _DayStatus.noCheckout => _tag(
+                      '퇴근누락',
+                      AppColors.workNoCheckout,
+                    ),
                     _DayStatus.absent => _tag('결근', AppColors.error),
                     _DayStatus.leave => _tag('월차', AppColors.primary),
                     _DayStatus.off => SizedBox(),

@@ -5,6 +5,13 @@ enum _DayStatus {
   normal('정상'),
   late('지각'),
   early('조기 퇴근'),
+
+  /// 출근은 찍었는데 퇴근을 안 찍고 간 날 — **몇 시에 갔는지 모르는 날**이다.
+  ///
+  /// 조기퇴근과 붙여 두면 안 된다. 조기퇴근은 일찍 간 게 **확인된** 것이고
+  /// 이건 기록이 없는 것이라, 밤늦게까지 있다가 바코드만 잊은 사람도
+  /// 여기 들어온다 (예전에는 조기퇴근으로 뭉뚱그려져서 억울한 자리였다).
+  noCheckout('퇴근 누락'),
   absent('결근'),
   leave('월차'),
   off('휴무');
@@ -17,16 +24,22 @@ enum _DayStatus {
     _DayStatus.normal => AppColors.success,
     _DayStatus.late => AppColors.warning,
     _DayStatus.early => AppColors.warning,
+    _DayStatus.noCheckout => AppColors.workNoCheckout,
     _DayStatus.absent => AppColors.error,
     _DayStatus.leave => AppColors.primary,
     _DayStatus.off => AppColors.gray300,
   };
 
   /// 근무한 날인지 (요약의 근무일 수에 들어간다)
+  ///
+  /// 퇴근누락도 **일한 날로 센다** — 출근 기록이 있으니 나온 것은 분명하고,
+  /// 안 찍은 건 스캔을 빠뜨린 것이지 결근이 아니다. 빼면 그날 일한 게
+  /// 통째로 없던 일이 된다.
   bool get worked =>
       this == _DayStatus.normal ||
       this == _DayStatus.late ||
-      this == _DayStatus.early;
+      this == _DayStatus.early ||
+      this == _DayStatus.noCheckout;
 
   /// 서버 판정을 화면 상태로 옮긴다
   ///
@@ -38,8 +51,8 @@ enum _DayStatus {
     AttendanceStatus.overtime ||
     AttendanceStatus.inProgress => _DayStatus.normal,
     AttendanceStatus.late || AttendanceStatus.lateAndEarly => _DayStatus.late,
-    AttendanceStatus.earlyLeave ||
-    AttendanceStatus.noCheckout => _DayStatus.early,
+    AttendanceStatus.earlyLeave => _DayStatus.early,
+    AttendanceStatus.noCheckout => _DayStatus.noCheckout,
     AttendanceStatus.absent => _DayStatus.absent,
     AttendanceStatus.onLeave => _DayStatus.leave,
     AttendanceStatus.dayOff || AttendanceStatus.unknown => _DayStatus.off,
