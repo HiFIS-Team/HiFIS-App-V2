@@ -481,56 +481,72 @@ class _WorkScreenState extends State<WorkScreen>
                           ),
                           SizedBox(height: 16),
                         ],
-                        // **두 칸을 다 살려 둔다.** 옮길 때마다 새로 만들면
+                        // 칸을 옮기면 **아래에서 살짝 올라온다** — 회원 친절도·
+                        // 랭킹·모니터링 목록바와 같은 움직임이다.
+                        //
+                        // `PaneTransition` 은 자식을 갈아끼우지 않고 감싼 채로
+                        // 다시 재생한다. 그래서 아래 두 칸을 **다 살려 둔 채로**
+                        // 애니메이션만 얹을 수 있다 — 옮길 때마다 새로 만들면
                         // `initState → 뼈대` 가 번쩍인다. `Offstage` 는 상태를
-                        // 그대로 두고 그리지도 재지도 않는다 — 덤으로 내 업무를
+                        // 그대로 두고 그리지도 재지도 않으며, 덤으로 내 업무를
                         // 공통 업무를 보는 동안 미리 받아 둔다.
-                        if (_canDoEnv)
-                          Offstage(
-                            offstage: _envTab != 1,
-                            child: MyTaskSection(reloadToken: _myTaskReload),
-                          ),
-                        Offstage(
-                          offstage: _canDoEnv && _envTab == 1,
+                        PaneTransition(
+                          step: _envTab,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              // 점검 항목은 **직접 수행하는 사람에게만** —
-                              // 대표·관리자는 내역만 본다 (서버가 기록을 안 받는다)
-                              if (_canDoEnv) ...[
-                                _ChecklistCard(
-                                  items: _envItems,
-                                  counts: _counts,
-                                  onAdjust: _adjust,
-                                  onShowHistory: _showHistory,
+                              if (_canDoEnv)
+                                Offstage(
+                                  offstage: _envTab != 1,
+                                  child: MyTaskSection(
+                                    reloadToken: _myTaskReload,
+                                  ),
                                 ),
-                                if (isDesktop) SizedBox(height: 16),
-                              ],
-                              // 내역 카드는 **점검 항목이 없는 사람**(대표·관리자)과
-                              // **데스크톱**에만 둔다.
-                              //
-                              // 폰에서 정비를 하는 사람은 점검 카드 머리말의 `총 N회` 를
-                              // 눌러 시트로 본다 — 그 아래 같은 내용을 또 깔면 화면만 길어진다.
-                              // 데스크톱은 그 자리가 눌리지 않는 글자라(`_ChecklistCard`)
-                              // 카드를 빼면 내역을 볼 길이 없어진다.
-                              // 대표·관리자는 '내 내역'이 **늘 비어 있다** — 서버가
-                              // 그들에게는 기록을 안 받는다(`_canDoEnv`). 빈 카드가
-                              // 절반을 차지하고 있었으므로 빼고 전체 내역을 넓힌다.
-                              if (isDesktop)
-                                if (_canDoEnv)
-                                  Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(child: _myHistoryCard),
-                                      SizedBox(width: 16),
-                                      Expanded(child: _allHistoryCard),
+                              Offstage(
+                                offstage: _canDoEnv && _envTab == 1,
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    // 점검 항목은 **직접 수행하는 사람에게만** —
+                                    // 대표·관리자는 내역만 본다 (서버가 기록을 안 받는다)
+                                    if (_canDoEnv) ...[
+                                      _ChecklistCard(
+                                        items: _envItems,
+                                        counts: _counts,
+                                        onAdjust: _adjust,
+                                        onShowHistory: _showHistory,
+                                      ),
+                                      if (isDesktop) SizedBox(height: 16),
                                     ],
-                                  )
-                                else
-                                  _allHistoryCard
-                              else if (!_canDoEnv)
-                                _allHistoryCard,
+                                    // 내역 카드는 **점검 항목이 없는 사람**(대표·관리자)과
+                                    // **데스크톱**에만 둔다.
+                                    //
+                                    // 폰에서 정비를 하는 사람은 점검 카드 머리말의 `총 N회` 를
+                                    // 눌러 시트로 본다 — 그 아래 같은 내용을 또 깔면 화면만 길어진다.
+                                    // 데스크톱은 그 자리가 눌리지 않는 글자라(`_ChecklistCard`)
+                                    // 카드를 빼면 내역을 볼 길이 없어진다.
+                                    // 대표·관리자는 '내 내역'이 **늘 비어 있다** — 서버가
+                                    // 그들에게는 기록을 안 받는다(`_canDoEnv`). 빈 카드가
+                                    // 절반을 차지하고 있었으므로 빼고 전체 내역을 넓힌다.
+                                    if (isDesktop)
+                                      if (_canDoEnv)
+                                        Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Expanded(child: _myHistoryCard),
+                                            SizedBox(width: 16),
+                                            Expanded(child: _allHistoryCard),
+                                          ],
+                                        )
+                                      else
+                                        _allHistoryCard
+                                    else if (!_canDoEnv)
+                                      _allHistoryCard,
+                                  ],
+                                ),
+                              ),
                             ],
                           ),
                         ),
