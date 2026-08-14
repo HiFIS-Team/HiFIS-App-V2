@@ -146,26 +146,51 @@ class _HistoryScreenState extends State<_HistoryScreen> {
   late List<EnvTaskLog> _myLogs = widget.myLogs;
   late List<EnvTaskLog> _allLogs = widget.allLogs;
 
-  /// 목록이 **실제로 담고 있는** 날짜 — [_date] 보다 한 박자 늦게 따라온다
+  /// 뼈대를 **실제로 그릴지** — 세션 기록과 같은 규칙 (2026-08-14)
   ///
-  /// 받아 오는 동안 목록을 비우면 **내용 → 빈 화면 → 내용** 이 되어 깜빡인다.
-  /// 그래서 옛 목록을 그대로 둔 채 새 것을 기다렸다가, 도착하면
-  /// [PaneTransition] 으로 갈아 끼운다 (탭을 옮길 때와 같은 모션).
-  late DateTime _shownDate = _WorkScreenState._todayDate();
+  /// 받는 동안은 목록도 건수도 뼈대로 둔다. 다만 서버가 가까우면 값이 10ms
+  /// 안에 와서, 그때마다 뼈대를 깔았다 지우면 한두 프레임만 떴다 사라져
+  /// **오히려 깜빡인다** — [DelayedSpinner] 가 이미 같은 사정으로 220ms 를
+  /// 두고 있어서 **그 값을 그대로 쓴다.**
+  ///
+  /// 이 화면은 열 때 부모가 오늘 기록을 이미 넘겨줘서 false 로 시작한다
+  /// (세션 기록은 스스로 받아 와서 true 로 시작한다).
+  bool _showSkeleton = false;
+
+  Timer? _skeletonTimer;
+
+  /// 받기 시작 — 220ms 를 넘기면 그때 뼈대로 바꾼다
+  void _beginLoad() {
+    _skeletonTimer?.cancel();
+    _skeletonTimer = Timer(DelayedSpinner.delay, () {
+      if (mounted) setState(() => _showSkeleton = true);
+    });
+  }
+
+  /// 다 받았다(또는 실패) — 뼈대를 걷고 예약도 취소한다
+  void _endLoad() {
+    _skeletonTimer?.cancel();
+    _showSkeleton = false;
+  }
+
+  @override
+  void dispose() {
+    _skeletonTimer?.cancel();
+    super.dispose();
+  }
 
   static const _weekdays = ['월', '화', '수', '목', '금', '토', '일'];
 
   bool get _isToday => _date == _WorkScreenState._todayDate();
 
-  /// 목록에 담긴 날이 오늘인가 — 빈 문구는 **보이는 목록**을 따라가야 한다
-  bool get _shownIsToday => _shownDate == _WorkScreenState._todayDate();
-
   /// 날짜를 옮기고 그 날 기록을 받아 온다 — **다음 날로는 못 간다**
   Future<void> _move(int step) async {
     final next = DateTime(_date.year, _date.month, _date.day + step);
     if (next.isAfter(_WorkScreenState._todayDate())) return;
-    // 머리말은 바로 바꾼다 — 누른 티가 나야 한다. 목록은 도착하면 바뀐다
-    setState(() => _date = next);
+    setState(() {
+      _date = next;
+      _beginLoad();
+    });
     try {
       final logs = await EnvApi.logs(
         branchId: widget.branchId,
@@ -180,33 +205,35 @@ class _HistoryScreenState extends State<_HistoryScreen> {
           for (final log in logs)
             if (log.employeeId == currentUser?.id) log,
         ];
-        _shownDate = next;
+        _endLoad();
       });
     } catch (error) {
-      if (mounted) AppToast.show(context, messageOf(error));
+      if (!mounted) return;
+      setState(_endLoad); // 실패해도 뼈대에 갇히지 않게 푼다
+      AppToast.show(context, messageOf(error));
     }
   }
 
-  /// 날짜 좌우 화살표 — 근태 달력·랭킹과 **같은 모양**이다.
+  /// 날짜 좌우 화살표 — **세션 기록의 달 이동바(`_MonthBar`)와 같은 모양**이다
+  ///
+  /// 테두리 없이 아이콘만 두고 여백으로 누를 자리를 만든다. 회색 상자를
+  /// 두르면 줄이 무거워진다 (2026-08-14, 세션 쪽이 낫다고 정했다).
+  ///
   /// [onTap] 이 null 이면 흐린 채로 안 눌린다 (자리는 그대로 둔다).
   Widget _arrow(IconData icon, VoidCallback? onTap) {
-    final box = Container(
-      width: 30,
-      height: 30,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: AppColors.gray50,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Icon(
-        icon,
-        size: 13,
-        color: onTap == null ? AppColors.gray300 : AppColors.textSecondary,
+    final enabled = onTap != null;
+    return Pressable(
+      onTap: onTap ?? () {},
+      scale: enabled ? 0.9 : 1,
+      child: Padding(
+        padding: EdgeInsets.all(8),
+        child: Icon(
+          icon,
+          size: 15,
+          color: enabled ? AppColors.textSecondary : AppColors.gray300,
+        ),
       ),
     );
-    return onTap == null
-        ? box
-        : Pressable(onTap: onTap, scale: 0.9, child: box);
   }
 
   @override
@@ -221,103 +248,112 @@ class _HistoryScreenState extends State<_HistoryScreen> {
       backgroundColor: AppColors.surface,
       body: Stack(
         children: [
-          SafeArea(
-            bottom: false,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 상단 고정 타이틀 영역만큼 비워둔다
-                SizedBox(height: 56),
-                Padding(
-                  padding: EdgeInsets.fromLTRB(24, 12, 24, 0),
-                  child: Row(
-                    children: [
-                      _arrow(CupertinoIcons.chevron_left, () => _move(-1)),
-                      SizedBox(width: 10),
-                      Text(date, style: AppTextStyles.caption),
-                      SizedBox(width: 10),
-                      // 다음 날은 아직 안 왔으니 늘 비어 있다 — 흐려 두고 안 눌리게
-                      _arrow(
-                        CupertinoIcons.chevron_right,
-                        _isToday ? null : () => _move(1),
-                      ),
-                      Spacer(),
-                      Text(
-                        '총 ${logs.length}회',
-                        style: AppTextStyles.body2.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: widget.tabs ? 8 : 14),
-                // 내 내역 / 전체 내역 전환 탭 (업무 탭과 같은 밑줄 스타일)
-                if (widget.tabs)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _WorkTab(
-                          label: '내 내역',
-                          selected: !_all,
-                          expand: true,
-                          onTap: () => setState(() => _all = false),
-                        ),
-                      ),
-                      Expanded(
-                        child: _WorkTab(
-                          label: '전체 내역',
-                          selected: _all,
-                          expand: true,
-                          onTap: () => setState(() => _all = true),
-                        ),
-                      ),
-                    ],
-                  ),
-                Container(height: 1, color: AppColors.gray100),
-                // 날짜가 바뀌면 목록이 **떠 있는 채로** 새 것으로 넘어간다 —
-                // 탭을 옮길 때와 같은 모션이다 (비웠다가 채우면 깜빡인다)
-                Expanded(
-                  child: PaneTransition(
-                    step: _shownDate,
-                    child: sorted.isEmpty
-                        ? Align(
-                            alignment: Alignment.topLeft,
-                            child: Padding(
-                              padding: EdgeInsets.fromLTRB(24, 32, 24, 44),
-                              child: Text(
-                                // 문구는 **보이는 목록**을 따라간다 (_date 가 아니다)
-                                _shownIsToday
-                                    ? (_all
-                                          ? '오늘 완료된 항목이 없어요'
-                                          : '오늘 완료한 항목이 없어요')
-                                    : (_all ? '완료된 항목이 없어요' : '완료한 항목이 없어요'),
-                                style: AppTextStyles.body2.copyWith(
-                                  color: AppColors.textTertiary,
-                                ),
-                              ),
-                            ),
-                          )
-                        : ListView.separated(
-                            // 날짜·탭이 바뀌면 맨 위부터 다시 본다
-                            key: ValueKey('$_all-$_shownDate'),
-                            padding: EdgeInsets.fromLTRB(
-                              24,
-                              12,
-                              24,
-                              MediaQuery.paddingOf(context).bottom + 24,
-                            ),
-                            itemCount: sorted.length,
-                            separatorBuilder: (_, _) =>
-                                Divider(height: 1, color: AppColors.divider),
-                            // 전체 내역에서는 누가 했는지 이름을 함께 보여준다
-                            itemBuilder: (_, index) =>
-                                _LogRow(log: sorted[index], showName: _all),
+          // 머리말 건수와 목록이 **한 박자로** 반짝이게 하나로 감싼다 —
+          // 따로 감싸면 컨트롤러가 둘이라 박자가 어긋난다
+          SkeletonGroup(
+            child: SafeArea(
+              bottom: false,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 상단 고정 타이틀 영역만큼 비워둔다
+                  SizedBox(height: 56),
+                  Padding(
+                    // 세션 기록의 `_MonthBar` 와 같은 여백이다 — 왼쪽 16 인 것은
+                    // 화살표가 제 안에 8 을 갖고 있어서, 눈에 보이는 끝이 24 로
+                    // 아래 목록과 맞는다
+                    padding: EdgeInsets.fromLTRB(16, 6, 24, 6),
+                    child: Row(
+                      children: [
+                        _arrow(CupertinoIcons.chevron_left, () => _move(-1)),
+                        Text(
+                          date,
+                          style: AppTextStyles.body2.copyWith(
+                            fontWeight: FontWeight.w700,
                           ),
+                        ),
+                        // 다음 날은 아직 안 왔으니 늘 비어 있다 — 흐려 두고 안 눌리게
+                        _arrow(
+                          CupertinoIcons.chevron_right,
+                          _isToday ? null : () => _move(1),
+                        ),
+                        Spacer(),
+                        // 받아 오는 동안은 건수도 뼈대다 (세션 기록과 같다)
+                        if (_showSkeleton)
+                          Skeleton(width: 46, height: 12)
+                        else
+                          Text(
+                            '총 ${logs.length}회',
+                            style: AppTextStyles.caption.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                  SizedBox(height: widget.tabs ? 8 : 14),
+                  // 내 내역 / 전체 내역 전환 탭 (업무 탭과 같은 밑줄 스타일)
+                  if (widget.tabs)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _WorkTab(
+                            label: '내 내역',
+                            selected: !_all,
+                            expand: true,
+                            onTap: () => setState(() => _all = false),
+                          ),
+                        ),
+                        Expanded(
+                          child: _WorkTab(
+                            label: '전체 내역',
+                            selected: _all,
+                            expand: true,
+                            onTap: () => setState(() => _all = true),
+                          ),
+                        ),
+                      ],
+                    ),
+                  Container(height: 1, color: AppColors.gray100),
+                  if (_showSkeleton)
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(24, 24, 24, 24),
+                      child: SkeletonRows(rows: 5, avatar: 0, trailing: 40),
+                    )
+                  else if (sorted.isEmpty)
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(24, 32, 24, 44),
+                      child: Text(
+                        _isToday
+                            ? (_all ? '오늘 완료된 항목이 없어요' : '오늘 완료한 항목이 없어요')
+                            : (_all ? '완료된 항목이 없어요' : '완료한 항목이 없어요'),
+                        style: AppTextStyles.body2.copyWith(
+                          color: AppColors.textTertiary,
+                        ),
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: ListView.separated(
+                        // 날짜·탭이 바뀌면 맨 위부터 다시 본다
+                        key: ValueKey('$_all-$_date'),
+                        padding: EdgeInsets.fromLTRB(
+                          24,
+                          12,
+                          24,
+                          MediaQuery.paddingOf(context).bottom + 24,
+                        ),
+                        itemCount: sorted.length,
+                        separatorBuilder: (_, _) =>
+                            Divider(height: 1, color: AppColors.divider),
+                        // 전체 내역에서는 누가 했는지 이름을 함께 보여준다
+                        itemBuilder: (_, index) =>
+                            _LogRow(log: sorted[index], showName: _all),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
           // 상단 중앙 고정 타이틀 (터치는 아래로 통과)
