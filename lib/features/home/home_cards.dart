@@ -27,18 +27,34 @@ class _StackedRows extends StatelessWidget {
 ///
 /// 데스크톱은 두 장을 나란히 놓고 `IntrinsicHeight` 로 맞추므로 그냥 통과시킨다.
 class _CardBody extends StatelessWidget {
-  _CardBody({required this.child});
+  _CardBody({required this.child, this.min = phoneCardBody});
 
   final Widget child;
+
+  /// 본문 최소 높이 — 카드 바깥 여백이 다른 곳만 따로 준다 ([_noticeCardBody])
+  final double min;
 
   @override
   Widget build(BuildContext context) => isDesktop
       ? child
       : ConstrainedBox(
-          constraints: BoxConstraints(minHeight: phoneCardBody),
+          constraints: BoxConstraints(minHeight: min),
           child: child,
         );
 }
+
+/// 공지 카드 본문의 최소 높이 — **프로젝트 카드와 총 높이를 맞춘 값**
+///
+/// 두 카드는 바깥 여백이 다르다. 공지 줄이 자체로 위아래 14 를 갖고 있어서
+/// 카드 쪽 여백을 그만큼 줄여 뒀다.
+///
+/// | | 머리말 아래 | 카드 아래 |
+/// |---|---|---|
+/// | 프로젝트 | 14 | 20 |
+/// | 공지 | 4 | 8 |
+///
+/// 그래서 [phoneCardBody] 를 그대로 주면 공지가 **22 짧다.** 그 차이를 더한다.
+const _noticeCardBody = phoneCardBody + 22;
 
 class _CardHeader extends StatelessWidget {
   _CardHeader({
@@ -255,6 +271,7 @@ class _NoticeCard extends StatelessWidget {
           else if (briefs.isEmpty)
             // 공지 탭의 빈 상태와 같은 아이콘
             _CardBody(
+              min: _noticeCardBody,
               child: Center(
                 child: EmptyCard(
                   icon: Icons.campaign_rounded,
@@ -264,13 +281,24 @@ class _NoticeCard extends StatelessWidget {
               ),
             )
           else
-            for (var i = 0; i < briefs.length; i++) ...[
-              if (i > 0) Divider(),
-              _NoticeRow(
-                brief: briefs[i],
-                onTap: () => _open(context, briefs[i]),
+            // **프로젝트 카드와 같은 최소 높이를 건다.** 안 걸면 공지가 한 건일
+            // 때 카드가 그만큼만 남아서 위 프로젝트 네모와 크기가 어긋난다
+            // (빈 상태에만 걸려 있어서 1~2건일 때 쪼그라들었다)
+            _CardBody(
+              min: _noticeCardBody,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var i = 0; i < briefs.length; i++) ...[
+                    if (i > 0) Divider(),
+                    _NoticeRow(
+                      brief: briefs[i],
+                      onTap: () => _open(context, briefs[i]),
+                    ),
+                  ],
+                ],
               ),
-            ],
+            ),
         ],
       ),
     );

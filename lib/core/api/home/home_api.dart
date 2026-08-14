@@ -52,7 +52,8 @@ enum InboxKind {
   leave('LEAVE'),
   approval('APPROVAL'),
   event('EVENT'),
-  myTask('MY_TASK');
+  myTask('MY_TASK'),
+  project('PROJECT');
 
   const InboxKind(this.wire);
 
