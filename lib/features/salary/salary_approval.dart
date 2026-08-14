@@ -13,7 +13,8 @@ part of 'salary_screen.dart';
 bool get _canSeeApproval =>
     myRole == Role.master || myRole == Role.admin || myRole == Role.manager;
 
-/// 실제로 승인·반려·지급을 누를 수 있는 사람
+/// 실제로 승인·반려·지급을 누를 수 있는 사람 — **MASTER 만**
+/// (ADMIN·MANAGER 는 결재함이 보이되 버튼이 없다)
 bool get _canDecide => myRole.canApprove;
 
 /// 급여 화면을 **관리 화면으로** 보는 사람 (MASTER · ADMIN)

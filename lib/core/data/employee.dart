@@ -27,8 +27,14 @@ enum Role {
   /// 관리 작업(직원·지점·점수 부여)을 할 수 있는가
   bool get strong => this != Role.member;
 
-  /// 승인·반려를 실행할 수 있는가 — ADMIN 은 보기만 된다
-  bool get canApprove => this == Role.master || this == Role.manager;
+  /// 승인·반려를 실행할 수 있는가 — **MASTER 만이다**
+  ///
+  /// 월차·급여·일정·프로젝트·전자결재 **다섯 갈래가 전부 같은 값**이다
+  /// (2026-08-14 결정). 예전에는 갈래마다 달라서, 월차·급여는 MANAGER 가 하고
+  /// 일정은 ADMIN 이 하고 나머지는 MASTER 만 했다.
+  ///
+  /// ADMIN·MANAGER 는 **결재함을 보기만** 한다 — 목록은 그대로 뜨고 버튼만 없다.
+  bool get canApprove => this == Role.master;
 
   /// 남에게 기여 점수를 줄 수 있는가 (마스터~매니저)
   bool get canGrant => strong;

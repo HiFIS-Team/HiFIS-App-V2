@@ -8,7 +8,7 @@ part of 'attendance_screen.dart';
 //
 // 서버 권한을 그대로 따른다:
 //   조회   MASTER · ADMIN · MANAGER   (MANAGER 는 서버가 자기 지점으로 좁힌다)
-//   처리   MASTER · MANAGER           (ADMIN 은 지켜보는 자리라 버튼이 없다)
+//   처리   MASTER                     (ADMIN·MANAGER 는 보기만 — 버튼이 없다)
 // ---------------------------------------------------------------------------
 
 /// 결재 대기를 볼 수 있는 사람

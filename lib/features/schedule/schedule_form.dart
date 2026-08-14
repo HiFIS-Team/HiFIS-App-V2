@@ -611,8 +611,12 @@ class _PickButton extends StatelessWidget {
   }
 }
 
-/// 일정 신청을 승인·반려할 수 있는 사람 — 승인 없이 올릴 수 있는 사람과 같다
-bool get _canDecide => myRole == Role.master || myRole == Role.admin;
+/// 일정 신청을 승인·반려할 수 있는 사람 — **MASTER 만이다**
+///
+/// **승인 없이 올릴 수 있는 사람과 다르다.** 그쪽은 MASTER·ADMIN 이고
+/// (서버 `_OVERSEERS`), 결재는 대표만 한다. 예전에는 둘을 같은 값으로 봐서
+/// ADMIN 이 남의 일정을 결재했다 (2026-08-14 에 갈랐다).
+bool get _canDecide => myRole.canApprove;
 
 /// 폼이 들고 나오는 결재 — 반려는 서버가 일정을 지운다
 enum EventDecision { approve, reject }

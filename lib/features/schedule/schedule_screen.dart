@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import '../../core/api/client/api_exception.dart';
 import '../../core/api/project/event_api.dart';
 import '../../core/data/current_user.dart';
-import '../../core/data/employee.dart';
 import '../../core/data/staff.dart';
 import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
