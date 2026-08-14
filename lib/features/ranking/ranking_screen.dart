@@ -46,9 +46,17 @@ class RankingScreen extends StatefulWidget {
   State<RankingScreen> createState() => _RankingScreenState();
 }
 
-class _RankingScreenState extends State<RankingScreen> with ScreenRefresh<RankingScreen> {
+class _RankingScreenState extends State<RankingScreen>
+    with ScreenRefresh<RankingScreen> {
   /// 고른 항목 ([_Metric] 순서)
   int _tab = 0;
+
+  /// 보고 있는 달 — 랭킹은 달마다 새로 시작한다
+  ///
+  /// 1일이 되면 그 달 실적이 비어 있으니 저절로 초기화된다 (따로 도는 것이 없다).
+  /// 날짜는 버리고 **연·월만** 쓴다 — 31일에 열었을 때 이전 달로 넘기면
+  /// `DateTime(2026, 7, 31)` 처럼 없는 날이 되어 8월로 되돌아온다.
+  DateTime _viewMonth = DateTime(DateTime.now().year, DateTime.now().month);
 
   /// 탭에 다시 들어오거나 앱이 다시 앞으로 나왔을 때 조용히 다시 받는다
   @override
@@ -74,11 +82,33 @@ class _RankingScreenState extends State<RankingScreen> with ScreenRefresh<Rankin
 
   Future<void> _load() async {
     try {
-      await _loadRanking();
+      await _loadRanking(period: _periodKey);
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
     }
     if (mounted) setState(() {});
+  }
+
+  /// 서버에 보낼 달 (`YYYY-MM`)
+  String get _periodKey =>
+      '${_viewMonth.year}-${_viewMonth.month.toString().padLeft(2, '0')}';
+
+  /// 이번 달을 보고 있나 — **다음 달로는 못 넘긴다** (아직 안 온 달이다)
+  bool get _isThisMonth {
+    final now = DateTime.now();
+    return _viewMonth.year == now.year && _viewMonth.month == now.month;
+  }
+
+  /// 달을 옮기고 그 달 판을 다시 받는다
+  ///
+  /// 사람 고른 것(`_pickedId`)은 푼다 — 달이 바뀌면 그 사람의 점수 내역도
+  /// 달라지는데, 열린 채로 두면 옛 달 숫자가 잠깐 남는다.
+  void _moveMonth(int step) {
+    setState(() {
+      _viewMonth = DateTime(_viewMonth.year, _viewMonth.month + step);
+      _pickedId = null;
+    });
+    _load();
   }
 
   /// 폰에서 고른 지점 — 폰은 머리말 왼쪽에 고르개가 그대로 있다
@@ -114,10 +144,48 @@ class _RankingScreenState extends State<RankingScreen> with ScreenRefresh<Rankin
     ];
   }
 
-  /// 이번 달 (랭킹은 달마다 초기화된다)
-  String get _month {
-    final now = DateTime.now();
-    return '${now.year}년 ${now.month}월';
+  /// 보고 있는 달 — `2026년 8월`
+  String get _month => '${_viewMonth.year}년 ${_viewMonth.month}월';
+
+  /// 달 이동 줄 — 근태 달력과 **같은 모양**이다 (좌우 화살표 + 가운데 달)
+  ///
+  /// 뒤로는 제한이 없다. 기록이 없는 달은 원래 있던 '집계된 실적이 없어요'
+  /// 빈 화면이 그대로 뜬다.
+  Widget _monthNav() => Row(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      _arrow(CupertinoIcons.chevron_left, () => _moveMonth(-1)),
+      SizedBox(width: 14),
+      Text(_month, style: AppTextStyles.title3),
+      SizedBox(width: 14),
+      // 다음 달은 아직 안 왔으니 늘 비어 있다 — 눌리지 않게 흐려 둔다
+      _arrow(
+        CupertinoIcons.chevron_right,
+        _isThisMonth ? null : () => _moveMonth(1),
+      ),
+    ],
+  );
+
+  /// [onTap] 이 null 이면 흐린 채로 안 눌린다 (자리는 그대로 둔다 — 감추면
+  /// 이번 달일 때만 줄이 한 칸 좁아져서 화면이 흔들린다)
+  Widget _arrow(IconData icon, VoidCallback? onTap) {
+    final box = Container(
+      width: 30,
+      height: 30,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppColors.gray50,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Icon(
+        icon,
+        size: 13,
+        color: onTap == null ? AppColors.gray300 : AppColors.textSecondary,
+      ),
+    );
+    return onTap == null
+        ? box
+        : Pressable(onTap: onTap, scale: 0.9, child: box);
   }
 
   Widget _tabs() => SegmentedTabs(
@@ -254,6 +322,8 @@ class _RankingScreenState extends State<RankingScreen> with ScreenRefresh<Rankin
           onSelect: (i) => setState(() => _tab = i),
         ),
         children: [
+          _monthNav(),
+          SizedBox(height: 14),
           PaneTransition(
             step: _tab,
             child: entries.isEmpty
@@ -271,13 +341,16 @@ class _RankingScreenState extends State<RankingScreen> with ScreenRefresh<Rankin
           padding: EdgeInsets.fromLTRB(24, 64, 24, 32),
           children: [
             DesktopHeader(
+              // 달은 아래 이동 줄이 들고 있다 — 부제에도 적으면 두 번 나온다
               title: '랭킹',
-              subtitle: '$_month 실적 기준으로 줄 세웠어요',
+              subtitle: '실적 기준으로 줄 세웠어요',
               // 지점 고르개는 헤더의 지점 아이콘으로 옮겼다 — 조직도·업무와
               // 같은 값을 본다 (core/data/branch_scope.dart)
             ),
             SizedBox(height: 22),
             _tabs(),
+            SizedBox(height: 16),
+            _monthNav(),
             SizedBox(height: 16),
             // 탭을 옮길 때 내용이 같이 갈린다 (업무·모니터링과 같은 모션)
             PaneTransition(

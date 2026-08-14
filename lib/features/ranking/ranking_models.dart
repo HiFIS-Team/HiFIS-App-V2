@@ -148,8 +148,12 @@ class _Ranker {
 final _rankers = <_Ranker>[];
 
 /// 랭킹판 받아오기 — 전사로 한 번 받고 지점 필터는 화면에서 건다
-Future<void> _loadRanking() async {
-  final rows = await ScoreApi.board();
+/// [period] 는 `YYYY-MM`. 비우면 서버가 이번 달로 본다.
+///
+/// 지난달 순위(`lastRank`)도 서버가 **그 달 기준**으로 다시 매겨 준다 —
+/// 7월을 보면 6월과 견준 등락이 나온다.
+Future<void> _loadRanking({String? period}) async {
+  final rows = await ScoreApi.board(period: period);
   _rankers
     ..clear()
     ..addAll([for (final row in rows) _Ranker.fromRow(row)]);
