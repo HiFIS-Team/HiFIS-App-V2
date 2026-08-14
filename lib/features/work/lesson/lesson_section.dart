@@ -1,3 +1,4 @@
+import '../../../core/widgets/display/avatar.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' as ui;
