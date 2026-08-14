@@ -9,6 +9,7 @@ class _HistoryCard extends StatefulWidget {
     required this.showName,
     required this.emptyText,
     required this.onOpenAll,
+    this.rows = 5,
   });
 
   final String title;
@@ -19,6 +20,13 @@ class _HistoryCard extends StatefulWidget {
   /// 카드에는 다섯 줄만 보이므로 나머지는 모달에서 본다
   final VoidCallback onOpenAll;
 
+  /// 미리보기로 보여줄 줄 수
+  ///
+  /// 기본 5줄은 **내 내역과 나란히 설 때**의 값이다 — 좌우 카드 높이가
+  /// 어긋나면 안 된다. 대표·관리자는 내 내역이 없어서 전체 내역이 혼자
+  /// 서므로 10줄로 늘린다 (2026-08-14 대표 요청).
+  final int rows;
+
   @override
   State<_HistoryCard> createState() => _HistoryCardState();
 }
@@ -26,9 +34,10 @@ class _HistoryCard extends StatefulWidget {
 class _HistoryCardState extends State<_HistoryCard> {
   final _scrollController = ScrollController();
 
-  /// 한 줄 높이(위아래 여백 13 + 본문 22.5)에 구분선을 더한 다섯 줄 높이.
-  /// 기록이 적어도 이 높이를 유지해 좌우 카드가 같은 크기로 보인다.
-  static const _listHeight = 5 * 48.5 + 4;
+  /// 한 줄 높이(위아래 여백 13 + 본문 22.5)에 구분선을 더한 값
+  static const _rowHeight = 48.5;
+
+  double get _listHeight => widget.rows * _rowHeight + 4;
 
   @override
   void dispose() {
@@ -147,11 +156,36 @@ class _HistoryScreenState extends State<_HistoryScreen>
   late List<EnvTaskLog> _myLogs = widget.myLogs;
   late List<EnvTaskLog> _allLogs = widget.allLogs;
 
+  /// 검색어 — 항목 이름과 사람 이름을 같이 훑는다
+  ///
+  /// 하루에 100건 넘게 쌓이는 지점이 있어서 눈으로 훑기 어렵다.
+  /// 세션 기록·칭찬 목록과 **같은 글래스 검색바**를 쓴다.
+  final _search = TextEditingController();
+
+  /// 공백·대소문자를 지우고 맞춘다 ('화장실 청소' 로 쳐도 찾히게)
+  List<EnvTaskLog> _filter(List<EnvTaskLog> rows) {
+    final key = _WorkScreenState._envKey(_search.text.trim());
+    if (key.isEmpty) return rows;
+    return [
+      for (final log in rows)
+        if (_WorkScreenState._envKey(log.itemName).contains(key) ||
+            _WorkScreenState._envKey(_logAuthor(log)).contains(key))
+          log,
+    ];
+  }
+
   /// 열 때 부모가 오늘 기록을 이미 넘겨줘서 뼈대 없이 시작한다
   /// (세션 기록은 스스로 받아 와서 뼈대로 시작한다)
   @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
   void initState() {
     super.initState();
+    _search.addListener(() => setState(() {}));
     skipFirstSkeleton();
   }
 
@@ -216,7 +250,7 @@ class _HistoryScreenState extends State<_HistoryScreen>
   Widget build(BuildContext context) {
     final date =
         '${_date.month}월 ${_date.day}일 ${_weekdays[_date.weekday - 1]}요일';
-    final logs = _all ? _allLogs : _myLogs;
+    final logs = _filter(_all ? _allLogs : _myLogs);
     final sorted = List.of(logs)
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
@@ -301,7 +335,9 @@ class _HistoryScreenState extends State<_HistoryScreen>
                     Padding(
                       padding: EdgeInsets.fromLTRB(24, 32, 24, 44),
                       child: Text(
-                        _isToday
+                        _search.text.trim().isNotEmpty
+                            ? '찾는 기록이 없어요'
+                            : _isToday
                             ? (_all ? '오늘 완료된 항목이 없어요' : '오늘 완료한 항목이 없어요')
                             : (_all ? '완료된 항목이 없어요' : '완료한 항목이 없어요'),
                         style: AppTextStyles.body2.copyWith(
@@ -314,11 +350,12 @@ class _HistoryScreenState extends State<_HistoryScreen>
                       child: ListView.separated(
                         // 날짜·탭이 바뀌면 맨 위부터 다시 본다
                         key: ValueKey('$_all-$_date'),
+                        // 아래 글래스 검색바에 마지막 줄이 가리지 않게 띄운다
                         padding: EdgeInsets.fromLTRB(
                           24,
                           12,
                           24,
-                          MediaQuery.paddingOf(context).bottom + 24,
+                          MediaQuery.paddingOf(context).bottom + 92,
                         ),
                         itemCount: sorted.length,
                         separatorBuilder: (_, _) =>
@@ -363,6 +400,8 @@ class _HistoryScreenState extends State<_HistoryScreen>
               ),
             ),
           ),
+          // 아래 떠 있는 글래스 검색바 — 세션 기록·칭찬 목록과 같은 부품이다
+          GlassSearchBar(controller: _search, hint: '항목·이름 검색'),
         ],
       ),
     );

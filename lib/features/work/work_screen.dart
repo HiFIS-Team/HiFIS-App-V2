@@ -22,6 +22,7 @@ import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/util/skeleton_delay.dart';
 import '../../core/widgets/feedback/skeleton.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
+import '../../core/widgets/glass/glass_search_bar.dart';
 import '../../core/widgets/input/app_button.dart';
 import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/input/pressable.dart';
@@ -452,6 +453,9 @@ class _WorkScreenState extends State<WorkScreen>
     showName: true,
     emptyText: '오늘 완료된 항목이 없어요',
     onOpenAll: () => _showHistory(all: true, tabs: false),
+    // 대표·관리자는 '내 내역'이 없어서 이 카드가 혼자 선다 —
+    // 옆에 맞출 카드가 없으니 두 배로 보여준다 (2026-08-14 대표 요청)
+    rows: _canDoEnv ? 5 : 10,
   );
 
   /// 고른 항목의 내용 — 탭 전환 시 페이드로 바뀐다.
