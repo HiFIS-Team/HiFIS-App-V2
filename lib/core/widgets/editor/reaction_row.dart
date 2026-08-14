@@ -292,20 +292,25 @@ class _ReactionPeopleSheetState extends State<_ReactionPeopleSheet> {
               style: AppTextStyles.body1.copyWith(fontWeight: FontWeight.w700),
             ),
             SizedBox(height: 12),
-            // 이모지 칸 — 밑줄로 지금 보고 있는 것을 알린다
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  for (final reaction in widget.reactions)
-                    _EmojiTab(
-                      emoji: reaction.emoji,
-                      count: reaction.count,
-                      selected: reaction.emoji == _emoji,
-                      onTap: () => setState(() => _emoji = reaction.emoji),
-                    ),
-                ],
+            // 이모지 칸 — 밑줄로 지금 보고 있는 것을 알린다.
+            // **폭을 꽉 채워야 왼쪽부터 선다** — 안 그러면 스크롤뷰가 내용
+            // 만큼만 넓어져서 Column 이 가운데로 밀어 놓는다 (실제로 그랬다)
+            SizedBox(
+              width: double.infinity,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    for (final reaction in widget.reactions)
+                      _EmojiTab(
+                        emoji: reaction.emoji,
+                        count: reaction.count,
+                        selected: reaction.emoji == _emoji,
+                        onTap: () => setState(() => _emoji = reaction.emoji),
+                      ),
+                  ],
+                ),
               ),
             ),
             Container(height: 1, color: AppColors.gray100),
