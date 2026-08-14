@@ -16,9 +16,9 @@ class _MemberDetail extends StatefulWidget {
   State<_MemberDetail> createState() => _MemberDetailState();
 }
 
-class _MemberDetailState extends State<_MemberDetail> {
+class _MemberDetailState extends State<_MemberDetail>
+    with SkeletonDelay<_MemberDetail> {
   _MonthSummary? _month;
-  bool _loading = false;
 
   /// 인사 정보를 바꿨으면 갈아끼운 사람 — 닫을 때 명단으로 돌려준다
   _Member? _edited;
@@ -35,11 +35,15 @@ class _MemberDetailState extends State<_MemberDetail> {
   @override
   void initState() {
     super.initState();
-    if (member.active && _canSeeMonth) _loadMonth();
+    if (member.active && _canSeeMonth) {
+      _loadMonth();
+    } else {
+      skipFirstSkeleton(); // 카드를 아예 안 그리는 사람이라 받을 것이 없다
+    }
   }
 
   Future<void> _loadMonth() async {
-    setState(() => _loading = true);
+    setState(beginLoad);
     final now = DateTime.now();
     final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
     try {
@@ -55,7 +59,7 @@ class _MemberDetailState extends State<_MemberDetail> {
     } catch (_) {
       // 권한이 없거나 서버가 못 주면 카드를 안 그린다
     }
-    if (mounted) setState(() => _loading = false);
+    if (mounted) setState(endLoad);
   }
 
   void _copy(BuildContext context, String label, String value) {
@@ -155,7 +159,7 @@ class _MemberDetailState extends State<_MemberDetail> {
             SizedBox(height: 12),
             if (_month case final summary?)
               _MonthCard(summary: summary)
-            else if (_loading)
+            else if (showSkeleton)
               _MonthPlaceholder(),
           ],
         ],

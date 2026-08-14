@@ -29,6 +29,7 @@ import '../../core/widgets/nav/pane_transition.dart';
 import '../../core/widgets/input/app_button.dart';
 import '../../core/widgets/feedback/skeleton.dart';
 import '../../core/util/screen_refresh.dart';
+import '../../core/util/skeleton_delay.dart';
 
 part 'attendance_models.dart';
 part 'attendance_leave.dart';
@@ -48,7 +49,8 @@ class AttendanceScreen extends StatefulWidget {
   State<AttendanceScreen> createState() => _AttendanceScreenState();
 }
 
-class _AttendanceScreenState extends State<AttendanceScreen> with ScreenRefresh<AttendanceScreen> {
+class _AttendanceScreenState extends State<AttendanceScreen>
+    with ScreenRefresh<AttendanceScreen>, SkeletonDelay<AttendanceScreen> {
   /// 달력이 보고 있는 달
   late DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
 
@@ -64,9 +66,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> with ScreenRefresh<
   /// 그 주의 일요일 — 달력이 일요일 시작이라 거기에 맞춘다
   static DateTime _sundayOf(DateTime date) =>
       DateTime(date.year, date.month, date.day - date.weekday % 7);
-
-  /// 첫 로딩 — 받아오기 전에는 빈 달력 대신 로딩을 보여준다
-  bool _loading = true;
 
   /// 탭에 다시 들어오거나 앱이 다시 앞으로 나왔을 때 조용히 다시 받는다
   @override
@@ -86,9 +85,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> with ScreenRefresh<
   }
 
   /// 헤더에서 지점을 바꿨다 — 대표 화면의 오늘 판·달력을 그 지점으로 다시 받는다
+  ///
+  /// **달력을 안 지운다.** 빨리 오면 뼈대가 아예 안 뜨고 옛 달력 위에 새 값이
+  /// 얹힌다 (`SkeletonDelay`) — 지점을 바꿀 때마다 화면이 깜빡이던 자리다.
   void _onBranchScope() {
     if (!mounted) return;
-    setState(() => _loading = true);
+    setState(beginLoad);
     _load();
   }
 
@@ -101,7 +103,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> with ScreenRefresh<
       final end = DateTime(_week.year, _week.month, _week.day + 6);
       await _fetchRoster([_week, end]);
     }
-    if (mounted) setState(() => _loading = false);
+    if (mounted) setState(endLoad);
   }
 
   /// 월차를 승인·반려한 뒤 다시 받는다 — 결재함과 달력이 같이 바뀐다
@@ -219,7 +221,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> with ScreenRefresh<
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
+    if (showSkeleton) {
       if (!isDesktop) return _AttendanceSkeleton();
       return SkeletonDesktopPage(
         children: [

@@ -18,7 +18,7 @@ import '../../core/util/platform.dart';
 import '../../core/util/sf_symbols.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/widgets/feedback/app_toast.dart';
-import '../../core/widgets/feedback/delayed_spinner.dart';
+import '../../core/util/skeleton_delay.dart';
 import '../../core/widgets/feedback/skeleton.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/input/app_button.dart';
@@ -59,7 +59,7 @@ class WorkScreen extends StatefulWidget {
 }
 
 class _WorkScreenState extends State<WorkScreen>
-    with ScreenRefresh<WorkScreen> {
+    with ScreenRefresh<WorkScreen>, SkeletonDelay<WorkScreen> {
   int _tab = 0;
 
   /// 환경정비 항목과 배점 — 지점마다 다르다
@@ -71,8 +71,6 @@ class _WorkScreenState extends State<WorkScreen>
   /// 날짜를 옮겨 본다 — `+` 가 서버에 **누른 시각**으로 남아서 지난 날짜에는
   /// 만들 수가 없고, 그러면 칩과 내역이 서로 다른 날을 가리키게 된다.
   List<EnvTaskLog> _logs = const [];
-
-  bool _envLoading = true;
 
   static DateTime _todayDate() {
     final now = DateTime.now();
@@ -108,9 +106,12 @@ class _WorkScreenState extends State<WorkScreen>
 
   /// 헤더에서 지점을 바꿨다 — 이 화면이 들고 있는 것만 다시 받는다.
   /// 항목 화면들은 각자 `didUpdateWidget` 에서 다시 받는다.
+  ///
+  /// **칩·내역을 안 지운다.** 빨리 오면 뼈대가 아예 안 뜨고 옛 판 위에 새 값이
+  /// 얹힌다 (`SkeletonDelay`) — 지점을 바꿀 때마다 깜빡이던 자리다.
   void _onBranchScope() {
     if (!mounted) return;
-    setState(() => _envLoading = true);
+    setState(beginLoad);
     _loadEnv();
   }
 
@@ -135,11 +136,11 @@ class _WorkScreenState extends State<WorkScreen>
         // 서버가 sortOrder 순으로 준다 — 앱이 다시 세우지 않는다
         _envItems = items;
         _logs = logs;
-        _envLoading = false;
+        endLoad();
       });
     } catch (error) {
       if (!mounted) return;
-      setState(() => _envLoading = false);
+      setState(endLoad);
       AppToast.show(context, messageOf(error));
     }
   }
@@ -394,7 +395,7 @@ class _WorkScreenState extends State<WorkScreen>
           if (item.checklist)
             Padding(
               padding: EdgeInsets.symmetric(horizontal: _pad),
-              child: _envLoading
+              child: showSkeleton
                   ? _ChecklistSkeleton()
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,

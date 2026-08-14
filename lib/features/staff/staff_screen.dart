@@ -15,6 +15,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
+import '../../core/util/skeleton_delay.dart';
 import '../../core/widgets/display/avatar.dart';
 import '../../core/widgets/display/placeholder_screen.dart';
 import '../../core/widgets/display/section_header.dart';
@@ -63,7 +64,8 @@ class StaffScreen extends StatefulWidget {
   State<StaffScreen> createState() => _StaffScreenState();
 }
 
-class _StaffScreenState extends State<StaffScreen> with ScreenRefresh<StaffScreen> {
+class _StaffScreenState extends State<StaffScreen>
+    with ScreenRefresh<StaffScreen> {
   String _query = '';
   String _rank = _allRanks;
 
