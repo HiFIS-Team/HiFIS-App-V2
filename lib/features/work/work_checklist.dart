@@ -2,7 +2,7 @@ part of 'work_screen.dart';
 
 /// 환경정비 점검 카드 — 항목이 2열로 내려가며 배치되고,
 /// 각 항목의 좌우 −/+ 버튼으로 오늘 수행 횟수를 조절한다.
-class _ChecklistCard extends StatefulWidget {
+class _ChecklistCard extends StatelessWidget {
   _ChecklistCard({
     required this.items,
     required this.counts,
@@ -22,35 +22,8 @@ class _ChecklistCard extends StatefulWidget {
   final VoidCallback onShowHistory;
 
   @override
-  State<_ChecklistCard> createState() => _ChecklistCardState();
-}
-
-class _ChecklistCardState extends State<_ChecklistCard> {
-  final _search = TextEditingController();
-
-  /// 검색어 — 항목이 22개라 눈으로 훑기 어렵다
-  String _query = '';
-
-  @override
-  void dispose() {
-    _search.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final items = widget.items;
-    final counts = widget.counts;
     final total = counts.values.fold(0, (sum, c) => sum + c);
-
-    // 이름을 맞출 때는 공백·대소문자를 지운다 ('화장실 청소' 로 쳐도 찾히게)
-    final key = _WorkScreenState._envKey(_query);
-    final shown = key.isEmpty
-        ? items
-        : [
-            for (final item in items)
-              if (_WorkScreenState._envKey(item.name).contains(key)) item,
-          ];
 
     return Container(
       width: double.infinity,
@@ -78,14 +51,9 @@ class _ChecklistCardState extends State<_ChecklistCard> {
                     ),
                   )
                 else
-                  SeeAllButton(onTap: widget.onShowHistory, label: '총 $total회'),
+                  SeeAllButton(onTap: onShowHistory, label: '총 $total회'),
               ],
             ),
-          ),
-          SizedBox(height: 12),
-          _SearchField(
-            controller: _search,
-            onChanged: (value) => setState(() => _query = value),
           ),
           SizedBox(height: 12),
           // 데스크톱은 폭이 넓어 한 줄에 여러 개를 넣는다.
@@ -100,40 +68,25 @@ class _ChecklistCardState extends State<_ChecklistCard> {
               // 폰은 칸이 좁아 애플·안드로이드 모두 필요하다.
               final chipWidth =
                   (constraints.maxWidth - 10 * (columns - 1)) / columns;
-              // 글자 크기는 **거른 목록이 아니라 전체**로 잰다 —
-              // 검색으로 긴 라벨이 빠질 때마다 남은 칩들이 커졌다 작아진다
               final fontSize = _chipFontSize([
                 for (final item in items) item.name,
               ], chipWidth);
-              if (shown.isEmpty) {
-                return Padding(
-                  padding: EdgeInsets.symmetric(vertical: 18),
-                  child: Center(
-                    child: Text(
-                      '찾는 항목이 없어요',
-                      style: AppTextStyles.body2.copyWith(
-                        color: AppColors.gray400,
-                      ),
-                    ),
-                  ),
-                );
-              }
               return Column(
                 children: [
-                  for (var i = 0; i < shown.length; i += columns) ...[
+                  for (var i = 0; i < items.length; i += columns) ...[
                     if (i > 0) SizedBox(height: 10),
                     Row(
                       children: [
                         for (var col = 0; col < columns; col++) ...[
                           if (col > 0) SizedBox(width: 10),
                           Expanded(
-                            child: i + col < shown.length
+                            child: i + col < items.length
                                 ? _CountChip(
-                                    label: shown[i + col].name,
-                                    count: counts[shown[i + col].id] ?? 0,
+                                    label: items[i + col].name,
+                                    count: counts[items[i + col].id] ?? 0,
                                     fontSize: fontSize,
                                     onAdjust: (delta) =>
-                                        widget.onAdjust(shown[i + col], delta),
+                                        onAdjust(items[i + col], delta),
                                   )
                                 : SizedBox(),
                           ),
@@ -149,51 +102,6 @@ class _ChecklistCardState extends State<_ChecklistCard> {
       ),
     );
   }
-}
-
-/// 항목을 이름으로 거르는 칸 — **조직도 검색칸과 같은 모양**이다
-/// (회색 면 + 돋보기, [staff_filters.dart] 의 `_SearchBar`).
-///
-/// `GlassSearchBar` 는 화면 아래에 떠 있는 블러 바라 흰 카드 안에는 안 맞는다.
-class _SearchField extends StatelessWidget {
-  _SearchField({required this.controller, required this.onChanged});
-
-  final TextEditingController controller;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    height: 38,
-    padding: EdgeInsets.symmetric(horizontal: 14),
-    decoration: BoxDecoration(
-      // 흰 카드와 겹쳐 보이지 않게 눕히는 회색 면
-      color: AppColors.gray100,
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: Row(
-      children: [
-        Icon(CupertinoIcons.search, size: 15, color: AppColors.gray500),
-        SizedBox(width: 8),
-        Expanded(
-          child: TextField(
-            controller: controller,
-            style: AppTextStyles.body2.copyWith(fontSize: 14),
-            cursorColor: AppColors.primary,
-            onChanged: onChanged,
-            decoration: InputDecoration(
-              hintText: '항목 찾기',
-              hintStyle: AppTextStyles.body2.copyWith(
-                fontSize: 14,
-                color: AppColors.gray400,
-              ),
-              border: InputBorder.none,
-              isCollapsed: true,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
 }
 
 /// 좌 − / 우 + 버튼이 달린 횟수 칩
