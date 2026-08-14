@@ -25,12 +25,16 @@ class _MemberDetailState extends State<_MemberDetail>
 
   _Member get member => _edited ?? widget.member;
 
-  /// 남의 근태를 볼 수 있는지
+  /// 남의 근태를 볼 수 있는지 — **본인이거나 MASTER · ADMIN**
   ///
-  /// 서버가 `/attendance/calendar`·`/leaves/balance` 를 **점장 이상**에게만 연다
-  /// (일반 직원이 부르면 403). 지각 횟수는 원래 남이 볼 것도 아니라
-  /// 앱도 같은 기준으로 카드를 감춘다.
-  bool get _canSeeMonth => member.isMe || myRole.strong;
+  /// 서버가 `/attendance/calendar`·`/leaves/balance` 를 그 둘에게만 연다
+  /// (그 밖에는 403). 지각 횟수는 원래 남이 볼 것도 아니라 앱도 같은 기준으로
+  /// 카드를 감춘다.
+  ///
+  /// **MANAGER 는 뺐다 (2026-08-14).** 결재가 대표 전용이 되면서 점장이
+  /// 남의 근태를 볼 자리가 없어졌다 — 월차 결재함·급여 결재 탭과 같은 정리다.
+  bool get _canSeeMonth =>
+      member.isMe || myRole == Role.master || myRole == Role.admin;
 
   @override
   void initState() {
