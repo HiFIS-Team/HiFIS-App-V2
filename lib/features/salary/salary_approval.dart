@@ -4,14 +4,22 @@ part of 'salary_screen.dart';
 // 결재 — 급여 신청을 받아 승인·반려·지급 처리한다
 //
 // 서버 권한을 그대로 따른다:
-//   조회   MASTER · ADMIN · MANAGER   (MANAGER 는 서버가 자기 지점으로 좁힌다)
-//   처리   MASTER · MANAGER           (ADMIN 은 지켜보는 자리라 버튼이 없다)
+//   조회   MASTER · ADMIN   (ADMIN 은 지켜보는 자리라 버튼이 없다)
+//   처리   MASTER
 // 눌러도 403 이 날 버튼은 아예 안 보여준다.
 // ---------------------------------------------------------------------------
 
-/// 결재 탭을 볼 수 있는 사람
-bool get _canSeeApproval =>
-    myRole == Role.master || myRole == Role.admin || myRole == Role.manager;
+/// 결재 탭을 볼 수 있는 사람 — **MASTER · ADMIN**
+///
+/// **MANAGER 는 뺐다 (2026-08-14).** 점장도 본인 급여를 신청하는 쪽이지
+/// 결재하는 쪽이 아니다. 결재가 대표 전용이 되면서 점장에게는 누를 수 없는
+/// 목록만 남았는데, 거기에 **남의 급여 금액**이 그대로 적혀 있었다.
+///
+/// 이 값은 이제 [_isPayBoss] 와 같다. 그래서 아래 `_canSeeApproval &&
+/// !_isPayBoss` 로 만들던 `내 급여 / 결재` **탭 줄이 아무에게도 안 뜬다** —
+/// 대표·관리자는 화면 전체가 결재 화면이라 원래 탭이 없었고, 점장은
+/// 이제 직원과 같은 화면이다.
+bool get _canSeeApproval => _isPayBoss;
 
 /// 실제로 승인·반려·지급을 누를 수 있는 사람 — **MASTER 만**
 /// (ADMIN·MANAGER 는 결재함이 보이되 버튼이 없다)

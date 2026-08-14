@@ -7,15 +7,21 @@ part of 'attendance_screen.dart';
 // 대기 중인 신청이 있으면 '월차 신청' 버튼 자리를 반려·승인이 대신 차지한다.
 //
 // 서버 권한을 그대로 따른다:
-//   조회   MASTER · ADMIN · MANAGER   (MANAGER 는 서버가 자기 지점으로 좁힌다)
-//   처리   MASTER                     (ADMIN·MANAGER 는 보기만 — 버튼이 없다)
+//   조회   MASTER · ADMIN   (ADMIN 은 보기만 — 버튼이 없다)
+//   처리   MASTER
 // ---------------------------------------------------------------------------
 
-/// 결재 대기를 볼 수 있는 사람
-bool get _canSeeLeaveInbox =>
-    myRole == Role.master || myRole == Role.admin || myRole == Role.manager;
+/// 결재 대기를 볼 수 있는 사람 — **MASTER · ADMIN**
+///
+/// **MANAGER 는 뺐다 (2026-08-14).** 점장도 본인이 월차를 내는 쪽이지
+/// 받는 쪽이 아니다. 결재가 대표 전용이 되면서 점장에게는 누를 수 없는
+/// 목록만 남았는데, 거기에 **남의 휴가 사유**가 그대로 적혀 있었다.
+///
+/// 이 값이 false 면 대기 목록을 아예 안 받아서(`attendance_models.dart`)
+/// 화면이 직원과 똑같아진다 — 결재 줄도 없고 월차 신청 버튼이 그대로다.
+bool get _canSeeLeaveInbox => _isBoss;
 
-/// 실제로 승인·반려를 누를 수 있는 사람
+/// 실제로 승인·반려를 누를 수 있는 사람 — **MASTER 만**
 bool get _canDecideLeave => myRole.canApprove;
 
 /// 근태 화면을 **관리 화면으로** 보는 사람 (MASTER · ADMIN)
