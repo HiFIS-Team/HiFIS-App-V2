@@ -145,41 +145,45 @@ class _HistoryScreenState extends State<_HistoryScreen> {
 
   late List<EnvTaskLog> _myLogs = widget.myLogs;
   late List<EnvTaskLog> _allLogs = widget.allLogs;
-  bool _loading = false;
+
+  /// 목록이 **실제로 담고 있는** 날짜 — [_date] 보다 한 박자 늦게 따라온다
+  ///
+  /// 받아 오는 동안 목록을 비우면 **내용 → 빈 화면 → 내용** 이 되어 깜빡인다.
+  /// 그래서 옛 목록을 그대로 둔 채 새 것을 기다렸다가, 도착하면
+  /// [PaneTransition] 으로 갈아 끼운다 (탭을 옮길 때와 같은 모션).
+  late DateTime _shownDate = _WorkScreenState._todayDate();
 
   static const _weekdays = ['월', '화', '수', '목', '금', '토', '일'];
 
   bool get _isToday => _date == _WorkScreenState._todayDate();
 
+  /// 목록에 담긴 날이 오늘인가 — 빈 문구는 **보이는 목록**을 따라가야 한다
+  bool get _shownIsToday => _shownDate == _WorkScreenState._todayDate();
+
   /// 날짜를 옮기고 그 날 기록을 받아 온다 — **다음 날로는 못 간다**
   Future<void> _move(int step) async {
     final next = DateTime(_date.year, _date.month, _date.day + step);
     if (next.isAfter(_WorkScreenState._todayDate())) return;
-    setState(() {
-      _date = next;
-      _loading = true;
-      // 옛 날짜 줄을 남겨 두면 머리말은 새 날짜인데 목록은 이전 날이 된다
-      _myLogs = const [];
-      _allLogs = const [];
-    });
+    // 머리말은 바로 바꾼다 — 누른 티가 나야 한다. 목록은 도착하면 바뀐다
+    setState(() => _date = next);
     try {
       final logs = await EnvApi.logs(
         branchId: widget.branchId,
         date: dateKey(next),
       );
-      if (!mounted) return;
+      // 기다리는 사이 또 눌렀으면 이 응답은 버린다 (빠르게 여러 날 넘길 때
+      // 늦게 온 옛 응답이 새 날짜를 덮어쓰면 안 된다)
+      if (!mounted || _date != next) return;
       setState(() {
         _allLogs = logs;
         _myLogs = [
           for (final log in logs)
             if (log.employeeId == currentUser?.id) log,
         ];
-        _loading = false;
+        _shownDate = next;
       });
     } catch (error) {
-      if (!mounted) return;
-      setState(() => _loading = false);
-      AppToast.show(context, messageOf(error));
+      if (mounted) AppToast.show(context, messageOf(error));
     }
   }
 
@@ -272,40 +276,47 @@ class _HistoryScreenState extends State<_HistoryScreen> {
                     ],
                   ),
                 Container(height: 1, color: AppColors.gray100),
-                if (sorted.isEmpty)
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(24, 32, 24, 44),
-                    // 받아 오는 동안은 비워 둔다 — '없어요' 를 잠깐 띄우면
-                    // 기록이 있는 날인데도 없다고 했다가 채워진다
-                    child: _loading
-                        ? SizedBox()
-                        : Text(
-                            _isToday
-                                ? (_all ? '오늘 완료된 항목이 없어요' : '오늘 완료한 항목이 없어요')
-                                : (_all ? '완료된 항목이 없어요' : '완료한 항목이 없어요'),
-                            style: AppTextStyles.body2.copyWith(
-                              color: AppColors.textTertiary,
+                // 날짜가 바뀌면 목록이 **떠 있는 채로** 새 것으로 넘어간다 —
+                // 탭을 옮길 때와 같은 모션이다 (비웠다가 채우면 깜빡인다)
+                Expanded(
+                  child: PaneTransition(
+                    step: _shownDate,
+                    child: sorted.isEmpty
+                        ? Align(
+                            alignment: Alignment.topLeft,
+                            child: Padding(
+                              padding: EdgeInsets.fromLTRB(24, 32, 24, 44),
+                              child: Text(
+                                // 문구는 **보이는 목록**을 따라간다 (_date 가 아니다)
+                                _shownIsToday
+                                    ? (_all
+                                          ? '오늘 완료된 항목이 없어요'
+                                          : '오늘 완료한 항목이 없어요')
+                                    : (_all ? '완료된 항목이 없어요' : '완료한 항목이 없어요'),
+                                style: AppTextStyles.body2.copyWith(
+                                  color: AppColors.textTertiary,
+                                ),
+                              ),
                             ),
+                          )
+                        : ListView.separated(
+                            // 날짜·탭이 바뀌면 맨 위부터 다시 본다
+                            key: ValueKey('$_all-$_shownDate'),
+                            padding: EdgeInsets.fromLTRB(
+                              24,
+                              12,
+                              24,
+                              MediaQuery.paddingOf(context).bottom + 24,
+                            ),
+                            itemCount: sorted.length,
+                            separatorBuilder: (_, _) =>
+                                Divider(height: 1, color: AppColors.divider),
+                            // 전체 내역에서는 누가 했는지 이름을 함께 보여준다
+                            itemBuilder: (_, index) =>
+                                _LogRow(log: sorted[index], showName: _all),
                           ),
-                  )
-                else
-                  Expanded(
-                    child: ListView.separated(
-                      key: ValueKey(_all),
-                      padding: EdgeInsets.fromLTRB(
-                        24,
-                        12,
-                        24,
-                        MediaQuery.paddingOf(context).bottom + 24,
-                      ),
-                      itemCount: sorted.length,
-                      separatorBuilder: (_, _) =>
-                          Divider(height: 1, color: AppColors.divider),
-                      // 전체 내역에서는 누가 했는지 이름을 함께 보여준다
-                      itemBuilder: (_, index) =>
-                          _LogRow(log: sorted[index], showName: _all),
-                    ),
                   ),
+                ),
               ],
             ),
           ),
