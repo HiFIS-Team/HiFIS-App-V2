@@ -34,6 +34,7 @@ class _Ranker {
   const _Ranker({
     required this.id,
     required this.name,
+    required this.job,
     required this.team,
     required this.branch,
     required this.revenue,
@@ -59,6 +60,7 @@ class _Ranker {
   factory _Ranker.fromRow(RankingRow row) => _Ranker(
     id: row.employeeId,
     name: row.name,
+    job: StaffDirectory.instance.byId(row.employeeId)?.rank,
     team: StaffDirectory.instance.byId(row.employeeId)?.rank.label ?? '',
     branch: StaffDirectory.instance.branchName(row.branchId),
     revenue: row.revenue,
@@ -83,6 +85,10 @@ class _Ranker {
 
   final String id;
   final String name;
+
+  /// 직군 — **칩으로 거를 때** 쓴다 ([team] 은 그걸 사람이 읽는 이름이다).
+  /// 명단을 아직 못 받았으면 null 이고, 그러면 '전체' 에서만 보인다.
+  final Rank? job;
 
   /// 직군 — 이름 아래 붙는다
   final String team;
@@ -164,6 +170,21 @@ Future<void> _loadRanking({String? period}) async {
 /// HQ 지점 이름과 **같은 글자**다. HQ 소속(MASTER·ADMIN)인 사람의 실적은
 /// 어차피 랭킹에 안 오르므로 둘이 부딪칠 일이 없다.
 const _allBranches = '전 지점';
+
+/// 직군 필터에 세울 것 — **랭킹에 실제로 오르는 직군만** 둔다
+///
+/// 대표·개발자는 MASTER, 마케터는 ADMIN 이라 서버가 순위에서 아예 뺀다.
+/// 칸을 만들어 봐야 늘 0 이라 자리만 차지한다.
+///
+/// **조직도는 점장·팀장을 '관리자' 한 칸으로 묶는데 여기서는 나눈다.**
+/// 거기는 사람을 찾는 화면이고 여기는 같은 일을 하는 사람끼리 견주는
+/// 화면이라, 점장과 팀장을 한 줄에 세울 이유가 없다.
+const _rankingJobs = <Rank>[
+  Rank.storeManager,
+  Rank.teamLead,
+  Rank.trainer,
+  Rank.fc,
+];
 
 /// 시상대 색 — 위(밝은 쪽), 아래(진한 쪽)
 ///

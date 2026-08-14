@@ -1,3 +1,4 @@
+import 'package:cupertino_native/cupertino_native.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -12,8 +13,11 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
+import '../../core/util/sf_symbols.dart';
 import '../../core/widgets/display/avatar.dart';
 import '../../core/widgets/feedback/app_toast.dart';
+import '../../core/widgets/glass/glass_icon_button.dart';
+import '../../core/widgets/glass/glass_menu.dart';
 import '../../core/widgets/feedback/delayed_spinner.dart';
 import '../../core/widgets/feedback/empty_card.dart';
 import '../../core/widgets/input/mode_switch.dart';
@@ -123,9 +127,17 @@ class _RankingScreenState extends State<RankingScreen>
 
   _Metric get _metric => _Metric.values[_tab];
 
-  /// 지금 보고 있는 지점 사람들 — 종합 점수의 기준 모집단이기도 하다
+  /// 고른 직군 — null 이면 전 직군
+  Rank? _job;
+
+  /// 지금 보고 있는 지점·직군 사람들 — 종합 점수의 기준 모집단이기도 하다
+  ///
+  /// 직군을 고르면 **그 안에서 다시 줄 세운다.** 시상대·내 순위·종합 환산이
+  /// 다 이 목록을 보므로, 트레이너만 볼 때는 트레이너끼리의 등수가 나온다.
+  /// 트레이너와 FC 를 한 줄에 세우면 매출 비교가 뜻이 없어서 나눈 것이다.
   List<_Ranker> get _pool => _rankers
       .where((r) => _branch == _allBranches || r.branch == _branch)
+      .where((r) => _job == null || r.job == _job)
       .toList();
 
   /// 고른 항목 기준으로 줄 세운 순위표
@@ -192,6 +204,15 @@ class _RankingScreenState extends State<RankingScreen>
     labels: [for (final m in _Metric.values) m.label],
     selected: _tab,
     onSelect: (i) => setState(() => _tab = i),
+  );
+
+  /// 직군 고르개 — 고르면 열어 둔 점수 내역은 접는다 (그 사람이 빠질 수 있다)
+  Widget _jobFilter() => _JobFilterButton(
+    selected: _job,
+    onSelect: (job) => setState(() {
+      _job = job;
+      _pickedId = null;
+    }),
   );
 
   /// 점수 내역이 열려 있는 사람 — **종합 탭에서만** 채워진다
@@ -317,6 +338,8 @@ class _RankingScreenState extends State<RankingScreen>
     if (!isDesktop) {
       return PhoneListScaffold(
         title: '랭킹',
+        // 왼쪽 위 글래스 필터 — 스크롤과 따로 떠 있는 자리다
+        leading: _jobFilter(),
         filter: _PhoneTabs(
           selected: _tab,
           onSelect: (i) => setState(() => _tab = i),
@@ -344,8 +367,11 @@ class _RankingScreenState extends State<RankingScreen>
               // 달은 아래 이동 줄이 들고 있다 — 부제에도 적으면 두 번 나온다
               title: '랭킹',
               subtitle: '실적 기준으로 줄 세웠어요',
-              // 지점 고르개는 헤더의 지점 아이콘으로 옮겼다 — 조직도·업무와
-              // 같은 값을 본다 (core/data/branch_scope.dart)
+              // 지점 고르개는 셸 헤더의 지점 아이콘이 맡는다 — 조직도·업무와
+              // 같은 값을 본다 (core/data/branch_scope.dart).
+              // 직군은 이 화면만 쓰는 값이라 여기 둔다. **제목 앞이 아니라
+              // 오른쪽 끝**이다 — 페이지 제목 앞에 버튼이 서면 어색하다
+              trailing: _jobFilter(),
             ),
             SizedBox(height: 22),
             _tabs(),

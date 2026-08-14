@@ -99,3 +99,117 @@ class _PhoneTabs extends StatelessWidget {
     );
   }
 }
+
+/// 직군 고르개 — 헤더 왼쪽의 **리퀴드 글래스 필터**
+///
+/// 트레이너와 FC 를 한 줄에 세우면 매출 비교가 뜻이 없어서 붙였다.
+/// 하나 고르면 **그 직군끼리 다시 줄 세운다** — 시상대·내 순위·종합 환산이
+/// 다 같은 목록을 보므로 등수가 그 안에서 매겨진다.
+///
+/// 메뉴는 **지점 고르개([BranchScopeButton])와 같은 부품**이다 — 아이폰은
+/// OS 가 그리는 네이티브 메뉴, 그 외는 [showGlassMenu]. 두 버튼이 한 화면에
+/// 뜨는데 유리 느낌이 다르면 티가 난다.
+///
+/// | | 어디에 |
+/// |---|---|
+/// | 폰 | 왼쪽 위 ([PhoneListScaffold.leading]) — 스크롤과 따로 떠 있는 자리 |
+/// | 데스크톱 | 머리말 오른쪽 끝 (제목 앞에 버튼을 두면 어색하다) |
+class _JobFilterButton extends StatefulWidget {
+  _JobFilterButton({required this.selected, required this.onSelect});
+
+  /// null 이면 '전체'
+  final Rank? selected;
+  final ValueChanged<Rank?> onSelect;
+
+  @override
+  State<_JobFilterButton> createState() => _JobFilterButtonState();
+}
+
+class _JobFilterButtonState extends State<_JobFilterButton> {
+  /// 메뉴를 버튼 아래에 띄우려면 버튼 자리를 알아야 한다
+  final _key = GlobalKey();
+
+  /// 이미 떠 있는지 — 없으면 누를 때마다 하나씩 더 쌓인다
+  bool _open = false;
+
+  static const _allLabel = '전체';
+
+  /// 걸려 있으면 채운 아이콘 — 버튼이 아이콘 하나라 고른 직군 **이름**은
+  /// 메뉴를 열어야 보인다. 최소한 "지금 걸려 있다"는 건 알 수 있게 한다.
+  String get _symbol => widget.selected == null
+      ? 'line.3.horizontal.decrease'
+      : 'line.3.horizontal.decrease.circle.fill';
+
+  Future<void> _openMenu() async {
+    if (_open) return;
+    _open = true;
+    final picked = await showGlassMenu<int>(
+      context: context,
+      anchorKey: _key,
+      width: 200,
+      // 왼쪽 위 버튼이라 메뉴도 왼쪽에 맞춘다 (기본값은 오른쪽 정렬)
+      alignRight: false,
+      items: [
+        GlassMenuItem(
+          // null 은 '안 골랐다'와 구분이 안 돼서 전체에 따로 값을 준다
+          value: -1,
+          label: _allLabel,
+          icon: CupertinoIcons.square_grid_2x2,
+          selected: widget.selected == null,
+        ),
+        for (var i = 0; i < _rankingJobs.length; i++)
+          GlassMenuItem(
+            value: i,
+            label: _rankingJobs[i].label,
+            icon: CupertinoIcons.person,
+            selected: widget.selected == _rankingJobs[i],
+          ),
+      ],
+    );
+    _open = false;
+    if (!mounted || picked == null) return;
+    widget.onSelect(picked == -1 ? null : _rankingJobs[picked]);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // 아이폰은 OS 가 그리는 네이티브 메뉴 — 지점 고르개와 같은 부품이다.
+    // **macOS 는 안 쓴다** — 같은 패키지가 메뉴를 버튼 왼쪽에 고정해서
+    // 창 밖으로 새어 나간다 (지점 고르개와 같은 이유).
+    if (isApple && !isDesktop) {
+      // 테마가 바뀌면 새로 만든다 — 패키지의 setBrightness 가 아이콘 설정을
+      // 유실한다. **고른 직군은 키에 안 넣는다** (넣으면 고를 때마다 네이티브
+      // 뷰를 새로 만든다).
+      return CNPopupMenuButton.icon(
+        key: ValueKey('ranking-job-${AppColors.isDark}'),
+        buttonIcon: CNSymbol(_symbol, size: 16.8, color: AppColors.gray700),
+        size: 40,
+        items: [
+          // 네이티브 메뉴에는 체크마크를 못 단다 — 고른 줄은 **아이콘 자리**가
+          // 체크로 바뀐다 (지점 고르개와 같다).
+          CNPopupMenuItem(
+            label: _allLabel,
+            icon: CNSymbol(
+              widget.selected == null ? 'checkmark' : 'square.grid.2x2',
+            ),
+          ),
+          for (final job in _rankingJobs)
+            CNPopupMenuItem(
+              label: job.label,
+              icon: CNSymbol(widget.selected == job ? 'checkmark' : 'person'),
+            ),
+        ],
+        onSelected: (index) =>
+            widget.onSelect(index == 0 ? null : _rankingJobs[index - 1]),
+      );
+    }
+
+    return GlassIconButton(
+      key: _key,
+      // 심볼이 바뀌어도 네이티브 버튼을 새로 만들지 않게 고정 식별자를 준다
+      stableId: 'ranking-job',
+      symbol: _symbol,
+      onPressed: _openMenu,
+    );
+  }
+}
