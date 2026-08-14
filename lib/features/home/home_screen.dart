@@ -19,12 +19,16 @@ import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
+import '../../core/util/screen_refresh.dart';
+import '../../core/util/skeleton_delay.dart';
 import '../../core/widgets/display/avatar.dart';
+import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/feedback/empty_card.dart';
 import '../../core/widgets/feedback/reject_reason_dialog.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/input/mini_button.dart';
+import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/input/see_all_button.dart';
 import '../approval/approval_screen.dart';
@@ -99,30 +103,30 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
+class _HomeScreenState extends State<HomeScreen>
+    with ScreenRefresh<HomeScreen> {
   /// 오늘 요약 — 도착 전에는 null 이라 근무 카드가 '미출근'으로 그려진다
   ///
   /// 첫 화면이라 통째로 로딩을 돌리면 앱을 열 때마다 빈 화면을 보게 된다.
   /// 인사말·시계는 기기에서 바로 나오므로 그대로 두고 값만 채운다.
   HomeSummary? _summary;
 
-  /// 마지막으로 받아온 시각 — 창을 옮길 때마다 다시 부르지 않게 막는다
-  DateTime? _loadedAt;
-
-  /// 다시 받기까지 두는 최소 간격
+  /// 탭에 다시 들어오거나 앱이 다시 앞으로 나왔을 때 조용히 다시 받는다
   ///
-  /// macOS 는 **창이 포커스만 잃어도** inactive → resumed 가 오간다.
-  /// 그대로 두면 다른 앱을 잠깐 볼 때마다 요청이 나간다 (실제로 몇 초 간격으로
-  /// 나갔다). 오늘 근태는 그렇게 자주 바뀌지 않는다.
-  static const _minReloadGap = Duration(minutes: 1);
+  /// **다른 탭 11개와 같은 장치를 쓴다** (2026-08-14). 예전에는 홈만
+  /// `WidgetsBindingObserver` 로 직접 재조회했는데, 그러면 **탭을 옮겼다
+  /// 돌아와도 안 받아서** 다른 탭에서 결재한 것이 홈 숫자에 안 비쳤다.
+  ///
+  /// 최소 간격은 믹스인이 들고 있다 (`screenRefreshGap`, 1분). macOS 가
+  /// 창 포커스만 잃어도 오가는 문제도 거기서 같이 막힌다 (`apple/macos.md` 3번).
+  @override
+  Future<void> onScreenRefresh() => _load();
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    // 바코드 화면이 '방금 찍혔다'고 알려 주면 바로 다시 받는다.
-    // 안 걸면 찍고 홈으로 와도 '오늘 근무' 가 한동안 미출근 그대로다
-    // (아래 [_minReloadGap] 에 막혀서 포커스를 옮겨도 안 바뀐다).
+    // 바코드 화면이 '방금 찍혔다'고 알려 주면 **간격을 안 따지고** 바로 받는다.
+    // 안 걸면 찍고 홈으로 와도 '오늘 근무' 가 한동안 미출근 그대로다.
     attendanceChanged.addListener(_reload);
     _load();
   }
@@ -130,7 +134,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     attendanceChanged.removeListener(_reload);
-    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
@@ -139,19 +142,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (mounted) _load();
   }
 
-  /// 앱을 다시 열면 다시 받는다 — 배경에 둔 사이 출퇴근이나 날짜가 바뀐다
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state != AppLifecycleState.resumed) return;
-    final at = _loadedAt;
-    if (at != null && DateTime.now().difference(at) < _minReloadGap) return;
-    _load();
-  }
-
   Future<void> _load() async {
     if (currentUser == null) return;
-    // 실패해도 찍어 둔다 — 서버가 죽어 있을 때 포커스마다 재시도하지 않게
-    _loadedAt = DateTime.now();
     try {
       // 공지·프로젝트 카드가 목록을 그대로 읽는다 — 요약과 같이 받아 둔다.
       // 알림은 카드에 안 쓰지만 헤더 종 배지가 여기서 받은 수를 본다

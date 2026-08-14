@@ -60,17 +60,29 @@ class _GreetingCard extends StatelessWidget {
 /// **ADMIN 은 버튼이 없다.** 지켜보는 자리라 목록은 같이 보되 승인·반려는
 /// MASTER 만 누른다 (급여·월차 결재 화면과 같은 기준 — 눌러도 403 날 버튼은 안 낸다).
 class _InboxCard extends StatefulWidget {
-  _InboxCard({this.onOpen});
+  _InboxCard({this.onOpen}) : full = false;
+
+  /// 전체보기 — 같은 State 를 **화면 한 장으로** 그린다
+  ///
+  /// 승인·반려는 종류마다 부르는 곳이 달라서(`_approve`·`_reject`) 복사해
+  /// 두면 한쪽만 고쳐질 때 **엉뚱한 결재가 통과한다.** 그래서 카드와 화면이
+  /// 같은 State 를 쓰고 [full] 로 그리는 모양만 가른다.
+  _InboxCard.full() : onOpen = null, full = true;
 
   final void Function(NotificationTarget)? onOpen;
+
+  /// true 면 카드가 아니라 밀려 들어오는 화면으로 그린다
+  final bool full;
 
   @override
   State<_InboxCard> createState() => _InboxCardState();
 }
 
-class _InboxCardState extends State<_InboxCard> {
+class _InboxCardState extends State<_InboxCard> with SkeletonDelay<_InboxCard> {
   List<InboxItem> _items = const [];
-  bool _loading = true;
+
+  /// 보고 있는 칸 — **카드는 늘 `대기` 다.** 전체보기에서만 목록바로 바뀐다.
+  InboxStatus _status = InboxStatus.pending;
 
   /// 처리 중인 항목 id — 그 줄의 버튼만 잠근다
   ///
@@ -78,9 +90,9 @@ class _InboxCardState extends State<_InboxCard> {
   /// 두 번 보내고 두 번째가 400 으로 떨어진다.
   String? _busyId;
 
-  /// 데스크톱은 나란히 선 프로젝트 카드와 줄 수를 맞춘다
-  /// 카드에 세우는 줄 수 — 폰은 네 장을 같게 맞춘다
-  int get _max => isDesktop ? 4 : phoneCardRows;
+  /// 카드에 세우는 줄 수 — 데스크톱은 나란히 선 프로젝트 카드와 맞추고,
+  /// 폰은 네 장을 같게 맞춘다. **전체보기 화면에서는 안 자른다.**
+  int get _max => widget.full ? _items.length : (isDesktop ? 4 : phoneCardRows);
 
   @override
   void initState() {
@@ -89,18 +101,37 @@ class _InboxCardState extends State<_InboxCard> {
   }
 
   Future<void> _load() async {
+    final asked = _status;
     try {
-      final rows = await HomeApi.inbox();
-      if (!mounted) return;
+      final rows = await HomeApi.inbox(status: asked);
+      // 받는 동안 다른 칸을 눌렀으면 버린다 — 안 그러면 늦게 온 응답이
+      // 지금 보고 있는 칸을 덮어쓴다
+      if (!mounted || asked != _status) return;
       setState(() {
         _items = rows;
-        _loading = false;
+        endLoad();
       });
     } catch (error) {
-      if (!mounted) return;
-      setState(() => _loading = false);
+      if (!mounted || asked != _status) return;
+      setState(endLoad); // 실패해도 뼈대에 갇히지 않게 푼다
       AppToast.show(context, messageOf(error));
     }
+  }
+
+  /// 목록바에서 칸을 옮긴다 — 칸마다 서버에 다시 묻는다
+  ///
+  /// 세 칸을 미리 다 받아 두면 화면을 열 때 요청이 셋으로 는다.
+  /// 처리된 것은 열어 보는 일이 드물어서 누를 때만 받는다.
+  ///
+  /// **줄은 안 지운다.** 지우면 10ms 만에 새 줄이 와도 그 사이가 빈 화면이라
+  /// 깜빡인다 — 옛 줄을 그대로 두고 오는 대로 갈아끼운다.
+  void _pick(InboxStatus status) {
+    if (status == _status) return;
+    setState(() {
+      _status = status;
+      beginLoad();
+    });
+    _load();
   }
 
   /// 버튼을 낼지 — **MASTER 만 낸다.**
@@ -114,7 +145,14 @@ class _InboxCardState extends State<_InboxCard> {
   ///
   /// MANAGER 는 애초에 이 카드를 못 본다 — `/me/inbox` 가 ADMIN 게이트라
   /// 403 이고, 홈도 MASTER·ADMIN 에게만 카드를 그린다.
-  bool get _canDecide => myRole == Role.master;
+  ///
+  /// **처리된 칸에서는 아무도 못 낸다** — 이미 끝난 결재라 누를 것이 없다.
+  ///
+  /// 칸을 옮기는 동안(`loading`)도 안 낸다. 그때는 **옛 칸의 줄이 아직 떠
+  /// 있어서**, 승인 칸에서 대기로 옮기자마자 누르면 이미 승인된 것을 다시
+  /// 보내 400 이 난다.
+  bool get _canDecide =>
+      myRole == Role.master && _status == InboxStatus.pending && !loading;
 
   /// 종류마다 부르는 곳이 다르다 — id 는 그 테이블의 것이다
   Future<void> _approve(InboxItem item) => _run(item, () async {
@@ -175,28 +213,13 @@ class _InboxCardState extends State<_InboxCard> {
     }
   }
 
-  /// '전체'는 종류가 섞여 있어 한 화면으로 못 보낸다 — 제일 많은 쪽으로 보낸다
-  VoidCallback? get _openAll {
-    if (_items.isEmpty || widget.onOpen == null) return null;
-    final counts = <InboxKind, int>{};
-    for (final item in _items) {
-      counts[item.kind] = (counts[item.kind] ?? 0) + 1;
-    }
-    final top = counts.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
-    final target = switch (top) {
-      InboxKind.payslip => NotificationTarget.salary,
-      InboxKind.leave => NotificationTarget.attendance,
-      InboxKind.approval => NotificationTarget.approval,
-      InboxKind.event => NotificationTarget.schedule,
-    };
-    // 전자결재·일정은 폰에 탭이 아예 없다
-    if (!isDesktop &&
-        (target == NotificationTarget.approval ||
-            target == NotificationTarget.schedule)) {
-      return null;
-    }
-    return () => widget.onOpen!.call(target);
-  }
+  /// 전체보기 — **결재만 모은 화면**을 연다
+  ///
+  /// 예전에는 제일 많은 종류의 탭으로 보냈다. 그러면 급여 3건·월차 2건일 때
+  /// 급여 탭으로 가는데 **월차 2건은 거기 없어서** 나머지를 찾아 헤맸고,
+  /// 폰은 전자결재·일정 탭이 아예 없어 그게 제일 많으면 **버튼이 사라졌다.**
+  /// 지금은 네 종류가 한 목록에 그대로 서므로 어디로 보낼지 고를 일이 없다.
+  void _openAll() => showFullPage<void>(context, (_) => _InboxCard.full());
 
   @override
   Widget build(BuildContext context) {
@@ -215,8 +238,8 @@ class _InboxCardState extends State<_InboxCard> {
     // 데스크톱은 옆 카드에 높이를 맞추느라 카드가 늘어나는데, 안내가 위에
     // 붙으면 아래가 휑하다. `centered` 가 true 면 남는 높이를 다 쓴다.
     final Widget body;
-    final bool centered = _loading || rows.isEmpty;
-    if (_loading) {
+    final bool centered = showSkeleton || rows.isEmpty;
+    if (showSkeleton) {
       body = SkeletonGroup(child: SkeletonRows(rows: 3, trailing: 56));
     } else if (rows.isEmpty) {
       // 결재함이 비었다는 뜻이라 월차·급여 결재함과 같은 쟁반 아이콘을 쓴다
@@ -231,6 +254,107 @@ class _InboxCardState extends State<_InboxCard> {
       body = _StackedRows(rows: rows);
     }
 
+    // 전체보기 — 카드가 아니라 밀려 들어오는 화면 한 장으로 그린다.
+    // 줄·승인·반려는 위에서 만든 것을 그대로 쓴다 (카드와 같은 State).
+    if (widget.full) {
+      return Scaffold(
+        backgroundColor: AppColors.surface,
+        body: Stack(
+          children: [
+            SafeArea(
+              bottom: false,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 상단 고정 타이틀 영역만큼 비워둔다
+                  SizedBox(height: 56),
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(20, 4, 20, 12),
+                    child: _InboxTabs(selected: _status, onSelect: _pick),
+                  ),
+                  if (showSkeleton)
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(24, 12, 24, 24),
+                      child: SkeletonGroup(
+                        child: SkeletonRows(
+                          rows: 5,
+                          // 줄 간격을 실제 목록과 맞춘다 (위아래 14 + 구분선)
+                          gap: 29,
+                          // 처리된 칸에는 승인·반려 버튼이 없다.
+                          // `_canDecide` 는 받는 중에 false 라 여기 못 쓴다
+                          trailing:
+                              myRole == Role.master &&
+                                  _status == InboxStatus.pending
+                              ? 56
+                              : 0,
+                        ),
+                      ),
+                    )
+                  else if (rows.isEmpty)
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(24, 20, 24, 44),
+                      child: Text(
+                        switch (_status) {
+                          InboxStatus.pending => '결재할 게 없어요',
+                          InboxStatus.approved => '승인한 결재가 없어요',
+                          InboxStatus.rejected => '반려한 결재가 없어요',
+                        },
+                        style: AppTextStyles.body2.copyWith(
+                          color: AppColors.textTertiary,
+                        ),
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: ListView.separated(
+                        padding: EdgeInsets.fromLTRB(
+                          20,
+                          8,
+                          20,
+                          MediaQuery.paddingOf(context).bottom + 24,
+                        ),
+                        itemCount: rows.length,
+                        separatorBuilder: (_, _) =>
+                            Divider(height: 1, color: AppColors.divider),
+                        // 카드는 줄 사이를 14 로 띄우는데(`_StackedRows`) 여기는
+                        // 구분선이 있어 위아래로 나눠 준다 — 안 주면 글자가
+                        // 선에 붙어 목록이 빽빽해 보인다
+                        itemBuilder: (_, index) => Padding(
+                          padding: EdgeInsets.symmetric(vertical: 14),
+                          child: rows[index],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            // 상단 중앙 고정 타이틀 (터치는 아래로 통과)
+            IgnorePointer(
+              child: SafeArea(
+                bottom: false,
+                child: SizedBox(
+                  height: 56,
+                  // 카드는 '결재 대기' 지만 여기는 승인·반려 칸도 있어서 '결재' 다
+                  child: Center(child: Text('결재', style: AppTextStyles.title3)),
+                ),
+              ),
+            ),
+            // 좌측 상단 고정 뒤로가기 글래스 버튼
+            SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: EdgeInsets.only(top: 8, left: 16),
+                child: GlassIconButton(
+                  symbol: 'chevron.backward',
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       padding: EdgeInsets.all(20),
       decoration: AppDecorations.card(),
@@ -240,7 +364,8 @@ class _InboxCardState extends State<_InboxCard> {
           _CardHeader(
             title: '결재 대기',
             count: _items.length,
-            onOpenAll: _openAll,
+            // 결재함이 비었으면 열어 봐야 빈 화면이라 버튼을 안 낸다
+            onOpenAll: _items.isEmpty ? null : _openAll,
           ),
           SizedBox(height: 14),
           // `Expanded` 는 Column 의 **직계 자식**이어야 해서 여기서 바로 감싼다
@@ -255,6 +380,56 @@ class _InboxCardState extends State<_InboxCard> {
             ConstrainedBox(
               constraints: BoxConstraints(minHeight: phoneCardBody),
               child: body,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 결재 전체보기의 목록바 — `대기 · 승인 · 반려`
+///
+/// **전자결재 폰 목록바(`_StateTabs`)와 같은 토큰**을 쓴다. 같은 결재를
+/// 다루는 두 화면이라 결이 다르면 바로 눈에 띈다.
+/// 공용 [SegmentedTabs] 는 높이가 48 이고 고른 칸 글자가 파랑이라 안 쓴다.
+class _InboxTabs extends StatelessWidget {
+  _InboxTabs({required this.selected, required this.onSelect});
+
+  final InboxStatus selected;
+  final ValueChanged<InboxStatus> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 44,
+      padding: EdgeInsets.all(4),
+      decoration: segmentTrack(),
+      child: Row(
+        children: [
+          for (final status in InboxStatus.values)
+            Expanded(
+              child: Pressable(
+                onTap: () => onSelect(status),
+                scale: 0.97,
+                // 배경은 애니메이션 없이 즉시 바꾼다
+                child: Container(
+                  decoration: segmentFill(selected: status == selected),
+                  child: Center(
+                    child: Text(
+                      status.label,
+                      style: AppTextStyles.body2.copyWith(
+                        fontSize: 13,
+                        color: status == selected
+                            ? AppColors.primary
+                            : AppColors.gray600,
+                        fontWeight: status == selected
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ),
         ],
       ),

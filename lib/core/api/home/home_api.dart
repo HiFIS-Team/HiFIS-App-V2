@@ -63,6 +63,24 @@ enum InboxKind {
   );
 }
 
+/// 결재함의 세 칸 (서버 `InboxStatus`) — 앱 결재 화면의 `대기 · 승인 · 반려` 탭
+///
+/// **종류마다 상태 이름이 다르다** (급여 `SUBMITTED`, 전자결재 `IN_PROGRESS` …).
+/// 어느 상태가 어느 칸에 드는지는 서버가 알고, 앱은 이 셋으로만 묻는다.
+enum InboxStatus {
+  pending('PENDING', '대기'),
+  approved('APPROVED', '승인'),
+
+  /// 본인이 물린 것(월차 취소·결재 회수)도 여기 온다 — 전자결재 화면이
+  /// 회수를 반려 탭에 두는 것과 같은 규칙이다
+  rejected('REJECTED', '반려');
+
+  const InboxStatus(this.wire, this.label);
+
+  final String wire;
+  final String label;
+}
+
 /// 결재를 기다리는 것 한 줄 (서버 `InboxItemOut`)
 ///
 /// **MASTER · ADMIN 에게만 온다.** 급여·월차·전자결재가 테이블은 따로인데
@@ -153,10 +171,20 @@ class HomeApi {
     return HomeSummary.fromJson(data);
   }
 
-  /// 결재를 기다리는 것 — **MASTER · ADMIN 만** (그 외는 403).
-  /// 오래 묵은 것부터 온다
-  static Future<List<InboxItem>> inbox() async {
-    final rows = await _client.getList('/me/inbox');
+  /// 결재 목록 — **MASTER · ADMIN 만** (그 외는 403)
+  ///
+  /// 대기는 **오래 묵은 것부터**(먼저 처리돼야 한다), 처리된 것은
+  /// **최근 것부터** 온다.
+  ///
+  /// **일정 반려는 안 온다** — 서버가 반려할 때 행을 지운다.
+  /// 승인된 일정도 결재를 거친 것만 온다 (대표가 올려 바로 선 일정은 빠진다).
+  static Future<List<InboxItem>> inbox({
+    InboxStatus status = InboxStatus.pending,
+  }) async {
+    final rows = await _client.getList(
+      '/me/inbox',
+      query: {'status': status.wire},
+    );
     return [
       for (final row in rows)
         InboxItem.fromJson((row as Map).cast<String, dynamic>()),
