@@ -168,6 +168,12 @@ class _NoteScreenState extends State<_NoteScreen> {
     }
   }
 
+  /// 프로젝트로 옮기기 — 걸리고 나면 버튼이 사라져야 해서 다시 그린다
+  Future<void> _toProject() async {
+    await _moveNoteToProject(context, widget.note);
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     // 남이 쓴 회의록은 읽기만 한다 (서버가 작성자·관리자만 통과시킨다)
@@ -177,6 +183,12 @@ class _NoteScreenState extends State<_NoteScreen> {
       title: '회의록',
       // 편집·삭제는 헤더 글래스 버튼으로 올린다
       actions: [
+        // 프로젝트로 옮기기 — PC 는 제목 옆에 글자 버튼으로 있다.
+        // **이미 걸린 회의록에는 안 뜬다** (하나의 회의록은 하나의 프로젝트)
+        if (!_editing &&
+            widget.note.id != null &&
+            widget.note.projectId == null)
+          GlassIconButton(symbol: 'folder.badge.plus', onPressed: _toProject),
         if (_editing)
           GlassIconButton(
             symbol: 'trash',

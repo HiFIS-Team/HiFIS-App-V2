@@ -27,6 +27,8 @@ const _icons = <String, IconData>{
   'checkmark.seal': Icons.approval_rounded,
   'chevron.backward': Icons.arrow_back_ios_new_rounded,
   'door.right.hand.open': Icons.logout_rounded,
+  // 회의록을 프로젝트로 옮기기 — PC 쪽 버튼과 같은 아이콘이다
+  'folder.badge.plus': Icons.create_new_folder_rounded,
   'line.3.horizontal.decrease': Icons.filter_list_rounded,
   // 필터가 걸려 있을 때 — 안 넣으면 안드로이드·윈도우에서 빈 원이 된다
   'line.3.horizontal.decrease.circle.fill': Icons.filter_alt_rounded,

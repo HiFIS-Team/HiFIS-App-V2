@@ -442,6 +442,70 @@ class _EmptyNote extends StatelessWidget {
   }
 }
 
+// ── 회의록 → 프로젝트 ──
+
+/// 본문에서 체크박스 줄만 뽑는다 — `- [ ] 현수막 교체` → `현수막 교체`
+///
+/// **회의에서 이미 체크한 것도 담는다.** 프로젝트에서는 다시 확인하고
+/// 누르는 게 보통이라 체크 상태는 안 가져온다 (2026-08-14 결정).
+List<String> _checkboxesOf(String body) => [
+  for (final line in body.split('\n'))
+    if (RegExp(r'^\s*[-*]\s+\[[ xX]\]\s*(.+)$').firstMatch(line) case final m?)
+      m.group(1)!.trim(),
+];
+
+/// 첫 문단 — 프로젝트 설명 자리에 넣는다 (체크박스·제목 줄은 뺀다)
+String _firstParagraphOf(String body) {
+  for (final line in body.split('\n')) {
+    final text = line.trim();
+    if (text.isEmpty) continue;
+    if (text.startsWith('#') || RegExp(r'^[-*>]').hasMatch(text)) continue;
+    return text;
+  }
+  return '';
+}
+
+/// 회의록을 프로젝트로 옮긴다
+///
+/// 폼을 다시 채우게 하지 않는다 — **누르면 바로 만들어진다.**
+/// 마감일·색처럼 여기서 정할 수 없는 것은 만들어진 프로젝트에서 고친다.
+/// 만들어지면 **이 회의록을 그 프로젝트에 건다** — 나중에 "이 프로젝트가
+/// 어느 회의에서 나왔나" 가 남는다.
+///
+/// **폰 헤더 버튼과 PC 제목 옆 버튼이 이 함수 하나를 부른다.** 위젯 밖에
+/// 둔 이유가 그것이다 — 폰은 헤더가 `_NoteScreen`, 본문이 `_NoteView` 라
+/// 상태를 나눠 갖고 있어서 안에 두면 한쪽에서 못 부른다.
+Future<void> _moveNoteToProject(BuildContext context, _Note note) async {
+  final todos = _checkboxesOf(note.body);
+  final ok = await showConfirmDialog(
+    context,
+    title: '프로젝트로 옮길까요?',
+    message:
+        '${note.title}\n'
+        '할 일 ${todos.length}개 · 참여 ${note.members.length}명 · 마감 2주 뒤',
+    confirmLabel: '옮기기',
+  );
+  if (!ok || !context.mounted) return;
+  final projectId = await createProjectFrom(
+    context,
+    ProjectSeed(
+      title: note.title,
+      purpose: _firstParagraphOf(note.body),
+      members: note.members,
+      todos: todos,
+    ),
+  );
+  if (projectId == null || !context.mounted) return;
+  try {
+    await MeetingApi.update(note.id!, projectId: projectId);
+    note.projectId = projectId;
+    if (context.mounted) AppToast.show(context, '프로젝트를 만들고 이 회의록을 걸었어요');
+  } catch (error) {
+    // 프로젝트는 이미 만들어졌다 — 연결만 실패한 것이라 그렇게 알린다
+    if (context.mounted) AppToast.show(context, '프로젝트는 만들었는데 회의록 연결에 실패했어요');
+  }
+}
+
 // ── 우측 본문 ──
 
 class _NoteView extends StatefulWidget {
@@ -591,68 +655,10 @@ class _NoteViewState extends State<_NoteView> {
     widget.onChanged();
   }
 
-  /// 본문에서 체크박스 줄만 뽑는다 — `- [ ] 현수막 교체` → `현수막 교체`
-  ///
-  /// **회의에서 이미 체크한 것도 담는다.** 프로젝트에서는 다시 확인하고
-  /// 누르는 게 보통이라 체크 상태는 안 가져온다 (2026-08-14 결정).
-  List<String> get _checkboxes => [
-    for (final line in widget.note.body.split('\n'))
-      if (RegExp(r'^\s*[-*]\s+\[[ xX]\]\s*(.+)$').firstMatch(line)
-          case final m?)
-        m.group(1)!.trim(),
-  ];
-
-  /// 첫 문단 — 프로젝트 설명 자리에 넣는다 (체크박스·제목 줄은 뺀다)
-  String get _firstParagraph {
-    for (final line in widget.note.body.split('\n')) {
-      final text = line.trim();
-      if (text.isEmpty) continue;
-      if (text.startsWith('#') || RegExp(r'^[-*>]').hasMatch(text)) continue;
-      return text;
-    }
-    return '';
-  }
-
-  /// 회의록 → 프로젝트
-  ///
-  /// 폼을 미리 채워 열고, 만들어지면 **이 회의록을 그 프로젝트에 건다.**
-  /// 나중에 "이 프로젝트가 어느 회의에서 나왔나" 가 남는다.
-  ///
-  /// ⚠️ 거는 순간 공개 범위가 같이 좁아진다 (`scope=PROJECT`) —
-  /// 그 프로젝트 사람과 참석자만 보게 된다 (backend-gap 44).
+  /// 회의록 → 프로젝트 (PC 는 제목 옆 버튼, 폰은 헤더 글래스 버튼)
   Future<void> _toProject() async {
-    final note = widget.note;
-    final todos = _checkboxes;
-    // 폼을 다시 채우게 하지 않는다 — **누르면 바로 만들어진다.**
-    // 마감일·색처럼 여기서 정할 수 없는 것은 만들어진 프로젝트에서 고친다.
-    final ok = await showConfirmDialog(
-      context,
-      title: '프로젝트로 옮길까요?',
-      message:
-          '${note.title}\n'
-          '할 일 ${todos.length}개 · 참여 ${note.members.length}명 · 마감 2주 뒤',
-      confirmLabel: '옮기기',
-    );
-    if (!ok || !mounted) return;
-    final projectId = await createProjectFrom(
-      context,
-      ProjectSeed(
-        title: note.title,
-        purpose: _firstParagraph,
-        members: note.members,
-        todos: todos,
-      ),
-    );
-    if (projectId == null || !mounted) return;
-    try {
-      await MeetingApi.update(note.id!, projectId: projectId);
-      if (!mounted) return;
-      setState(() => note.projectId = projectId);
-      AppToast.show(context, '프로젝트를 만들고 이 회의록을 걸었어요');
-    } catch (error) {
-      // 프로젝트는 이미 만들어졌다 — 연결만 실패한 것이라 그렇게 알린다
-      if (mounted) AppToast.show(context, '프로젝트는 만들었는데 회의록 연결에 실패했어요');
-    }
+    await _moveNoteToProject(context, widget.note);
+    if (mounted) setState(() {});
   }
 
   @override
