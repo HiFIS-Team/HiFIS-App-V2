@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/api/chat/chat_api.dart';
 import '../../core/data/branch_scope.dart';
+import '../../core/data/header_action.dart';
 import '../../core/data/staff.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -345,6 +346,7 @@ class _MainShellState extends State<MainShell> {
                                 ),
                               ),
                             ),
+                            _HeaderLeading(),
                             SafeArea(
                               bottom: false,
                               child: Align(
@@ -391,6 +393,7 @@ class _MainShellState extends State<MainShell> {
             children: [..._mainPages, ..._subPages],
           ),
           // 모든 탭 위에 떠 있는 공통 글래스 헤더
+          _HeaderLeading(),
           SafeArea(
             bottom: false,
             child: Align(
@@ -430,6 +433,7 @@ class _MainShellState extends State<MainShell> {
             children: [..._mainPages, ..._subPages],
           ),
           // 모든 탭 위에 떠 있는 공통 글래스 헤더
+          _HeaderLeading(),
           SafeArea(
             bottom: false,
             child: Align(
@@ -781,6 +785,39 @@ class _ChatDockState extends State<_ChatDock> {
 ///
 /// 바코드 오버레이가 떠 있는 동안에는 버튼 모양은 그대로 두고
 /// 터치만 비활성화한다. 글래스 눌림 효과가 딤 위로 그려지는 것을 막기 위함.
+/// 화면이 끼워 넣는 버튼 — **화면 왼쪽 끝**에 선다
+///
+/// 오른쪽 뭉치(`_HeaderButtons`)와 **다른 레이어**다. 그 Row 는
+/// `Align(topRight)` 라, 거기에 아무리 앞에 넣어도 오른쪽 뭉치의 왼쪽일 뿐
+/// 화면 왼쪽 끝이 아니다 (그렇게 만들었다가 고쳤다 — 2026-08-14).
+///
+/// 값은 [headerAction] 하나가 들고, 지금은 업무 화면의 `내 업무 추가` 가 쓴다.
+class _HeaderLeading extends StatelessWidget {
+  _HeaderLeading();
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+    bottom: false,
+    child: Align(
+      alignment: Alignment.topLeft,
+      // 오른쪽 뭉치와 같은 높이·같은 여백 (top 8 · 가장자리 16)
+      child: Padding(
+        padding: EdgeInsets.only(top: 8, left: 16),
+        child: ValueListenableBuilder<HeaderAction?>(
+          valueListenable: headerAction,
+          builder: (context, action, child) => action == null
+              ? SizedBox.shrink()
+              : GlassIconButton(
+                  symbol: action.symbol,
+                  stableId: 'header-leading',
+                  onPressed: action.onPressed,
+                ),
+        ),
+      ),
+    ),
+  );
+}
+
 class _HeaderButtons extends StatefulWidget {
   _HeaderButtons({this.notiOpen});
 

@@ -8,6 +8,8 @@ import '../../core/api/chat/chat_socket.dart';
 import '../../core/api/client/api_client.dart';
 import '../../core/api/client/token_store.dart';
 import '../../core/data/branch_scope.dart';
+import '../../core/data/header_action.dart';
+import '../work/my_task/my_task_section.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
 import '../../core/data/staff_directory.dart';
@@ -147,6 +149,8 @@ class AuthSession extends ValueNotifier<bool> {
     resetProjectDueModal();
     // 앞사람이 보던 지점이 다음 사람 화면에 걸려 있으면 안 된다
     resetBranchScope();
+    resetHeaderAction();
+    resetMyTaskCache();
     value = false;
   }
 }

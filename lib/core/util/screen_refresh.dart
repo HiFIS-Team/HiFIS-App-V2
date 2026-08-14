@@ -72,8 +72,18 @@ mixin ScreenRefresh<T extends StatefulWidget> on State<T> {
     super.dispose();
   }
 
-  /// 탭이 다시 보이게 됐다 (가려질 때도 불리므로 켜진 쪽만 본다)
+  /// 이 탭이 지금 보이는가 — 화면이 직접 알아야 할 때 쓴다
+  ///
+  /// `LazyIndexedStack` 때문에 **탭을 옮겨도 `dispose` 가 안 온다.**
+  /// 셸 헤더에 버튼을 얹는 것처럼 화면 밖에 남는 것을 치우려면 이게 필요하다.
+  bool get screenVisible => _isVisible;
+
+  /// 보임·가려짐이 바뀌었다 — 기본은 아무것도 안 한다
+  void onScreenVisibility(bool visible) {}
+
+  /// 탭이 다시 보이게 됐다 (가려질 때도 불린다)
   void _onVisible() {
+    onScreenVisibility(_isVisible);
     if (_isVisible) _refresh();
   }
 

@@ -8,6 +8,7 @@ import '../../core/api/work/env_api.dart';
 import '../../core/data/branch_scope.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
+import '../../core/data/header_action.dart';
 import '../../core/data/staff.dart';
 import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
@@ -69,6 +70,42 @@ class _WorkScreenState extends State<WorkScreen>
   /// 없어서 예전처럼 내역만 본다 (2026-08-14 — 매니저·멤버 화면부터 만든다).
   int _envTab = 0;
 
+  /// 헤더 `+` 로 업무를 추가하면 오른다 — [MyTaskSection] 이 다시 받는다
+  int _myTaskReload = 0;
+
+  /// 화면 왼쪽 끝의 `+` 를 켜고 끈다
+  ///
+  /// **환경정비 탭에 있는 내내 둔다.** 공통 업무 / 내 업무 칸을 옮길 때마다
+  /// 켰다 껐다 하면 버튼이 생겼다 없어져서 그게 곧 깜빡임이다.
+  /// 공통 업무를 보다가 눌러도 되게, 만들고 나면 내 업무 칸으로 옮겨 준다.
+  void _syncHeaderAction() => _setHeaderAction(
+    _canDoEnv && _items[_tab].checklist
+        ? HeaderAction(symbol: 'plus', onPressed: _addMyTask)
+        : null,
+  );
+
+  /// **한 프레임 뒤에** 바꾼다
+  ///
+  /// 탭이 보이고 가려지는 신호(`TickerMode`)가 **빌드 도중**에 온다.
+  /// 그때 값을 바꾸면 헤더가 빌드 중에 다시 빌드되라고 표시돼서
+  /// `setState() called during build` 로 죽는다 (실제로 겪었다).
+  void _setHeaderAction(HeaderAction? next) {
+    if (headerAction.value == next) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) headerAction.value = next;
+    });
+  }
+
+  Future<void> _addMyTask() async {
+    if (await addMyTasks(context) && mounted) {
+      setState(() {
+        _myTaskReload++;
+        // 만든 것을 바로 보여준다 — 공통 업무를 보다 눌렀을 수도 있다
+        _envTab = 1;
+      });
+    }
+  }
+
   /// 환경정비 항목과 배점 — 지점마다 다르다
   List<EnvItem> _envItems = const [];
 
@@ -98,16 +135,35 @@ class _WorkScreenState extends State<WorkScreen>
   @override
   Future<void> onScreenRefresh() => _loadEnv();
 
+  /// 다른 탭으로 가면 헤더 `+` 를 치운다
+  ///
+  /// `LazyIndexedStack` 이라 탭을 옮겨도 이 화면이 안 죽는다 — `dispose` 를
+  /// 기다리면 홈·프로젝트에서도 이 버튼이 떠 있게 된다.
+  @override
+  void onScreenVisibility(bool visible) {
+    if (visible) {
+      _syncHeaderAction();
+    } else {
+      _setHeaderAction(null);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     branchScope.addListener(_onBranchScope);
     _loadEnv();
+    // 첫 화면이 환경정비라 여기서 한 번 맞춘다
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _syncHeaderAction();
+    });
   }
 
   @override
   void dispose() {
     branchScope.removeListener(_onBranchScope);
+    // 안 비우면 다른 탭에서도 이 버튼이 남는다
+    headerAction.value = null;
     super.dispose();
   }
 
@@ -266,7 +322,10 @@ class _WorkScreenState extends State<WorkScreen>
       return SegmentedTabs(
         labels: [for (final item in _items) item.label],
         selected: _tab,
-        onSelect: (i) => setState(() => _tab = i),
+        onSelect: (i) => setState(() {
+          _tab = i;
+          _syncHeaderAction();
+        }),
       );
     }
 
@@ -284,7 +343,12 @@ class _WorkScreenState extends State<WorkScreen>
                 child: _WorkTab(
                   label: _items[i].label,
                   selected: _tab == i,
-                  onTap: () => setState(() => _tab = i),
+                  // 데스크톱 탭(`SegmentedTabs`)과 **같이** 헤더를 맞춘다.
+                  // 한쪽만 고쳐서 다른 항목에도 `+` 가 남았던 자리다.
+                  onTap: () => setState(() {
+                    _tab = i;
+                    _syncHeaderAction();
+                  }),
                 ),
               ),
             ),
@@ -417,45 +481,59 @@ class _WorkScreenState extends State<WorkScreen>
                           ),
                           SizedBox(height: 16),
                         ],
-                        if (_canDoEnv && _envTab == 1)
-                          MyTaskSection()
-                        else ...[
-                          // 점검 항목은 **직접 수행하는 사람에게만** —
-                          // 대표·관리자는 내역만 본다 (서버가 기록을 안 받는다)
-                          if (_canDoEnv) ...[
-                            _ChecklistCard(
-                              items: _envItems,
-                              counts: _counts,
-                              onAdjust: _adjust,
-                              onShowHistory: _showHistory,
-                            ),
-                            if (isDesktop) SizedBox(height: 16),
-                          ],
-                          // 내역 카드는 **점검 항목이 없는 사람**(대표·관리자)과
-                          // **데스크톱**에만 둔다.
-                          //
-                          // 폰에서 정비를 하는 사람은 점검 카드 머리말의 `총 N회` 를
-                          // 눌러 시트로 본다 — 그 아래 같은 내용을 또 깔면 화면만 길어진다.
-                          // 데스크톱은 그 자리가 눌리지 않는 글자라(`_ChecklistCard`)
-                          // 카드를 빼면 내역을 볼 길이 없어진다.
-                          // 대표·관리자는 '내 내역'이 **늘 비어 있다** — 서버가
-                          // 그들에게는 기록을 안 받는다(`_canDoEnv`). 빈 카드가
-                          // 절반을 차지하고 있었으므로 빼고 전체 내역을 넓힌다.
-                          if (isDesktop)
-                            if (_canDoEnv)
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(child: _myHistoryCard),
-                                  SizedBox(width: 16),
-                                  Expanded(child: _allHistoryCard),
-                                ],
-                              )
-                            else
-                              _allHistoryCard
-                          else if (!_canDoEnv)
-                            _allHistoryCard,
-                        ],
+                        // **두 칸을 다 살려 둔다.** 옮길 때마다 새로 만들면
+                        // `initState → 뼈대` 가 번쩍인다. `Offstage` 는 상태를
+                        // 그대로 두고 그리지도 재지도 않는다 — 덤으로 내 업무를
+                        // 공통 업무를 보는 동안 미리 받아 둔다.
+                        if (_canDoEnv)
+                          Offstage(
+                            offstage: _envTab != 1,
+                            child: MyTaskSection(reloadToken: _myTaskReload),
+                          ),
+                        Offstage(
+                          offstage: _canDoEnv && _envTab == 1,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // 점검 항목은 **직접 수행하는 사람에게만** —
+                              // 대표·관리자는 내역만 본다 (서버가 기록을 안 받는다)
+                              if (_canDoEnv) ...[
+                                _ChecklistCard(
+                                  items: _envItems,
+                                  counts: _counts,
+                                  onAdjust: _adjust,
+                                  onShowHistory: _showHistory,
+                                ),
+                                if (isDesktop) SizedBox(height: 16),
+                              ],
+                              // 내역 카드는 **점검 항목이 없는 사람**(대표·관리자)과
+                              // **데스크톱**에만 둔다.
+                              //
+                              // 폰에서 정비를 하는 사람은 점검 카드 머리말의 `총 N회` 를
+                              // 눌러 시트로 본다 — 그 아래 같은 내용을 또 깔면 화면만 길어진다.
+                              // 데스크톱은 그 자리가 눌리지 않는 글자라(`_ChecklistCard`)
+                              // 카드를 빼면 내역을 볼 길이 없어진다.
+                              // 대표·관리자는 '내 내역'이 **늘 비어 있다** — 서버가
+                              // 그들에게는 기록을 안 받는다(`_canDoEnv`). 빈 카드가
+                              // 절반을 차지하고 있었으므로 빼고 전체 내역을 넓힌다.
+                              if (isDesktop)
+                                if (_canDoEnv)
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(child: _myHistoryCard),
+                                      SizedBox(width: 16),
+                                      Expanded(child: _allHistoryCard),
+                                    ],
+                                  )
+                                else
+                                  _allHistoryCard
+                              else if (!_canDoEnv)
+                                _allHistoryCard,
+                            ],
+                          ),
+                        ),
                       ],
                     ),
             )

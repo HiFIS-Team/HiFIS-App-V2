@@ -19,6 +19,48 @@ import '../../../core/widgets/nav/phone_scaffold.dart';
 
 part 'my_task_forms.dart';
 
+/// 마지막으로 받아 둔 하루치 — **화면 밖에 둔다**
+///
+/// `공통 업무 ↔ 내 업무` 칸을 옮기면 이 화면이 통째로 새로 만들어져서,
+/// 화면 안에만 들고 있으면 들어올 때마다 `initState → 뼈대` 가 번쩍인다.
+/// 옛 목록을 여기 두고 **그걸 그린 채로 조용히 다시 받는다**
+/// (claude.md 의 `뼈대를 그리는 동안 옛 내용을 지우지 않는다`).
+///
+/// 세션 안에서만 산다 — 로그아웃하면 [resetMyTaskCache].
+MyTaskDay? _cached;
+
+/// 로그아웃할 때 비운다 — 다음 사람에게 앞사람 할 일이 보이면 안 된다
+void resetMyTaskCache() => _cached = null;
+
+/// 내 업무 추가 — **업무 화면 머리말의 `+` 가 부른다**
+///
+/// 카드 안이 아니라 밖에서 부르는 이유: 추가 버튼이 환경정비 머리말로
+/// 올라갔다 (2026-08-14). 만들었으면 true — 부른 쪽이 목록을 다시 받는다.
+Future<bool> addMyTasks(BuildContext context) async {
+  // 폰은 오른쪽에서 밀려 들어오고, 데스크톱은 가운데 모달이다
+  // (프로젝트 만들기·내역 전체보기와 같은 `showFullPage`)
+  final contents = await showFullPage<List<String>>(
+    context,
+    (_) => const _AddTaskScreen(),
+  );
+  if (contents == null || contents.isEmpty || !context.mounted) return false;
+  try {
+    // 여러 줄을 **한 번에** 보낸다 — 줄마다 부르면 중간에 끊겼을 때
+    // 반만 들어간 채로 화면이 닫힌다
+    await MyTaskApi.create(contents);
+    if (context.mounted) {
+      AppToast.show(
+        context,
+        contents.length == 1 ? '업무를 추가했어요' : '업무 ${contents.length}개를 추가했어요',
+      );
+    }
+    return true;
+  } catch (error) {
+    if (context.mounted) AppToast.show(context, messageOf(error));
+    return false;
+  }
+}
+
 /// 내 업무 — 하루에 한 번씩 체크하는 개인 업무 목록
 ///
 /// 공통 업무(환경정비 칩)와 **도는 방식이 다르다.**
@@ -31,7 +73,11 @@ part 'my_task_forms.dart';
 /// 추가는 본인이 바로 하고, **수정·삭제는 대표 결재**를 받는다.
 /// 결재를 기다리는 동안에는 그 줄을 손댈 수 없다.
 class MyTaskSection extends StatefulWidget {
-  const MyTaskSection({super.key});
+  const MyTaskSection({super.key, this.reloadToken = 0});
+
+  /// 밖에서 업무를 추가하면 이 값이 오른다 — 그때 목록을 다시 받는다
+  /// (추가 버튼이 머리말로 올라가서 카드 밖에 있다)
+  final int reloadToken;
 
   @override
   State<MyTaskSection> createState() => _MyTaskSectionState();
@@ -39,7 +85,8 @@ class MyTaskSection extends StatefulWidget {
 
 class _MyTaskSectionState extends State<MyTaskSection>
     with ScreenRefresh<MyTaskSection>, SkeletonDelay<MyTaskSection> {
-  MyTaskDay? _day;
+  /// 옛 목록으로 시작한다 — 처음 들어올 때만 비어 있다
+  MyTaskDay? _day = _cached;
 
   /// 서버에 보내는 중인 줄 — 답이 오기 전에 또 누르면 두 번 나간다
   final _busy = <String>{};
@@ -47,7 +94,15 @@ class _MyTaskSectionState extends State<MyTaskSection>
   @override
   void initState() {
     super.initState();
+    // 보여줄 옛 목록이 있으면 뼈대를 건너뛴다 — 그게 곧 깜빡임이다
+    if (_cached != null) skipFirstSkeleton();
     _load();
+  }
+
+  @override
+  void didUpdateWidget(MyTaskSection old) {
+    super.didUpdateWidget(old);
+    if (old.reloadToken != widget.reloadToken) _load();
   }
 
   @override
@@ -58,6 +113,7 @@ class _MyTaskSectionState extends State<MyTaskSection>
       final day = await MyTaskApi.day();
       if (!mounted) return;
       // **옛 목록을 안 지운다** — 지우면 그 사이가 빈 화면이라 깜빡인다
+      _cached = day;
       setState(() {
         _day = day;
         endLoad();
@@ -84,30 +140,6 @@ class _MyTaskSectionState extends State<MyTaskSection>
       if (mounted) AppToast.show(context, messageOf(error));
     }
     if (mounted) setState(() => _busy.remove(task.id));
-  }
-
-  Future<void> _add() async {
-    // 폰은 오른쪽에서 밀려 들어오고, 데스크톱은 가운데 모달이다
-    // (프로젝트 만들기·내역 전체보기와 같은 `showFullPage`)
-    final contents = await showFullPage<List<String>>(
-      context,
-      (_) => const _AddTaskScreen(),
-    );
-    if (contents == null || contents.isEmpty || !mounted) return;
-    try {
-      // 여러 줄을 **한 번에** 보낸다 — 줄마다 부르면 중간에 끊겼을 때
-      // 반만 들어간 채로 화면이 닫힌다
-      await MyTaskApi.create(contents);
-      await _load();
-      if (mounted) {
-        AppToast.show(
-          context,
-          contents.length == 1 ? '업무를 추가했어요' : '업무 ${contents.length}개를 추가했어요',
-        );
-      }
-    } catch (error) {
-      if (mounted) AppToast.show(context, messageOf(error));
-    }
   }
 
   Future<void> _request(MyTask task, MyTaskRequestType type) async {
@@ -149,20 +181,6 @@ class _MyTaskSectionState extends State<MyTaskSection>
               children: [
                 Expanded(child: Text('오늘 할 일', style: AppTextStyles.label)),
                 _DoneBadge(day: day),
-                const SizedBox(width: 4),
-                // 프로젝트 목록 머리말과 같은 자리·같은 부품이다
-                Pressable(
-                  onTap: _add,
-                  scale: 0.94,
-                  pressedColor: AppColors.primaryLight,
-                  borderRadius: BorderRadius.circular(100),
-                  padding: const EdgeInsets.all(4),
-                  child: const Icon(
-                    Icons.add_rounded,
-                    size: 20,
-                    color: AppColors.primary,
-                  ),
-                ),
               ],
             ),
           ),
@@ -250,13 +268,11 @@ class _TaskRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: checked ? AppColors.primaryLight : AppColors.gray50,
+        // **다 한 줄은 도드라지지 않는다.** 파란 면으로 띄우면 눈이 거기
+        // 멈추는데, 봐야 하는 건 아직 안 한 줄이다. 줄이 그어진 채로
+        // 조용히 물러난다.
+        color: AppColors.gray50,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: checked
-              ? AppColors.primary.withValues(alpha: 0.25)
-              : Colors.transparent,
-        ),
       ),
       child: Row(
         children: [
@@ -278,8 +294,15 @@ class _TaskRow extends StatelessWidget {
                 Text(
                   task.content,
                   style: AppTextStyles.body2.copyWith(
-                    color: checked ? AppColors.primary : AppColors.textPrimary,
-                    fontWeight: checked ? FontWeight.w700 : FontWeight.w500,
+                    // 다 한 줄은 **글자를 눕힌다** — 색만 바꾸면 남은 것과
+                    // 한눈에 안 갈린다. 줄이 그어지면 훑어보다 멈추지 않는다
+                    color: checked
+                        ? AppColors.textTertiary
+                        : AppColors.textPrimary,
+                    fontWeight: FontWeight.w500,
+                    decoration: checked ? TextDecoration.lineThrough : null,
+                    decorationColor: AppColors.textTertiary,
+                    decorationThickness: 1.6,
                   ),
                 ),
                 if (pending != null) ...[

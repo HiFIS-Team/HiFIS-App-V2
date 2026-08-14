@@ -58,18 +58,18 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final body = Container(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 22),
-      decoration: AppDecorations.card(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '매일 할 일을 적어주세요. 하루에 한 번씩 체크해요.',
-            style: AppTextStyles.caption.copyWith(height: 1.5),
+    final body = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 입력칸 — 카드 없이 큼직하게. 이 화면의 주인공이다
+        Container(
+          padding: const EdgeInsets.fromLTRB(18, 6, 6, 6),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.gray100),
           ),
-          const SizedBox(height: 14),
-          Row(
+          child: Row(
             children: [
               Expanded(
                 child: _Field(
@@ -79,41 +79,81 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
                   hintText: '예) 탈의실 향기 확인',
                   maxLength: _contentMax,
                   onSubmitted: (_) => _stage(),
+                  bare: true,
                 ),
               ),
-              const SizedBox(width: 8),
-              // 한 줄 더 적을 때 누른다 — 엔터와 같은 일을 한다
+              // 한 줄 더 — 엔터와 같은 일을 한다
               Pressable(
                 onTap: _stage,
-                scale: 0.94,
-                child: Container(
-                  width: 44,
-                  height: 44,
+                scale: 0.92,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 160),
+                  width: 40,
+                  height: 40,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: _value.isEmpty
                         ? AppColors.gray100
                         : AppColors.primary,
-                    borderRadius: BorderRadius.circular(12),
+                    shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    Icons.add_rounded,
-                    size: 20,
+                    Icons.arrow_upward_rounded,
+                    size: 19,
                     color: _value.isEmpty ? AppColors.gray400 : Colors.white,
                   ),
                 ),
               ),
             ],
           ),
+        ),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.only(left: 6),
+          child: Text(
+            '엔터를 누르면 한 줄씩 더 담을 수 있어요',
+            style: AppTextStyles.caption.copyWith(color: AppColors.gray400),
+          ),
+        ),
+        const SizedBox(height: 20),
+        if (_staged.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 28),
+            child: Center(
+              child: Column(
+                children: [
+                  Icon(
+                    CupertinoIcons.checkmark_circle,
+                    size: 30,
+                    color: AppColors.gray300,
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    '적은 업무가 여기 쌓여요',
+                    style: AppTextStyles.body2.copyWith(
+                      color: AppColors.gray400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else ...[
+          Padding(
+            padding: const EdgeInsets.only(left: 6, bottom: 10),
+            child: Text('담은 업무 ${_staged.length}개', style: AppTextStyles.label),
+          ),
+          // **실제 목록과 같은 모양이다** — 만들고 나면 어떻게 보이는지가
+          // 여기서 그대로 보인다
           for (var i = 0; i < _staged.length; i++) ...[
-            const SizedBox(height: 8),
+            if (i > 0) const SizedBox(height: 8),
             _StagedRow(
               text: _staged[i],
               onRemove: () => setState(() => _staged.removeAt(i)),
             ),
           ],
         ],
-      ),
+      ],
     );
 
     if (!isDesktop) {
@@ -136,36 +176,45 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
       );
     }
 
-    // 데스크톱은 가운데 모달 — `showFullPage` 가 틀을 씌운다
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+    // 데스크톱은 가운데 모달 — `showFullPage` 의 틀은 **자기 Scaffold 를 가진
+    // 화면**을 기대한다. 맨 Column 을 넣으면 Material 이 없어서 TextField 가
+    // 죽는다 (실제로 겪었다).
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 14),
-            child: Text('업무 추가', style: AppTextStyles.title3),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(28, 26, 28, 8),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(left: 4, bottom: 18),
+                  child: Text('업무 추가', style: AppTextStyles.title3),
+                ),
+                body,
+              ],
+            ),
           ),
-          body,
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: AppButton(
-                  label: '취소',
-                  onTap: () => Navigator.pop(context),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(28, 8, 28, 22),
+            child: Row(
+              children: [
+                Expanded(
+                  child: AppButton(
+                    label: '취소',
+                    onTap: () => Navigator.pop(context),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: AppButton(
-                  label: _count > 1 ? '$_count개 추가' : '추가',
-                  filled: _count > 0,
-                  onTap: _submit,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: AppButton(
+                    label: _count > 1 ? '$_count개 추가' : '추가',
+                    filled: _count > 0,
+                    onTap: _submit,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -182,14 +231,22 @@ class _StagedRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+    padding: const EdgeInsets.fromLTRB(14, 12, 9, 12),
     decoration: BoxDecoration(
       color: AppColors.gray50,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(14),
     ),
     child: Row(
       children: [
-        Expanded(child: Text(text, style: AppTextStyles.body2)),
+        // 실제 목록의 체크 자리와 같은 크기·색이라 미리보기가 된다
+        Icon(CupertinoIcons.circle, size: 22, color: AppColors.gray300),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            text,
+            style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w500),
+          ),
+        ),
         Pressable(
           onTap: onRemove,
           scale: 0.9,
@@ -395,6 +452,7 @@ class _Field extends StatelessWidget {
     this.autofocus = false,
     this.onSubmitted,
     this.focusNode,
+    this.bare = false,
   });
 
   final TextEditingController controller;
@@ -404,13 +462,20 @@ class _Field extends StatelessWidget {
   final bool autofocus;
   final ValueChanged<String>? onSubmitted;
 
+  /// 회색 면 없이 글자만 — 바깥에서 이미 칸을 그렸을 때
+  final bool bare;
+
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    decoration: BoxDecoration(
-      color: AppColors.gray50,
-      borderRadius: BorderRadius.circular(12),
-    ),
+    padding: bare
+        ? EdgeInsets.zero
+        : const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    decoration: bare
+        ? null
+        : BoxDecoration(
+            color: AppColors.gray50,
+            borderRadius: BorderRadius.circular(12),
+          ),
     child: TextField(
       controller: controller,
       focusNode: focusNode,
