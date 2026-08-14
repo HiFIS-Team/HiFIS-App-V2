@@ -1,3 +1,9 @@
+import '../../core/api/work/env_api.dart';
+import '../../core/util/layout.dart';
+import '../../core/util/skeleton_delay.dart';
+import '../../core/widgets/feedback/app_dialog.dart';
+import '../../core/widgets/feedback/skeleton.dart';
+import '../../core/widgets/display/progress_bar.dart';
 import 'package:cupertino_native/cupertino_native.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -35,6 +41,7 @@ part 'ranking_myrank.dart';
 part 'ranking_podium.dart';
 part 'ranking_table.dart';
 part 'ranking_breakdown.dart';
+part 'ranking_env_detail.dart';
 
 /// 랭킹 화면
 ///
@@ -222,9 +229,22 @@ class _RankingScreenState extends State<RankingScreen>
   String? _pickedId;
 
   /// 종합 탭에서만 사람을 누를 수 있다 — 다른 탭은 예전 그대로다
-  bool get _canPick => _metric == _Metric.overall;
+  /// 줄을 누를 수 있는 항목
+  ///
+  /// - **종합** — 아래에서 판이 올라와 그 사람 항목별 환산을 보여준다
+  /// - **환경정비** — 오른쪽에서 화면이 밀려 들어와 **항목마다 몇 점 땄나**를
+  ///   보여준다 (2026-08-14 대표 요청). 랭킹판은 합계뿐이라 왜 위인지 모른다
+  bool get _canPick => _metric == _Metric.overall || _metric == _Metric.care;
 
   void _pick(_Ranker ranker) {
+    // 환경정비는 판이 아니라 화면이다 — 항목이 22개라 아래 판에 안 들어간다
+    if (_metric == _Metric.care) {
+      showFullPage<void>(
+        context,
+        (_) => _EnvScoreDetailScreen(ranker: ranker, period: _periodKey),
+      );
+      return;
+    }
     if (!isDesktop) {
       // 아래에서 올라와 화면 끝에 붙는 판 — 손잡이를 쓸어내리거나 밖을
       // 누르면 닫힌다. 뒤는 어두워진다 (`showModalBottomSheet` 기본값).
@@ -245,7 +265,7 @@ class _RankingScreenState extends State<RankingScreen>
 
   List<Widget> _body(List<_Entry> entries) {
     // 열어 둔 사람이 지금 목록에 없으면(지점·탭을 옮겼다) 판을 접는다
-    final picked = !_canPick
+    final picked = _metric != _Metric.overall
         ? null
         : entries
               .where((e) => e.ranker.id == _pickedId)
