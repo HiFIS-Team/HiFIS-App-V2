@@ -207,11 +207,25 @@ class _TodoComposer extends StatefulWidget {
 class _TodoComposerState extends State<_TodoComposer> {
   final _controller = TextEditingController();
   final _focus = FocusNode();
+
+  /// 몇 개를 한 번에 붙일지 — **비워 두면 1개다**
+  ///
+  /// 같은 일을 여러 번 해야 하는 자리(전단지 배포 3회처럼)를 한 줄로 적으면
+  /// 체크를 한 번밖에 못 한다. 개수만큼 줄을 만들어 하나씩 체크하게 한다.
+  final _count = TextEditingController();
+
   String? _assignee;
+
+  /// 적힌 개수 — 비었거나 0 이면 1, 두 자리까지만 받는다(`maxLength`)
+  int get _times {
+    final n = int.tryParse(_count.text.trim()) ?? 1;
+    return n < 1 ? 1 : n;
+  }
 
   @override
   void dispose() {
     _controller.dispose();
+    _count.dispose();
     _focus.dispose();
     super.dispose();
   }
@@ -219,8 +233,15 @@ class _TodoComposerState extends State<_TodoComposer> {
   void _submit() {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
-    widget.onAdd(text, _assignee);
+    final times = _times;
+    for (var i = 1; i <= times; i++) {
+      // 여러 개일 때만 번호를 붙인다 — 1개짜리에 `청소 1` 이 뜨면 어색하다
+      widget.onAdd(times == 1 ? text : '$text $i', _assignee);
+    }
     _controller.clear();
+    // **개수는 되돌린다.** 담당자와 달리 그대로 두면 다음에 한 줄만 적었는데
+    // 세 줄이 붙는다 — 눌러 보기 전에는 안 보이는 자리라 놀란다.
+    _count.clear();
     // 연달아 적을 수 있게 담당자와 포커스는 유지한다
     _focus.requestFocus();
   }
@@ -255,6 +276,34 @@ class _TodoComposerState extends State<_TodoComposer> {
           ),
         ),
         SizedBox(width: 6),
+        // 개수 — 비워 두면 1개다. 평소에는 눈에 안 띄게 좁게 둔다
+        Container(
+          width: 38,
+          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 11),
+          decoration: BoxDecoration(
+            color: AppColors.gray50,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: TextField(
+            controller: _count,
+            textAlign: TextAlign.center,
+            keyboardType: TextInputType.number,
+            // 두 자리까지 — 같은 할 일을 100개 붙일 일은 없다
+            maxLength: 2,
+            style: AppTextStyles.body2,
+            cursorColor: AppColors.primary,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _submit(),
+            decoration: InputDecoration(
+              hintText: '1',
+              hintStyle: AppTextStyles.body2.copyWith(color: AppColors.gray400),
+              border: InputBorder.none,
+              isCollapsed: true,
+              counterText: '', // 글자 수 표시가 줄 아래로 삐져나온다
+            ),
+          ),
+        ),
+        SizedBox(width: 4),
         _AssigneeChip(
           name: _assignee,
           onTap: () async {
