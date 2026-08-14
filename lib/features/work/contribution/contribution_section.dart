@@ -141,7 +141,10 @@ class _ContributionSectionState extends State<ContributionSection> {
     List<ContributionGrant> given,
     List<ScoreEvent> events,
   ) {
-    final scope = branchScopeId;
+    // **남의 것이 섞여 올 때만 거른다.** 그 밖에는 원장이 이미 `employeeId=나` 라
+    // 여기서 지점을 또 걸면 내가 다른 지점을 보는 동안 **내 자동 점수가 통째로
+    // 사라진다** (점장이 지점을 고를 수 있게 되면서 걸린 자리 — 2026-08-14).
+    final scope = _givenOnly ? branchScopeId : null;
     final me = currentUser?.id;
     return [
       for (final grant in received)

@@ -40,7 +40,10 @@ class _LessonStore {
     final now = DateTime.now();
     // 셋 다 서로를 안 기다려도 되니 같이 띄운다
     final memberRequest = MemberApi.list(branchId: branchId);
-    final registrationRequest = RegistrationApi.list();
+    // **회원 목록과 같은 지점**이어야 한다 — 회원의 남은 회차를 여기서 찾는다
+    // (`currentRegistrationOf`). 한쪽만 지점을 따라가면 고른 지점의 회원이
+    // 전부 등록권 없는 사람으로 보인다.
+    final registrationRequest = RegistrationApi.list(branchId: branchId);
     final signRequest = SessionSignApi.list(
       // 대표·관리자는 자기 싸인이 없다 — 안 주면 서버가 지점 전체를 준다
       trainerId: _viewOnly ? null : currentUser?.id,

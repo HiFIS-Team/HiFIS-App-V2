@@ -855,15 +855,16 @@ class _HeaderButtonsState extends State<_HeaderButtons> {
               onPressed: _openBarcode,
             ),
             SizedBox(width: 10),
-          ]
-          // 바코드가 없는 대표·관리자는 그 자리가 **어느 탭에서나** 비어 있다 —
-          // 지점 고르개를 거기에 고정으로 둔다. 둘은 같이 뜰 일이 없다
-          // (`doesFieldWork` 와 `branchScopeVisible` 이 갈라지는 값이라
-          // 한 사람에게 하나만 해당된다).
+          ],
+          // 지점 고르개 — 바코드 **다음 자리**다.
+          //
+          // MASTER·ADMIN 은 바코드가 없어서 이 줄의 맨 앞이 되고,
+          // MANAGER 는 바코드 오른쪽에 나란히 선다 (둘 다 해당되는 유일한 권한).
+          // MEMBER 는 아예 안 뜬다.
           //
           // 예전에는 업무·랭킹이 화면 안에 각자 고르개를 갖고 있었다. 그러면
           // 옆 화면으로 옮길 때 값이 초기화되고 둘이 서로 다른 지점을 가리켰다.
-          else if (branchScopeVisible) ...[
+          if (branchScopeVisible) ...[
             BranchScopeButton(enabled: !_overlayOpen),
             SizedBox(width: 10),
           ],
