@@ -28,6 +28,7 @@ import '../../core/widgets/input/see_all_button.dart';
 import '../../core/widgets/nav/desktop_header.dart';
 import 'contribution/contribution_section.dart';
 import 'lesson/lesson_section.dart';
+import 'my_task/my_task_section.dart';
 import 'peer_review/peer_review_section.dart';
 import 'praise/praise_section.dart';
 import '../../core/widgets/nav/pane_transition.dart';
@@ -61,6 +62,12 @@ class WorkScreen extends StatefulWidget {
 class _WorkScreenState extends State<WorkScreen>
     with ScreenRefresh<WorkScreen>, SkeletonDelay<WorkScreen> {
   int _tab = 0;
+
+  /// 환경정비 안의 목록바 — 0 공통 업무 · 1 내 업무
+  ///
+  /// **직접 수행하는 사람에게만 뜬다** (`_canDoEnv`). 대표·관리자는 내 업무가
+  /// 없어서 예전처럼 내역만 본다 (2026-08-14 — 매니저·멤버 화면부터 만든다).
+  int _envTab = 0;
 
   /// 환경정비 항목과 배점 — 지점마다 다르다
   List<EnvItem> _envItems = const [];
@@ -400,41 +407,55 @@ class _WorkScreenState extends State<WorkScreen>
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // 점검 항목은 **직접 수행하는 사람에게만** —
-                        // 대표·관리자는 내역만 본다 (서버가 기록을 안 받는다)
+                        // 공통 업무 / 내 업무 — 직접 수행하는 사람에게만 뜬다.
+                        // 대표·관리자는 갈래가 하나뿐이라 바를 안 그린다.
                         if (_canDoEnv) ...[
-                          _ChecklistCard(
-                            items: _envItems,
-                            counts: _counts,
-                            onAdjust: _adjust,
-                            onShowHistory: _showHistory,
+                          SegmentedTabs(
+                            labels: const ['공통 업무', '내 업무'],
+                            selected: _envTab,
+                            onSelect: (i) => setState(() => _envTab = i),
                           ),
-                          if (isDesktop) SizedBox(height: 16),
+                          SizedBox(height: 16),
                         ],
-                        // 내역 카드는 **점검 항목이 없는 사람**(대표·관리자)과
-                        // **데스크톱**에만 둔다.
-                        //
-                        // 폰에서 정비를 하는 사람은 점검 카드 머리말의 `총 N회` 를
-                        // 눌러 시트로 본다 — 그 아래 같은 내용을 또 깔면 화면만 길어진다.
-                        // 데스크톱은 그 자리가 눌리지 않는 글자라(`_ChecklistCard`)
-                        // 카드를 빼면 내역을 볼 길이 없어진다.
-                        // 대표·관리자는 '내 내역'이 **늘 비어 있다** — 서버가
-                        // 그들에게는 기록을 안 받는다(`_canDoEnv`). 빈 카드가
-                        // 절반을 차지하고 있었으므로 빼고 전체 내역을 넓힌다.
-                        if (isDesktop)
-                          if (_canDoEnv)
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(child: _myHistoryCard),
-                                SizedBox(width: 16),
-                                Expanded(child: _allHistoryCard),
-                              ],
-                            )
-                          else
-                            _allHistoryCard
-                        else if (!_canDoEnv)
-                          _allHistoryCard,
+                        if (_canDoEnv && _envTab == 1)
+                          MyTaskSection()
+                        else ...[
+                          // 점검 항목은 **직접 수행하는 사람에게만** —
+                          // 대표·관리자는 내역만 본다 (서버가 기록을 안 받는다)
+                          if (_canDoEnv) ...[
+                            _ChecklistCard(
+                              items: _envItems,
+                              counts: _counts,
+                              onAdjust: _adjust,
+                              onShowHistory: _showHistory,
+                            ),
+                            if (isDesktop) SizedBox(height: 16),
+                          ],
+                          // 내역 카드는 **점검 항목이 없는 사람**(대표·관리자)과
+                          // **데스크톱**에만 둔다.
+                          //
+                          // 폰에서 정비를 하는 사람은 점검 카드 머리말의 `총 N회` 를
+                          // 눌러 시트로 본다 — 그 아래 같은 내용을 또 깔면 화면만 길어진다.
+                          // 데스크톱은 그 자리가 눌리지 않는 글자라(`_ChecklistCard`)
+                          // 카드를 빼면 내역을 볼 길이 없어진다.
+                          // 대표·관리자는 '내 내역'이 **늘 비어 있다** — 서버가
+                          // 그들에게는 기록을 안 받는다(`_canDoEnv`). 빈 카드가
+                          // 절반을 차지하고 있었으므로 빼고 전체 내역을 넓힌다.
+                          if (isDesktop)
+                            if (_canDoEnv)
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(child: _myHistoryCard),
+                                  SizedBox(width: 16),
+                                  Expanded(child: _allHistoryCard),
+                                ],
+                              )
+                            else
+                              _allHistoryCard
+                          else if (!_canDoEnv)
+                            _allHistoryCard,
+                        ],
                       ],
                     ),
             )
