@@ -51,7 +51,8 @@ enum InboxKind {
   payslip('PAYSLIP'),
   leave('LEAVE'),
   approval('APPROVAL'),
-  event('EVENT');
+  event('EVENT'),
+  myTask('MY_TASK');
 
   const InboxKind(this.wire);
 

@@ -165,6 +165,8 @@ class _InboxCardState extends State<_InboxCard> with SkeletonDelay<_InboxCard> {
         await ApprovalApi.approve(item.id);
       case InboxKind.event:
         await EventApi.approve(item.id);
+      case InboxKind.myTask:
+        await MyTaskApi.approve(item.id);
     }
   }, '승인했어요');
 
@@ -176,6 +178,7 @@ class _InboxCardState extends State<_InboxCard> with SkeletonDelay<_InboxCard> {
         InboxKind.leave => '예) 그날은 인원이 모자라요',
         InboxKind.approval => '예) 금액 근거를 더 적어주세요',
         InboxKind.event => '예) 그날은 이미 다른 행사가 있어요',
+        InboxKind.myTask => '예) 그 업무는 계속 해야 해요',
       },
     );
     if (reason == null || !mounted) return;
@@ -189,6 +192,8 @@ class _InboxCardState extends State<_InboxCard> with SkeletonDelay<_InboxCard> {
           await ApprovalApi.reject(item.id, comment: reason);
         case InboxKind.event:
           await EventApi.reject(item.id, reason: reason);
+        case InboxKind.myTask:
+          await MyTaskApi.reject(item.id, reason);
       }
     }, '반려했어요');
   }
