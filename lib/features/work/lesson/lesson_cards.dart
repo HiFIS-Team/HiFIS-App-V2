@@ -220,13 +220,18 @@ class _MonthBar extends StatelessWidget {
           ),
           _arrow(CupertinoIcons.chevron_right, onNext),
           Spacer(),
-          Text(
-            loading ? '불러오는 중' : '총 $count건',
-            style: AppTextStyles.caption.copyWith(
-              color: loading ? AppColors.textTertiary : AppColors.primary,
-              fontWeight: FontWeight.w700,
+          // 받아 오는 동안은 건수도 뼈대다 — 글자로 바꿔 두면 달을 넘길 때마다
+          // `총 12건` → `불러오는 중` → `총 8건` 으로 세 번 바뀌어 깜빡인다
+          if (loading)
+            Skeleton(width: 46, height: 12)
+          else
+            Text(
+              '총 $count건',
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
         ],
       ),
     );
