@@ -33,17 +33,19 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
     ];
   }
 
-  /// 갈래에 맞는 회원 — 이름 검색까지 걸어서 준다
+  /// 갈래에 맞는 회원 — 트레이너 필터와 이름 검색까지 걸어서 준다
   List<Member> get _shownMembers {
     final store = _LessonStore.instance;
     final query = _search.text.trim();
     final wantDone = _tab == 2;
     return [
       for (final m in _members)
-        if (query.isEmpty || m.name.contains(query))
-          if ((store.currentRegistrationOf(m.id)?.exhausted ?? false) ==
-              wantDone)
-            m,
+        // 회원은 달과 무관한 **지금 상태**라 담당 트레이너로 거른다
+        if (_trainerId == null || m.ownerTrainerId == _trainerId)
+          if (query.isEmpty || m.name.contains(query))
+            if ((store.currentRegistrationOf(m.id)?.exhausted ?? false) ==
+                wantDone)
+              m,
     ]..sort((a, b) => a.name.compareTo(b.name));
   }
 
@@ -56,16 +58,20 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
   /// 받으면 되고 트레이너를 바꿀 때 기다릴 일이 없다.
   String? _trainerId;
 
-  /// 이 달 기록에 이름이 있는 트레이너 — 이름순
+  /// 고를 수 있는 트레이너 — 이름순
   ///
-  /// 명단 전체가 아니라 **기록이 있는 사람만** 세운다. 이 달에 수업이 없던
-  /// 사람을 골라 봐야 빈 화면이다.
+  /// 명단 전체가 아니라 **이 화면에 이름이 있는 사람만** 세운다. 이 달 싸인을
+  /// 한 사람과 회원을 맡고 있는 사람을 **합쳐서** 세운다 — 갈래를 옮길 때마다
+  /// 메뉴가 늘었다 줄었다 하면 고른 사람이 목록에서 사라진다.
   List<({String id, String name})> get _trainers {
     final names = <String, String>{};
+    void add(String id) =>
+        names[id] ??= StaffDirectory.instance.byId(id)?.name ?? '알 수 없음';
     for (final sign in _rows) {
-      names[sign.performedByTrainerId] ??=
-          StaffDirectory.instance.byId(sign.performedByTrainerId)?.name ??
-          '알 수 없음';
+      add(sign.performedByTrainerId);
+    }
+    for (final member in _members) {
+      add(member.ownerTrainerId);
     }
     return [for (final e in names.entries) (id: e.key, name: e.value)]
       ..sort((a, b) => a.name.compareTo(b.name));
@@ -215,7 +221,9 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
                   SizedBox(height: 56),
                   _MonthBar(
                     month: _month,
-                    count: sorted.length,
+                    // 지금 아래에 서 있는 것을 센다 — 회원 갈래에서 싸인
+                    // 건수를 세면 목록과 숫자가 어긋난다
+                    count: _tab == 0 ? sorted.length : _shownMembers.length,
                     loading: showSkeleton,
                     onPrev: () => _shiftMonth(-1),
                     // 아직 오지 않은 달은 볼 게 없으니 막는다
