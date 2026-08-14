@@ -110,12 +110,17 @@ class _HistoryScreen extends StatefulWidget {
   _HistoryScreen({
     required this.myLogs,
     required this.allLogs,
+    required this.branchId,
     this.initialAll = false,
     this.tabs = true,
   });
 
+  /// 열 때 받은 **오늘** 기록 — 날짜를 옮기기 전까지는 이걸 그대로 쓴다
   final List<EnvTaskLog> myLogs;
   final List<EnvTaskLog> allLogs;
+
+  /// 날짜를 옮길 때 다시 받을 지점 (null 이면 전 지점)
+  final String? branchId;
 
   /// 어느 쪽으로 열지 (데스크톱은 누른 카드에 맞춰 연다)
   final bool initialAll;
@@ -131,13 +136,80 @@ class _HistoryScreenState extends State<_HistoryScreen> {
   /// true면 전체 내역
   late bool _all = widget.initialAll;
 
+  /// 보고 있는 날짜 — **여기서만 옮긴다**
+  ///
+  /// 업무 화면(칩)은 늘 오늘이다. `+` 가 서버에 **누른 시각**으로 남아서
+  /// 지난 날짜에는 만들 수가 없는데, 거기에 날짜를 두면 칩과 내역이 서로
+  /// 다른 날을 가리키게 된다. 그래서 지난 기록은 이 화면에서만 본다.
+  late DateTime _date = _WorkScreenState._todayDate();
+
+  late List<EnvTaskLog> _myLogs = widget.myLogs;
+  late List<EnvTaskLog> _allLogs = widget.allLogs;
+  bool _loading = false;
+
   static const _weekdays = ['월', '화', '수', '목', '금', '토', '일'];
+
+  bool get _isToday => _date == _WorkScreenState._todayDate();
+
+  /// 날짜를 옮기고 그 날 기록을 받아 온다 — **다음 날로는 못 간다**
+  Future<void> _move(int step) async {
+    final next = DateTime(_date.year, _date.month, _date.day + step);
+    if (next.isAfter(_WorkScreenState._todayDate())) return;
+    setState(() {
+      _date = next;
+      _loading = true;
+      // 옛 날짜 줄을 남겨 두면 머리말은 새 날짜인데 목록은 이전 날이 된다
+      _myLogs = const [];
+      _allLogs = const [];
+    });
+    try {
+      final logs = await EnvApi.logs(
+        branchId: widget.branchId,
+        date: dateKey(next),
+      );
+      if (!mounted) return;
+      setState(() {
+        _allLogs = logs;
+        _myLogs = [
+          for (final log in logs)
+            if (log.employeeId == currentUser?.id) log,
+        ];
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      AppToast.show(context, messageOf(error));
+    }
+  }
+
+  /// 날짜 좌우 화살표 — 근태 달력·랭킹과 **같은 모양**이다.
+  /// [onTap] 이 null 이면 흐린 채로 안 눌린다 (자리는 그대로 둔다).
+  Widget _arrow(IconData icon, VoidCallback? onTap) {
+    final box = Container(
+      width: 30,
+      height: 30,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppColors.gray50,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Icon(
+        icon,
+        size: 13,
+        color: onTap == null ? AppColors.gray300 : AppColors.textSecondary,
+      ),
+    );
+    return onTap == null
+        ? box
+        : Pressable(onTap: onTap, scale: 0.9, child: box);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final date = '${now.month}월 ${now.day}일 ${_weekdays[now.weekday - 1]}요일';
-    final logs = _all ? widget.allLogs : widget.myLogs;
+    final date =
+        '${_date.month}월 ${_date.day}일 ${_weekdays[_date.weekday - 1]}요일';
+    final logs = _all ? _allLogs : _myLogs;
     final sorted = List.of(logs)
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
@@ -156,7 +228,16 @@ class _HistoryScreenState extends State<_HistoryScreen> {
                   padding: EdgeInsets.fromLTRB(24, 12, 24, 0),
                   child: Row(
                     children: [
-                      Expanded(child: Text(date, style: AppTextStyles.caption)),
+                      _arrow(CupertinoIcons.chevron_left, () => _move(-1)),
+                      SizedBox(width: 10),
+                      Text(date, style: AppTextStyles.caption),
+                      SizedBox(width: 10),
+                      // 다음 날은 아직 안 왔으니 늘 비어 있다 — 흐려 두고 안 눌리게
+                      _arrow(
+                        CupertinoIcons.chevron_right,
+                        _isToday ? null : () => _move(1),
+                      ),
+                      Spacer(),
                       Text(
                         '총 ${logs.length}회',
                         style: AppTextStyles.body2.copyWith(
@@ -194,12 +275,18 @@ class _HistoryScreenState extends State<_HistoryScreen> {
                 if (sorted.isEmpty)
                   Padding(
                     padding: EdgeInsets.fromLTRB(24, 32, 24, 44),
-                    child: Text(
-                      _all ? '오늘 완료된 항목이 없어요' : '오늘 완료한 항목이 없어요',
-                      style: AppTextStyles.body2.copyWith(
-                        color: AppColors.textTertiary,
-                      ),
-                    ),
+                    // 받아 오는 동안은 비워 둔다 — '없어요' 를 잠깐 띄우면
+                    // 기록이 있는 날인데도 없다고 했다가 채워진다
+                    child: _loading
+                        ? SizedBox()
+                        : Text(
+                            _isToday
+                                ? (_all ? '오늘 완료된 항목이 없어요' : '오늘 완료한 항목이 없어요')
+                                : (_all ? '완료된 항목이 없어요' : '완료한 항목이 없어요'),
+                            style: AppTextStyles.body2.copyWith(
+                              color: AppColors.textTertiary,
+                            ),
+                          ),
                   )
                 else
                   Expanded(
@@ -230,8 +317,9 @@ class _HistoryScreenState extends State<_HistoryScreen> {
                 height: 56,
                 child: Center(
                   child: Text(
+                    // 날짜를 옮기면 '오늘' 이 틀린 말이 된다
                     widget.tabs
-                        ? '오늘 내역'
+                        ? (_isToday ? '오늘 내역' : '수행 내역')
                         : _all
                         ? '전체 내역'
                         : '내 내역',

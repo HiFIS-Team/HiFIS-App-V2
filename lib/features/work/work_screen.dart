@@ -55,16 +55,26 @@ class WorkScreen extends StatefulWidget {
   State<WorkScreen> createState() => _WorkScreenState();
 }
 
-class _WorkScreenState extends State<WorkScreen> with ScreenRefresh<WorkScreen> {
+class _WorkScreenState extends State<WorkScreen>
+    with ScreenRefresh<WorkScreen> {
   int _tab = 0;
 
   /// 환경정비 항목과 배점 — 지점마다 다르다
   List<EnvItem> _envItems = const [];
 
   /// 오늘 지점에서 나온 수행 기록 전부 (내 것 + 동료 것)
+  ///
+  /// **이 화면은 늘 오늘이다.** 지난 날짜는 전체보기 화면(`_HistoryScreen`)에서
+  /// 날짜를 옮겨 본다 — `+` 가 서버에 **누른 시각**으로 남아서 지난 날짜에는
+  /// 만들 수가 없고, 그러면 칩과 내역이 서로 다른 날을 가리키게 된다.
   List<EnvTaskLog> _logs = const [];
 
   bool _envLoading = true;
+
+  static DateTime _todayDate() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
 
   /// 다섯 항목이 같이 보는 지점 — null 이면 전 지점
   ///
@@ -113,7 +123,7 @@ class _WorkScreenState extends State<WorkScreen> with ScreenRefresh<WorkScreen> 
       // 화면이 "오늘 점검"이라 오늘 것만 받는다 — 서버가 한국 시간으로 잘라 준다
       final logRequest = EnvApi.logs(
         branchId: branchId,
-        date: dateKey(DateTime.now()),
+        date: dateKey(_todayDate()),
       );
       final items = await itemRequest;
       final logs = await logRequest;
@@ -137,6 +147,7 @@ class _WorkScreenState extends State<WorkScreen> with ScreenRefresh<WorkScreen> 
   /// 없게 해 둔다.
   static String _envKey(String name) => name.replaceAll(' ', '').toLowerCase();
 
+  /// 오늘 내 기록 — 칩의 숫자와 `−` 로 지울 대상이 여기서 나온다
   List<EnvTaskLog> get _myLogs => [
     for (final log in _logs)
       if (log.employeeId == currentUser?.id) log,
@@ -209,6 +220,8 @@ class _WorkScreenState extends State<WorkScreen> with ScreenRefresh<WorkScreen> 
       (_) => _HistoryScreen(
         myLogs: _myLogs,
         allLogs: List.of(_logs),
+        // 날짜를 옮기면 그 화면이 직접 다시 받는다 — 어느 지점인지 넘겨준다
+        branchId: _branch,
         initialAll: all,
         tabs: tabs,
       ),
@@ -401,20 +414,23 @@ class _WorkScreenState extends State<WorkScreen> with ScreenRefresh<WorkScreen> 
                         // 눌러 시트로 본다 — 그 아래 같은 내용을 또 깔면 화면만 길어진다.
                         // 데스크톱은 그 자리가 눌리지 않는 글자라(`_ChecklistCard`)
                         // 카드를 빼면 내역을 볼 길이 없어진다.
+                        // 대표·관리자는 '내 내역'이 **늘 비어 있다** — 서버가
+                        // 그들에게는 기록을 안 받는다(`_canDoEnv`). 빈 카드가
+                        // 절반을 차지하고 있었으므로 빼고 전체 내역을 넓힌다.
                         if (isDesktop)
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(child: _myHistoryCard),
-                              SizedBox(width: 16),
-                              Expanded(child: _allHistoryCard),
-                            ],
-                          )
-                        else if (!_canDoEnv) ...[
-                          _myHistoryCard,
-                          SizedBox(height: 16),
+                          if (_canDoEnv)
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(child: _myHistoryCard),
+                                SizedBox(width: 16),
+                                Expanded(child: _allHistoryCard),
+                              ],
+                            )
+                          else
+                            _allHistoryCard
+                        else if (!_canDoEnv)
                           _allHistoryCard,
-                        ],
                       ],
                     ),
             )
