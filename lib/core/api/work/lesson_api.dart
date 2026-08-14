@@ -331,16 +331,10 @@ class RegistrationApi {
     String? trainerId,
     RegistrationType? type,
     String? period,
-    String? branchId,
   }) async {
     final rows = await ApiClient.instance.getList(
       '/registrations',
-      query: {
-        'trainerId': ?trainerId,
-        'type': ?type?.wire,
-        'period': ?period,
-        'branchId': ?branchId,
-      },
+      query: {'trainerId': ?trainerId, 'type': ?type?.wire, 'period': ?period},
     );
     return [
       for (final row in rows)
