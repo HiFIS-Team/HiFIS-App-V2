@@ -44,16 +44,6 @@ class _ProjectComposerState extends State<_ProjectComposer> {
 
   Color _color = AppColors.primary;
 
-  /// 프로젝트를 구분하는 색 — 빨강은 D-day 배지와 헷갈려서 뺐다
-  static const _palette = [
-    AppColors.primary,
-    AppColors.violet,
-    AppColors.teal,
-    AppColors.success,
-    AppColors.warning,
-    Color(0xFF8B95A1),
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -220,7 +210,7 @@ class _ProjectComposerState extends State<_ProjectComposer> {
         Row(
           children: [
             SizedBox(width: 62, child: Text('색상', style: AppTextStyles.label)),
-            for (final color in _palette)
+            for (final color in _projectPalette)
               Pressable(
                 onTap: () => setState(() => _color = color),
                 scale: 0.9,

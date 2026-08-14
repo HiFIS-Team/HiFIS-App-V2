@@ -45,12 +45,18 @@ enum _Phase {
 }
 
 /// 기한 연장 신청 한 건 (승인 전까지 마감일은 그대로다)
+/// 대기 중인 결재 한 건 — 기한 연장 · 누락 사유 · 수정 · 삭제
+///
+/// 프로젝트당 **하나뿐이다** (서버가 그렇게 막는다). 그래서 [_Project.request]
+/// 가 하나이고, 상세의 결재 카드도 한 장만 뜬다.
 class _Extension {
   _Extension({
     required this.requester,
-    required this.due,
     required this.reason,
     required this.time,
+    this.type = ProjectRequestType.extension,
+    this.due,
+    this.payload,
     this.id,
   });
 
@@ -59,10 +65,22 @@ class _Extension {
 
   final String requester;
 
-  /// 신청한 새 마감일
-  final DateTime due;
+  /// 무엇을 결재받는 건가 — 카드 문구와 승인했을 때 벌어지는 일이 갈린다
+  final ProjectRequestType type;
+
+  /// 신청한 새 마감일 — **기한 연장·누락 사유만 있다**
+  final DateTime? due;
+
+  /// 수정 신청이 담은 '이렇게 바꾸겠다' (`title` · `purpose` · `color`)
+  final Map<String, dynamic>? payload;
+
   final String reason;
   final DateTime time;
+
+  /// 승인되기 전까지는 프로젝트에 안 쓰인다 — 카드에 견줘 보여줄 때 쓴다
+  String? get newTitle => payload?['title'] as String?;
+  String? get newPurpose => payload?['purpose'] as String?;
+  String? get newColor => payload?['color'] as String?;
 }
 
 /// 프로젝트 한 건 — 진행률은 할 일에서 계산한다
@@ -79,6 +97,7 @@ class _Project {
     this.id,
     this.colorHex,
     this.createdById,
+    this.ownerId,
     this.memberIds = const [],
     this.serverProgress = 0,
     this.serverTodoCount = 0,
@@ -97,7 +116,13 @@ class _Project {
   String? colorHex;
 
   String owner;
+
+  /// 만든 사람 uuid — 화면에는 안 쓰고 서버 응답을 그대로 들고만 있는다.
+  /// **손댈 권한과 상관없다** ([_isMember] 는 담당자·참여 멤버만 본다)
   final String? createdById;
+
+  /// 담당자 uuid — 이름([owner])은 동명이인에 걸려서 권한 판정에 못 쓴다
+  final String? ownerId;
   DateTime start;
 
   /// 마감일 — 기한 연장이 승인되면 늘어난다
@@ -194,6 +219,7 @@ _Project _fromServer(Project row, ProjectRequest? request) {
     colorHex: row.color,
     owner: _nameOf(row.ownerId),
     createdById: row.createdById,
+    ownerId: row.ownerId,
     start: row.startAt,
     due: row.due,
     members: [for (final id in row.assigneeIds) _nameOf(id)]
@@ -209,7 +235,9 @@ _Project _fromServer(Project row, ProjectRequest? request) {
         : _Extension(
             id: request.id,
             requester: _nameOf(request.requestedById),
+            type: request.type,
             due: request.newDue,
+            payload: request.payload,
             reason: request.reason,
             time: request.createdAt,
           ),
@@ -246,6 +274,19 @@ Color? _hexColor(String? value) {
 }
 
 /// 색 → `#RRGGBB`. 서버는 이 형식으로만 받는다
+/// 프로젝트를 구분하는 색 — 빨강은 D-day 배지와 헷갈려서 뺐다
+///
+/// **만들기 폼과 수정 창이 같이 쓴다.** 한쪽에만 있는 색이 생기면 그 색으로
+/// 만든 프로젝트를 나중에 못 고친다.
+const _projectPalette = [
+  AppColors.primary,
+  AppColors.violet,
+  AppColors.teal,
+  AppColors.success,
+  AppColors.warning,
+  Color(0xFF8B95A1),
+];
+
 String _hexOf(Color color) =>
     '#${(color.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
 
@@ -313,12 +354,19 @@ String _actorName(String? id) {
   return name.isEmpty ? '알 수 없음' : name;
 }
 
-/// 새 프로젝트를 서버에 올린다
+/// 새 프로젝트를 서버에 올린다 — **요청 한 번이다**
 ///
-/// 폼에서 미리 적어 둔 체크리스트도 같이 올린다 — 프로젝트를 먼저 만들어야
-/// 붙일 자리(uuid)가 생기므로 순서가 갈린다.
-/// 체크리스트가 하나라도 붙으면 서버가 진행률을 다시 계산해 주므로,
-/// 만들어진 프로젝트를 마지막에 한 번 더 받아 온다.
+/// 폼에서 미리 적어 둔 체크리스트를 같이 실어 보내면 서버가 한 트랜잭션에
+/// 넣어 준다.
+///
+/// 예전에는 프로젝트를 먼저 만들고 할 일마다 `addTodo` 를 따로 불렀다.
+/// 그런데 할 일 추가는 **이 프로젝트 사람만** 할 수 있어서(2026-08-14),
+/// **대표·관리자가 남에게 맡기는 프로젝트를 만들면 거기서 403 이 났다**
+/// (`이 프로젝트의 담당자만 할 수 있습니다` — 실제로 겪었다).
+/// 만드는 김에 붙이는 것이지 남의 프로젝트를 손대는 것이 아니다.
+///
+/// 덤으로 **반쯤 만들어진 프로젝트가 안 남는다** — 예전에는 할 일 추가가
+/// 중간에 실패하면 체크리스트가 모자란 프로젝트가 그대로 섰다.
 Future<_Project> _saveNewProject(_Project draft) async {
   final created = await ProjectApi.create(
     title: draft.name,
@@ -332,21 +380,19 @@ Future<_Project> _saveNewProject(_Project draft) async {
     // 안 고르면 서버가 만든 사람을 담당으로 넣는다
     ownerId: StaffDirectory.instance.byName(draft.owner)?.id,
     color: draft.colorHex,
+    todos: [
+      for (var i = 0; i < draft.todos.length; i++)
+        {
+          'content': draft.todos[i].text,
+          'assigneeId': StaffDirectory.instance
+              .byName(draft.todos[i].assignee ?? '')
+              ?.id,
+          'sort': i,
+        },
+    ],
   );
 
-  for (var i = 0; i < draft.todos.length; i++) {
-    final todo = draft.todos[i];
-    await ProjectApi.addTodo(
-      created.id,
-      content: todo.text,
-      assigneeId: StaffDirectory.instance.byName(todo.assignee ?? '')?.id,
-      sort: i,
-    );
-  }
-
-  final rows = await ProjectApi.list();
-  final fresh = rows.where((p) => p.id == created.id).firstOrNull ?? created;
-  final project = _fromServer(fresh, null);
+  final project = _fromServer(created, null);
   // 방금 적은 것이라 다시 받을 필요가 없다
   await _loadTodos(project);
   // 타임라인은 서버가 '프로젝트를 만들었어요' 한 줄을 이미 쌓아 뒀다

@@ -113,6 +113,10 @@ class _ProjectCard extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (project.request case final request?) ...[
+                  SizedBox(width: 6),
+                  _RequestChip(type: request.type),
+                ],
                 SizedBox(width: 8),
                 _DdayBadge(dday: dday, phase: project.phase),
               ],

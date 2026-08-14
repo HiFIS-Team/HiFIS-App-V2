@@ -60,7 +60,8 @@ class ProjectScreen extends StatefulWidget {
   State<ProjectScreen> createState() => _ProjectScreenState();
 }
 
-class _ProjectScreenState extends State<ProjectScreen> with ScreenRefresh<ProjectScreen> {
+class _ProjectScreenState extends State<ProjectScreen>
+    with ScreenRefresh<ProjectScreen> {
   /// 보고 있는 단계 (진행 중 / 완료 / 누락)
   _Phase _phase = _Phase.running;
 
@@ -486,6 +487,10 @@ class _ProjectTileState extends State<_ProjectTile> {
                       ),
                     ),
                   ),
+                  if (project.request case final request?) ...[
+                    SizedBox(width: 6),
+                    _RequestChip(type: request.type),
+                  ],
                   SizedBox(width: 6),
                   _DdayBadge(dday: dday, phase: project.phase),
                 ],
@@ -530,6 +535,43 @@ class _EmptyDetail extends StatelessWidget {
 // ── 공통 조각 ──
 
 /// D-day 배지 — 임박할수록 빨개지고, 끝난 프로젝트는 단계를 그대로 보여준다
+/// 대기 중인 결재 알림 칩 — 목록 카드에 **조그맣게** 붙는다
+///
+/// 삭제 신청이 올라간 프로젝트는 승인 전까지 목록에 그대로 있다. 아무 표시가
+/// 없으면 왜 아직 있는지 알 수 없어서 한 마디 붙인다 (2026-08-14 요청).
+/// 수정·연장도 같은 자리에 선다 — 종류만 다르고 뜻은 같다.
+///
+/// D-day 배지 왼쪽이다. 이름과 배지 사이라 카드 높이가 안 바뀐다.
+class _RequestChip extends StatelessWidget {
+  _RequestChip({required this.type});
+
+  final ProjectRequestType type;
+
+  /// 삭제만 빨강 — 승인되면 없어지는 것이라 결이 다르다
+  bool get _danger => type == ProjectRequestType.delete;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _danger ? AppColors.error : AppColors.warning;
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        '${_requestLabel(type).replaceFirst('프로젝트 ', '')} 대기',
+        style: AppTextStyles.caption.copyWith(
+          fontSize: 10,
+          height: 1.3,
+          color: color,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
 class _DdayBadge extends StatelessWidget {
   _DdayBadge({required this.dday, required this.phase});
 

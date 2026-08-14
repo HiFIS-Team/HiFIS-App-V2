@@ -30,7 +30,13 @@ enum ProjectRequestType {
   extension('EXTENSION'),
 
   /// 마감이 지난 뒤 왜 늦었고 언제까지 끝내겠다는 사유
-  overdue('OVERDUE');
+  overdue('OVERDUE'),
+
+  /// 이름·설명·색을 이렇게 바꾸겠다 — **담당자만 올린다**
+  edit('EDIT'),
+
+  /// 프로젝트를 지우겠다 — **담당자만 올린다**
+  delete('DELETE');
 
   const ProjectRequestType(this.wire);
 
@@ -296,6 +302,7 @@ class ProjectRequest {
     required this.type,
     required this.newDue,
     required this.reason,
+    this.payload,
     required this.status,
     required this.requestedById,
     required this.createdAt,
@@ -308,7 +315,9 @@ class ProjectRequest {
     id: json['id'] as String,
     projectId: json['projectId'] as String,
     type: ProjectRequestType.parse(json['type'] as String?),
-    newDue: _time(json['newDue'])!,
+    // 수정·삭제 신청에는 기한이 없다
+    newDue: _time(json['newDue']),
+    payload: (json['payload'] as Map?)?.cast<String, dynamic>(),
     reason: json['reason'] as String? ?? '',
     status: ProjectRequestStatus.parse(json['status'] as String?),
     requestedById: json['requestedById'] as String,
@@ -322,8 +331,13 @@ class ProjectRequest {
   final String projectId;
   final ProjectRequestType type;
 
-  /// 신청한 새 마감일
-  final DateTime newDue;
+  /// 신청한 새 마감일 — 수정·삭제 신청에는 없다
+  final DateTime? newDue;
+
+  /// 수정 신청이 담은 '이렇게 바꾸겠다' (`title` · `purpose` · `color`).
+  /// 승인 전에는 프로젝트에 안 쓰인다 — 결재하는 쪽이 무엇을 승인하는지
+  /// 보려면 여기 들고 있어야 한다
+  final Map<String, dynamic>? payload;
   final String reason;
   final ProjectRequestStatus status;
   final String requestedById;
@@ -361,6 +375,12 @@ class ProjectApi {
     ];
   }
 
+  /// 프로젝트를 만든다 — **체크리스트도 같이 보낸다**
+  ///
+  /// [todos] 는 `{content, assigneeId?, sort}` 목록이다. 예전에는 만든 뒤
+  /// 할 일마다 `addTodo` 를 따로 불렀는데, 그 라우트가 **이 프로젝트 사람만**
+  /// 통과시켜서 대표·관리자가 남에게 맡기는 프로젝트를 만들 때 403 이 났다.
+  /// 한 요청으로 보내면 서버가 한 트랜잭션에 넣는다.
   static Future<Project> create({
     required String title,
     required DateTime due,
@@ -370,6 +390,7 @@ class ProjectApi {
     List<String> assigneeIds = const [],
     String? ownerId,
     String? color,
+    List<Map<String, dynamic>> todos = const [],
   }) async {
     final data = await _client.post(
       '/projects',
@@ -383,6 +404,7 @@ class ProjectApi {
         // 안 주면 서버가 만든 사람을 담당으로 넣는다
         'ownerId': ?ownerId,
         'color': ?color,
+        'todos': todos,
       },
     );
     return Project.fromJson(data!);
@@ -412,6 +434,7 @@ class ProjectApi {
         'assigneeIds': ?assigneeIds,
         'ownerId': ?ownerId,
         'color': ?color,
+        'todos': todos,
       },
     );
     return Project.fromJson(data!);
@@ -525,17 +548,28 @@ class ProjectApi {
   }
 
   /// 기한 연장·누락 사유 올리기 — 대표 승인 전까지 마감일은 그대로다
+  /// 결재를 올린다 — 기한 연장 · 누락 사유 · 수정 · 삭제 네 종류가 같은 통로다
+  ///
+  /// 종류마다 채우는 칸이 다르다 (서버가 422 로 거른다).
+  ///
+  /// | 종류 | 채울 것 |
+  /// |---|---|
+  /// | `extension` · `overdue` | [newDue] |
+  /// | `edit` | [payload] (`title` · `purpose` · `color` 중 하나 이상) |
+  /// | `delete` | 없음 |
   static Future<ProjectRequest> requestChange(
     String projectId, {
     required ProjectRequestType type,
-    required DateTime newDue,
     required String reason,
+    DateTime? newDue,
+    Map<String, String>? payload,
   }) async {
     final data = await _client.post(
       '/projects/$projectId/requests',
       body: {
         'type': type.wire,
-        'newDue': newDue.toUtc().toIso8601String(),
+        if (newDue != null) 'newDue': newDue.toUtc().toIso8601String(),
+        'payload': ?payload,
         'reason': reason,
       },
     );

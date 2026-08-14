@@ -29,6 +29,7 @@ Future<void> _extendProject(
       project.request = _Extension(
         id: saved.id,
         requester: me,
+        type: saved.type,
         due: saved.newDue,
         reason: saved.reason,
         time: saved.createdAt,
@@ -45,32 +46,96 @@ Future<void> _extendProject(
     0,
     _Event(
       author: me,
-      text: '기한 연장 신청 ($before → ${_date(draft.due)})',
+      text: '기한 연장 신청 ($before → ${_date(draft.due!)})',
       time: DateTime.now(),
     ),
   );
   onChanged();
 }
 
+/// 이 프로젝트 사람인가 — **담당자와 참여 멤버뿐이다.**
+///
+/// 2026-08-14 정해졌다: "프로젝트 안에서 손댈 수 있는 건 그 프로젝트의
+/// 담당자와 참여 멤버만." 역할 예외도, **만든 사람 예외도 없다.**
+///
+/// **만든 사람을 안 본다**는 것이 핵심이다. 대표·관리자는 자기가 담당자도
+/// 참여자도 아니고 **남을 지정해서** 만든다 — 만든 사람을 통과시키면 그 둘이
+/// 자기가 만든 프로젝트를 계속 손대게 된다.
+/// 직원·점장은 폼이 본인을 담당자로 넣어 주므로 자기 것에서 잠기지 않는다.
+///
+/// 서버도 같은 기준으로 막는다 (`_is_member` → 403 `NOT_PROJECT_MEMBER`).
+/// **여기서 잠그는 것은 눌러도 403 날 버튼뿐이다** — 댓글·연장 결재·점수
+/// 부여는 서버가 열어 둔 자리라 그대로 둔다 ("댓글은 예외").
+bool _isMember(_Project project) {
+  final id = currentUser?.id;
+  if (id == null) return false;
+  return project.ownerId == id || project.memberIds.contains(id);
+}
+
 /// 연장 신청을 올릴 수 있는 상태 (끝났거나 이미 올린 신청이 있으면 못 올린다)
 ///
 /// **대표·관리자는 못 올린다.** 일을 하는 사람이 올리고 대표가 결재하는 흐름이라,
 /// 자기가 올려서 자기가 승인하는 자리가 되면 결재가 뜻을 잃는다.
+///
+/// 남의 프로젝트에도 못 올린다 — 예전에는 **서버에 가드가 아예 없어서**
+/// 아무나 남의 프로젝트 기한을 늘려 달라고 대표에게 올릴 수 있었다.
 bool _canExtendProject(_Project project) =>
     myRole.doesFieldWork &&
+    _isMember(project) &&
     project.phase != _Phase.done &&
     project.request == null;
 
 /// 연장 신청을 결재할 수 있는 사람 — 서버가 MASTER 로만 열어 뒀다
 bool get _canDecideRequest => myRole == Role.master;
 
-/// 완료된 프로젝트는 손대지 못한다 — **MASTER 만** 되돌릴 수 있다
+/// 결재 종류의 이름 — 카드·타임라인·확인 창이 같은 말을 쓴다
+String _requestLabel(ProjectRequestType type) => switch (type) {
+  ProjectRequestType.extension => '기한 연장',
+  ProjectRequestType.overdue => '누락 사유',
+  ProjectRequestType.edit => '프로젝트 수정',
+  ProjectRequestType.delete => '프로젝트 삭제',
+};
+
+/// 수정·삭제를 올릴 수 있는 사람 — **담당자만** (서버 `NOT_PROJECT_OWNER`)
 ///
-/// 완료가 곧 점수라, 됐다 안 됐다 하면 담당자 점수도 같이 흔들린다.
-/// 서버도 같은 기준으로 막는다 (`_ensure_open` → 403 `PROJECT_DONE`).
-/// 댓글은 잠기지 않는다.
+/// 참여 멤버는 예전에도 못 했다. 완료된 프로젝트는 아무도 못 올린다.
+/// 대기 중인 결재가 있으면 못 올린다 — 프로젝트당 하나뿐이다.
+bool _canRequestEdit(_Project project) =>
+    project.ownerId != null &&
+    project.ownerId == currentUser?.id &&
+    project.phase != _Phase.done &&
+    project.request == null;
+
+/// 결재 카드에서 '무엇이 바뀌나' 한 줄 — 삭제는 견줄 값이 없어 null
+String? _requestChange(_Project project, _Extension request) =>
+    switch (request.type) {
+      ProjectRequestType.extension || ProjectRequestType.overdue =>
+        '${_date(project.due)} → ${_date(request.due!)}',
+      // 바꾸겠다는 칸만 적는다 — 설명·색은 한 줄에 견주기 어려워 이름만 보인다
+      ProjectRequestType.edit => [
+        if (request.newTitle case final t?) '이름 → $t',
+        if (request.newPurpose != null) '설명 바꿈',
+        if (request.newColor != null) '색 바꿈',
+      ].join(' · '),
+      ProjectRequestType.delete => null,
+    };
+
+/// 손댈 수 없는 프로젝트 — **자리는 그대로 두고 안 눌리게만 한다**
+///
+/// 두 가지가 잠근다.
+///
+/// - **내가 이 프로젝트 사람이 아니다** ([_isMember]) — 남의 일이다
+/// - **완료됐다** — 완료가 곧 점수라, 됐다 안 됐다 하면 담당자 점수도 같이
+///   흔들린다. 이건 **MASTER 만** 되돌릴 수 있다
+///
+/// 서버도 같은 기준으로 막는다 (403 `NOT_PROJECT_MEMBER` · `PROJECT_DONE`).
+/// 댓글은 둘 다에 안 잠긴다.
+///
+/// **완료 되돌리기는 MASTER 도 자기 프로젝트에서만 된다.** 멤버 잠금이 먼저라
+/// 남의 완료 프로젝트는 대표도 못 푼다 (2026-08-14 결정의 결과다).
 bool _isLocked(_Project project) =>
-    project.phase == _Phase.done && myRole != Role.master;
+    !_isMember(project) ||
+    (project.phase == _Phase.done && myRole != Role.master);
 
 class _ProjectDetail extends StatelessWidget {
   _ProjectDetail({
@@ -184,6 +249,66 @@ class _ProjectDetail extends StatelessWidget {
   Future<void> _requestExtension(BuildContext context) =>
       _extendProject(context, project, onChanged);
 
+  /// 수정 신청 — **승인 전까지는 아무것도 안 바뀐다**
+  ///
+  /// 신청할 때 프로젝트에 바로 쓰고 '되돌리기'를 두면, 승인 전인데 이미 바뀐
+  /// 이름이 목록에 뜬다. 바꾸겠다는 값은 신청서(`payload`)가 들고 있다가
+  /// 승인되는 순간 옮겨 담긴다.
+  Future<void> _requestEdit(BuildContext context) async {
+    final draft = await _showEditDialog(context, project);
+    if (draft == null || !context.mounted) return;
+    await _sendRequest(
+      context,
+      type: ProjectRequestType.edit,
+      payload: draft.payload,
+      reason: draft.reason,
+    );
+  }
+
+  /// 삭제 신청 — 승인 전까지 프로젝트는 그대로 있고 '삭제 대기'만 붙는다
+  Future<void> _requestDelete(BuildContext context) async {
+    final reason = await _showDeleteDialog(context, project);
+    if (reason == null || !context.mounted) return;
+    await _sendRequest(
+      context,
+      type: ProjectRequestType.delete,
+      reason: reason,
+    );
+  }
+
+  /// 수정·삭제 신청을 올린다 — 둘이 같은 통로라 한 곳에서 보낸다
+  Future<void> _sendRequest(
+    BuildContext context, {
+    required ProjectRequestType type,
+    required String reason,
+    Map<String, String>? payload,
+  }) async {
+    final projectId = project.id;
+    if (projectId == null) return;
+    final label = _requestLabel(type);
+    try {
+      final saved = await ProjectApi.requestChange(
+        projectId,
+        type: type,
+        payload: payload,
+        reason: reason,
+      );
+      project.request = _Extension(
+        id: saved.id,
+        requester: me,
+        type: saved.type,
+        payload: saved.payload,
+        reason: saved.reason,
+        time: saved.createdAt,
+      );
+      _log('$label 신청');
+      onChanged();
+      if (context.mounted) AppToast.show(context, '$label을 신청했어요');
+    } catch (error) {
+      if (context.mounted) AppToast.show(context, messageOf(error));
+    }
+  }
+
   /// 승인·반려 모두 사유를 남겨야 처리된다
   Future<void> _decide(BuildContext context, {required bool approve}) async {
     final request = project.request!;
@@ -208,40 +333,83 @@ class _ProjectDetail extends StatelessWidget {
       }
     }
 
-    if (approve) {
-      _log(
-        '기한 연장 승인 (${_date(project.due)} → ${_date(request.due)}) · $reason',
-      );
-      // 승인하면 서버가 프로젝트 마감일을 새 날짜로 바꿔 준다
-      project.due = request.due;
-    } else {
-      _log('기한 연장 반려 (마감일 ${_date(project.due)} 유지) · $reason');
+    final label = _requestLabel(request.type);
+    if (!approve) {
+      _log('$label 반려 · $reason');
+      project.request = null;
+      onChanged();
+      if (context.mounted) AppToast.show(context, '반려했어요');
+      return;
+    }
+
+    // 승인 — 종류마다 서버가 해 준 것을 화면에도 그대로 반영한다
+    switch (request.type) {
+      case ProjectRequestType.extension:
+      case ProjectRequestType.overdue:
+        _log(
+          '$label 승인 (${_date(project.due)} → ${_date(request.due!)}) · $reason',
+        );
+        project.due = request.due!;
+      case ProjectRequestType.edit:
+        _log('$label 승인 · $reason');
+        if (request.newTitle case final title?) project.name = title;
+        if (request.newPurpose case final purpose?) project.desc = purpose;
+        if (request.newColor case final color?) project.colorHex = color;
+      case ProjectRequestType.delete:
+        // 서버가 지웠다 — 목록에서도 빼고, 폰이면 상세를 닫는다.
+        // 여기서 `onChanged` 를 부르면 없는 프로젝트를 다시 그린다
+        _projects.remove(project);
+        if (context.mounted) {
+          AppToast.show(context, '삭제했어요');
+          if (Navigator.canPop(context)) Navigator.pop(context);
+        }
+        onChanged();
+        return;
     }
     project.request = null;
     onChanged();
     if (context.mounted) {
       // 다른 결재 자리와 같은 문구 — 방금 누른 버튼 옆이라 뭘 처리했는지는 분명하다
-      AppToast.show(context, approve ? '승인했어요' : '반려했어요');
+      AppToast.show(context, '승인했어요');
     }
   }
 
   /// 연장 신청 버튼 (끝난 프로젝트나 이미 올린 신청이 있으면 감춘다)
-  Widget _extendButton(BuildContext context) => Pressable(
-    onTap: () => _requestExtension(context),
-    scale: 0.94,
-    pressedColor: AppColors.gray100,
-    borderRadius: BorderRadius.circular(100),
-    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-    child: Text(
-      '기한 연장',
-      style: AppTextStyles.caption.copyWith(
-        color: AppColors.primary,
-        fontWeight: FontWeight.w700,
-      ),
-    ),
-  );
+  Widget _extendButton(BuildContext context) =>
+      _headButton('기한 연장', () => _requestExtension(context));
+
+  /// 머리말 오른쪽 글자 버튼 — 기한 연장 · 수정 · 삭제가 같은 모양으로 선다
+  Widget _headButton(String label, VoidCallback onTap, {bool danger = false}) =>
+      Pressable(
+        onTap: onTap,
+        scale: 0.94,
+        pressedColor: AppColors.gray100,
+        borderRadius: BorderRadius.circular(100),
+        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        child: Text(
+          label,
+          style: AppTextStyles.caption.copyWith(
+            color: danger ? AppColors.error : AppColors.primary,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
 
   bool get _canExtend => _canExtendProject(project);
+
+  /// 머리말 오른쪽 결재 버튼들 — 담당자에게만 수정·삭제가 붙는다
+  ///
+  /// 셋 다 **대표 결재를 받는 것**이라 한자리에 모은다. 대기 중인 결재가
+  /// 있으면 셋 다 사라진다 (프로젝트당 하나뿐이라 올려도 400 이 난다).
+  List<Widget> _headActions(BuildContext context) => [
+    if (_canExtend) ...[SizedBox(width: 8), _extendButton(context)],
+    if (_canRequestEdit(project)) ...[
+      SizedBox(width: 4),
+      _headButton('수정', () => _requestEdit(context)),
+      SizedBox(width: 4),
+      _headButton('삭제', () => _requestDelete(context), danger: true),
+    ],
+  ];
 
   /// 데스크톱 머리말 — 한 줄에 이름·D-day, 오른쪽 끝에 참여자
   List<Widget> _desktopHead(BuildContext context, int dday) => [
@@ -283,7 +451,7 @@ class _ProjectDetail extends StatelessWidget {
           '${_date(project.start)} ~ ${_date(project.due)} · 담당 ${project.owner}',
           style: AppTextStyles.caption,
         ),
-        if (_canExtend) ...[SizedBox(width: 8), _extendButton(context)],
+        ..._headActions(context),
       ],
     ),
     if (project.desc.isNotEmpty) ...[
@@ -465,16 +633,21 @@ class _ExtensionCard extends StatelessWidget {
           runSpacing: 2,
           children: [
             Text(
-              '기한 연장 승인 대기',
+              '${_requestLabel(request.type)} 승인 대기',
               style: AppTextStyles.body2.copyWith(
                 color: AppColors.warning,
                 fontWeight: FontWeight.w700,
               ),
             ),
-            Text(
-              '${_date(project.due)} → ${_date(request.due)}',
-              style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w600),
-            ),
+            // 무엇을 승인하는지 — 종류마다 볼 것이 다르다.
+            // 삭제는 견줄 값이 없어서 이 줄이 아예 없다
+            if (_requestChange(project, request) case final change?)
+              Text(
+                change,
+                style: AppTextStyles.body2.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
           ],
         ),
         SizedBox(height: 4),
