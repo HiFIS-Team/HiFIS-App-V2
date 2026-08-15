@@ -45,6 +45,14 @@ import UserNotifications
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
 
+    // 리퀴드 글래스 면 — 검색바·입력바·상단 블러가 쓴다 ([GlassSurface.swift])
+    if let glassRegistrar = engineBridge.pluginRegistry.registrar(forPlugin: "HiFISGlassSurface") {
+      glassRegistrar.register(
+        GlassSurfaceFactory(messenger: glassRegistrar.messenger()),
+        withId: "com.hifis/glass_surface"
+      )
+    }
+
     guard let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "HiFISCaptureGuard")
     else { return }
 
