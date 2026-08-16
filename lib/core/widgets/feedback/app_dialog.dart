@@ -4,6 +4,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../util/platform.dart';
 import '../input/app_button.dart';
+import '../input/pressable.dart';
 import '../../theme/app_shadows.dart';
 import '../../util/app_route.dart';
 
@@ -146,6 +147,11 @@ class _ConfirmCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return isAndroid ? _material(context) : _apple(context);
+  }
+
+  /// 애플·윈도우 — 가운데 정렬 제목에 채운 버튼 둘 (지금까지와 똑같다)
+  Widget _apple(BuildContext context) {
     return Container(
       width: dialogWidth(context, 320),
       padding: EdgeInsets.fromLTRB(24, 26, 24, 20),
@@ -189,6 +195,88 @@ class _ConfirmCard extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  /// 안드로이드 — Material 3 알림창
+  ///
+  /// 제목·본문은 **왼쪽**, 버튼은 **오른쪽 아래에 글자만**. 되돌리는 쪽(취소)이
+  /// 왼쪽, 확정하는 쪽이 오른쪽이다. 모서리는 28.
+  ///
+  /// 애플은 가운데 정렬에 채운 버튼 둘인데, 그대로 두면 안드로이드에서
+  /// **iOS 알림창을 보는 느낌**이 난다.
+  Widget _material(BuildContext context) {
+    return Container(
+      width: dialogWidth(context, 340),
+      padding: EdgeInsets.fromLTRB(24, 24, 16, 16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: EdgeInsets.only(right: 8),
+            child: Text(title, style: AppTextStyles.title3),
+          ),
+          if (message != null) ...[
+            SizedBox(height: 12),
+            Padding(
+              padding: EdgeInsets.only(right: 8),
+              child: Text(
+                message!,
+                style: AppTextStyles.body2.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ],
+          SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              _TextAction(
+                label: cancelLabel,
+                color: AppColors.textSecondary,
+                onTap: () => Navigator.pop(context, false),
+              ),
+              SizedBox(width: 4),
+              _TextAction(
+                label: confirmLabel,
+                color: destructive ? AppColors.error : AppColors.primary,
+                onTap: () => Navigator.pop(context, true),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Material 알림창의 글자 버튼 — 눌리는 자리가 글자보다 넉넉해야 한다
+class _TextAction extends StatelessWidget {
+  _TextAction({required this.label, required this.color, required this.onTap});
+
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Text(
+        label,
+        style: AppTextStyles.body1.copyWith(
+          color: color,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }

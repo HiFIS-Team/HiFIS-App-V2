@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:hifis_app/core/util/app_route.dart';
+import 'package:hifis_app/core/widgets/feedback/app_dialog.dart';
+import 'package:hifis_app/core/widgets/input/app_button.dart';
 import 'package:hifis_app/core/widgets/input/pressable.dart';
 
 void main() {
@@ -152,6 +154,71 @@ void main() {
     expect(clip.radius, isNull);
     expect(clip.circle, isFalse);
   });
+
+  // ── 되묻는 팝업 ──
+
+  Future<void> openConfirm(WidgetTester tester) async {
+    await tester.pumpWidget(
+      wrap(
+        Builder(
+          builder: (context) => Pressable(
+            onTap: () => showConfirmDialog(
+              context,
+              title: '이 공지를 지울까요?',
+              message: '지우면 되돌릴 수 없어요.',
+              confirmLabel: '삭제',
+              destructive: true,
+            ),
+            child: SizedBox(width: 80, height: 40),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byType(Pressable));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('안드로이드 — 왼쪽 정렬에 글자 버튼 (Material 3)', (tester) async {
+    await openConfirm(tester);
+
+    expect(find.byType(AppButton), findsNothing, reason: '채운 버튼은 애플 것');
+    expect(find.text('취소'), findsOneWidget);
+    expect(find.text('삭제'), findsOneWidget);
+
+    final title = tester.widget<Text>(find.text('이 공지를 지울까요?'));
+    expect(title.textAlign, isNot(TextAlign.center), reason: '제목은 왼쪽');
+  }, variant: android);
+
+  testWidgets('애플 — 가운데 정렬에 채운 버튼 둘 (예전 그대로)', (tester) async {
+    await openConfirm(tester);
+
+    expect(find.byType(AppButton), findsNWidgets(2));
+
+    final title = tester.widget<Text>(find.text('이 공지를 지울까요?'));
+    expect(title.textAlign, TextAlign.center);
+  }, variant: apple);
+
+  testWidgets('안드로이드 — 확인을 누르면 true 가 돌아온다', (tester) async {
+    bool? answer;
+    await tester.pumpWidget(
+      wrap(
+        Builder(
+          builder: (context) => Pressable(
+            onTap: () async {
+              answer = await showConfirmDialog(context, title: '지울까요?');
+            },
+            child: SizedBox(width: 80, height: 40),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byType(Pressable));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('확인'));
+    await tester.pumpAndSettle();
+    expect(answer, isTrue);
+  }, variant: android);
 
   // ── 화면 전환 ──
 
