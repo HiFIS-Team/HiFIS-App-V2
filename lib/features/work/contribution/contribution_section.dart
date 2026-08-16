@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/util/skeleton_delay.dart';
+
 import '../../../core/api/client/api_exception.dart';
 import '../../../core/api/work/contribution_api.dart';
 import '../../../core/api/work/score_api.dart';
@@ -44,9 +46,8 @@ class ContributionSection extends StatefulWidget {
   State<ContributionSection> createState() => _ContributionSectionState();
 }
 
-class _ContributionSectionState extends State<ContributionSection> {
-  bool _loading = true;
-
+class _ContributionSectionState extends State<ContributionSection>
+    with SkeletonDelay<ContributionSection> {
   /// 화면에 그리는 목록 — 받아 둔 것을 지점 필터까지 걸러 세운 결과
   List<_Contribution> _items = const [];
 
@@ -85,7 +86,7 @@ class _ContributionSectionState extends State<ContributionSection> {
   Future<void> _load() async {
     final me = currentUser;
     if (me == null) {
-      setState(() => _loading = false);
+      setState(endLoad);
       return;
     }
     final period = periodKey(DateTime.now());
@@ -119,11 +120,11 @@ class _ContributionSectionState extends State<ContributionSection> {
         _given = given;
         _events = events;
         _rebuild();
-        _loading = false;
+        endLoad();
       });
     } catch (error) {
       if (!mounted) return;
-      setState(() => _loading = false);
+      setState(endLoad);
       AppToast.show(context, messageOf(error));
     }
   }
@@ -202,7 +203,7 @@ class _ContributionSectionState extends State<ContributionSection> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return WorkSectionSkeleton();
+    if (showSkeleton) return WorkSectionSkeleton();
 
     // 폰은 기여마다 카드 하나 (다른 업무 목록과 같은 결).
     // 데스크톱은 2단 화면이라 카드가 과해서 기존 줄 목록을 그대로 쓴다.

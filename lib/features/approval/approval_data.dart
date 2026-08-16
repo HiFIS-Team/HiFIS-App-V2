@@ -166,6 +166,12 @@ final _docs = <_Doc>[];
 
 bool _docsLoaded = false;
 
+/// 로그아웃 때 비운다 — **다음 사람에게 앞사람 것이 보이면 안 된다**
+void resetApprovalCache() {
+  _docs.clear();
+  _docsLoaded = false;
+}
+
 /// 서버는 '전체 결재'를 안 준다 — 내가 얽힌 세 함을 합쳐서 목록을 만든다
 ///
 /// 그래서 이 목록은 '모든 결재'가 아니라 **내가 올렸거나 내가 결재하는 것**이다.

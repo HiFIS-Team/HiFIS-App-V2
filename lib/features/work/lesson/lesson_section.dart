@@ -57,9 +57,8 @@ class LessonSection extends StatefulWidget {
   State<LessonSection> createState() => _LessonSectionState();
 }
 
-class _LessonSectionState extends State<LessonSection> {
-  bool _loading = true;
-
+class _LessonSectionState extends State<LessonSection>
+    with SkeletonDelay<LessonSection> {
   @override
   void initState() {
     super.initState();
@@ -79,7 +78,7 @@ class _LessonSectionState extends State<LessonSection> {
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
     }
-    if (mounted) setState(() => _loading = false);
+    if (mounted) setState(endLoad);
   }
 
   /// 회원 등록 화면을 연다 — 폰은 밀려 들어오고 PC는 모달로 뜬다
@@ -104,7 +103,7 @@ class _LessonSectionState extends State<LessonSection> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return WorkSectionSkeleton();
+    if (showSkeleton) return WorkSectionSkeleton();
 
     // 상단 액션 버튼 두 개 — 폰·PC 공통. 대표·관리자는 수행자가 아니라 안 그린다
     final actions = _viewOnly

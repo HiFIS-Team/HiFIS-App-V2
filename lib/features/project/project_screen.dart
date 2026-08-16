@@ -36,6 +36,7 @@ import '../notifications/notification_screen.dart'
     show NotificationTarget, requestedScreen;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/util/screen_refresh.dart';
+import '../../core/util/skeleton_delay.dart';
 
 part 'project_comments.dart';
 part 'project_phone.dart';
@@ -61,15 +62,12 @@ class ProjectScreen extends StatefulWidget {
 }
 
 class _ProjectScreenState extends State<ProjectScreen>
-    with ScreenRefresh<ProjectScreen> {
+    with ScreenRefresh<ProjectScreen>, SkeletonDelay<ProjectScreen> {
   /// 보고 있는 단계 (진행 중 / 완료 / 누락)
   _Phase _phase = _Phase.running;
 
   /// 선택한 프로젝트 (목록이 바뀌면 첫 항목으로 되돌린다)
   _Project? _selected;
-
-  /// 첫 진입에만 스피너를 돌린다 — 탭을 다시 열 때는 받아둔 목록을 바로 그린다
-  bool _loading = !_projectsLoaded;
 
   /// 탭에 다시 들어오거나 앱이 다시 앞으로 나왔을 때 조용히 다시 받는다
   @override
@@ -78,6 +76,8 @@ class _ProjectScreenState extends State<ProjectScreen>
   @override
   void initState() {
     super.initState();
+    // 받아 둔 목록이 있으면 뼈대 없이 시작한다 (다시 열 때 안 깜빡인다)
+    if (_projectsLoaded) skipFirstSkeleton();
     // 홈에서 넘어오며 걸어둔 요청은 첫 빌드 전에 반영한다 (setState 필요 없음)
     _consumeRequest();
     requestedProject.addListener(_onRequest);
@@ -99,7 +99,7 @@ class _ProjectScreenState extends State<ProjectScreen>
       _failed = true;
       if (mounted) AppToast.show(context, messageOf(error));
     }
-    if (mounted) setState(() => _loading = false);
+    if (mounted) setState(endLoad);
     _openPending();
   }
 
@@ -120,7 +120,7 @@ class _ProjectScreenState extends State<ProjectScreen>
   /// 목록이 비어 있어서 못 찾는다. 다 받고 나서 [_load] 가 다시 부른다.
   void _openPending() {
     final id = _pendingId;
-    if (id == null || _loading || !mounted) return;
+    if (id == null || loading || !mounted) return;
     _pendingId = null;
     final found = _projects.where((p) => p.id == id).firstOrNull;
     // 못 찾으면 목록만 보여준다 — 지워졌거나 내가 못 보는 프로젝트다
@@ -134,7 +134,7 @@ class _ProjectScreenState extends State<ProjectScreen>
   }
 
   void _retry() {
-    setState(() => _loading = true);
+    setState(beginLoad);
     _load();
   }
 
@@ -205,7 +205,7 @@ class _ProjectScreenState extends State<ProjectScreen>
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
+    if (showSkeleton) {
       if (!isDesktop) return _ProjectSkeleton();
       return SkeletonTwoPane(rows: 5);
     }

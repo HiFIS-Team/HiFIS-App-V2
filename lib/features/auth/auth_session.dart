@@ -17,7 +17,12 @@ import '../../core/util/capture_guard.dart';
 import '../../core/util/push.dart';
 import '../messages/chat_store.dart';
 import '../../core/util/photo_cache.dart';
-import '../project/project_screen.dart' show resetProjectDueModal;
+import '../project/project_screen.dart'
+    show resetProjectCache, resetProjectDueModal;
+import '../notice/notice_screen.dart' show resetNoticeCache;
+import '../meeting/meeting_screen.dart' show resetMeetingCache;
+import '../staff/staff_screen.dart' show resetStaffCache;
+import '../approval/approval_screen.dart' show resetApprovalCache;
 
 /// 로그인 세션
 ///
@@ -151,6 +156,14 @@ class AuthSession extends ValueNotifier<bool> {
     resetBranchScope();
     resetHeaderAction();
     resetMyTaskCache();
+    // 화면들이 들고 있는 목록도 비운다 — **다음 사람에게 앞사람 것이 보이면 안 된다.**
+    // 탭을 다시 열 때 안 깜빡이려고 모듈 전역에 남겨 두는 것들이라
+    // 여기서 안 비우면 로그아웃해도 살아남는다
+    resetNoticeCache();
+    resetProjectCache();
+    resetMeetingCache();
+    resetStaffCache();
+    resetApprovalCache();
     value = false;
   }
 }

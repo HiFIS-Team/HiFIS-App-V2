@@ -64,6 +64,12 @@ final _notices = <_Notice>[];
 /// 한 번이라도 받아왔는지 — 탭을 다시 열 때 빈 목록을 깜빡이지 않게 한다
 bool _noticesLoaded = false;
 
+/// 로그아웃 때 비운다 — **다음 사람에게 앞사람 것이 보이면 안 된다**
+void resetNoticeCache() {
+  _notices.clear();
+  _noticesLoaded = false;
+}
+
 Future<void> _loadNotices() async {
   final rows = await NoticeApi.list();
   // 목록을 새로 받는 김에 확인 현황도 버린다 —

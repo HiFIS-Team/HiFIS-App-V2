@@ -349,9 +349,9 @@ class _InviteKeyScreen extends StatefulWidget {
   State<_InviteKeyScreen> createState() => _InviteKeyScreenState();
 }
 
-class _InviteKeyScreenState extends State<_InviteKeyScreen> {
+class _InviteKeyScreenState extends State<_InviteKeyScreen>
+    with SkeletonDelay<_InviteKeyScreen> {
   List<InviteKey> _keys = const [];
-  bool _loading = true;
 
   @override
   void initState() {
@@ -366,7 +366,7 @@ class _InviteKeyScreenState extends State<_InviteKeyScreen> {
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
     }
-    if (mounted) setState(() => _loading = false);
+    if (mounted) setState(endLoad);
   }
 
   Future<void> _issue() async {
@@ -448,7 +448,7 @@ class _InviteKeyScreenState extends State<_InviteKeyScreen> {
             ),
           ),
           SizedBox(height: 20),
-          if (_loading)
+          if (showSkeleton)
             SkeletonGroup(child: SkeletonRows(rows: 3, avatar: 0, trailing: 64))
           else ...[
             _SectionHeader(title: '쓸 수 있는 키', count: usable.length),

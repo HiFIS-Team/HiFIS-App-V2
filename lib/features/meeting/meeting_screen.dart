@@ -30,6 +30,7 @@ import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/widgets/feedback/failed_card.dart';
 import '../../core/widgets/feedback/skeleton.dart';
 import '../../core/util/screen_refresh.dart';
+import '../../core/util/skeleton_delay.dart';
 
 part 'meeting_phone.dart';
 
@@ -49,13 +50,11 @@ class MeetingScreen extends StatefulWidget {
 }
 
 class _MeetingScreenState extends State<MeetingScreen>
-    with ScreenRefresh<MeetingScreen> {
+    with ScreenRefresh<MeetingScreen>, SkeletonDelay<MeetingScreen> {
   _Note? _selected;
 
   /// 새로 만든 회의록은 바로 편집 모드로 연다
   bool _startEditing = false;
-
-  bool _loading = !_notesLoaded;
 
   /// 탭에 다시 들어오거나 앱이 다시 앞으로 나왔을 때 조용히 다시 받는다
   @override
@@ -64,6 +63,8 @@ class _MeetingScreenState extends State<MeetingScreen>
   @override
   void initState() {
     super.initState();
+    // 받아 둔 목록이 있으면 뼈대 없이 시작한다 (다시 열 때 안 깜빡인다)
+    if (_notesLoaded) skipFirstSkeleton();
     _load();
   }
 
@@ -79,11 +80,11 @@ class _MeetingScreenState extends State<MeetingScreen>
       _failed = true;
       if (mounted) AppToast.show(context, messageOf(error));
     }
-    if (mounted) setState(() => _loading = false);
+    if (mounted) setState(endLoad);
   }
 
   void _retry() {
-    setState(() => _loading = true);
+    setState(beginLoad);
     _load();
   }
 
@@ -159,7 +160,7 @@ class _MeetingScreenState extends State<MeetingScreen>
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
+    if (showSkeleton) {
       if (!isDesktop) return _MeetingSkeleton();
       return SkeletonTwoPane(rows: 6, filter: false);
     }
@@ -1110,6 +1111,12 @@ final _notes = <_Note>[];
 
 /// 한 번이라도 받아왔는지 — 탭을 다시 열 때 빈 목록을 깜빡이지 않게 한다
 bool _notesLoaded = false;
+
+/// 로그아웃 때 비운다 — **다음 사람에게 앞사람 것이 보이면 안 된다**
+void resetMeetingCache() {
+  _notes.clear();
+  _notesLoaded = false;
+}
 
 /// 회의록을 걸 수 있는 프로젝트 — 고르개와 걸린 이름 표시에 같이 쓴다
 final _projects = <Project>[];

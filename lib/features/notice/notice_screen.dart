@@ -27,6 +27,7 @@ import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/widgets/feedback/failed_card.dart';
 import '../../core/widgets/feedback/skeleton.dart';
 import '../../core/util/screen_refresh.dart';
+import '../../core/util/skeleton_delay.dart';
 
 part 'notice_phone.dart';
 part 'notice_list.dart';
@@ -50,7 +51,7 @@ class NoticeScreen extends StatefulWidget {
 }
 
 class _NoticeScreenState extends State<NoticeScreen>
-    with ScreenRefresh<NoticeScreen> {
+    with ScreenRefresh<NoticeScreen>, SkeletonDelay<NoticeScreen> {
   /// true면 안 읽은 공지만
   bool _unreadOnly = false;
 
@@ -59,9 +60,6 @@ class _NoticeScreenState extends State<NoticeScreen>
   /// 새로 쓴 공지는 바로 편집 모드로 연다
   bool _startEditing = false;
 
-  /// 첫 진입에만 스피너를 돌린다 — 탭을 다시 열 때는 받아둔 목록을 바로 그린다
-  bool _loading = !_noticesLoaded;
-
   /// 탭에 다시 들어오거나 앱이 다시 앞으로 나왔을 때 조용히 다시 받는다
   @override
   Future<void> onScreenRefresh() => _load();
@@ -69,6 +67,8 @@ class _NoticeScreenState extends State<NoticeScreen>
   @override
   void initState() {
     super.initState();
+    // 받아 둔 목록이 있으면 뼈대 없이 시작한다 (다시 열 때 안 깜빡인다)
+    if (_noticesLoaded) skipFirstSkeleton();
     // 홈에서 넘어오며 걸어둔 요청은 첫 빌드 전에 반영한다 (setState 필요 없음)
     _consumeRequest();
     requestedNotice.addListener(_onRequest);
@@ -89,11 +89,11 @@ class _NoticeScreenState extends State<NoticeScreen>
       _failed = true;
       if (mounted) AppToast.show(context, messageOf(error));
     }
-    if (mounted) setState(() => _loading = false);
+    if (mounted) setState(endLoad);
   }
 
   void _retry() {
-    setState(() => _loading = true);
+    setState(beginLoad);
     _load();
   }
 
@@ -210,7 +210,7 @@ class _NoticeScreenState extends State<NoticeScreen>
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
+    if (showSkeleton) {
       if (!isDesktop) return _NoticeSkeleton();
       return SkeletonTwoPane(rows: 6);
     }

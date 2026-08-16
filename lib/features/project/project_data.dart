@@ -191,6 +191,12 @@ final _projects = <_Project>[];
 /// 한 번이라도 받아왔는지 — 탭을 다시 열 때 빈 목록을 깜빡이지 않게 한다
 bool _projectsLoaded = false;
 
+/// 로그아웃 때 비운다 — **다음 사람에게 앞사람 것이 보이면 안 된다**
+void resetProjectCache() {
+  _projects.clear();
+  _projectsLoaded = false;
+}
+
 Future<void> _loadProjects() async {
   // 결재 대기 중인 기한 변경 요청을 같이 받아 프로젝트에 붙인다
   final listing = ProjectApi.list();

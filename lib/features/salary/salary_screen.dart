@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/util/skeleton_delay.dart';
+
 import '../../core/api/client/api_exception.dart';
 import '../../core/api/staff/payroll_api.dart';
 import '../../core/data/employee.dart';
@@ -46,9 +48,7 @@ class SalaryScreen extends StatefulWidget {
 }
 
 class _SalaryScreenState extends State<SalaryScreen>
-    with ScreenRefresh<SalaryScreen> {
-  bool _loading = true;
-
+    with ScreenRefresh<SalaryScreen>, SkeletonDelay<SalaryScreen> {
   /// 0 = 내 급여, 1 = 결재. 결재함을 볼 수 없는 사람에게는 탭 자체가 없다
   ///
   /// **MASTER·ADMIN 에게는 이 탭이 없다** — 화면 전체가 이미 결재 화면이다.
@@ -98,7 +98,7 @@ class _SalaryScreenState extends State<SalaryScreen>
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
     }
-    if (mounted) setState(() => _loading = false);
+    if (mounted) setState(endLoad);
   }
 
   /// 신청을 하나 넘긴다 — 화면 전체가 그 사람 것으로 바뀐다
@@ -186,7 +186,7 @@ class _SalaryScreenState extends State<SalaryScreen>
 
   @override
   Widget build(BuildContext context) {
-    if (_loading || _payslips.isEmpty) {
+    if (showSkeleton || _payslips.isEmpty) {
       if (!isDesktop) return _SalarySkeleton();
       return SkeletonDesktopPage(
         children: [

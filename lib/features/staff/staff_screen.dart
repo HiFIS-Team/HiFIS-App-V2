@@ -65,7 +65,7 @@ class StaffScreen extends StatefulWidget {
 }
 
 class _StaffScreenState extends State<StaffScreen>
-    with ScreenRefresh<StaffScreen> {
+    with ScreenRefresh<StaffScreen>, SkeletonDelay<StaffScreen> {
   String _query = '';
   String _rank = _allRanks;
 
@@ -81,8 +81,6 @@ class _StaffScreenState extends State<StaffScreen>
   /// 카드 보기(true) · 목록 보기(false)
   bool _grid = true;
 
-  bool _loading = !_staffLoaded;
-
   /// 탭에 다시 들어오거나 앱이 다시 앞으로 나왔을 때 조용히 다시 받는다
   @override
   Future<void> onScreenRefresh() => _load();
@@ -90,6 +88,8 @@ class _StaffScreenState extends State<StaffScreen>
   @override
   void initState() {
     super.initState();
+    // 받아 둔 목록이 있으면 뼈대 없이 시작한다 (다시 열 때 안 깜빡인다)
+    if (_staffLoaded) skipFirstSkeleton();
     branchScope.addListener(_onBranchScope);
     _load();
   }
@@ -120,11 +120,11 @@ class _StaffScreenState extends State<StaffScreen>
       _failed = true;
       if (mounted) AppToast.show(context, messageOf(error));
     }
-    if (mounted) setState(() => _loading = false);
+    if (mounted) setState(endLoad);
   }
 
   void _retry() {
-    setState(() => _loading = true);
+    setState(beginLoad);
     _load();
   }
 
@@ -223,7 +223,7 @@ class _StaffScreenState extends State<StaffScreen>
   Widget build(BuildContext context) {
     if (!isDesktop) return PlaceholderScreen(emoji: '👥', title: '직원');
 
-    if (_loading) {
+    if (showSkeleton) {
       return SkeletonDesktopPage(
         children: [
           Skeleton(height: 40, radius: 12),

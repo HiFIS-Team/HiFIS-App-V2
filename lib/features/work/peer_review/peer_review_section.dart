@@ -1,5 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+
+import '../../../core/util/skeleton_delay.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/api/client/api_exception.dart';
@@ -64,9 +66,8 @@ enum _Filter {
   final String label;
 }
 
-class _PeerReviewSectionState extends State<PeerReviewSection> {
-  bool _loading = true;
-
+class _PeerReviewSectionState extends State<PeerReviewSection>
+    with SkeletonDelay<PeerReviewSection> {
   /// 평가 대상 — 같은 지점 사람들, 본인이 맨 앞
   List<Employee> _targets = const [];
 
@@ -111,13 +112,13 @@ class _PeerReviewSectionState extends State<PeerReviewSection> {
           for (final review in reviews)
             if (review.reviewerId == me?.id) review.revieweeId: review,
         };
-        _loading = false;
+        endLoad();
       });
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _targets = _targetsOf(me);
-        _loading = false;
+        endLoad();
       });
       AppToast.show(context, messageOf(error));
     }
@@ -155,7 +156,7 @@ class _PeerReviewSectionState extends State<PeerReviewSection> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return WorkSectionSkeleton();
+    if (showSkeleton) return WorkSectionSkeleton();
 
     // 대표·관리자는 평가를 쓰지 않는다 — 누가 냈는지만 본다
     if (!_canReview) {

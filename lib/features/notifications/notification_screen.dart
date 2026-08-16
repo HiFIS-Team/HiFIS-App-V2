@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/util/skeleton_delay.dart';
+
 import '../../core/api/client/api_exception.dart';
 import '../../core/api/home/notification_api.dart';
 import '../../core/theme/app_colors.dart';
@@ -37,7 +39,8 @@ class NotificationScreen extends StatefulWidget {
   State<NotificationScreen> createState() => _NotificationScreenState();
 }
 
-class _NotificationScreenState extends State<NotificationScreen> {
+class _NotificationScreenState extends State<NotificationScreen>
+    with SkeletonDelay<NotificationScreen> {
   final _scrollController = ScrollController();
 
   /// 0(펼침) ~ 1(접힘). 스크롤에 따른 상단 블러 강도.
@@ -45,10 +48,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
   /// true면 안 읽은 알림만 보여준다
   bool _unreadOnly = false;
-
-  /// 홈이 먼저 받아 둔 게 있으면 그걸 보여주면서 조용히 새로 받는다.
-  /// 있는 걸 두고 스피너부터 띄우면 열 때마다 화면이 한 번 비워진다
-  bool _loading = _items.isEmpty;
 
   @override
   void initState() {
@@ -78,11 +77,11 @@ class _NotificationScreenState extends State<NotificationScreen> {
       _failed = true;
       if (mounted) AppToast.show(context, messageOf(error));
     }
-    if (mounted) setState(() => _loading = false);
+    if (mounted) setState(endLoad);
   }
 
   void _retry() {
-    setState(() => _loading = true);
+    setState(beginLoad);
     _load();
   }
 
@@ -161,7 +160,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   onChanged: (value) => setState(() => _unreadOnly = value),
                 ),
                 SizedBox(height: 20),
-                if (_loading)
+                if (showSkeleton)
                   SkeletonGroup(
                     child: SkeletonCard(
                       padding: EdgeInsets.all(20),

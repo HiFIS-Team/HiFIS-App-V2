@@ -28,6 +28,7 @@ import '../../core/widgets/nav/phone_scaffold.dart';
 import '../../core/util/when.dart';
 import '../../core/widgets/feedback/skeleton.dart';
 import '../../core/util/screen_refresh.dart';
+import '../../core/util/skeleton_delay.dart';
 part 'approval_list.dart';
 part 'approval_detail.dart';
 part 'approval_phone.dart';
@@ -57,13 +58,11 @@ class ApprovalScreen extends StatefulWidget {
 bool get _canWrite => myRole != Role.master && myRole != Role.admin;
 
 class _ApprovalScreenState extends State<ApprovalScreen>
-    with ScreenRefresh<ApprovalScreen> {
+    with ScreenRefresh<ApprovalScreen>, SkeletonDelay<ApprovalScreen> {
   _State _filter = _State.pending;
 
   /// 고른 문서 — 목록이 갈릴 때마다 새 객체가 오므로 id 로 들고 있는다
   String? _selectedId;
-
-  bool _loading = !_docsLoaded;
 
   /// 탭에 다시 들어오거나 앱이 다시 앞으로 나왔을 때 조용히 다시 받는다
   @override
@@ -72,6 +71,8 @@ class _ApprovalScreenState extends State<ApprovalScreen>
   @override
   void initState() {
     super.initState();
+    // 받아 둔 목록이 있으면 뼈대 없이 시작한다 (다시 열 때 안 깜빡인다)
+    if (_docsLoaded) skipFirstSkeleton();
     _load();
   }
 
@@ -81,7 +82,7 @@ class _ApprovalScreenState extends State<ApprovalScreen>
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
     }
-    if (mounted) setState(() => _loading = false);
+    if (mounted) setState(endLoad);
   }
 
   List<_Doc> get _visible {
@@ -219,7 +220,7 @@ class _ApprovalScreenState extends State<ApprovalScreen>
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
+    if (showSkeleton) {
       return isDesktop ? SkeletonTwoPane(rows: 6) : _ApprovalSkeleton();
     }
 

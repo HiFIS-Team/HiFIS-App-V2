@@ -4,6 +4,8 @@ import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/util/skeleton_delay.dart';
+
 import '../../core/api/client/api_exception.dart';
 import '../../core/api/monitoring/access_log_api.dart';
 import '../../core/data/employee.dart';
@@ -62,11 +64,11 @@ class MonitoringScreen extends StatefulWidget {
 /// 잔디에 그릴 날 수 — 가로 한 줄이 하루다
 const _grassDays = 14;
 
-class _MonitoringScreenState extends State<MonitoringScreen> {
+class _MonitoringScreenState extends State<MonitoringScreen>
+    with SkeletonDelay<MonitoringScreen> {
   /// 통계·잔디가 보는 창 — 최근 14일을 덮을 만큼 넉넉히 받는다.
   /// **목록은 여기서 안 뽑는다** (아래 [_rows] 가 번호 페이지로 따로 받는다).
   List<AccessLog> _logs = const [];
-  bool _loading = true;
 
   /// 목록 한 장에 몇 줄까지
   static const _perPage = 100;
@@ -130,11 +132,11 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
         _rows = page.items;
         _total = page.total;
         _failed = page.failed;
-        _loading = false;
+        endLoad();
       });
     } catch (error) {
       if (!mounted) return;
-      setState(() => _loading = false);
+      setState(endLoad);
       AppToast.show(context, messageOf(error));
     }
   }
@@ -309,7 +311,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
         height: (MediaQuery.sizeOf(context).height - 300).clamp(420.0, 1000.0),
       );
     }
-    if (_loading) {
+    if (showSkeleton) {
       return SkeletonGroup(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

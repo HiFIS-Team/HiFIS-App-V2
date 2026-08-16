@@ -146,6 +146,12 @@ final _members = <_Member>[];
 
 bool _staffLoaded = false;
 
+/// 로그아웃 때 비운다 — **다음 사람에게 앞사람 것이 보이면 안 된다**
+void resetStaffCache() {
+  _members.clear();
+  _staffLoaded = false;
+}
+
 /// 명단·지점을 받아 화면 모델을 세운다
 ///
 /// 오늘 근태는 따로 부르지 않는다 — 명단에 사람마다 실려 온다

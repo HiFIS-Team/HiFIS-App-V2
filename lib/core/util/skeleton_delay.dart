@@ -43,9 +43,21 @@ import '../widgets/feedback/delayed_spinner.dart';
 /// **뼈대를 그리는 동안 옛 내용을 지우지 않는다.** 지우면 그 사이가 빈 화면이라
 /// 그것도 깜빡인다 — 옛 줄을 둔 채로 오는 대로 갈아끼우는 게 제일 조용하다.
 mixin SkeletonDelay<T extends StatefulWidget> on State<T> {
+  /// 뼈대가 한 번 떴으면 **최소 이만큼은 유지한다**
+  ///
+  /// 개발 서버가 같은 맥이라 값이 10~30ms 만에 온다. 그때 뼈대를 바로 걷으면
+  /// 한두 프레임만 떴다 사라져서 **번쩍인다.** 늦게 띄우는 것([DelayedSpinner.delay])
+  /// 만으로는 첫 로딩을 못 막는다 — 첫 로딩은 늦추지 않고 바로 띄우기 때문이다.
+  ///
+  /// 인스타처럼 "떴으면 한 박자는 보이고 사라진다"로 맞춘다.
+  static const minVisible = Duration(milliseconds: 300);
+
   bool _showSkeleton = true;
   bool _loading = true;
   Timer? _skeletonTimer;
+
+  /// 뼈대가 실제로 화면에 뜬 시각 — [minVisible] 을 재는 기준
+  DateTime? _shownAt = DateTime.now();
 
   /// 뼈대를 **실제로 그릴지** — 첫 로딩은 바로, 다시 받을 때는 늦을 때만
   ///
@@ -68,22 +80,54 @@ mixin SkeletonDelay<T extends StatefulWidget> on State<T> {
   void skipFirstSkeleton() {
     _showSkeleton = false;
     _loading = false;
+    _shownAt = null;
   }
 
   /// 받기 시작 — [DelayedSpinner.delay] 를 넘기면 그때 뼈대로 바꾼다
   void beginLoad() {
     _loading = true;
     _skeletonTimer?.cancel();
+    if (_showSkeleton) {
+      // 이미 떠 있다(첫 로딩) — 언제부터 떠 있었는지를 잃지 않는다
+      _shownAt ??= DateTime.now();
+      return;
+    }
     _skeletonTimer = Timer(DelayedSpinner.delay, () {
-      if (mounted) setState(() => _showSkeleton = true);
+      if (!mounted) return;
+      setState(() {
+        _showSkeleton = true;
+        _shownAt = DateTime.now();
+      });
     });
   }
 
   /// 다 받았다(또는 실패) — 뼈대를 걷고 예약도 취소한다
+  ///
+  /// **뜬 지 [minVisible] 이 안 됐으면 그만큼 미뤄서 걷는다.** 값은 이미
+  /// 부르는 쪽 setState 에서 갈아끼워졌으므로, 뼈대만 잠깐 더 덮고 있다가 사라진다.
   void endLoad() {
     _skeletonTimer?.cancel();
-    _showSkeleton = false;
     _loading = false;
+    if (!_showSkeleton) {
+      _shownAt = null;
+      return;
+    }
+    final shownAt = _shownAt;
+    final left = shownAt == null
+        ? Duration.zero
+        : minVisible - DateTime.now().difference(shownAt);
+    if (left <= Duration.zero) {
+      _showSkeleton = false;
+      _shownAt = null;
+      return;
+    }
+    _skeletonTimer = Timer(left, () {
+      if (!mounted) return;
+      setState(() {
+        _showSkeleton = false;
+        _shownAt = null;
+      });
+    });
   }
 
   @override

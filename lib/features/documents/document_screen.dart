@@ -5,6 +5,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/util/skeleton_delay.dart';
+
 import '../../core/api/client/api_exception.dart';
 import '../../core/api/docs/document_api.dart';
 import '../../core/data/current_user.dart';
@@ -46,7 +48,7 @@ class DocumentScreen extends StatefulWidget {
 }
 
 class _DocumentScreenState extends State<DocumentScreen>
-    with ScreenRefresh<DocumentScreen> {
+    with ScreenRefresh<DocumentScreen>, SkeletonDelay<DocumentScreen> {
   /// 지금 열려 있는 폴더까지의 경로 (첫 칸은 항상 최상위)
   final List<_Item> _path = [_root];
 
@@ -80,8 +82,6 @@ class _DocumentScreenState extends State<DocumentScreen>
     if (--_busy == 0 && mounted) setState(() => _uploading = false);
   }
 
-  bool _loading = _treeScope != _scope;
-
   String _query = '';
 
   @override
@@ -96,7 +96,7 @@ class _DocumentScreenState extends State<DocumentScreen>
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
     }
-    if (mounted) setState(() => _loading = false);
+    if (mounted) setState(endLoad);
   }
 
   /// 탭에 다시 들어오거나 앱이 다시 앞으로 나왔을 때 조용히 다시 받는다
@@ -726,7 +726,7 @@ class _DocumentScreenState extends State<DocumentScreen>
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
+    if (showSkeleton) {
       return SkeletonTwoPane(rows: 7, filter: false);
     }
 
