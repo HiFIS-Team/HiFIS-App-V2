@@ -53,38 +53,35 @@ class _EmojiCapsule extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(32),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          decoration: BoxDecoration(
-            color: AppColors.surface.withValues(alpha: 0.8),
-            borderRadius: BorderRadius.circular(32),
-            border: Border.all(color: AppColors.gray100),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (final emoji in _reactionEmojis)
-                GestureDetector(
-                  onTap: () => Navigator.pop(context, emoji),
-                  child: Container(
-                    width: 44,
-                    height: 44,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: emoji == selected
-                          ? AppColors.gray100
-                          : Colors.transparent,
-                      shape: BoxShape.circle,
-                    ),
-                    child: _EmojiText(emoji, size: 24),
+    return GlassSurface(
+      radius: 32,
+      // 이모지를 누르는 면이라 유리 눌림 반응을 켠다
+      interactive: true,
+      // 애플이 아닌 곳에서 쓰던 값 그대로 — 화면이 안 바뀐다
+      fallbackColor: AppColors.surface.withValues(alpha: 0.8),
+      fallbackBorder: Border.all(color: AppColors.gray100),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final emoji in _reactionEmojis)
+              GestureDetector(
+                onTap: () => Navigator.pop(context, emoji),
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: emoji == selected
+                        ? AppColors.gray100
+                        : Colors.transparent,
+                    shape: BoxShape.circle,
                   ),
+                  child: _EmojiText(emoji, size: 24),
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
       ),
     );

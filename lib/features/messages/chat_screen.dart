@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
-import 'dart:ui';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
@@ -22,6 +21,7 @@ import '../../core/util/platform.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/glass/glass_input_bar.dart';
+import '../../core/widgets/glass/glass_surface.dart';
 import '../../core/widgets/glass/top_frost.dart';
 import '../../core/widgets/input/pressable.dart';
 import 'chat_detail_screen.dart';

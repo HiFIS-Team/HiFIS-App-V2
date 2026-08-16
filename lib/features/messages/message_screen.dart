@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:cupertino_native/cupertino_native.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -14,6 +12,7 @@ import '../../core/util/sf_symbols.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/glass/glass_menu.dart';
+import '../../core/widgets/glass/glass_surface.dart';
 import '../../core/widgets/glass/top_frost.dart';
 import 'chat_screen.dart';
 import 'chat_store.dart';
@@ -393,19 +392,18 @@ class _FloatingSearchBar extends StatelessWidget {
         borderRadius: BorderRadius.circular(28),
         boxShadow: AppShadows.float,
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-          child: Container(
-            height: 52,
+      child: GlassSurface(
+        radius: 28,
+        // 누르는 면이라 유리가 눌리는 반응을 켠다
+        interactive: true,
+        // 애플이 아닌 곳에서 쓰던 값 그대로 — 화면이 안 바뀐다
+        fallbackColor: AppColors.surface.withValues(alpha: 0.72),
+        // 네이티브 글래스의 림처럼 보이는 헤어라인 — 흰 배경에서도 구분되게
+        fallbackBorder: Border.all(color: AppColors.gray100),
+        child: SizedBox(
+          height: 52,
+          child: Padding(
             padding: EdgeInsets.symmetric(horizontal: 18),
-            decoration: BoxDecoration(
-              color: AppColors.surface.withValues(alpha: 0.72),
-              borderRadius: BorderRadius.circular(28),
-              // 네이티브 글래스의 림처럼 보이는 헤어라인 — 흰 배경에서도 구분되게
-              border: Border.all(color: AppColors.gray100),
-            ),
             child: Row(
               children: [
                 Icon(CupertinoIcons.search, size: 20, color: AppColors.gray500),
