@@ -37,7 +37,6 @@ import '../notifications/notification_screen.dart'
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/util/screen_refresh.dart';
 import '../../core/util/skeleton_delay.dart';
-import '../../core/util/app_route.dart';
 
 part 'project_comments.dart';
 part 'project_phone.dart';
@@ -696,7 +695,7 @@ class ProjectBrief {
   /// 폰: 상세 화면을 옆에서 밀어 연다
   Future<void> open(BuildContext context) => Navigator.push(
     context,
-    appRoute((_) => _ProjectDetailScreen(project: _project)),
+    CupertinoPageRoute(builder: (_) => _ProjectDetailScreen(project: _project)),
   );
 }
 

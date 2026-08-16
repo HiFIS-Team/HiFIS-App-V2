@@ -11,7 +11,9 @@ Future<_Project?> _showProjectComposer(
   if (!isDesktop) {
     return Navigator.push<_Project>(
       context,
-      appRoute((_) => _ProjectComposer(phone: true, seed: seed)),
+      CupertinoPageRoute(
+        builder: (_) => _ProjectComposer(phone: true, seed: seed),
+      ),
     );
   }
   return showAppDialog<_Project>(

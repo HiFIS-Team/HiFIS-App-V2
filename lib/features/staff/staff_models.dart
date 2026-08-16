@@ -177,7 +177,10 @@ Future<void> _openChat(BuildContext context, _Member member) async {
   try {
     final room = await ChatStore.instance.createRoom([member.id]);
     if (!context.mounted) return;
-    Navigator.push(context, appRoute((_) => ChatScreen(roomId: room.id)));
+    Navigator.push(
+      context,
+      CupertinoPageRoute(builder: (_) => ChatScreen(roomId: room.id)),
+    );
   } catch (error) {
     if (context.mounted) AppToast.show(context, messageOf(error));
   }

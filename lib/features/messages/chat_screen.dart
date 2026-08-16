@@ -27,7 +27,6 @@ import '../../core/widgets/input/pressable.dart';
 import 'chat_detail_screen.dart';
 import 'chat_store.dart';
 import '../../core/theme/app_shadows.dart';
-import '../../core/util/app_route.dart';
 part 'chat_bubbles.dart';
 part 'chat_photo_viewer.dart';
 part 'chat_reactions.dart';
@@ -381,7 +380,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Future<void> _openDetail() async {
     final left = await Navigator.push<bool>(
       context,
-      appRoute((_) => ChatDetailScreen(roomId: _roomId)),
+      CupertinoPageRoute(builder: (_) => ChatDetailScreen(roomId: _roomId)),
     );
     // 방을 나갔으면 이 화면도 닫는다 — 없는 방에 남아 있을 수 없다
     if (left == true && mounted) Navigator.pop(context);

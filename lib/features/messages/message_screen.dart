@@ -18,7 +18,6 @@ import 'chat_screen.dart';
 import 'chat_store.dart';
 import 'new_message_screen.dart';
 import '../../core/theme/app_shadows.dart';
-import '../../core/util/app_route.dart';
 
 /// 사내톡 화면 (인스타그램 DM 스타일)
 ///
@@ -104,7 +103,10 @@ class _MessageScreenState extends State<MessageScreen> {
 
     Navigator.push(
       context,
-      appRoute((_) => NewMessageScreen(), fullscreenDialog: true),
+      CupertinoPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => NewMessageScreen(),
+      ),
     );
   }
 
@@ -221,8 +223,9 @@ class _MessageScreenState extends State<MessageScreen> {
   }) {
     Navigator.push(
       context,
-      appRoute(
-        (_) => _ArchiveScreen(title: title, emptyText: emptyText, load: load),
+      CupertinoPageRoute(
+        builder: (_) =>
+            _ArchiveScreen(title: title, emptyText: emptyText, load: load),
       ),
     );
   }
@@ -576,7 +579,10 @@ class _ConversationTile extends StatelessWidget {
           onOpen!(room);
           return;
         }
-        Navigator.push(context, appRoute((_) => ChatScreen(roomId: room.id)));
+        Navigator.push(
+          context,
+          CupertinoPageRoute(builder: (_) => ChatScreen(roomId: room.id)),
+        );
       },
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),

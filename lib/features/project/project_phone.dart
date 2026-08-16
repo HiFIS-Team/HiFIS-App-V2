@@ -34,7 +34,9 @@ class _ProjectPhone extends StatelessWidget {
     if (!context.mounted) return;
     await Navigator.push(
       context,
-      appRoute((_) => _ProjectDetailScreen(project: project)),
+      CupertinoPageRoute(
+        builder: (_) => _ProjectDetailScreen(project: project),
+      ),
     );
     onChanged();
   }

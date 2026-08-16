@@ -10,7 +10,7 @@ Future<bool?> _showPayslipForm(BuildContext context, _Payslip payslip) {
   }
   return Navigator.push<bool>(
     context,
-    appRoute((_) => _PayslipForm(payslip: payslip)),
+    CupertinoPageRoute(builder: (_) => _PayslipForm(payslip: payslip)),
   );
 }
 

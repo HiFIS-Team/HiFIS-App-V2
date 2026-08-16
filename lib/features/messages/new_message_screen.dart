@@ -15,7 +15,6 @@ import '../../core/widgets/glass/top_frost.dart';
 import 'chat_screen.dart';
 import 'chat_store.dart';
 import '../../core/theme/app_decorations.dart';
-import '../../core/util/app_route.dart';
 
 /// 새 사내톡 만들기 화면 (아래에서 올라오는 모달)
 ///
@@ -119,7 +118,9 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
       if (!mounted) return;
       final navigator = Navigator.of(context);
       navigator.pop();
-      navigator.push(appRoute((_) => ChatScreen(roomId: room.id)));
+      navigator.push(
+        CupertinoPageRoute(builder: (_) => ChatScreen(roomId: room.id)),
+      );
     } catch (error) {
       if (mounted) {
         setState(() => _creating = false);

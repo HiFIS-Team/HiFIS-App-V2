@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoPageRoute;
 import 'package:flutter/material.dart';
 
 import '../../core/api/client/api_exception.dart';
@@ -21,7 +22,6 @@ import '../../core/widgets/glass/glass_bottom_button.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/nav/phone_scaffold.dart';
 import '../../core/util/screen_refresh.dart';
-import '../../core/util/app_route.dart';
 part 'schedule_phone.dart';
 part 'schedule_day.dart';
 part 'schedule_form.dart';

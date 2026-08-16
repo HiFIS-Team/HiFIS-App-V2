@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
@@ -5,7 +6,6 @@ import '../../theme/app_text_styles.dart';
 import '../../util/platform.dart';
 import '../input/app_button.dart';
 import '../../theme/app_shadows.dart';
-import '../../util/app_route.dart';
 
 /// '전체 보기'처럼 목록을 통째로 여는 화면 띄우기
 ///
@@ -13,7 +13,7 @@ import '../../util/app_route.dart';
 /// 데스크톱은 콘텐츠를 통째로 덮으면 사이드바 맥락이 끊겨서, 가운데 큰 모달로 띄운다.
 Future<T?> showFullPage<T>(BuildContext context, WidgetBuilder builder) {
   if (!isDesktop) {
-    return Navigator.push<T>(context, appRoute(builder));
+    return Navigator.push<T>(context, CupertinoPageRoute(builder: builder));
   }
   return showDialog<T>(
     context: context,

@@ -9,7 +9,10 @@ part of 'approval_screen.dart';
 /// PC 는 창 그대로지만 폭을 [dialogWidth] 로 재서 좁은 창에서도 넘치지 않는다.
 Future<_Draft?> _showComposer(BuildContext context) {
   if (!isDesktop) {
-    return Navigator.push<_Draft>(context, appRoute((_) => _Composer()));
+    return Navigator.push<_Draft>(
+      context,
+      CupertinoPageRoute(builder: (_) => _Composer()),
+    );
   }
   return showAppDialog<_Draft>(context, (context) => _Composer());
 }

@@ -15,7 +15,9 @@ Future<Event?> showEventDialog(
   if (!isDesktop) {
     return Navigator.push<Event>(
       context,
-      appRoute((_) => _EventDialog(date: date, origin: origin)),
+      CupertinoPageRoute(
+        builder: (_) => _EventDialog(date: date, origin: origin),
+      ),
     );
   }
   return showDialog<Event>(

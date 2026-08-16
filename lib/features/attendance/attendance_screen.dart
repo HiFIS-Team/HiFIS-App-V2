@@ -30,7 +30,6 @@ import '../../core/widgets/input/app_button.dart';
 import '../../core/widgets/feedback/skeleton.dart';
 import '../../core/util/screen_refresh.dart';
 import '../../core/util/skeleton_delay.dart';
-import '../../core/util/app_route.dart';
 
 part 'attendance_models.dart';
 part 'attendance_leave.dart';
