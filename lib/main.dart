@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'core/data/current_user.dart';
 import 'core/theme/app_colors.dart';
+import 'core/theme/theme_controller.dart';
 import 'core/theme/app_theme.dart';
 import 'core/util/capture_guard.dart';
 import 'core/util/platform.dart';
@@ -19,6 +20,8 @@ void main() async {
   // 캡처 방지를 먼저 켠다 — 대표면 아래 restore 가 꺼 준다.
   // 로그인 전에도 켜 둬야 못 막는 순간이 안 생긴다.
   unawaited(CaptureGuard.apply());
+  // 테마를 먼저 되살린다 — 뒤에 하면 라이트로 한 번 그려졌다 바뀌어 깜빡인다
+  await ThemeController.restore();
   // 자동 로그인 여부를 먼저 읽어야 스플래시 뒤에서 맞는 화면을 그릴 수 있다
   await AuthSession.instance.restore();
   runApp(HiFISApp());
