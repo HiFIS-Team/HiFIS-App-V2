@@ -53,6 +53,31 @@ import UserNotifications
       )
     }
 
+    // 앱 테마 → 창 외관
+    //
+    // **네이티브 뷰는 앱 안 테마를 모른다.** iOS 시스템 외관만 본다. 앱은
+    // 자체 토글(`AppColors.setDark`)로 도는데 시스템이 라이트면 **다크 모드에서
+    // 유리가 밝은 유리로 그려진다** (실제로 겪었다 — 상단 띠가 흰색으로 떴다).
+    //
+    // 뷰마다 손보지 않고 **창 하나**에 건다. 그러면 우리 유리뿐 아니라
+    // `CNButton`·`CNTabBar`·시스템 메뉴·키보드까지 전부 따라온다.
+    if let themeRegistrar = engineBridge.pluginRegistry.registrar(forPlugin: "HiFISTheme") {
+      let channel = FlutterMethodChannel(
+        name: "com.hifis/theme", binaryMessenger: themeRegistrar.messenger())
+      channel.setMethodCallHandler { call, result in
+        guard call.method == "setDark", let dark = call.arguments as? Bool else {
+          result(FlutterMethodNotImplemented)
+          return
+        }
+        let style: UIUserInterfaceStyle = dark ? .dark : .light
+        // 창을 못 찾으면 조용히 넘어간다 — 색이 어긋날 뿐 앱은 돈다
+        for scene in UIApplication.shared.connectedScenes {
+          (scene as? UIWindowScene)?.windows.forEach { $0.overrideUserInterfaceStyle = style }
+        }
+        result(nil)
+      }
+    }
+
     guard let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "HiFISCaptureGuard")
     else { return }
 
