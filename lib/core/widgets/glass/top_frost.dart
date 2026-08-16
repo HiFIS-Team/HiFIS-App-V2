@@ -3,6 +3,8 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'glass_surface.dart';
+
 /// 스크롤 오프셋 → 상단 블러 세기(0~1)
 ///
 /// 이 값을 State 필드로 두고 setState로 갱신하면 스크롤 한 프레임마다
@@ -41,6 +43,45 @@ class TopFrost extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final topInset = MediaQuery.paddingOf(context).top;
+
+    // 애플이면 진짜 유리로 — 그 외는 아래 Flutter 블러 그대로 (한 글자도 안 바뀐다)
+    if (GlassSurface.supported) {
+      return IgnorePointer(
+        child: ValueListenableBuilder<double>(
+          valueListenable: collapse,
+          builder: (context, value, _) => SizedBox(
+            height: topInset + 60,
+            // **네이티브 유리는 세기 조절이 안 된다** (애플이 정한다).
+            // 스크롤에 따라 진해지는 것을 유리 자체를 페이드해서 만든다 —
+            // 플랫폼 뷰에 Opacity 가 먹는지가 이 실험의 핵심이다
+            child: Opacity(
+              opacity: value,
+              child: GlassSurface(
+                // 상단 블러는 누르는 면이 아니다 — 유리 눌림 반응을 안 켠다
+                //
+                // **`SizedBox.expand` 가 없으면 유리가 폭 0 이 된다.** GlassSurface
+                // 안의 Stack 이 자식 크기를 따라가는데, 자식 없는 DecoratedBox 는
+                // 제일 작은 크기로 잡혀서 아무것도 안 보인다 (실제로 겪었다)
+                child: SizedBox.expand(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          color.withValues(alpha: 0.85),
+                          color.withValues(alpha: 0.0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     return IgnorePointer(
       child: ValueListenableBuilder<double>(
