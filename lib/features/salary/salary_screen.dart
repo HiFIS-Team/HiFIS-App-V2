@@ -30,6 +30,7 @@ import '../../core/widgets/nav/phone_scaffold.dart';
 import '../../core/util/when.dart';
 import '../../core/widgets/nav/pane_transition.dart';
 import '../../core/util/screen_refresh.dart';
+import '../../core/util/app_route.dart';
 
 part 'salary_models.dart';
 part 'salary_form.dart';

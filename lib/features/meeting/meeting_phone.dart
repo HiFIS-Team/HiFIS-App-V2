@@ -25,9 +25,7 @@ class _MeetingPhone extends StatelessWidget {
   }) async {
     final result = await Navigator.push<String>(
       context,
-      CupertinoPageRoute(
-        builder: (_) => _NoteScreen(note: note, editing: editing),
-      ),
+      appRoute((_) => _NoteScreen(note: note, editing: editing)),
     );
     if (!context.mounted) return;
     if (result == 'delete') {

@@ -13,6 +13,7 @@ import '../../core/widgets/glass/top_frost.dart';
 import '../../core/widgets/input/pressable.dart';
 import 'chat_store.dart';
 import 'new_message_screen.dart';
+import '../../core/util/app_route.dart';
 
 /// 채팅방 상세 화면 (이름/멤버 초대/공유된 콘텐츠)
 ///
@@ -148,9 +149,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   Future<void> _invite() async {
     final picked = await Navigator.push<List<String>>(
       context,
-      CupertinoPageRoute(
+      appRoute(
+        (_) => NewMessageScreen(inviteMode: true),
         fullscreenDialog: true,
-        builder: (_) => NewMessageScreen(inviteMode: true),
       ),
     );
     if (picked == null || picked.isEmpty || !mounted) return;

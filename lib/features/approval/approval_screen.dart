@@ -29,6 +29,7 @@ import '../../core/util/when.dart';
 import '../../core/widgets/feedback/skeleton.dart';
 import '../../core/util/screen_refresh.dart';
 import '../../core/util/skeleton_delay.dart';
+import '../../core/util/app_route.dart';
 part 'approval_list.dart';
 part 'approval_detail.dart';
 part 'approval_phone.dart';
@@ -205,8 +206,8 @@ class _ApprovalScreenState extends State<ApprovalScreen>
   Future<void> _openDoc(_Doc doc) async {
     await Navigator.push(
       context,
-      CupertinoPageRoute(
-        builder: (_) => _DocDetailScreen(
+      appRoute(
+        (_) => _DocDetailScreen(
           doc: doc,
           onApprove: (d) => _decide(d, approve: true),
           onReject: (d) => _decide(d, approve: false),

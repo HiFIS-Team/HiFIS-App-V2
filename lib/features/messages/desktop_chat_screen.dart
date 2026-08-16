@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/api/chat/chat_api.dart';
@@ -9,6 +8,7 @@ import '../../core/widgets/input/pressable.dart';
 import 'chat_screen.dart';
 import 'message_screen.dart';
 import 'new_message_screen.dart';
+import '../../core/util/app_route.dart';
 
 /// 데스크톱 사내톡 전체보기 (인스타그램 DM 데스크톱 패턴)
 ///
@@ -28,7 +28,7 @@ class _DesktopChatScreenState extends State<DesktopChatScreen> {
   void _openChat(ChatRoom room) {
     // 이전에 보던 채팅방은 스택에 쌓지 않고 갈아끼운다
     _rightNavKey.currentState?.pushAndRemoveUntil(
-      CupertinoPageRoute(builder: (_) => ChatScreen(roomId: room.id)),
+      appRoute((_) => ChatScreen(roomId: room.id)),
       (route) => route.isFirst,
     );
   }
@@ -36,10 +36,7 @@ class _DesktopChatScreenState extends State<DesktopChatScreen> {
   /// 새 사내톡 — **오른쪽 메시지 칸**에 띄운다 (채팅방이 뜨는 그 자리)
   void _newMessage() {
     _rightNavKey.currentState?.push(
-      CupertinoPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => NewMessageScreen(),
-      ),
+      appRoute((_) => NewMessageScreen(), fullscreenDialog: true),
     );
   }
 

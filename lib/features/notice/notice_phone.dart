@@ -37,9 +37,7 @@ class _NoticePhone extends StatelessWidget {
     onChanged();
     final result = await Navigator.push<String>(
       context,
-      CupertinoPageRoute(
-        builder: (_) => _NoticePage(notice: notice, editing: editing),
-      ),
+      appRoute((_) => _NoticePage(notice: notice, editing: editing)),
     );
     if (!context.mounted) return;
     if (result == 'delete') {

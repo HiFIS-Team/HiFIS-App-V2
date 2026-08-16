@@ -1,6 +1,5 @@
 import 'dart:ui';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/api/chat/chat_api.dart';
@@ -39,6 +38,7 @@ import '../staff/staff_screen.dart';
 import '../work/work_screen.dart';
 import 'desktop_sidebar.dart';
 import '../../core/theme/app_shadows.dart';
+import '../../core/util/app_route.dart';
 
 /// 하단 탭바와 탭별 화면을 관리하는 루트 셸
 ///
@@ -542,10 +542,7 @@ class _ChatDockState extends State<_ChatDock> {
   /// 패널을 닫고 콘텐츠 영역 전체를 쓰는 전체보기로 전환한다
   void _expand() {
     setState(() => _open = false);
-    Navigator.push(
-      context,
-      CupertinoPageRoute(builder: (_) => DesktopChatScreen()),
-    );
+    Navigator.push(context, appRoute((_) => DesktopChatScreen()));
   }
 
   /// 아이콘 + `사내톡` + 좌우 여백만 있을 때의 폭
@@ -850,10 +847,8 @@ class _HeaderButtonsState extends State<_HeaderButtons> {
           symbol: 'bell',
           showBadge: unread > 0,
           enabled: !_overlayOpen,
-          onPressed: () => Navigator.push(
-            context,
-            CupertinoPageRoute(builder: (_) => NotificationScreen()),
-          ),
+          onPressed: () =>
+              Navigator.push(context, appRoute((_) => NotificationScreen())),
         ),
       );
     }
@@ -913,10 +908,8 @@ class _HeaderButtonsState extends State<_HeaderButtons> {
               symbol: 'message',
               showBadge: unread > 0,
               enabled: !_overlayOpen,
-              onPressed: () => Navigator.push(
-                context,
-                CupertinoPageRoute(builder: (_) => MessageScreen()),
-              ),
+              onPressed: () =>
+                  Navigator.push(context, appRoute((_) => MessageScreen())),
             ),
           ),
           SizedBox(width: 10),
@@ -933,10 +926,8 @@ class _HeaderButtonsState extends State<_HeaderButtons> {
         GlassIconButton(
           symbol: 'person',
           enabled: !_overlayOpen,
-          onPressed: () => Navigator.push(
-            context,
-            CupertinoPageRoute(builder: (_) => ProfileScreen()),
-          ),
+          onPressed: () =>
+              Navigator.push(context, appRoute((_) => ProfileScreen())),
         ),
       ],
     );

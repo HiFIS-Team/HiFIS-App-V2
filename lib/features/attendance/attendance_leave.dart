@@ -496,7 +496,7 @@ Future<_Leave?> _showLeaveComposer(BuildContext context) {
   if (!isDesktop) {
     return Navigator.push<_Leave>(
       context,
-      CupertinoPageRoute(builder: (_) => _LeaveComposer(phone: true)),
+      appRoute((_) => _LeaveComposer(phone: true)),
     );
   }
   return showAppDialog<_Leave>(context, (context) => _LeaveComposer());

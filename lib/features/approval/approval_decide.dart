@@ -15,9 +15,7 @@ Future<String?> _showDecisionDialog(
   if (!isDesktop) {
     return Navigator.push<String>(
       context,
-      CupertinoPageRoute(
-        builder: (_) => _DecisionDialog(doc: doc, approve: approve),
-      ),
+      appRoute((_) => _DecisionDialog(doc: doc, approve: approve)),
     );
   }
   return showAppDialog<String>(

@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/api/client/api_exception.dart';
@@ -28,6 +27,7 @@ import '../../core/widgets/feedback/failed_card.dart';
 import '../../core/widgets/feedback/skeleton.dart';
 import '../../core/util/screen_refresh.dart';
 import '../../core/util/skeleton_delay.dart';
+import '../../core/util/app_route.dart';
 
 part 'notice_phone.dart';
 part 'notice_list.dart';
@@ -314,9 +314,7 @@ class NoticeBrief {
     _markRead(_notice);
     return Navigator.push(
       context,
-      CupertinoPageRoute(
-        builder: (_) => _NoticePage(notice: _notice, editing: false),
-      ),
+      appRoute((_) => _NoticePage(notice: _notice, editing: false)),
     );
   }
 }

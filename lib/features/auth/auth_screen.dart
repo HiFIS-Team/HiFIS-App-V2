@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -16,6 +15,7 @@ import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../legal/legal_screen.dart';
 import 'auth_session.dart';
+import '../../core/util/app_route.dart';
 
 part 'auth_widgets.dart';
 part 'auth_signup.dart';
@@ -83,7 +83,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _openSignup() async {
     final email = await Navigator.push<String>(
       context,
-      CupertinoPageRoute(builder: (_) => _SignupScreen()),
+      appRoute((_) => _SignupScreen()),
     );
     if (email == null || !mounted) return;
 
@@ -98,7 +98,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _openReset() async {
     final done = await Navigator.push<bool>(
       context,
-      CupertinoPageRoute(builder: (_) => _PasswordResetScreen()),
+      appRoute((_) => _PasswordResetScreen()),
     );
     if (done != true || !mounted) return;
     AppToast.show(context, '비밀번호를 변경했어요');

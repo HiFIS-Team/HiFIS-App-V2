@@ -39,6 +39,7 @@ import '../notifications/notification_screen.dart';
 import '../project/project_screen.dart';
 import '../schedule/schedule_screen.dart';
 import '../../core/widgets/feedback/skeleton.dart';
+import '../../core/util/app_route.dart';
 part 'home_inbox.dart';
 part 'home_staff.dart';
 part 'home_status.dart';
@@ -170,8 +171,7 @@ class _HomeScreenState extends State<HomeScreen>
     if (mounted) setState(() {});
   }
 
-  void _open(Widget screen) =>
-      Navigator.push(context, CupertinoPageRoute(builder: (_) => screen));
+  void _open(Widget screen) => Navigator.push(context, appRoute((_) => screen));
 
   /// 폰 홈 왼쪽 위 바로가기 — 일정 · 전자결재
   ///
