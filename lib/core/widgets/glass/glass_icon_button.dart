@@ -52,11 +52,13 @@ class GlassIconButton extends StatelessWidget {
             // 패키지의 setBrightness가 아이콘 설정을 유실하는 버그가 있어,
             // 테마가 바뀌면 네이티브 버튼을 새로 생성한다.
             key: ValueKey('glass-${stableId ?? symbol}-${AppColors.isDark}'),
-            icon: CNSymbol(
-              symbol,
-              size: size * 0.42,
-              color: symbolColor ?? AppColors.gray700,
-            ),
+            // **색을 안 준다.** 안 주면 패키지가 `.label` 로 두고, 리퀴드
+            // 글래스가 **뒤에 뭐가 있느냐에 맞춰 심볼 색을 뒤집는다**
+            // (vibrancy). 회색으로 못 박으면 그 자동 대비가 죽어서 어두운
+            // 사진 위에서 아이콘이 안 보인다 (사내톡에서 실제로 걸릴 자리).
+            //
+            // 뜻이 있는 색(삭제 빨강·완료 파랑)은 그대로 넘긴다.
+            icon: CNSymbol(symbol, size: size * 0.42, color: symbolColor),
             size: size,
             enabled: enabled,
             onPressed: onPressed ?? () {},
