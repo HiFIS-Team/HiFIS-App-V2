@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -15,6 +17,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/layout.dart';
+import '../../core/util/photo.dart';
 import '../../core/util/platform.dart';
 import '../../core/util/sf_symbols.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
@@ -246,7 +249,24 @@ class _WorkScreenState extends State<WorkScreen>
           );
           if (note == null || !mounted) return;
         }
-        final log = await EnvApi.createLog(item.id, note: note);
+        // 현수막은 사진과 위치를 먼저 받는다 — 창 안에서 사진까지 올리고 온다
+        String? photoUrl;
+        String? place;
+        if (_needsPhoto(item)) {
+          final proof = await showAppDialog<({String url, String place})>(
+            context,
+            (_) => _PhotoProofCard(item: item),
+          );
+          if (proof == null || !mounted) return;
+          photoUrl = proof.url;
+          place = proof.place;
+        }
+        final log = await EnvApi.createLog(
+          item.id,
+          note: note,
+          photoUrl: photoUrl,
+          place: place,
+        );
         if (!mounted) return;
         setState(() => _logs = [log, ..._logs]);
         AppToast.show(
@@ -700,6 +720,198 @@ class _WriteInCardState extends State<_WriteInCard> {
     );
   }
 }
+
+/// 사진과 위치를 반드시 받는 항목 — **서버의 `PHOTO_REQUIRED_ITEMS` 와 같아야 한다**
+///
+/// 여기서 안 막아도 서버가 400 으로 되돌려 보내지만, 그러면 사용자는 누른 뒤에야
+/// 알게 된다. 한쪽만 늘리면 그 항목이 눌러도 안 되는 칩이 되므로 같이 고친다.
+const _photoRequiredItems = {'현수막'};
+
+bool _needsPhoto(EnvItem item) => _photoRequiredItems
+    .map(_WorkScreenState._envKey)
+    .contains(_WorkScreenState._envKey(item.name));
+
+/// 현수막처럼 확인이 필요한 항목의 `+` 를 눌렀을 때 뜨는 창
+///
+/// **사진과 위치를 둘 다 채워야 완료가 눌린다.** 걸었다고 칩만 누르면 실제로
+/// 걸었는지 확인할 방법이 없어서 대표님이 요청한 자리다 (2026-08-18).
+///
+/// 사진은 **이 창 안에서 올리고** 끝나면 닫는다. 닫은 뒤에 올리면 몇 초 동안
+/// 아무 표시가 없어서 칩을 다시 누르게 된다 — 완료 버튼이 스피너로 바뀌는
+/// 편이 지금 무슨 일이 일어나는지 보인다.
+class _PhotoProofCard extends StatefulWidget {
+  _PhotoProofCard({required this.item});
+
+  final EnvItem item;
+
+  @override
+  State<_PhotoProofCard> createState() => _PhotoProofCardState();
+}
+
+class _PhotoProofCardState extends State<_PhotoProofCard> {
+  final _place = TextEditingController();
+
+  /// 고른 사진 — 아직 안 올렸다
+  String? _path;
+  String? _name;
+
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _place.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _place.dispose();
+    super.dispose();
+  }
+
+  bool get _ready => _path != null && _place.text.trim().isNotEmpty;
+
+  Future<void> _pick() async {
+    final picked = await FilePicker.pickFiles(
+      type: isDesktop ? FileType.any : FileType.image,
+      compressionQuality: isDesktop ? 0 : 100,
+    );
+    final file = picked?.files.firstOrNull;
+    if (file?.path case final path?) {
+      setState(() {
+        _path = path;
+        _name = file!.name;
+      });
+    }
+  }
+
+  /// 사진을 줄여 올리고 주소를 돌려준다 — 실패하면 창을 안 닫는다
+  Future<void> _submit() async {
+    if (!_ready || _busy) return;
+    setState(() => _busy = true);
+    try {
+      // 사내톡 사진과 같은 규칙으로 줄인다 (원본 그대로 올리면 장당 몇 MB 다)
+      final (path, name) = await shrinkPhoto(_path!, _name ?? 'photo.jpg');
+      final url = await EnvApi.uploadPhoto(path, filename: name);
+      if (!mounted) return;
+      Navigator.pop(context, (url: url, place: _place.text.trim()));
+    } catch (error) {
+      if (mounted) {
+        setState(() => _busy = false);
+        AppToast.show(context, messageOf(error));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: dialogWidth(context, 320),
+      padding: EdgeInsets.fromLTRB(24, 24, 24, 20),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('어디에 걸었나요?', style: AppTextStyles.title3),
+          SizedBox(height: 6),
+          Text(
+            '${widget.item.name}은(는) 사진과 위치를 남겨야 기록돼요.',
+            style: AppTextStyles.caption.copyWith(height: 1.5),
+          ),
+          SizedBox(height: 14),
+          _photoBox(),
+          SizedBox(height: 10),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppColors.gray50,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: TextField(
+              controller: _place,
+              maxLength: _placeMaxLength,
+              style: AppTextStyles.body1,
+              cursorColor: AppColors.primary,
+              onSubmitted: (_) => _submit(),
+              decoration: InputDecoration(
+                hintText: '예) 정문 앞 도로',
+                hintStyle: AppTextStyles.body1.copyWith(
+                  color: AppColors.gray400,
+                ),
+                border: InputBorder.none,
+                isCollapsed: true,
+                counterText: '',
+              ),
+            ),
+          ),
+          SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: AppButton(
+                  label: '취소',
+                  onTap: () => Navigator.pop(context),
+                ),
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                child: AppButton(
+                  label: '완료',
+                  filled: _ready,
+                  busy: _busy,
+                  onTap: _submit,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 사진 자리 — 고르기 전에는 점선 대신 회색 면에 안내, 고르면 미리보기
+  Widget _photoBox() {
+    return Pressable(
+      onTap: _busy ? () {} : _pick,
+      scale: 0.98,
+      child: Container(
+        height: 132,
+        width: double.infinity,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: AppColors.gray50,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: _path == null
+            ? Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    CupertinoIcons.camera,
+                    size: 22,
+                    color: AppColors.gray400,
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    '사진 고르기',
+                    style: AppTextStyles.body2.copyWith(
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                ],
+              )
+            : Image.file(File(_path!), fit: BoxFit.cover),
+      ),
+    );
+  }
+}
+
+/// 위치 입력 길이 — 기록에 그대로 남는 값이라 서버 컬럼(100)과 맞춘다
+const _placeMaxLength = 30;
 
 /// 수행 기록을 누가 남겼는지 — 서버는 직원 id 만 준다
 String _logAuthor(EnvTaskLog log) =>

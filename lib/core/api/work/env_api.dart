@@ -1,3 +1,5 @@
+import 'package:dio/dio.dart';
+
 import '../client/api_client.dart';
 
 export '../client/period.dart' show dateKey, periodKey;
@@ -57,6 +59,8 @@ class EnvTaskLog {
     required this.points,
     required this.createdAt,
     this.note,
+    this.photoUrl,
+    this.place,
   });
 
   factory EnvTaskLog.fromJson(Map<String, dynamic> json) => EnvTaskLog(
@@ -68,6 +72,8 @@ class EnvTaskLog {
     points: json['points'] as int,
     createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
     note: json['note'] as String?,
+    photoUrl: json['photoUrl'] as String?,
+    place: json['place'] as String?,
   );
 
   final String id;
@@ -83,6 +89,12 @@ class EnvTaskLog {
 
   final DateTime createdAt;
   final String? note;
+
+  /// 수행 사진 — **현수막만 채워진다** (그 항목은 사진 없이 못 남긴다)
+  final String? photoUrl;
+
+  /// 어디에 했는지 — 사진과 짝이다 (현수막을 어디에 걸었나)
+  final String? place;
 }
 
 /// `/env-items` `/env-logs` — 환경정비
@@ -131,12 +143,36 @@ class EnvApi {
   }
 
   /// 수행 기록 남기기 — 항목 배점만큼 환경정비 점수가 쌓인다
-  static Future<EnvTaskLog> createLog(String envItemId, {String? note}) async {
+  static Future<EnvTaskLog> createLog(
+    String envItemId, {
+    String? note,
+    String? photoUrl,
+    String? place,
+  }) async {
     final data = await _client.post(
       '/env-logs',
-      body: {'envItemId': envItemId, 'note': ?note},
+      body: {
+        'envItemId': envItemId,
+        'note': ?note,
+        'photoUrl': ?photoUrl,
+        'place': ?place,
+      },
     );
     return EnvTaskLog.fromJson(data!);
+  }
+
+  /// 수행 사진 올리기 — 돌려받은 주소를 [createLog] 의 `photoUrl` 에 넘긴다
+  ///
+  /// **기록 만들기와 두 번에 나뉘어 있다.** `/env-logs` 는 JSON 을 받는데 파일을
+  /// 실으려면 multipart 로 바꿔야 하고, 그러면 사진이 필요 없는 나머지 21개
+  /// 항목까지 다 같이 바뀐다. 사진을 받는 건 현수막 하나뿐이라 그 항목만
+  /// 한 번 더 부른다.
+  static Future<String> uploadPhoto(String path, {String? filename}) async {
+    final form = FormData.fromMap({
+      'file': await MultipartFile.fromFile(path, filename: filename),
+    });
+    final data = await _client.post('/env-logs/photo', body: form);
+    return data!['url'] as String;
   }
 
   /// 수행 취소 — 쌓였던 점수도 같이 회수된다
