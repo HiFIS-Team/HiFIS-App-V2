@@ -44,6 +44,7 @@ class Event {
     this.memo = '',
     this.members = const [],
     this.pending = false,
+    this.personal = false,
   }) : until = until ?? date;
 
   /// 서버 uuid — null 이면 아직 안 올린 것 (폼이 막 돌려준 값)
@@ -78,6 +79,9 @@ class Event {
   /// 서버가 걸러 주므로 **올린 사람과 MASTER·ADMIN 에게만** 온다.
   final bool pending;
 
+  /// 개인 일정인지 — **본인만 고치고 지운다** (점장·대표도 남의 것은 못 건드린다)
+  final bool personal;
+
   /// 수정 폼에서 삭제를 눌렀다는 표시
   bool deleted = false;
 
@@ -104,11 +108,61 @@ class Event {
   }
 
   /// 고치거나 지울 수 있는지 — 서버 `_get_owned` 와 같은 기준이다
-  bool get canEdit =>
-      id == null ||
-      ownerId == null ||
-      ownerId == currentUser?.id ||
-      myRole.strong;
+  ///
+  /// **개인 일정은 본인만.** 대표가 남의 PT 시간을 열어 고치면 적어 둔 사람이
+  /// 모르는 사이에 바뀐다 — 서버도 `PERSONAL_EVENT` 로 막는다.
+  bool get canEdit {
+    if (id == null || ownerId == null) return true;
+    if (personal) return ownerId == currentUser?.id;
+    return ownerId == currentUser?.id || myRole.strong;
+  }
+}
+
+/// 일정 갈래 — 공통(전사) · 개인 (2026-08-18 대표 결정)
+///
+/// **개인 일정은 본인이 PT 시간 같은 걸 적어 두는 자리다.**
+/// 서버가 `scope` 하나로 가른다 (`app/api/board/events.py` `PERSONAL_SCOPE`).
+///
+/// | | 누가 보나 | 결재 |
+/// |---|---|---|
+/// | 공통 | 전 직원 | MASTER·ADMIN 이 아니면 승인을 받는다 |
+/// | 개인 | **본인만** (MASTER·ADMIN 은 한 사람씩 골라 본다) | 없다 — 바로 뜬다 |
+enum ScheduleScope {
+  company('전사', '공통 일정'),
+  personal('개인', '개인 일정');
+
+  const ScheduleScope(this.wire, this.label);
+
+  /// 서버가 받는 값 — 이미 쌓인 일정이 전부 `전사` 라 그 글자를 그대로 쓴다
+  final String wire;
+
+  final String label;
+}
+
+/// 지금 보고 있는 갈래
+ScheduleScope scheduleScope = ScheduleScope.company;
+
+/// 누구의 개인 일정을 보고 있나 — null 이면 본인
+///
+/// **MASTER·ADMIN 만 남을 고를 수 있다.** 그 밖이 넣어도 서버가 본인 것을 준다.
+String? personalOwnerId;
+
+/// 로그아웃할 때 되돌린다 — 다음 사람에게 앞사람 갈래가 남으면 안 된다
+void resetScheduleScope() {
+  scheduleScope = ScheduleScope.company;
+  personalOwnerId = null;
+  events.clear();
+  _loadedMonths.clear();
+}
+
+/// 갈래나 보는 사람이 바뀌었다 — **받아 둔 걸 통째로 버린다**
+///
+/// 안 버리면 공통 일정과 개인 일정이 한 목록에 섞여서, 갈래를 옮겨도
+/// 앞 갈래 일정이 달력에 그대로 남는다 (문서함이 갈래를 바꿀 때 트리를
+/// 통째로 다시 받는 것과 같다).
+void _resetLoaded() {
+  events.clear();
+  _loadedMonths.clear();
 }
 
 /// 받아 둔 일정. 달을 옮겨도 유지되도록 모듈 전역으로 둔다.
@@ -134,6 +188,11 @@ Future<void> _loadMonth(DateTime month) async {
       59,
       59,
     ).add(Duration(days: 7)),
+    scope: scheduleScope.wire,
+    // 공통 칸에서는 안 보낸다 — 개인 일정을 누구 걸로 볼지와 상관없는 자리다
+    employeeId: scheduleScope == ScheduleScope.personal
+        ? personalOwnerId
+        : null,
   );
   // 넓혀 받은 만큼 옆 달과 겹친다 — 같은 걸 두 번 넣지 않게 id 로 거른다
   final known = {for (final event in events) ?event.id};
@@ -163,6 +222,7 @@ Event _fromServer(CalendarEvent row) {
     members: _namesOf(row.attendeeIds),
     memo: row.memo ?? '',
     pending: row.pending,
+    personal: row.scope == ScheduleScope.personal.wire,
   );
 }
 
@@ -206,10 +266,7 @@ List<String> _idsOf(List<String> names) => [
 String _hexOf(Color color) =>
     '#${(color.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
 
-/// 공개 범위 — 앱에 아직 개념이 없다. 서버가 필수로 받아서 한 값으로만 보낸다
-const _scope = '전사';
-
-/// 새 일정을 올린다
+/// 새 일정을 올린다 — **보고 있는 갈래로 간다**
 Future<Event> _createEvent(Event draft) async {
   final (startAt, endAt) = _range(draft);
   final created = await EventApi.create(
@@ -218,7 +275,7 @@ Future<Event> _createEvent(Event draft) async {
     endAt: endAt,
     allDay: draft.allDay,
     category: draft.kind.label,
-    scope: _scope,
+    scope: scheduleScope.wire,
     color: _hexOf(draft.kind.color),
     place: draft.place.isEmpty ? null : draft.place,
     attendeeIds: _idsOf(draft.members),

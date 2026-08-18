@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/api/client/api_exception.dart';
 import '../../core/api/project/event_api.dart';
 import '../../core/data/current_user.dart';
+import '../../core/data/employee.dart';
 import '../../core/data/staff.dart';
 import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
@@ -14,6 +15,7 @@ import '../../core/widgets/display/scroll_box.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/feedback/reject_reason_dialog.dart';
 import '../../core/widgets/input/mini_button.dart';
+import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/theme/app_decorations.dart';
@@ -113,7 +115,53 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     if (mounted) setState(() {});
   }
 
+  /// 갈래를 옮긴다 — 받아 둔 걸 버리고 다시 받는다
+  void _pickScope(int index) {
+    final next = ScheduleScope.values[index];
+    if (next == scheduleScope) return;
+    setState(() {
+      scheduleScope = next;
+      // 공통으로 돌아가면 보던 사람을 놓는다 — 다시 개인으로 올 때
+      // 남의 달력이 그대로 떠 있으면 자기 것으로 착각한다
+      if (next == ScheduleScope.company) personalOwnerId = null;
+      _resetLoaded();
+      _loading = true;
+    });
+    _load();
+  }
+
+  /// 누구의 개인 일정을 볼지 — **MASTER·ADMIN 만 부른다**
+  Future<void> _pickPerson() async {
+    final picked = await showAppDialog<String>(
+      context,
+      (_) => _PersonPicker(selected: personalOwnerId ?? currentUser?.id),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      personalOwnerId = picked == currentUser?.id ? null : picked;
+      _resetLoaded();
+      _loading = true;
+    });
+    _load();
+  }
+
+  /// 지금 보고 있는 사람 이름 — 개인 칸의 이름 버튼에 뜬다
+  String get _personLabel =>
+      StaffDirectory.instance.byId(personalOwnerId ?? '')?.name ?? '내 일정';
+
+  /// 남의 개인 일정을 보고 있는가 — 그때는 추가를 막는다
+  bool get _viewingOther =>
+      scheduleScope == ScheduleScope.personal &&
+      personalOwnerId != null &&
+      personalOwnerId != currentUser?.id;
+
   Future<void> _add() async {
+    // 남의 달력에 내 일정을 만들게 되는 자리라 아예 안 연다
+    // (서버는 늘 **부른 사람** 것으로 만든다 — owner_id=current.id)
+    if (_viewingOther) {
+      AppToast.show(context, '$_personLabel님 일정은 볼 수만 있어요');
+      return;
+    }
     final now = DateTime.now();
     // 오늘이 보이는 자리면 오늘, 아니면 보고 있는 달·주의 첫날을 기본값으로
     final start = isDesktop ? _month : _week;
@@ -142,6 +190,9 @@ class _ScheduleScreenState extends State<ScheduleScreen>
         onToday: _goToday,
         onAdd: _add,
         onPick: _openDay,
+        onScope: _pickScope,
+        onPerson: _pickPerson,
+        personLabel: _personLabel,
       );
     }
 
@@ -236,6 +287,14 @@ class _ScheduleScreenState extends State<ScheduleScreen>
               ],
             ),
           ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(28, 0, 28, 14),
+            child: _ScopeBar(
+              onScope: _pickScope,
+              onPerson: _pickPerson,
+              personLabel: _personLabel,
+            ),
+          ),
           // 요일 머리
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 28),
@@ -304,6 +363,163 @@ class _ScheduleScreenState extends State<ScheduleScreen>
 const _weekdays = ['일', '월', '화', '수', '목', '금', '토'];
 
 /// 헤더의 달 이동 버튼
+/// 남의 개인 일정을 볼 수 있는 권한 — **MASTER·ADMIN 만** (서버와 같은 기준)
+bool get _canSeeOthers => myRole == Role.master || myRole == Role.admin;
+
+/// `공통 일정 / 개인 일정` 목록바 — 달력 위 한 줄
+///
+/// 업무 화면의 `공통 업무 / 내 업무` 와 **같은 물건**이다 (`SegmentedTabs`).
+/// 한 화면 안에서 칸을 가르는 모양이 둘로 갈리면 안 된다.
+///
+/// 오른쪽 이름 버튼은 **개인 칸이고 MASTER·ADMIN 일 때만** 나온다.
+/// 직원에게는 고를 것이 자기밖에 없어서 자리만 차지한다.
+class _ScopeBar extends StatelessWidget {
+  const _ScopeBar({
+    required this.onScope,
+    required this.onPerson,
+    required this.personLabel,
+  });
+
+  final ValueChanged<int> onScope;
+  final VoidCallback onPerson;
+  final String personLabel;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      SegmentedTabs(
+        labels: [for (final scope in ScheduleScope.values) scope.label],
+        selected: scheduleScope.index,
+        onSelect: onScope,
+        expand: false,
+      ),
+      if (scheduleScope == ScheduleScope.personal && _canSeeOthers) ...[
+        SizedBox(width: 12),
+        Pressable(
+          onTap: onPerson,
+          scale: 0.96,
+          pressedColor: AppColors.gray100,
+          borderRadius: BorderRadius.circular(100),
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                personLabel,
+                style: AppTextStyles.body2.copyWith(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              SizedBox(width: 2),
+              Icon(
+                Icons.expand_more_rounded,
+                size: 18,
+                color: AppColors.textTertiary,
+              ),
+            ],
+          ),
+        ),
+      ],
+    ],
+  );
+}
+
+/// 누구의 개인 일정을 볼지 고르는 시트 — **본인이 맨 위**
+class _PersonPicker extends StatelessWidget {
+  const _PersonPicker({required this.selected});
+
+  /// 지금 보고 있는 사람
+  final String? selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final me = currentUser?.id;
+    final people = [
+      for (final person in StaffDirectory.instance.employees)
+        if (person.id != me) person,
+    ]..sort((a, b) => a.name.compareTo(b.name));
+
+    return Container(
+      width: dialogWidth(context, 320),
+      padding: EdgeInsets.fromLTRB(24, 24, 24, 16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('누구의 일정을 볼까요', style: AppTextStyles.title3),
+          SizedBox(height: 14),
+          ScrollBox(
+            maxHeight: 320,
+            child: Column(
+              children: [
+                if (me != null)
+                  _PersonRow(
+                    name: '내 일정',
+                    picked: selected == me,
+                    onTap: () => Navigator.pop(context, me),
+                  ),
+                for (final person in people)
+                  _PersonRow(
+                    name: person.name,
+                    picked: selected == person.id,
+                    onTap: () => Navigator.pop(context, person.id),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PersonRow extends StatelessWidget {
+  const _PersonRow({
+    required this.name,
+    required this.picked,
+    required this.onTap,
+  });
+
+  final String name;
+  final bool picked;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Pressable(
+    onTap: onTap,
+    scale: 0.98,
+    borderRadius: BorderRadius.circular(12),
+    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+    child: Row(
+      children: [
+        Avatar(
+          name: name == '내 일정' ? (currentUser?.name ?? '') : name,
+          size: 32,
+        ),
+        SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.body2.copyWith(
+              fontWeight: picked ? FontWeight.w700 : FontWeight.w500,
+              color: picked ? AppColors.primary : AppColors.textPrimary,
+            ),
+          ),
+        ),
+        if (picked)
+          Icon(Icons.check_rounded, size: 18, color: AppColors.primary),
+      ],
+    ),
+  );
+}
+
 class _RoundButton extends StatelessWidget {
   _RoundButton({required this.icon, required this.onTap});
 

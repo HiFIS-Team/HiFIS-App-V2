@@ -13,7 +13,10 @@ enum ScoreCategory {
   lesson('CLASS', '수업 개수'),
   contrib('CONTRIB', '센터 기여도'),
   project('PROJECT', '프로젝트 달성'),
-  operator('OPERATOR', '운영자 부여');
+  operator('OPERATOR', '운영자 부여'),
+  // 지각 차감 — **늘 음수다.** 출근 스캔이 자동으로 넣는다.
+  // 안 적어 두면 `parse` 가 운영자 부여로 떨어져 라벨이 틀리게 뜬다.
+  late('LATE', '지각');
 
   const ScoreCategory(this.wire, this.label);
 

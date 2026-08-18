@@ -21,6 +21,7 @@ import '../project/project_screen.dart'
     show resetProjectCache, resetProjectDueModal;
 import '../notice/notice_screen.dart' show resetNoticeCache;
 import '../meeting/meeting_screen.dart' show resetMeetingCache;
+import '../schedule/schedule_screen.dart' show resetScheduleScope;
 import '../staff/staff_screen.dart' show resetStaffCache;
 import '../approval/approval_screen.dart' show resetApprovalCache;
 
@@ -164,6 +165,9 @@ class AuthSession extends ValueNotifier<bool> {
     resetMeetingCache();
     resetStaffCache();
     resetApprovalCache();
+    // 일정은 갈래(공통·개인)와 보던 사람까지 되돌린다 — 안 그러면 다음 사람이
+    // 앞사람의 개인 일정 칸에서 시작한다
+    resetScheduleScope();
     value = false;
   }
 }

@@ -99,6 +99,7 @@ class EventApi {
     DateTime? from,
     DateTime? to,
     String? scope,
+    String? employeeId,
   }) async {
     final rows = await _client.getList(
       '/events',
@@ -106,6 +107,7 @@ class EventApi {
         'from': ?from?.toUtc().toIso8601String(),
         'to': ?to?.toUtc().toIso8601String(),
         'scope': ?scope,
+        'employeeId': ?employeeId,
       },
     );
     return [

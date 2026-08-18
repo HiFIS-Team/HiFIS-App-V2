@@ -20,6 +20,9 @@ class _SchedulePhone extends StatelessWidget {
     required this.onToday,
     required this.onAdd,
     required this.onPick,
+    required this.onScope,
+    required this.onPerson,
+    required this.personLabel,
   });
 
   /// 보고 있는 주의 일요일
@@ -31,6 +34,13 @@ class _SchedulePhone extends StatelessWidget {
   final VoidCallback onToday;
   final VoidCallback onAdd;
   final ValueChanged<DateTime> onPick;
+
+  /// 공통 ↔ 개인 목록바 — PC 와 같은 위젯을 쓴다
+  final ValueChanged<int> onScope;
+
+  /// 개인 칸에서 사람 고르기 (MASTER·ADMIN 만 버튼이 뜬다)
+  final VoidCallback onPerson;
+  final String personLabel;
 
   /// 그 주에 걸치는 날짜 일곱 개
   List<DateTime> get _dates => [
@@ -102,6 +112,12 @@ class _SchedulePhone extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+          SizedBox(height: 12),
+          _ScopeBar(
+            onScope: onScope,
+            onPerson: onPerson,
+            personLabel: personLabel,
           ),
           SizedBox(height: 14),
           Container(
