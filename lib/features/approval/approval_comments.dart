@@ -107,11 +107,17 @@ class _CommentSheetState extends State<_CommentSheet> {
                 ),
               ],
             ),
-            // 키보드가 올라오면 입력바도 같이 올라온다
+            // 키보드가 올라오면 입력바도 같이 올라온다.
+            // 아래 안전 영역을 빼는 이유는 프로젝트 댓글 시트와 같다
+            // ([project_comments.dart] 참고) — 두 시트가 같은 코드라
+            // 한쪽만 고치면 같은 자리에서 다르게 동작한다.
             Positioned(
               left: 16,
               right: 16,
-              bottom: MediaQuery.viewInsetsOf(context).bottom + 12,
+              bottom:
+                  MediaQuery.viewInsetsOf(context).bottom +
+                  MediaQuery.paddingOf(context).bottom +
+                  12,
               child: GlassInputBar(
                 onSend: _send,
                 focusNode: _focus,
