@@ -13,6 +13,7 @@ import '../work/my_task/my_task_section.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
 import '../../core/data/staff_directory.dart';
+import '../../core/util/app_trail.dart';
 import '../../core/util/capture_guard.dart';
 import '../../core/util/push.dart';
 import '../messages/chat_store.dart';
@@ -135,6 +136,9 @@ class AuthSession extends ValueNotifier<bool> {
     // **토큰을 지우기 전에** 부른다 — 이 요청도 로그인 상태여야 나간다.
     // 안 지우면 이 기기로 앞사람 알림이 계속 간다.
     await PushGuard.unregister();
+    // 쌓아 둔 앱 사용 기록도 여기서 올리고 비운다 — **같은 이유다.**
+    // 아래에서 부르면 토큰이 이미 없어서 못 보내고 그대로 버려진다
+    await AppTrail.reset();
     try {
       await AuthApi.logout();
     } catch (_) {

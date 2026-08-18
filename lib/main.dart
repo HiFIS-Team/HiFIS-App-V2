@@ -6,6 +6,7 @@ import 'core/data/current_user.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/theme_controller.dart';
 import 'core/theme/app_theme.dart';
+import 'core/util/app_trail.dart';
 import 'core/util/capture_guard.dart';
 import 'core/util/platform.dart';
 import 'core/util/screen_refresh.dart';
@@ -63,6 +64,11 @@ class _HiFISAppState extends State<HiFISApp> with WidgetsBindingObserver {
     // **프라이버시 커버보다 먼저 본다** — 커버는 모바일 전용이라 아래에서
     // 데스크톱을 걸러내는데, 다시 받는 것은 네 플랫폼 다 필요하다.
     if (state == AppLifecycleState.resumed) appResumed.value++;
+
+    // 앱이 뒤로 갈 때 쌓아 둔 앱 사용 기록을 밀어 넣는다 — 안 그러면 마지막
+    // 10초 치가 앱이 죽을 때 통째로 사라진다. **여기가 제일 중요한 자리다**
+    // (앱을 껐다 켜며 무언가를 하는 흐름이 그대로 안 남는다)
+    if (state != AppLifecycleState.resumed) unawaited(AppTrail.flush());
 
     // 데스크톱에서는 창이 포커스만 잃어도 inactive가 되어 커버가 덮이므로
     // (앱이 멈춘 것처럼 보인다) 프라이버시 커버를 모바일에서만 쓴다

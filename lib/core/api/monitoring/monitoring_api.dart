@@ -234,11 +234,22 @@ class MonitoringApi {
   ///
   /// 서버는 따로 저장하지 않는다. 쓰기 요청이라 활동 로그에 그대로 남고,
   /// 짧은 시간에 여러 번이면 이상 징후로 올라간다.
+  /// 앱 사용 기록을 **묶어서** 올린다 — 줄마다 부르면 요청이 수십 배가 된다
+  ///
+  /// 쌓고 보내는 규칙은 [AppTrail] 이 정한다. 여기는 보내기만 한다.
+  static Future<void> sendTrails(List<Map<String, dynamic>> items) =>
+      _client.post('/trails', body: {'items': items});
+
+  /// [kind] — `screenshot` · `recording`(녹화·미러링 시작) · `recording_end`(끝)
+  ///
+  /// [seconds] 는 `recording_end` 만 채운다. 서버가 멈춤 알림에 붙인다
+  /// (`3분 12초 동안`).
   static Future<void> reportCapture({
     required String platform,
     String kind = 'screenshot',
+    int? seconds,
   }) => _client.post(
     '/security/capture',
-    body: {'platform': platform, 'kind': kind},
+    body: {'platform': platform, 'kind': kind, 'seconds': ?seconds},
   );
 }

@@ -15,6 +15,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
+import '../../core/util/app_trail.dart';
 import '../../core/util/skeleton_delay.dart';
 import '../../core/widgets/display/avatar.dart';
 import '../../core/widgets/display/placeholder_screen.dart';
@@ -150,6 +151,7 @@ class _StaffScreenState extends State<StaffScreen>
   }
 
   Future<void> _open(_Member member) async {
+    AppTrail.view('직원 상세', target: member.name, id: member.id);
     await showFullPage<void>(context, (_) => _MemberDetail(member: member));
     // 상세에서 인사 정보를 바꿨을 수 있다 — 명단은 `_replaceMember` 가 이미
     // 갈아끼웠으므로 다시 그리기만 하면 된다

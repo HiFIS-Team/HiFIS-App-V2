@@ -14,6 +14,7 @@ import '../../core/util/push.dart';
 import '../../core/util/sf_symbols.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/input/pressable.dart';
+import '../../core/util/app_trail.dart';
 import '../../core/widgets/nav/android_tab_bar.dart';
 import '../../core/widgets/nav/app_tab_bar.dart';
 import '../../core/widgets/nav/branch_scope_button.dart';
@@ -223,6 +224,36 @@ class _MainShellState extends State<MainShell> {
   int _mainIndex = 0;
   int _subIndex = 1;
 
+  /// 탭·사이드바가 여는 화면의 한국어 이름 — **앱 사용 기록에 남는 이름이다**
+  ///
+  /// 순서가 위 목록들과 맞아야 한다. 어긋나면 엉뚱한 화면 이름이 기록된다.
+  static const _phoneNames = [
+    // 메인 바
+    '홈', '업무', '프로젝트', '회의록',
+    // 서브 바 (0번 뒤로가기는 화면이 아니라 뺀다)
+    '근태·월차', '급여', '공지', '랭킹',
+  ];
+  static const _desktopNames = [
+    '홈',
+    '업무',
+    '프로젝트',
+    '일정',
+    '회의록',
+    '문서함',
+    '결재',
+    '조직도',
+    '근태·월차',
+    '급여',
+    '공지',
+    '랭킹',
+    '모니터링',
+  ];
+
+  /// 화면을 열었다고 남긴다 — 목록 밖 번호면 조용히 넘어간다
+  static void _trailScreen(List<String> names, int index) {
+    if (index >= 0 && index < names.length) AppTrail.screen(names[index]);
+  }
+
   void _onMainTap(int i) {
     if (i == _mainSymbols.length - 1) {
       // "전체" 탭 → 서브 바로 전환, 첫 서브 화면(근태월차)으로
@@ -230,8 +261,10 @@ class _MainShellState extends State<MainShell> {
         _subMenu = true;
         _subIndex = 1;
       });
+      _trailScreen(_phoneNames, _mainSymbols.length - 1);
     } else {
       setState(() => _mainIndex = i);
+      _trailScreen(_phoneNames, i);
     }
   }
 
@@ -239,8 +272,11 @@ class _MainShellState extends State<MainShell> {
     if (i == 0) {
       // 뒤로가기 → 메인 바 복귀 (이전 탭 유지)
       setState(() => _subMenu = false);
+      _trailScreen(_phoneNames, _mainIndex);
     } else {
       setState(() => _subIndex = i);
+      // 서브 바는 메인 바(뒤로가기 뺀 4칸) 뒤에 이어 붙는다
+      _trailScreen(_phoneNames, _mainSymbols.length - 1 + i - 1);
     }
   }
 
@@ -297,6 +333,7 @@ class _MainShellState extends State<MainShell> {
                 // 열려 있는 슬라이드인 화면을 닫고 탭을 바꾼다
                 _paneNavKey.currentState?.popUntil((r) => r.isFirst);
                 _paneIndex.value = i;
+                _trailScreen(_desktopNames, i);
               },
             ),
           ),

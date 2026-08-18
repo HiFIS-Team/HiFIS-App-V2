@@ -44,6 +44,12 @@ class CaptureGuard {
 
   static bool _wired = false;
 
+  /// 녹화·미러링이 시작된 시각 — 멈출 때 몇 초였는지 재려고 들고 있는다
+  ///
+  /// **앱이 잰다.** 서버가 시작 기록을 뒤져 짝을 맞추려 하면 앱을 껐다 켜거나
+  /// 신고가 유실됐을 때 짝이 어긋나 엉뚱한 값이 나온다.
+  static DateTime? _recordingSince;
+
   /// 지금 켜져 있어야 하는가 — 로그인 전(=권한 모름)에도 켠다
   static bool get _wanted => myRole != Role.master;
 
@@ -74,11 +80,23 @@ class CaptureGuard {
         // 스크린샷이 찍혔다 — 막지 못했으니 남기기라도 한다
         case 'onScreenshot':
           _report('screenshot');
-        // 녹화·미러링이 시작·종료됐다
+        // 녹화·미러링이 시작·종료됐다 — **둘 다 알린다** (2026-08-18)
+        //
+        // 예전에는 시작만 보내서 얼마나 오래 내보냈는지를 알 방법이 없었다.
+        // 대표에게 바로 푸시가 가는 자리라 멈춘 것도 알아야 한다.
         case 'onCaptureChanged':
           final on = call.arguments as bool? ?? false;
           recording.value = on && _wanted;
-          if (on) _report('recording');
+          if (on) {
+            _recordingSince = DateTime.now();
+            _report('recording');
+          } else if (_recordingSince != null) {
+            final seconds = DateTime.now()
+                .difference(_recordingSince!)
+                .inSeconds;
+            _recordingSince = null;
+            _report('recording_end', seconds: seconds);
+          }
       }
       return null;
     });
@@ -88,12 +106,14 @@ class CaptureGuard {
   ///
   /// **대표는 안 보낸다** (애초에 막지도 않는다). 로그인 전에도 안 보낸다 —
   /// 토큰이 없어 401 이 날 뿐이다.
-  static void _report(String kind) {
+  static void _report(String kind, {int? seconds}) {
     if (!_wanted || currentUser == null) return;
     // 기다리지 않는다 — 찍는 순간 화면이 멈추면 안 된다
-    MonitoringApi.reportCapture(platform: platformName, kind: kind).catchError((
-      error,
-    ) {
+    MonitoringApi.reportCapture(
+      platform: platformName,
+      kind: kind,
+      seconds: seconds,
+    ).catchError((error) {
       debugPrint('캡처 신고 실패: $error');
     });
   }

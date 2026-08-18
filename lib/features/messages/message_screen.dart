@@ -8,6 +8,7 @@ import '../../core/data/staff.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
+import '../../core/util/app_trail.dart';
 import '../../core/util/sf_symbols.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
@@ -579,6 +580,7 @@ class _ConversationTile extends StatelessWidget {
           onOpen!(room);
           return;
         }
+        AppTrail.view('사내톡 방', target: room.name ?? '이름 없는 방', id: room.id);
         Navigator.push(
           context,
           CupertinoPageRoute(builder: (_) => ChatScreen(roomId: room.id)),

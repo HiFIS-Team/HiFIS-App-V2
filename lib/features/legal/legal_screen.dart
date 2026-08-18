@@ -15,7 +15,7 @@ import '../../core/widgets/nav/phone_scaffold.dart';
 /// 쓰므로 사본을 만들지 않는다 — 두 벌이 되면 반드시 한쪽만 고쳐진다.
 enum LegalDocument {
   terms('이용약관', 'assets/legal/terms.md', 'TERMS', '2026-08-01'),
-  privacy('개인정보처리방침', 'assets/legal/privacy.md', 'PRIVACY', '2026-08-01');
+  privacy('개인정보처리방침', 'assets/legal/privacy.md', 'PRIVACY', '2026-08-19');
 
   const LegalDocument(this.title, this.asset, this.wire, this.version);
 

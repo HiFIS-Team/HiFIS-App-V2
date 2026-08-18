@@ -6,6 +6,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/util/skeleton_delay.dart';
+import '../../core/util/app_trail.dart';
 
 import '../../core/api/client/api_exception.dart';
 import '../../core/api/docs/document_api.dart';
@@ -155,6 +156,8 @@ class _DocumentScreenState extends State<DocumentScreen>
 
   void _open(_Item item) {
     if (!item.isFolder) {
+      // 무엇을 열어 봤는지 남긴다 — 유출을 되짚을 때 제일 먼저 보는 자리다
+      AppTrail.view('문서 열람', target: item.name, id: item.id);
       _showFilePreview(context, item, onDownload: () => _download(item));
       return;
     }
@@ -612,6 +615,9 @@ class _DocumentScreenState extends State<DocumentScreen>
       fileName: item.name,
     );
     if (target == null || !mounted) return;
+    // **내려받기는 조회 요청(GET)이라 활동 로그에 안 남는다.** 여기서 안 남기면
+    // 파일을 받아 간 흔적이 어디에도 안 남는다
+    AppTrail.view('문서 내려받기', target: item.name, id: item.id);
 
     setState(() => _downloading = true);
     try {
