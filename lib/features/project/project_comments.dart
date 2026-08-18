@@ -88,11 +88,23 @@ class _CommentSheetState extends State<_CommentSheet> {
                 ),
               ],
             ),
-            // 키보드가 올라오면 입력바도 같이 올라온다
+            // 키보드가 올라오면 입력바도 같이 올라온다.
+            //
+            // **안드로이드는 시스템 하단바만큼 더 띄운다.** 화면 맨 아래를
+            // 제스처 바(24)나 3버튼 바(48)가 차지해서, 12만 띄우면 입력바가
+            // 그 밑으로 들어가 가린다 (3버튼이면 거의 다 덮인다).
+            // 바로 위 목록은 이미 `paddingOf(context).bottom` 을 빼고 있었다 —
+            // 입력바만 빠뜨린 자리다.
+            //
+            // 키보드가 올라오면 `paddingOf` 가 0이 되고 `viewInsetsOf` 에
+            // 하단바가 포함되므로 두 값을 더해도 겹치지 않는다.
             Positioned(
               left: 16,
               right: 16,
-              bottom: MediaQuery.viewInsetsOf(context).bottom + 12,
+              bottom:
+                  MediaQuery.viewInsetsOf(context).bottom +
+                  (isApple ? 0 : MediaQuery.paddingOf(context).bottom) +
+                  12,
               child: GlassInputBar(
                 onSend: _send,
                 focusNode: _focus,

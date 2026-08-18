@@ -15,6 +15,7 @@ import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
+import '../../core/util/sf_symbols.dart';
 import '../../core/widgets/display/avatar.dart';
 import '../../core/widgets/display/scroll_box.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
