@@ -586,147 +586,93 @@ class _MemberChip extends StatelessWidget {
   }
 }
 
-/// 참여 멤버 관리 — 직원을 눌러 넣고 뺀 뒤 '추가' 로 확정한다
+/// 참여 인원 보기 — **읽기만 한다** (2026-08-19)
 ///
-/// **고르는 동안에는 프로젝트를 안 건드린다.** 팝업 안에서만 담아 두고
-/// '추가' 를 눌러야 반영한다 — 그래야 '취소' 가 뜻이 있다.
-/// (예전에는 누르는 즉시 반영돼서 되돌릴 방법이 없었다.)
-void _showMemberManager(
-  BuildContext context,
-  _Project project,
-  VoidCallback onChanged,
-) {
-  final picked = {...project.members};
+/// 담당자가 맨 위, 그다음이 참여 멤버다. 사람을 넣는 건 `+` 쪽
+/// (`_requestMembers`)이고 그건 대표 결재를 받는다.
+///
+/// 예전에는 여기가 '참여 멤버 관리' 라 **전 직원이 뜨고 눌러서 넣고 뺐는데,
+/// 그 결과가 서버로 안 갔다** — 화면에서만 바뀌었다가 목록을 다시 받으면
+/// 되돌아왔다. 지금은 인원 변경이 결재를 거치므로 여기서 고칠 것이 없다.
+void _showMemberList(BuildContext context, _Project project) {
+  // 담당자를 맨 위로 올린다 — 나머지는 받은 차례 그대로
+  final owner = project.owner;
+  final names = [
+    if (project.members.contains(owner)) owner,
+    for (final name in project.members)
+      if (name != owner) name,
+  ];
 
-  showAppDialog<bool>(
+  showAppDialog<void>(
     context,
-    (context) => StatefulBuilder(
-      builder: (context, setLocal) => Container(
-        width: dialogWidth(context, 300),
-        padding: EdgeInsets.fromLTRB(16, 18, 16, 14),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 6),
-              child: Text('참여 멤버', style: AppTextStyles.title3),
-            ),
-            SizedBox(height: 8),
-            // 직원이 늘면 팝업이 화면 밖으로 나간다 — 높이만 막고 안에서 스크롤
-            ScrollBox(
-              maxHeight: kListBoxHeight,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (final staff in staffList)
-                    _MemberToggleRow(
-                      staff: staff,
-                      joined: picked.contains(staff.name),
-                      onTap: () {
-                        setLocal(() {
-                          if (!picked.remove(staff.name)) {
-                            picked.add(staff.name);
-                          }
-                        });
-                        HapticFeedback.selectionClick();
-                      },
-                    ),
-                ],
-              ),
-            ),
-            SizedBox(height: 14),
-            Row(
+    (context) => Container(
+      width: dialogWidth(context, 300),
+      padding: EdgeInsets.fromLTRB(16, 18, 16, 14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 6),
+            child: Text('참여 인원', style: AppTextStyles.title3),
+          ),
+          SizedBox(height: 8),
+          // 인원이 늘면 팝업이 화면 밖으로 나간다 — 높이만 막고 안에서 스크롤
+          ScrollBox(
+            maxHeight: kListBoxHeight,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: AppButton(
-                    label: '취소',
-                    onTap: () => Navigator.pop(context, false),
-                  ),
-                ),
-                SizedBox(width: 8),
-                Expanded(
-                  child: AppButton(
-                    label: '추가',
-                    filled: true,
-                    onTap: () => Navigator.pop(context, true),
-                  ),
-                ),
+                for (final name in names)
+                  _MemberRow(name: name, owner: name == owner),
               ],
             ),
-          ],
-        ),
+          ),
+          SizedBox(height: 14),
+          AppButton(label: '닫기', onTap: () => Navigator.pop(context)),
+        ],
       ),
     ),
-  ).then((confirmed) {
-    // 바깥을 눌러 닫으면 null 이다 — 취소와 같이 다룬다
-    if (confirmed != true) return;
-    project.members
-      ..clear()
-      ..addAll(picked);
-    // 빠진 사람이 맡고 있던 할 일은 담당자를 비운다
-    for (final todo in project.todos) {
-      if (todo.assignee case final name? when !picked.contains(name)) {
-        todo.assignee = null;
-      }
-    }
-    onChanged();
-  });
+  );
 }
 
-/// 멤버 관리 한 줄 — 오른쪽 동그라미로 참여 여부를 보여준다
-class _MemberToggleRow extends StatelessWidget {
-  _MemberToggleRow({
-    required this.staff,
-    required this.joined,
-    required this.onTap,
-  });
+/// 참여 인원 한 줄 — 담당자에게만 오른쪽에 표가 붙는다
+class _MemberRow extends StatelessWidget {
+  _MemberRow({required this.name, required this.owner});
 
-  final Staff staff;
-  final bool joined;
-  final VoidCallback onTap;
+  final String name;
+  final bool owner;
 
   @override
   Widget build(BuildContext context) {
-    return Pressable(
-      onTap: onTap,
-      scale: 0.98,
-      pressedColor: AppColors.gray100,
-      borderRadius: BorderRadius.circular(12),
+    return Padding(
       padding: EdgeInsets.symmetric(horizontal: 6, vertical: 7),
       child: Row(
         children: [
-          Avatar(name: staff.name, size: 32),
+          Avatar(name: name, size: 32),
           SizedBox(width: 10),
           Expanded(
             child: Text(
-              staff.name == me ? '${staff.name} (나)' : staff.name,
+              name == me ? '$name (나)' : name,
               style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w600),
             ),
           ),
-          Text(staff.role, style: AppTextStyles.caption),
-          SizedBox(width: 10),
-          Container(
-            width: 22,
-            height: 22,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: joined ? AppColors.primary : Colors.transparent,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: joined ? AppColors.primary : AppColors.gray300,
-                width: 1.5,
+          if (owner)
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppColors.gray50,
+                borderRadius: BorderRadius.circular(8),
               ),
-            ),
-            child: joined
-                ? Icon(Icons.check_rounded, size: 14, color: Colors.white)
-                : null,
-          ),
+              child: Text('담당자', style: AppTextStyles.caption),
+            )
+          else
+            Text(staffOf(name).role, style: AppTextStyles.caption),
         ],
       ),
     );

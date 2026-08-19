@@ -487,7 +487,7 @@ class _ProjectDetail extends StatelessWidget {
           ),
         ),
         SizedBox(width: 16),
-        _MemberBar(project: project, onChanged: onChanged),
+        _MemberBar(project: project, onAdd: () => _requestMembers(context)),
       ],
     ),
     SizedBox(height: 6),
@@ -550,7 +550,9 @@ class _ProjectDetail extends StatelessWidget {
     SizedBox(height: 12),
     // 연장 신청은 상단 글래스 버튼으로 올라가 여기엔 참여자만 남는다
     Row(
-      children: [_MemberBar(project: project, onChanged: onChanged)],
+      children: [
+        _MemberBar(project: project, onAdd: () => _requestMembers(context)),
+      ],
     ),
   ];
 
@@ -763,27 +765,45 @@ class _ExtensionCard extends StatelessWidget {
   }
 }
 
-/// 헤더 오른쪽 참여자 — 누르면 멤버 관리가 열린다
+/// 헤더 오른쪽 참여자 — **아바타와 `+` 가 서로 다른 일을 한다** (2026-08-19)
+///
+/// | 누른 곳 | 열리는 것 |
+/// |---|---|
+/// | 아바타 | 지금 참여 중인 사람 — 담당자부터, **읽기만 한다** |
+/// | `+` | 인원 추가 신청 — **참여 안 한 사람만** 고른다 (승인을 받는다) |
+///
+/// 예전에는 둘이 한 버튼이라 어디를 눌러도 전 직원 목록이 떴고, 거기서
+/// 켜고 끈 것이 **서버에 안 갔다** (화면에서만 바뀌었다가 다시 받으면 되돌아왔다).
 class _MemberBar extends StatelessWidget {
-  _MemberBar({required this.project, required this.onChanged});
+  _MemberBar({required this.project, required this.onAdd});
 
   final _Project project;
-  final VoidCallback onChanged;
+
+  /// `+` 를 눌렀을 때 — 상세가 들고 있는 인원 추가 신청으로 이어진다
+  final VoidCallback onAdd;
 
   @override
   Widget build(BuildContext context) {
-    return Pressable(
-      onTap: () => _showMemberManager(context, project, onChanged),
-      scale: 0.97,
-      pressedColor: AppColors.gray100,
-      borderRadius: BorderRadius.circular(100),
-      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AvatarStack(names: project.members, size: 28),
-          SizedBox(width: 6),
-          Container(
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Pressable(
+          onTap: () => _showMemberList(context, project),
+          scale: 0.97,
+          pressedColor: AppColors.gray100,
+          borderRadius: BorderRadius.circular(100),
+          // 둘로 나누면서도 **자리는 그대로 둔다** — 예전에는 한 버튼이
+          // 좌우 6 을 두고 가운데 틈이 6 이었다. 안쪽을 3+3 으로 나눠 맞춘다
+          padding: EdgeInsets.fromLTRB(6, 4, 3, 4),
+          child: AvatarStack(names: project.members, size: 28),
+        ),
+        Pressable(
+          onTap: onAdd,
+          scale: 0.9,
+          pressedColor: AppColors.gray100,
+          borderRadius: BorderRadius.circular(100),
+          padding: EdgeInsets.fromLTRB(3, 4, 6, 4),
+          child: Container(
             width: 28,
             height: 28,
             alignment: Alignment.center,
@@ -797,8 +817,8 @@ class _MemberBar extends StatelessWidget {
               color: AppColors.textSecondary,
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
