@@ -778,10 +778,15 @@ class _ProjectDetail extends StatelessWidget {
       ),
     ],
     SizedBox(height: 12),
-    // 연장 신청은 상단 글래스 버튼으로 올라가 여기엔 참여자만 남는다
+    // 연장·수정·인원 추가는 상단 글래스 버튼으로 올라가 여기엔 참여자만 남는다.
+    // 아바타를 누르면 참여 인원이 뜨는 것은 그대로다
     Row(
       children: [
-        _MemberBar(project: project, onAdd: () => _requestMembers(context)),
+        _MemberBar(
+          project: project,
+          onAdd: () => _requestMembers(context),
+          showAdd: false,
+        ),
       ],
     ),
   ];
@@ -1014,12 +1019,16 @@ class _ExtensionCard extends StatelessWidget {
 /// 예전에는 둘이 한 버튼이라 어디를 눌러도 전 직원 목록이 떴고, 거기서
 /// 켜고 끈 것이 **서버에 안 갔다** (화면에서만 바뀌었다가 다시 받으면 되돌아왔다).
 class _MemberBar extends StatelessWidget {
-  _MemberBar({required this.project, required this.onAdd});
+  _MemberBar({required this.project, required this.onAdd, this.showAdd = true});
 
   final _Project project;
 
   /// `+` 를 눌렀을 때 — 상세가 들고 있는 인원 추가 신청으로 이어진다
   final VoidCallback onAdd;
+
+  /// `+` 를 그릴까 — **폰은 안 그린다** (2026-08-19).
+  /// 상단 글래스 `사람+` 가 같은 일을 해서 한 화면에 둘로 보였다.
+  final bool showAdd;
 
   @override
   Widget build(BuildContext context) {
@@ -1033,30 +1042,33 @@ class _MemberBar extends StatelessWidget {
           borderRadius: BorderRadius.circular(100),
           // 둘로 나누면서도 **자리는 그대로 둔다** — 예전에는 한 버튼이
           // 좌우 6 을 두고 가운데 틈이 6 이었다. 안쪽을 3+3 으로 나눠 맞춘다
-          padding: EdgeInsets.fromLTRB(6, 4, 3, 4),
+          padding: showAdd
+              ? EdgeInsets.fromLTRB(6, 4, 3, 4)
+              : EdgeInsets.symmetric(horizontal: 6, vertical: 4),
           child: AvatarStack(names: project.members, size: 28),
         ),
-        Pressable(
-          onTap: onAdd,
-          scale: 0.9,
-          pressedColor: AppColors.gray100,
-          borderRadius: BorderRadius.circular(100),
-          padding: EdgeInsets.fromLTRB(3, 4, 6, 4),
-          child: Container(
-            width: 28,
-            height: 28,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.gray50,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.person_add_alt_rounded,
-              size: 15,
-              color: AppColors.textSecondary,
+        if (showAdd)
+          Pressable(
+            onTap: onAdd,
+            scale: 0.9,
+            pressedColor: AppColors.gray100,
+            borderRadius: BorderRadius.circular(100),
+            padding: EdgeInsets.fromLTRB(3, 4, 6, 4),
+            child: Container(
+              width: 28,
+              height: 28,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.gray50,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.person_add_alt_rounded,
+                size: 15,
+                color: AppColors.textSecondary,
+              ),
             ),
           ),
-        ),
       ],
     );
   }
