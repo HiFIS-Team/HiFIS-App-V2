@@ -91,6 +91,11 @@ import UserNotifications
       switch call.method {
       case "setSecure":
         self?.guarding = (call.arguments as? Bool) ?? true
+        // **지금 상태를 한 번 알려 준다.** `capturedDidChange` 는 이름 그대로
+        // *바뀔 때만* 오므로, 녹화를 켠 채 앱을 껐다 켜면 알림이 안 온다 —
+        // 새 프로세스는 `recording` 이 false 로 시작해서 **커버가 안 뜬 채로
+        // 화면이 그대로 나간다.** 실제로 이 자리가 뚫렸다 (2026-08-12).
+        self?.pushCaptureState()
         // false = **못 막는다.** 감지만 한다 — Dart 가 이 값으로 갈린다
         result(false)
       default:
@@ -122,8 +127,16 @@ import UserNotifications
 
   @objc private func onCaptureChanged() {
     guard guarding else { return }
+    pushCaptureState()
+  }
+
+  /// 지금 화면이 밖으로 나가는 중인지 Dart 에 알린다
+  ///
+  /// 감시를 끌 때(MASTER)는 무조건 `false` 가 간다 — 안 보내면 앞사람 세션에서
+  /// 올라간 커버가 대표 화면에 그대로 남는다.
+  private func pushCaptureState() {
     // 미러링·에어플레이도 여기 걸린다 — 화면이 다른 데로 나가는 건 매한가지다
-    let capturing = UIScreen.screens.contains { $0.isCaptured }
+    let capturing = guarding && UIScreen.screens.contains { $0.isCaptured }
     captureChannel?.invokeMethod("onCaptureChanged", arguments: capturing)
   }
 

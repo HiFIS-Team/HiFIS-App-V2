@@ -87,10 +87,17 @@ class CaptureGuard {
         case 'onCaptureChanged':
           final on = call.arguments as bool? ?? false;
           recording.value = on && _wanted;
-          if (on) {
+          // 로그인·세션 복원 때마다 **지금 상태**가 다시 온다 (네이티브가
+          // `setSecure` 에서 밀어 준다). 그래서 이미 아는 녹화는 커버만 다시
+          // 세우고 신고하지 않는다 — 안 그러면 한 번 녹화에 신고가 여러 번
+          // 올라가 대표 폰에 같은 푸시가 겹쳐 온다.
+          //
+          // 앱을 껐다 켠 것은 새 프로세스라 여기가 비어 있어 **다시 신고된다.**
+          // 녹화를 켠 채 재실행한 흐름이 그대로 남아야 한다.
+          if (on && _recordingSince == null) {
             _recordingSince = DateTime.now();
             _report('recording');
-          } else if (_recordingSince != null) {
+          } else if (!on && _recordingSince != null) {
             final seconds = DateTime.now()
                 .difference(_recordingSince!)
                 .inSeconds;
