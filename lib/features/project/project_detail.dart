@@ -326,43 +326,56 @@ class _ProjectDetail extends StatelessWidget {
   /// 신청할 때 프로젝트에 바로 쓰고 '되돌리기'를 두면, 승인 전인데 이미 바뀐
   /// 이름이 목록에 뜬다. 바꾸겠다는 값은 신청서(`payload`)가 들고 있다가
   /// 승인되는 순간 옮겨 담긴다.
+  /// 프로젝트 수정 — **자유든 결재든 같은 화면**이다 (2026-08-19)
+  ///
+  /// 만들기와 같은 폼이 지금 값으로 채워진 채 열린다. 갈리는 것은 안쪽뿐이다.
+  ///
+  /// | | 고칠 수 있는 칸 | 저장하면 |
+  /// |---|---|---|
+  /// | 자유 ([_canEditNow]) | 전부 (할 일까지) | 바로 반영 |
+  /// | 결재 | 이름·설명·색 + 사유 | 수정 신청 |
+  ///
+  /// 결재일 때 마감·담당자·참여 멤버·할 일이 잠기는 이유 — 그 셋은 각각
+  /// **다른 결재**(기한 연장·인원 추가)를 타고, 프로젝트당 대기 중인 결재는
+  /// 하나뿐이라 한 폼에서 같이 올릴 수 없다. 할 일은 결재를 아예 안 타서
+  /// 상세 화면의 할 일 카드에서 그대로 고친다.
   Future<void> _requestEdit(BuildContext context) async {
-    // **결재를 안 거쳐도 되면 만들기 페이지를 그대로 채워서 연다** (2026-08-19).
-    // 이름·설명·색뿐 아니라 마감·담당자·참여 멤버·할 일까지 한 화면에서 고친다.
-    if (_canEditNow(project)) {
-      var removed = false;
-      final draft = await _showProjectComposer(
-        context,
-        edit: project,
-        // 삭제는 폼 오른쪽 위 휴지통이 맡는다 (2026-08-19)
-        onDelete: () async {
+    final free = _canEditNow(project);
+    var removed = false;
+
+    final draft = await _showProjectComposer(
+      context,
+      edit: project,
+      // 삭제는 폼 오른쪽 위 휴지통이 맡는다 — 자유면 바로, 아니면 삭제 신청
+      onDelete: () async {
+        if (free) {
           removed = await _applyDelete(context, pop: false);
           return removed;
-        },
-      );
-      if (removed) {
-        // 폼은 스스로 닫혔다 — 폰이면 상세도 같이 닫는다
-        if (context.mounted && Navigator.canPop(context)) {
-          Navigator.pop(context);
         }
-        onChanged();
-        return;
-      }
-      if (draft == null || !context.mounted) return;
-      await _applyEdit(context, draft);
+        return _requestDelete(context);
+      },
+      // 결재로 올릴 때만 불린다 (폼이 사유까지 받아서 넘긴다)
+      onRequest: (draft, reason) => _sendRequest(
+        context,
+        type: ProjectRequestType.edit,
+        payload: {
+          'title': draft.name,
+          'purpose': draft.desc,
+          'color': ?draft.colorHex,
+        },
+        reason: reason,
+      ),
+    );
+
+    if (removed) {
+      // 폼은 스스로 닫혔다 — 폰이면 상세도 같이 닫는다
+      if (context.mounted && Navigator.canPop(context)) Navigator.pop(context);
+      onChanged();
       return;
     }
-    // 결재를 받아야 하는 자리 — **바꿀 수 있는 건 이름·설명·색뿐**이다.
-    // 마감은 기한 연장 결재, 인원은 인원 추가 결재로 길이 따로 있어서
-    // 전체 폼을 열면 고쳐도 안 올라가는 칸이 생긴다.
-    final draft = await _showEditDialog(context, project);
+    // 결재로 올린 경우는 폼이 `onRequest` 로 이미 끝냈다 (draft 가 안 온다)
     if (draft == null || !context.mounted) return;
-    await _sendRequest(
-      context,
-      type: ProjectRequestType.edit,
-      payload: draft.payload,
-      reason: draft.reason,
-    );
+    await _applyEdit(context, draft);
   }
 
   /// 결재를 안 거치고 바로 고친다 ([_canEditNow] 인 사람)
@@ -525,10 +538,11 @@ class _ProjectDetail extends StatelessWidget {
   }
 
   /// 삭제 신청 — 승인 전까지 프로젝트는 그대로 있고 '삭제 대기'만 붙는다
-  Future<void> _requestDelete(BuildContext context) async {
+  /// **올렸으면 true** — 수정 폼이 이 값을 보고 닫을지 정한다
+  Future<bool> _requestDelete(BuildContext context) async {
     final reason = await _showDeleteDialog(context, project);
-    if (reason == null || !context.mounted) return;
-    await _sendRequest(
+    if (reason == null || !context.mounted) return false;
+    return _sendRequest(
       context,
       type: ProjectRequestType.delete,
       reason: reason,
@@ -567,7 +581,7 @@ class _ProjectDetail extends StatelessWidget {
   }
 
   /// 수정·삭제 신청을 올린다 — 둘이 같은 통로라 한 곳에서 보낸다
-  Future<void> _sendRequest(
+  Future<bool> _sendRequest(
     BuildContext context, {
     required ProjectRequestType type,
     required String reason,
@@ -575,7 +589,7 @@ class _ProjectDetail extends StatelessWidget {
     List<String>? addIds,
   }) async {
     final projectId = project.id;
-    if (projectId == null) return;
+    if (projectId == null) return false;
     final label = _requestLabel(type);
     try {
       final saved = await ProjectApi.requestChange(
@@ -596,8 +610,10 @@ class _ProjectDetail extends StatelessWidget {
       _log('$label 신청');
       onChanged();
       if (context.mounted) AppToast.show(context, '$label을 신청했어요');
+      return true;
     } catch (error) {
       if (context.mounted) AppToast.show(context, messageOf(error));
+      return false;
     }
   }
 
@@ -700,20 +716,17 @@ class _ProjectDetail extends StatelessWidget {
   /// 넷 다 **대표 결재를 받는 것**이라 한자리에 모은다. 대기 중인 결재가
   /// 있으면 넷 다 사라진다 (프로젝트당 하나뿐이라 올려도 400 이 난다).
   ///
-  /// **`인원 추가` 는 여기 없다 (2026-08-19).** 참여자 아바타 옆 `+` 가 같은
-  /// 일을 해서 버튼이 두 개로 보였다 — 눈에 띄는 그쪽만 남겼다
-  /// (폰은 상단 글래스 `사람+`).
+  /// **`인원 추가`·`삭제` 는 여기 없다 (2026-08-19).**
+  ///
+  /// - 인원 추가 → 참여자 아바타 옆 `+` (폰은 상단 글래스 `사람+`)
+  /// - 삭제 → **수정 폼 오른쪽 위 휴지통**
+  ///
+  /// 같은 일을 하는 버튼이 두 군데 있으면 안 된다.
   List<Widget> _headActions(BuildContext context) => [
     if (_canExtend) ...[SizedBox(width: 8), _extendButton(context)],
     if (_canTouchProject(project)) ...[
       SizedBox(width: 4),
       _headButton('수정', () => _requestEdit(context)),
-    ],
-    // 삭제는 **결재가 필요할 때만** 여기 있다 — 그냥 지울 수 있는 사람은
-    // 수정 폼 오른쪽 위 휴지통으로 지운다 (버튼이 두 군데 있으면 안 된다)
-    if (_canRequestEdit(project)) ...[
-      SizedBox(width: 4),
-      _headButton('삭제', () => _requestDelete(context), danger: true),
     ],
   ];
 

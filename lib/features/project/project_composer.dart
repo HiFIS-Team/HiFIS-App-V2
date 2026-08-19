@@ -12,6 +12,7 @@ Future<_Project?> _showProjectComposer(
   ProjectSeed? seed,
   _Project? edit,
   Future<bool> Function()? onDelete,
+  Future<bool> Function(_Project draft, String reason)? onRequest,
 }) {
   // 폰은 팝업이 답답해서 오른쪽에서 밀려 들어오는 페이지로 연다
   if (!isDesktop) {
@@ -23,13 +24,19 @@ Future<_Project?> _showProjectComposer(
           seed: seed,
           edit: edit,
           onDelete: onDelete,
+          onRequest: onRequest,
         ),
       ),
     );
   }
   return showAppDialog<_Project>(
     context,
-    (context) => _ProjectComposer(seed: seed, edit: edit, onDelete: onDelete),
+    (context) => _ProjectComposer(
+      seed: seed,
+      edit: edit,
+      onDelete: onDelete,
+      onRequest: onRequest,
+    ),
   );
 }
 
@@ -75,7 +82,13 @@ Future<String?> createProjectFrom(
 }
 
 class _ProjectComposer extends StatefulWidget {
-  _ProjectComposer({this.phone = false, this.seed, this.edit, this.onDelete});
+  _ProjectComposer({
+    this.phone = false,
+    this.seed,
+    this.edit,
+    this.onDelete,
+    this.onRequest,
+  });
 
   /// 폰은 팝업이 아니라 밀려 들어오는 페이지로 뜬다
   final bool phone;
@@ -92,6 +105,13 @@ class _ProjectComposer extends StatefulWidget {
   /// 목록에서 빼는 뒷정리가 거기 있다. 폼은 자리만 내준다.
   final Future<bool> Function()? onDelete;
 
+  /// **결재로 올릴 때** — 값과 사유를 넘긴다. 올렸으면 true 면 폼을 닫는다.
+  ///
+  /// 할 일이 하나라도 체크된 뒤에는 바로 못 고치고 대표 승인을 받는다
+  /// (2026-08-19). 그때도 **화면은 만들 때와 같다** — 고칠 수 있는 칸만
+  /// 이름·설명·색으로 좁아지고 사유 칸이 하나 붙는다.
+  final Future<bool> Function(_Project draft, String reason)? onRequest;
+
   @override
   State<_ProjectComposer> createState() => _ProjectComposerState();
 }
@@ -107,6 +127,9 @@ class _ProjectComposerState extends State<_ProjectComposer> {
     text: _edit?.desc ?? widget.seed?.purpose ?? '',
   );
   final _nameFocus = FocusNode();
+
+  /// 수정 신청 사유 — 결재를 받아야 할 때만 쓴다
+  final _reason = TextEditingController();
 
   /// 기본 마감은 2주 뒤 — 고칠 때는 지금 마감이 든다
   late DateTime _due = _edit?.due ?? DateTime.now().add(Duration(days: 14));
@@ -159,6 +182,7 @@ class _ProjectComposerState extends State<_ProjectComposer> {
   void initState() {
     super.initState();
     _name.addListener(() => setState(() {}));
+    _reason.addListener(() => setState(() {}));
     // 페이지가 밀려 들어오는 중에 키보드가 같이 올라오면 어수선해서
     // 폰에서는 자동 포커스를 두지 않는다
     if (!widget.phone) _nameFocus.requestFocus();
@@ -168,6 +192,7 @@ class _ProjectComposerState extends State<_ProjectComposer> {
   void dispose() {
     _name.dispose();
     _desc.dispose();
+    _reason.dispose();
     _nameFocus.dispose();
     super.dispose();
   }
@@ -213,11 +238,22 @@ class _ProjectComposerState extends State<_ProjectComposer> {
     });
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     final name = _name.text.trim();
     if (name.isEmpty) {
       AppToast.show(context, '프로젝트 이름을 입력해주세요');
       _nameFocus.requestFocus();
+      return;
+    }
+    // 결재로 올리는 자리 — 고친 칸은 이름·설명·색뿐이고 사유가 필요하다
+    if (_needsApproval) {
+      final reason = _reason.text.trim();
+      if (reason.isEmpty) {
+        AppToast.show(context, '왜 고치는지 적어주세요');
+        return;
+      }
+      final sent = await widget.onRequest!.call(_draft(name), reason);
+      if (sent && mounted) Navigator.pop(context);
       return;
     }
     if (_owner.isEmpty) {
@@ -236,27 +272,26 @@ class _ProjectComposerState extends State<_ProjectComposer> {
       AppToast.show(context, '할 일마다 담당자를 정해주세요');
       return;
     }
-    final now = DateTime.now();
-    Navigator.pop(
-      context,
-      _Project(
-        name: name,
-        desc: _desc.text.trim(),
-        colorHex: _hexOf(_color),
-        owner: _owner,
-        start: now,
-        due: _due,
-        // 명단 순서대로 정렬해 두면 아바타 줄이 화면마다 같은 순서로 보인다
-        members: [
-          for (final staff in staffList)
-            if (_members.contains(staff.name)) staff.name,
-        ],
-        todos: _todos,
-        // 타임라인은 서버가 만들면서 '프로젝트를 만들었어요' 를 쌓아 준다
-        events: [],
-      ),
-    );
+    Navigator.pop(context, _draft(name));
   }
+
+  /// 폼에 적힌 것을 그대로 담은 값
+  _Project _draft(String name) => _Project(
+    name: name,
+    desc: _desc.text.trim(),
+    colorHex: _hexOf(_color),
+    owner: _owner,
+    start: _edit?.start ?? DateTime.now(),
+    due: _due,
+    // 명단 순서대로 정렬해 두면 아바타 줄이 화면마다 같은 순서로 보인다
+    members: [
+      for (final staff in staffList)
+        if (_members.contains(staff.name)) staff.name,
+    ],
+    todos: _todos,
+    // 타임라인은 서버가 만들면서 '프로젝트를 만들었어요' 를 쌓아 준다
+    events: [],
+  );
 
   /// 폼 본문 — 팝업(데스크톱)과 페이지(폰)가 같이 쓴다
   Widget _form(BuildContext context, int dday) {
@@ -277,8 +312,10 @@ class _ProjectComposerState extends State<_ProjectComposer> {
           children: [
             SizedBox(width: 62, child: Text('마감일', style: AppTextStyles.label)),
             Pressable(
-              onTap: _pickDue,
-              scale: 0.97,
+              // 결재 모드에서는 마감을 여기서 못 바꾼다 — 기한 연장 결재가
+              // 따로 있고, 프로젝트당 대기 중인 결재는 하나뿐이다
+              onTap: _needsApproval ? _lockedNote : _pickDue,
+              scale: _needsApproval ? 1 : 0.97,
               pressedColor: AppColors.gray100,
               borderRadius: BorderRadius.circular(10),
               padding: EdgeInsets.symmetric(horizontal: 10, vertical: 7),
@@ -310,22 +347,24 @@ class _ProjectComposerState extends State<_ProjectComposer> {
             SizedBox(width: 62, child: Text('담당', style: AppTextStyles.label)),
             _AssigneeChip(
               name: _owner.isEmpty ? null : _owner,
-              onTap: () async {
-                final picked = await _pickMember(
-                  context,
-                  // **명단 전체에서 고른다.** 참여 멤버 중에서만 고르게 하면
-                  // 대표가 프로젝트를 만들 때 멤버부터 넣어야 담당을 고를 수 있다
-                  names: [for (final staff in staffList) staff.name],
-                  current: _owner.isEmpty ? null : _owner,
-                );
-                // 담당은 비울 수 없다 (빈 문자열 = 안 고르고 닫음)
-                if (picked == null || picked.isEmpty) return;
-                setState(() {
-                  _owner = picked;
-                  // 맡은 사람은 당연히 참여한다
-                  if (!_members.contains(picked)) _members.add(picked);
-                });
-              },
+              onTap: _needsApproval
+                  ? _lockedNote
+                  : () async {
+                      final picked = await _pickMember(
+                        context,
+                        // **명단 전체에서 고른다.** 참여 멤버 중에서만 고르게 하면
+                        // 대표가 프로젝트를 만들 때 멤버부터 넣어야 담당을 고를 수 있다
+                        names: [for (final staff in staffList) staff.name],
+                        current: _owner.isEmpty ? null : _owner,
+                      );
+                      // 담당은 비울 수 없다 (빈 문자열 = 안 고르고 닫음)
+                      if (picked == null || picked.isEmpty) return;
+                      setState(() {
+                        _owner = picked;
+                        // 맡은 사람은 당연히 참여한다
+                        if (!_members.contains(picked)) _members.add(picked);
+                      });
+                    },
             ),
           ],
         ),
@@ -366,10 +405,13 @@ class _ProjectComposerState extends State<_ProjectComposer> {
                 _MemberChip(
                   staff: staff,
                   joined: _members.contains(staff.name),
-                  // 나는 담당 기본값이라 빼지 않는다
+                  // 나는 담당 기본값이라 빼지 않는다.
+                  // 결재 모드에서는 인원 추가 결재가 따로 있어서 잠근다
                   onTap: staff.name == me
                       ? null
-                      : () => _toggleMember(staff.name),
+                      : (_needsApproval
+                            ? _lockedNote
+                            : () => _toggleMember(staff.name)),
                 ),
             ],
           ),
@@ -388,11 +430,15 @@ class _ProjectComposerState extends State<_ProjectComposer> {
           ],
         ),
         SizedBox(height: 8),
-        _TodoComposer(
-          members: _members,
-          onAdd: (text, assignee) =>
-              setState(() => _todos.add(_Todo(text: text, assignee: assignee))),
-        ),
+        // 결재 모드에서는 여기서 할 일을 못 고친다 — 상세 화면의 할 일 카드가
+        // 그대로 열려 있고, 거기서 한 변경은 결재를 안 탄다
+        if (!_needsApproval)
+          _TodoComposer(
+            members: _members,
+            onAdd: (text, assignee) => setState(
+              () => _todos.add(_Todo(text: text, assignee: assignee)),
+            ),
+          ),
         for (final todo in _todos)
           Padding(
             padding: EdgeInsets.only(top: 8),
@@ -427,18 +473,25 @@ class _ProjectComposerState extends State<_ProjectComposer> {
                   ),
                 ],
                 SizedBox(width: 6),
-                Pressable(
-                  onTap: () => setState(() => _todos.remove(todo)),
-                  scale: 0.9,
-                  child: Icon(
-                    Icons.close_rounded,
-                    size: 16,
-                    color: AppColors.gray400,
+                if (!_needsApproval)
+                  Pressable(
+                    onTap: () => setState(() => _todos.remove(todo)),
+                    scale: 0.9,
+                    child: Icon(
+                      Icons.close_rounded,
+                      size: 16,
+                      color: AppColors.gray400,
+                    ),
                   ),
-                ),
               ],
             ),
           ),
+        if (_needsApproval) ...[
+          SizedBox(height: 18),
+          Text('수정 사유', style: AppTextStyles.label),
+          SizedBox(height: 8),
+          _Field(controller: _reason, hint: '왜 고치는지 적어주세요', lines: 2),
+        ],
       ],
     );
   }
@@ -458,6 +511,14 @@ class _ProjectComposerState extends State<_ProjectComposer> {
   Future<void> _delete() async {
     final done = await widget.onDelete!.call();
     if (done && mounted) Navigator.pop(context);
+  }
+
+  /// 결재 모드에서 못 고치는 칸을 눌렀을 때 — **왜 안 되는지 알려준다**
+  ///
+  /// 마감은 기한 연장 결재, 인원은 인원 추가 결재로 길이 따로 있고,
+  /// **프로젝트당 대기 중인 결재는 하나뿐**이라 한 폼에서 같이 못 올린다.
+  void _lockedNote() {
+    AppToast.show(context, '할 일이 시작돼서 이름·설명·색만 고칠 수 있어요');
   }
 
   /// 이 수정이 대표 결재를 거쳐야 하나 — 할 일이 하나라도 체크됐으면 그렇다
