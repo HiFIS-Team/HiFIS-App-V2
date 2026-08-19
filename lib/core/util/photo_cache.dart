@@ -8,6 +8,8 @@
 /// 흔히 쓰는 캐시 패키지들은 윈도우 지원이 확실하지 않다.
 library;
 
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import '../api/client/api_client.dart';
@@ -76,10 +78,72 @@ abstract final class PhotoCache {
     }
   }
 
+  // ── 사진 비율 — 받기 전에 자리를 잡으려고 기억해 둔다 ──
+  //
+  // 사진은 **다 받아서 풀기 전에는 높이를 모른다.** 그동안 말풍선이 0 높이로
+  // 서 있다가 사진이 뜨는 순간 늘어나서, 목록이 통째로 밀린다 — 방에 들어가면
+  // 바닥에 붙어 있던 화면이 중간에 서고, 스크롤하면 사진이 뜰 때마다 흔들렸다
+  // (2026-08-19). 대화방이 1.5초 동안 바닥을 붙잡고 있는 것도 그 때문이다.
+  //
+  // 한 번 본 사진은 비율을 적어 두고, 다음부터는 **받기 전에** 그 높이로
+  // 자리를 잡는다. 그러면 사진이 떠도 목록이 안 움직인다.
+  //
+  // 서버가 폭·높이를 안 준다 (`attachments` 가 주소 문자열 목록이다).
+  // 주면 처음 보는 사진도 자리를 잡을 수 있다 — backend-gap 에 적어 뒀다.
+  static final Map<String, double> _ratio = {};
+  static bool _ratioLoaded = false;
+  static bool _ratioDirty = false;
+
+  static File get _ratioFile => File('${_folder().path}/ratios.json');
+
+  static void _loadRatios() {
+    if (_ratioLoaded) return;
+    _ratioLoaded = true;
+    try {
+      final file = _ratioFile;
+      if (!file.existsSync()) return;
+      final data = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+      data.forEach((key, value) {
+        final ratio = value is num ? value.toDouble() : 0.0;
+        if (ratio > 0 && ratio.isFinite) _ratio[key] = ratio;
+      });
+    } catch (_) {
+      // 깨졌으면 없는 셈 친다 — 다시 재면 채워진다
+    }
+  }
+
+  /// 아는 비율(가로÷세로) — **처음 보는 사진이면 null**
+  static double? ratioOf(String url) {
+    _loadRatios();
+    return _ratio[keyOf(url)];
+  }
+
+  /// 방금 푼 사진의 비율을 적어 둔다
+  static void remember(String url, double ratio) {
+    if (!ratio.isFinite || ratio <= 0) return;
+    _loadRatios();
+    final key = keyOf(url);
+    if (_ratio[key] == ratio) return;
+    _ratio[key] = ratio;
+    // 사진 여러 장이 한꺼번에 풀리므로 모아서 한 번만 쓴다
+    if (_ratioDirty) return;
+    _ratioDirty = true;
+    Timer(const Duration(seconds: 1), () {
+      _ratioDirty = false;
+      try {
+        _ratioFile.writeAsStringSync(jsonEncode(_ratio));
+      } catch (_) {
+        // 못 남겨도 이번 실행에서는 메모리 값으로 돈다
+      }
+    });
+  }
+
   /// 로그아웃할 때 비운다 — 다음 사람에게 남의 사진이 남으면 안 된다
   static void clear() {
     _have.clear();
     _busy.clear();
+    _ratio.clear();
+    _ratioLoaded = false;
     try {
       final dir = _dir;
       if (dir != null && dir.existsSync()) dir.deleteSync(recursive: true);

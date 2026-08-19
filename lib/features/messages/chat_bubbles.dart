@@ -149,20 +149,12 @@ class _Attachments extends StatelessWidget {
     child: child,
   );
 
+  /// 사진 비율을 아직 모를 때 잡아 둘 높이 — 가로 사진(4:3) 쯤으로 본다
+  static const _unknownSingle = 165.0;
+
   /// 한 장 — 비율 그대로
-  Widget _single(String url) => ClipRRect(
-    borderRadius: BorderRadius.circular(14),
-    child: ConstrainedBox(
-      constraints: BoxConstraints(maxHeight: _maxSingle),
-      child: chatPhoto(
-        url,
-        width: _width,
-        cacheWidth: _cacheSingle,
-        // 못 받아오면(서명 만료 등) 파일 줄로 떨어진다
-        onError: (_, _, _) => _file(url, _tint),
-      ),
-    ),
-  );
+  Widget _single(String url) =>
+      _SinglePhoto(url: url, onError: (_, _, _) => _file(url, _tint));
 
   /// 여러 장 — 정사각으로 잘라 격자로
   ///
@@ -266,6 +258,80 @@ class _Attachments extends StatelessWidget {
   static String _nameOf(String url) {
     final path = url.split('?').first;
     return path.substring(path.lastIndexOf('/') + 1);
+  }
+}
+
+/// 사진 한 장 — **자리를 먼저 잡고** 그린다
+///
+/// 예전에는 높이를 안 정하고 사진이 스스로 정하게 뒀다. 그러면 다 받아서
+/// 풀기 전까지 **높이가 0** 이라, 사진이 뜨는 순간 말풍선이 확 늘어나면서
+/// 목록이 통째로 밀린다 (2026-08-19).
+///
+/// - 방에 들어가면 바닥에 내려놨는데 사진이 뜨면서 **화면이 중간에 선다**
+/// - 스크롤하면 사진이 하나씩 뜰 때마다 **목록이 흔들린다**
+///
+/// 대화방이 들어갈 때 1.5초 동안 바닥을 붙잡고 있는 것([_pinToBottom])도
+/// 이걸 덮으려던 것이다.
+///
+/// 한 번 본 사진은 [PhotoCache] 가 비율을 들고 있어서 **받기 전에** 제 높이로
+/// 자리를 잡는다 — 사진이 떠도 목록이 안 움직인다. 처음 보는 사진만
+/// [_Attachments._unknownSingle] 로 잡아 두었다가 풀리는 순간 고쳐 잡는다.
+///
+/// **비율을 알 때 그려지는 모양은 예전과 같다** — 예전에도 폭 220 에 높이는
+/// 비율대로였고 280 에서 잘렸다.
+class _SinglePhoto extends StatefulWidget {
+  _SinglePhoto({required this.url, required this.onError});
+
+  final String url;
+  final ImageErrorWidgetBuilder onError;
+
+  @override
+  State<_SinglePhoto> createState() => _SinglePhotoState();
+}
+
+class _SinglePhotoState extends State<_SinglePhoto> {
+  double? _ratio;
+  String? _key;
+
+  /// 이 폭에서 이 비율이면 몇 픽셀인가 — 280 을 넘으면 예전처럼 잘라 보여준다
+  double get _height {
+    final ratio = _ratio;
+    if (ratio == null) return _Attachments._unknownSingle;
+    final natural = _Attachments._width / ratio;
+    return natural > _Attachments._maxSingle
+        ? _Attachments._maxSingle
+        : natural;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // 서명이 갈려도 같은 사진이면 다시 안 묻는다
+    final key = PhotoCache.keyOf(widget.url);
+    if (key != _key) {
+      _key = key;
+      _ratio = PhotoCache.ratioOf(widget.url);
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: SizedBox(
+        width: _Attachments._width,
+        height: _height,
+        child: chatPhoto(
+          widget.url,
+          width: _Attachments._width,
+          cacheWidth: _Attachments._cacheSingle,
+          // 못 받아오면(서명 만료 등) 파일 줄로 떨어진다
+          onError: widget.onError,
+          // 재는 사이에 이 자리가 다른 사진으로 바뀌었으면 버린다
+          // (`ListView` 가 자리를 물려주면 한 State 가 여러 사진을 그린다)
+          onRatio: (ratio) {
+            if (!mounted || _key != key || ratio == _ratio) return;
+            setState(() => _ratio = ratio);
+          },
+        ),
+      ),
+    );
   }
 }
 

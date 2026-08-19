@@ -363,20 +363,25 @@ String _fileNameOf(String url) {
 /// 사진이 열 몇 장 쌓이면 이미지 캐시(100MB)가 넘쳐 오래된 것부터 버려지고,
 /// 스크롤을 올렸다 내리면 **사라졌다가 다시 뜬다** (실기기에서 실제로 났다).
 /// 크게 보기에서는 늘려 보므로 안 준다.
+/// [onRatio] — 사진을 풀어 비율을 알게 되면 알려준다. 자리를 미리 잡는 쪽
+/// ([_Attachments._single])이 그때 제 높이로 고쳐 잡는다.
 Widget chatPhoto(
   String url, {
   double? width,
   int? cacheWidth,
   BoxFit fit = BoxFit.cover,
   ImageErrorWidgetBuilder? onError,
+  ValueChanged<double>? onRatio,
 }) {
-  Widget file(File source, {ImageErrorWidgetBuilder? onFail}) => Image.file(
+  Widget file(File source, {bool fade = true}) => _fileImage(
     source,
+    url: url,
     width: width,
     cacheWidth: cacheWidth,
     fit: fit,
-    frameBuilder: _fadeIn,
-    errorBuilder: onFail ?? onError,
+    fade: fade,
+    onError: onError,
+    onRatio: onRatio,
   );
 
   // 아직 안 올라간 것 — 고르자마자 기기 원본을 그린다
@@ -389,8 +394,12 @@ Widget chatPhoto(
   if (mine != null && File(mine).existsSync()) return file(File(mine));
 
   // 예전에 받아 둔 것 — 첫 프레임부터 뜬다 (흰 칸에서 튀어나오지 않는다)
+  //
+  // **여기서는 서서히 들여보내지 않는다.** 한 번 본 사진이라 자리도 이미
+  // 잡혀 있는데 200ms 를 들여 나타나면 나갔다 들어올 때마다 새로 불러오는
+  // 것처럼 보인다 (2026-08-19). 받아 둔 것은 풀리는 대로 바로 그린다
   final saved = PhotoCache.ready(url);
-  if (saved != null) return file(saved);
+  if (saved != null) return file(saved, fade: false);
 
   return _FetchedPhoto(
     url: url,
@@ -398,7 +407,60 @@ Widget chatPhoto(
     cacheWidth: cacheWidth,
     fit: fit,
     onError: onError,
+    onRatio: onRatio,
   );
+}
+
+/// 기기에 있는 사진 한 장 — 그리면서 **비율을 한 번 재 둔다**
+Widget _fileImage(
+  File source, {
+  required String url,
+  required double? width,
+  required int? cacheWidth,
+  required BoxFit fit,
+  required bool fade,
+  ImageErrorWidgetBuilder? onError,
+  ValueChanged<double>? onRatio,
+}) {
+  // `Image.file(cacheWidth:)` 가 안에서 만드는 것과 같은 것을 직접 만든다 —
+  // 비율을 재려면 그림 공급자를 손에 쥐고 있어야 한다
+  final provider = ResizeImage.resizeIfNeeded(
+    cacheWidth,
+    null,
+    FileImage(source),
+  );
+  _measure(url, provider, onRatio);
+  return Image(
+    image: provider,
+    width: width,
+    fit: fit,
+    frameBuilder: fade ? _fadeIn : null,
+    errorBuilder: onError,
+  );
+}
+
+/// 풀린 사진의 가로세로 비율을 [PhotoCache] 에 적어 둔다 — 한 장에 한 번만
+///
+/// 그리는 데 쓰는 것과 **같은 공급자**를 넘겨받으므로 두 번 받지 않는다
+/// (플러터가 공급자별로 한 줄기만 만든다).
+void _measure(
+  String url,
+  ImageProvider provider,
+  ValueChanged<double>? onRatio,
+) {
+  // 아직 안 올라간 원본은 재도 소용없다 — 올라가면 파일 이름이 바뀐다
+  if (url.startsWith(localFilePrefix)) return;
+  if (PhotoCache.ratioOf(url) != null) return;
+
+  final stream = provider.resolve(ImageConfiguration.empty);
+  late final ImageStreamListener listener;
+  listener = ImageStreamListener((info, _) {
+    stream.removeListener(listener);
+    final ratio = info.image.width / info.image.height;
+    PhotoCache.remember(url, ratio);
+    onRatio?.call(ratio);
+  }, onError: (_, _) => stream.removeListener(listener));
+  stream.addListener(listener);
 }
 
 /// 받아오는 동안 흰 칸이었다가 툭 튀어나오지 않게 살짝 들여 보낸다
@@ -423,6 +485,7 @@ class _FetchedPhoto extends StatefulWidget {
     required this.cacheWidth,
     required this.fit,
     required this.onError,
+    this.onRatio,
   });
 
   final String url;
@@ -430,6 +493,7 @@ class _FetchedPhoto extends StatefulWidget {
   final int? cacheWidth;
   final BoxFit fit;
   final ImageErrorWidgetBuilder? onError;
+  final ValueChanged<double>? onRatio;
 
   @override
   State<_FetchedPhoto> createState() => _FetchedPhotoState();
@@ -455,13 +519,15 @@ class _FetchedPhotoState extends State<_FetchedPhoto> {
   Widget build(BuildContext context) {
     final file = _file;
     if (file != null) {
-      return Image.file(
+      return _fileImage(
         file,
+        url: widget.url,
         width: widget.width,
         cacheWidth: widget.cacheWidth,
         fit: widget.fit,
-        frameBuilder: _fadeIn,
-        errorBuilder: widget.onError,
+        fade: true, // 방금 받아온 것이라 서서히 들여보낸다
+        onError: widget.onError,
+        onRatio: widget.onRatio,
       );
     }
     // 못 받았으면 서버에서 바로 그려 본다 (거기서도 안 되면 부른 쪽이 정한다)
