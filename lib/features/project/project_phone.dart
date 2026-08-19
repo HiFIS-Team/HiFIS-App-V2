@@ -30,8 +30,14 @@ class _ProjectPhone extends StatelessWidget {
   final Future<void> Function(_Project) onOpen;
 
   Future<void> _open(BuildContext context, _Project project) async {
-    await onOpen(project);
-    if (!context.mounted) return;
+    // **받아 둔 것이 있으면 기다리지 않는다.** 들고 있는 줄을 그대로 띄우고,
+    // 새 값은 상세 화면이 받아서 오는 대로 갈아끼운다
+    // (`_ProjectDetailScreenState._load`). 기다리면 눌렀는데 화면이 잠깐
+    // 멈춘 것처럼 보인다 — 두 번째로 여는 것부터는 보여줄 것이 이미 있다
+    if (project.todos.isEmpty && project.events.isEmpty) {
+      await onOpen(project);
+      if (!context.mounted) return;
+    }
     await Navigator.push(
       context,
       CupertinoPageRoute(

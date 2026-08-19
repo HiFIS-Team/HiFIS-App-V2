@@ -119,10 +119,12 @@ class _Project {
 
   /// 만든 사람 uuid — 화면에는 안 쓰고 서버 응답을 그대로 들고만 있는다.
   /// **손댈 권한과 상관없다** ([_isMember] 는 담당자·참여 멤버만 본다)
-  final String? createdById;
+  ///
+  /// 목록을 다시 받으면 [_merged] 가 덮어쓴다 (담당자가 바뀔 수 있다)
+  String? createdById;
 
   /// 담당자 uuid — 이름([owner])은 동명이인에 걸려서 권한 판정에 못 쓴다
-  final String? ownerId;
+  String? ownerId;
   DateTime start;
 
   /// 마감일 — 기한 연장이 승인되면 늘어난다
@@ -206,10 +208,60 @@ Future<void> _loadProjects() async {
     for (final request in await pending) request.projectId: request,
   };
 
+  // **들고 있던 것은 그대로 두고 값만 갈아끼운다** ([_merged]).
+  final byId = {
+    for (final project in _projects)
+      if (project.id != null) project.id!: project,
+  };
+  final next = [
+    for (final row in rows) _merged(byId[row.id], row, requests[row.id]),
+  ];
   _projects
     ..clear()
-    ..addAll([for (final row in rows) _fromServer(row, requests[row.id])]);
+    ..addAll(next);
   _projectsLoaded = true;
+}
+
+/// 서버 값을 **들고 있던 프로젝트에 덮어쓴다** — 처음 보는 것이면 새로 만든다
+///
+/// 예전에는 목록을 받을 때마다 통째로 새로 만들었다. 그러면 상세에서 받아 둔
+/// **할 일·타임라인이 같이 날아가서**, 탭에 다시 들어올 때마다 그 자리가
+/// 비었다가 다시 채워졌다 (2026-08-19). 목록 응답에는 그 둘이 안 들어 있다.
+///
+/// 고른 프로젝트도 같이 풀렸다 — `_selected` 가 버려진 객체를 가리키게 되어
+/// PC 2단에서 **선택이 맨 위로 되돌아갔다** (`_Project` 는 `==` 를 안 고쳐서
+/// 같은 프로젝트라도 다른 것으로 본다).
+///
+/// **받아 둔 내용은 지우지 않고 표시만 내린다.** 그러면 옛 줄을 보여준 채로
+/// 다시 받아서 오는 대로 갈아끼운다 — 그 사이가 비지 않는다
+/// (`.claude/CLAUDE.md` 의 스켈레톤 규칙과 같은 뜻이다).
+_Project _merged(_Project? held, Project row, ProjectRequest? request) {
+  final fresh = _fromServer(row, request);
+  if (held == null) return fresh;
+
+  held
+    ..name = fresh.name
+    ..desc = fresh.desc
+    ..colorHex = fresh.colorHex
+    ..owner = fresh.owner
+    ..ownerId = fresh.ownerId
+    ..createdById = fresh.createdById
+    ..start = fresh.start
+    ..due = fresh.due
+    ..memberIds = fresh.memberIds
+    ..serverProgress = fresh.serverProgress
+    ..serverTodoCount = fresh.serverTodoCount
+    ..serverDoneCount = fresh.serverDoneCount
+    ..request = fresh.request;
+  held.members
+    ..clear()
+    ..addAll(fresh.members);
+
+  // 남이 체크했을 수 있으니 다시 받게 한다 — **내용은 그대로 두고 표시만.**
+  // 지우면 다시 받아오는 사이가 빈다
+  held.todosLoaded = false;
+  held.eventsLoaded = false;
+  return held;
 }
 
 /// 서버 프로젝트 → 화면 모델
