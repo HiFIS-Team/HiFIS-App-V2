@@ -822,15 +822,22 @@ class _ProjectDetail extends StatelessWidget {
     return Stack(
       children: [
         ListView(
+          // 아래는 **떠 있는 하트·댓글 바가 앉을 자리**를 비운다
+          // ([PostActions.inset]) — 안 비우면 마지막 카드가 바에 가린다
           padding: phone
               // 폰 상세는 헤더 뒤로 스크롤되고, 하단바가 없어 화면 아래 여백만 남긴다
               ? EdgeInsets.fromLTRB(
                   20,
                   PhoneDetailScaffold.topPadding,
                   20,
-                  MediaQuery.paddingOf(context).bottom + 32,
+                  MediaQuery.paddingOf(context).bottom + PostActions.inset,
                 )
-              : EdgeInsets.fromLTRB(28, 64, 28, bottomBarInset(context)),
+              : EdgeInsets.fromLTRB(
+                  28,
+                  64,
+                  28,
+                  bottomBarInset(context) + PostActions.inset,
+                ),
           children: [
             if (phone)
               ..._phoneHead(context, dday)
@@ -908,9 +915,9 @@ class _ProjectDetail extends StatelessWidget {
         // 하트·댓글 — 공지·회의록과 같은 위젯, 같은 자리 (2026-08-19).
         // 예전 댓글 카드·티저는 걷어냈다
         Positioned(
-          right: phone ? 8 : 20,
-          top: 0,
-          bottom: 0,
+          left: 0,
+          right: 0,
+          bottom: (phone ? MediaQuery.paddingOf(context).bottom : 0) + 16,
           child: Center(
             child: PostActions(
               target: ReactionTarget.project,

@@ -8,6 +8,7 @@ import '../../data/current_user.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../feedback/app_toast.dart';
+import '../glass/glass_surface.dart';
 import '../input/pressable.dart';
 import 'post_comment_sheet.dart';
 import 'reaction_row.dart';
@@ -23,22 +24,30 @@ export '../../api/notice/reaction_api.dart' show ReactionAgg, ReactionTarget;
 /// 이미 달려 있는 다른 이모지(👍 등)는 DB 에 남아 있지만 화면에는 안 나온다.
 const heartEmoji = '❤️';
 
-/// 글 오른쪽에 세로로 붙는 하트·댓글 (공지·회의록 공용)
+/// 글 아래 떠 있는 하트·댓글 바 (공지·회의록·프로젝트 공용)
 ///
 /// ```
-///   ♡      한 번 누르면 빨갛게 채워진다 · 꾹 누르면 누가 눌렀는지
-///   12
-///
-///   💬     누르면 댓글이 아래에서 올라온다
-///    3
+///        ╭──────────────────────╮
+///        │   ♡ 12      💬 3     │   ← 리퀴드 글래스
+///        ╰──────────────────────╯
 /// ```
 ///
-/// **화면 오른쪽에 떠 있는다** — 글을 스크롤해도 제자리다. 그래서 [Stack] 의
-/// 자식으로 올려 쓴다 (본문 안에 넣으면 같이 밀려 올라간다).
+/// - 하트를 **한 번 누르면** 빨갛게 채워지고, **꾹 누르면** 누가 눌렀는지 뜬다
+/// - 말풍선을 누르면 댓글이 아래에서 올라온다
 ///
-/// 아이콘은 **속이 빈 선**이다. 글래스(네이티브 뷰)를 안 쓰는 이유 —
-/// 글 위에 겹쳐 떠 있는 자리라 배경이 계속 바뀌는데, 글래스는 그 뒤를 흐리게
-/// 만들어 글자가 뭉갠다.
+/// ## 오른쪽 세로 줄이었다가 아래 가로 바가 됐다 (2026-08-19)
+///
+/// 처음에는 인스타처럼 **글 오른쪽에 세로로** 띄웠다. 인스타는 꽉 찬 영상
+/// 위라 아이콘만 얹어도 되는데, 우리는 **흰 카드 위**라 카드 글자와 겹쳐
+/// 얹힌 것처럼 보였다 (`활동 4` 옆에 하트가 물렸다). 캡슐을 둘러 봐도
+/// 여전히 붕 떠 보여서, 앱이 원래 쓰던 자리인 **화면 아래 글래스 바**로 옮겼다.
+///
+/// 검색바·입력바와 **같은 재질**이다 ([GlassSurface]) — 애플에서는 애플이
+/// 직접 그리고, 나머지는 블러로 떨어진다.
+///
+/// ⚠️ 안에 [GlassIconButton] 같은 **네이티브 버튼을 두지 않는다** — 유리 면과
+/// 같은 `Row` 에 두면 탭이 `onPressed` 까지 안 온다 (CLAUDE.md).
+/// 여기 든 것은 전부 [Pressable] + [Icon] 이다.
 class PostActions extends StatefulWidget {
   PostActions({
     super.key,
@@ -65,6 +74,13 @@ class PostActions extends StatefulWidget {
 
   /// 댓글이 늘거나 줄었을 때 — 화면이 자기 모델에 반영한다
   final ValueChanged<int> onCommentCount;
+
+  /// 바 높이
+  static const height = 52.0;
+
+  /// **본문이 비워 줘야 하는 아래 여백** — 목록 padding 에 더한다.
+  /// 바에 가려 마지막 줄이 안 보이면 안 된다
+  static const inset = height + 24;
 
   @override
   State<PostActions> createState() => _PostActionsState();
@@ -133,30 +149,42 @@ class _PostActionsState extends State<PostActions> {
     if (widget.targetId == null) return SizedBox.shrink();
     final hearts = _heart?.count ?? 0;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _ActionButton(
-          icon: _mine ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-          // 내가 누른 하트만 빨갛다 — 개수는 그대로 회색이라 숫자가 안 튄다
-          color: _mine ? AppColors.error : AppColors.textSecondary,
-          count: hearts,
-          onTap: _toggle,
-          onLongPress: _who,
+    return GlassSurface(
+      radius: 26,
+      // 누르는 면이라 유리가 눌리는 반응을 켠다 (검색바와 같다)
+      interactive: true,
+      // 애플이 아닌 곳에서 검색바가 쓰던 값 그대로
+      fallbackColor: AppColors.surface.withValues(alpha: 0.72),
+      fallbackBorder: Border.all(color: AppColors.gray100),
+      child: SizedBox(
+        height: PostActions.height,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _ActionButton(
+              icon: _mine
+                  ? Icons.favorite_rounded
+                  : Icons.favorite_border_rounded,
+              // 내가 누른 하트만 빨갛다 — 개수는 그대로 회색이라 숫자가 안 튄다
+              color: _mine ? AppColors.error : AppColors.textSecondary,
+              count: hearts,
+              onTap: _toggle,
+              onLongPress: _who,
+            ),
+            _ActionButton(
+              icon: Icons.mode_comment_outlined,
+              color: AppColors.textSecondary,
+              count: widget.commentCount,
+              onTap: _comments,
+            ),
+          ],
         ),
-        SizedBox(height: 18),
-        _ActionButton(
-          icon: Icons.mode_comment_outlined,
-          color: AppColors.textSecondary,
-          count: widget.commentCount,
-          onTap: _comments,
-        ),
-      ],
+      ),
     );
   }
 }
 
-/// 아이콘 하나 + 아래 숫자 — 0 이면 숫자를 안 그린다
+/// 아이콘 하나 + 옆 숫자 — 0 이면 숫자를 안 그린다
 class _ActionButton extends StatelessWidget {
   _ActionButton({
     required this.icon,
@@ -179,18 +207,17 @@ class _ActionButton extends StatelessWidget {
       onLongPress: onLongPress,
       scale: 0.86,
       borderRadius: BorderRadius.circular(100),
-      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      child: Column(
+      padding: EdgeInsets.symmetric(horizontal: 18),
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 26, color: color),
-          // 아직 아무도 안 눌렀으면 `0` 대신 비워 둔다 — 글 옆이 덜 어수선하다
+          Icon(icon, size: 22, color: color),
+          // 아직 아무도 안 눌렀으면 `0` 대신 비워 둔다 — 바가 덜 어수선하다
           if (count > 0) ...[
-            SizedBox(height: 3),
+            SizedBox(width: 6),
             Text(
               '$count',
-              style: AppTextStyles.caption.copyWith(
-                fontSize: 12,
+              style: AppTextStyles.body2.copyWith(
                 fontWeight: FontWeight.w700,
                 color: AppColors.textSecondary,
               ),

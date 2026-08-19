@@ -174,15 +174,22 @@ class _NoticeViewState extends State<_NoticeView> {
     return Stack(
       children: [
         ListView(
+          // 아래는 **떠 있는 하트·댓글 바가 앉을 자리**를 비운다
+          // ([PostActions.inset]) — 안 비우면 마지막 줄이 바에 가린다
           padding: phone
               // 폰 본문은 헤더 뒤로 스크롤되고, 하단바가 없어 화면 아래 여백만 남긴다
               ? EdgeInsets.fromLTRB(
                   20,
                   PhoneDetailScaffold.topPadding,
                   20,
-                  MediaQuery.paddingOf(context).bottom + 32,
+                  MediaQuery.paddingOf(context).bottom + PostActions.inset,
                 )
-              : EdgeInsets.fromLTRB(32, 64, 32, bottomBarInset(context)),
+              : EdgeInsets.fromLTRB(
+                  32,
+                  64,
+                  32,
+                  bottomBarInset(context) + PostActions.inset,
+                ),
           children: [
             // 폰은 편집·삭제가 헤더 글래스 버튼으로 올라가 제목만 남는다
             if (phone)
@@ -323,13 +330,12 @@ class _NoticeViewState extends State<_NoticeView> {
             ],
           ],
         ),
-        // 하트·댓글 — **화면 오른쪽에 떠 있는다** (2026-08-19).
-        // 본문 안에 넣으면 글과 같이 스크롤돼서 내려야만 보인다.
-        // `top`·`bottom` 을 0 으로 늘려 두고 [Center] 로 **세로 가운데**에 세운다
+        // 하트·댓글 — **화면 아래에 떠 있는 글래스 바**다 (2026-08-19).
+        // 본문 안에 넣으면 글과 같이 스크롤돼서 내려야만 보인다
         Positioned(
-          right: phone ? 8 : 20,
-          top: 0,
-          bottom: 0,
+          left: 0,
+          right: 0,
+          bottom: (phone ? MediaQuery.paddingOf(context).bottom : 0) + 16,
           child: Center(
             child: PostActions(
               target: ReactionTarget.notice,
