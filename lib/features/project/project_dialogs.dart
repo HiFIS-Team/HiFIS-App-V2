@@ -802,3 +802,170 @@ class _DeleteDialogState extends State<_DeleteDialog> {
     );
   }
 }
+
+/// 인원 추가 신청 창 — **넣기만 한다** (2026-08-19)
+///
+/// 빼는 자리를 안 둔 이유가 있다. 참여 멤버에서 빼면 그 사람에게 걸린
+/// 할 일(`_Todo.assignee`)이 붕 뜨고, 무엇으로 대신할지가 안 정해졌다.
+/// 서버도 같은 이유로 `addIds` 만 받는다.
+///
+/// **삭제 신청 창과 같은 틀이다** — 사유 칸과 버튼이 그대로고, 위에
+/// 고르는 줄만 하나 얹었다.
+Future<({List<String> names, String reason})?> _showMembersDialog(
+  BuildContext context,
+  _Project project,
+) {
+  return showAppDialog<({List<String> names, String reason})>(
+    context,
+    (context) => _MembersDialog(project: project),
+  );
+}
+
+class _MembersDialog extends StatefulWidget {
+  _MembersDialog({required this.project});
+
+  final _Project project;
+
+  @override
+  State<_MembersDialog> createState() => _MembersDialogState();
+}
+
+class _MembersDialogState extends State<_MembersDialog> {
+  final _reason = TextEditingController();
+  final _reasonFocus = FocusNode();
+
+  /// 이번에 넣을 사람 — 이름이다 (폼이 아직 이름을 사람 키로 쓴다)
+  final _picked = <String>[];
+
+  /// 고를 수 있는 사람 — **이미 참여 중인 사람은 뺀다.**
+  /// 넣어 봐야 서버가 `ALREADY_MEMBER` 로 되돌린다
+  late final _candidates = [
+    for (final staff in staffList)
+      if (!widget.project.members.contains(staff.name)) staff.name,
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _reason.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    _reasonFocus.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (_picked.isEmpty) {
+      AppToast.show(context, '넣을 사람을 골라주세요');
+      return;
+    }
+    final reason = _reason.text.trim();
+    if (reason.isEmpty) {
+      AppToast.show(context, '추가 사유를 입력해주세요');
+      _reasonFocus.requestFocus();
+      return;
+    }
+    // 명단 순서대로 — 아바타 줄이 화면마다 같은 순서로 보인다
+    Navigator.pop(context, (
+      names: [
+        for (final staff in staffList)
+          if (_picked.contains(staff.name)) staff.name,
+      ],
+      reason: reason,
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: dialogWidth(context, 400),
+      padding: EdgeInsets.fromLTRB(24, 22, 24, 18),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('인원 추가 신청', style: AppTextStyles.title2),
+          SizedBox(height: 6),
+          Text(
+            '승인되면 참여 멤버로 들어옵니다. 승인 전까지는 그대로예요',
+            style: AppTextStyles.caption,
+          ),
+          SizedBox(height: 16),
+          if (_candidates.isEmpty)
+            Text('더 넣을 사람이 없어요', style: AppTextStyles.caption)
+          else
+            ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: 180),
+              child: SingleChildScrollView(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final name in _candidates)
+                      _PickChip(
+                        name: name,
+                        on: _picked.contains(name),
+                        onTap: () => setState(() {
+                          if (!_picked.remove(name)) _picked.add(name);
+                        }),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          SizedBox(height: 14),
+          _Field(
+            controller: _reason,
+            focusNode: _reasonFocus,
+            hint: '왜 넣나요? (대표가 이걸 보고 결재해요)',
+            lines: 3,
+          ),
+          SizedBox(height: 18),
+          _DialogActions(
+            label: '추가 신청',
+            ready: _picked.isNotEmpty && _reason.text.trim().isNotEmpty,
+            onSubmit: _submit,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 고르는 알약 하나 — 누르면 켜고 꺼진다
+class _PickChip extends StatelessWidget {
+  const _PickChip({required this.name, required this.on, required this.onTap});
+
+  final String name;
+  final bool on;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      scale: 0.96,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: on ? AppColors.primary : AppColors.gray50,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          name,
+          style: AppTextStyles.body2.copyWith(
+            color: on ? Colors.white : AppColors.textSecondary,
+            fontWeight: on ? FontWeight.w600 : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+}

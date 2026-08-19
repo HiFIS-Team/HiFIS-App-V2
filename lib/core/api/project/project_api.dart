@@ -36,7 +36,12 @@ enum ProjectRequestType {
   edit('EDIT'),
 
   /// 프로젝트를 지우겠다 — **담당자만 올린다**
-  delete('DELETE');
+  delete('DELETE'),
+
+  /// 참여 인원을 **더하겠다** — 담당자만 올린다 (2026-08-19)
+  ///
+  /// 빼는 길은 없다 — 할 일에 붙은 담당이 붕 뜨기 때문이다 (서버 주석 참고).
+  members('MEMBERS');
 
   const ProjectRequestType(this.wire);
 
@@ -317,7 +322,11 @@ class ProjectRequest {
     type: ProjectRequestType.parse(json['type'] as String?),
     // 수정·삭제 신청에는 기한이 없다
     newDue: _time(json['newDue']),
-    payload: (json['payload'] as Map?)?.cast<String, dynamic>(),
+    // 서버는 `payload`(수정)와 `members`(인원 추가)를 갈라 보내는데, 앱은
+    // 한 칸으로 받는다 — 한 번에 한 종류만 오므로 섞일 일이 없다.
+    payload:
+        (json['members'] as Map?)?.cast<String, dynamic>() ??
+        (json['payload'] as Map?)?.cast<String, dynamic>(),
     reason: json['reason'] as String? ?? '',
     status: ProjectRequestStatus.parse(json['status'] as String?),
     requestedById: json['requestedById'] as String,
@@ -557,12 +566,14 @@ class ProjectApi {
   /// | `extension` · `overdue` | [newDue] |
   /// | `edit` | [payload] (`title` · `purpose` · `color` 중 하나 이상) |
   /// | `delete` | 없음 |
+  /// | `members` | [addIds] (넣을 사람 uuid, 하나 이상) |
   static Future<ProjectRequest> requestChange(
     String projectId, {
     required ProjectRequestType type,
     required String reason,
     DateTime? newDue,
     Map<String, String>? payload,
+    List<String>? addIds,
   }) async {
     final data = await _client.post(
       '/projects/$projectId/requests',
@@ -570,6 +581,8 @@ class ProjectApi {
         'type': type.wire,
         if (newDue != null) 'newDue': newDue.toUtc().toIso8601String(),
         'payload': ?payload,
+        // 서버는 인원 추가만 이 칸으로 받는다 (`payload` 와 따로다)
+        if (addIds != null) 'members': {'addIds': addIds},
         'reason': reason,
       },
     );

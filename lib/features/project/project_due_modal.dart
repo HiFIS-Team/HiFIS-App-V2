@@ -95,7 +95,14 @@ Future<void> showProjectDueModal(BuildContext context) async {
 ///
 /// 남은 날 제한이 없다. 만들어진 날부터 마감까지 계속 대상이고,
 /// 잦기는 [_shouldShow] 가 정한다.
+///
+/// **MASTER·ADMIN 에게는 안 띄운다** (2026-08-19 대표 결정). 직원이 만든
+/// 프로젝트에 대표를 참여 멤버로 넣으면 마감까지 앱을 열 때마다 모달이 떴다.
+/// 대표·관리자가 받는 것은 **마감이 지난 뒤 누가 누락했는지**이고 그건
+/// 알림함으로 따로 온다. 서버 리마인더도 같은 기준으로 빠진다
+/// (`_reminder_targets`).
 List<_Project> _dueTargets() {
+  if (myRole == Role.master || myRole == Role.admin) return const [];
   final me = currentUser?.id;
   return [
     for (final project in _projects)

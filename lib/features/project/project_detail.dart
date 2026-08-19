@@ -94,6 +94,7 @@ String _requestLabel(ProjectRequestType type) => switch (type) {
   ProjectRequestType.overdue => '누락 사유',
   ProjectRequestType.edit => '프로젝트 수정',
   ProjectRequestType.delete => '프로젝트 삭제',
+  ProjectRequestType.members => '인원 추가',
 };
 
 /// 수정·삭제를 올릴 수 있는 사람 — **담당자만** (서버 `NOT_PROJECT_OWNER`)
@@ -117,8 +118,17 @@ String? _requestChange(_Project project, _Extension request) =>
         if (request.newPurpose != null) '설명 바꿈',
         if (request.newColor != null) '색 바꿈',
       ].join(' · '),
+      // 결재자가 **누구를 넣는지** 알아야 판단이 된다 — 인원수만으로는 못 정한다
+      ProjectRequestType.members => _addedNames(request),
       ProjectRequestType.delete => null,
     };
+
+/// 인원 추가 신청이 넣겠다는 사람 이름들 — 명단에 없으면 인원수로 떨어진다
+String _addedNames(_Extension request) {
+  final ids = (request.payload?['addIds'] as List?)?.cast<String>() ?? const [];
+  final names = [for (final id in ids) ?StaffDirectory.instance.byId(id)?.name];
+  return names.isEmpty ? '${ids.length}명 추가' : names.join(' · ');
+}
 
 /// 손댈 수 없는 프로젝트 — **자리는 그대로 두고 안 눌리게만 한다**
 ///
@@ -265,6 +275,28 @@ class _ProjectDetail extends StatelessWidget {
     );
   }
 
+  /// 인원 추가 신청 — 승인되면 그때 참여 멤버가 늘어난다
+  ///
+  /// 폼은 이름을 다루고 서버는 uuid 를 받는다 — 일정 참석자와 같은 사정이라
+  /// 여기서 옮겨 담는다 (backend-gap 10). 명단에 없는 이름은 보낼 id 가 없어 빠진다.
+  Future<void> _requestMembers(BuildContext context) async {
+    final draft = await _showMembersDialog(context, project);
+    if (draft == null || !context.mounted) return;
+    final ids = [
+      for (final name in draft.names) ?StaffDirectory.instance.byName(name)?.id,
+    ];
+    if (ids.isEmpty) {
+      AppToast.show(context, '명단에서 그 사람을 못 찾았어요');
+      return;
+    }
+    await _sendRequest(
+      context,
+      type: ProjectRequestType.members,
+      addIds: ids,
+      reason: draft.reason,
+    );
+  }
+
   /// 삭제 신청 — 승인 전까지 프로젝트는 그대로 있고 '삭제 대기'만 붙는다
   Future<void> _requestDelete(BuildContext context) async {
     final reason = await _showDeleteDialog(context, project);
@@ -282,6 +314,7 @@ class _ProjectDetail extends StatelessWidget {
     required ProjectRequestType type,
     required String reason,
     Map<String, String>? payload,
+    List<String>? addIds,
   }) async {
     final projectId = project.id;
     if (projectId == null) return;
@@ -291,6 +324,7 @@ class _ProjectDetail extends StatelessWidget {
         projectId,
         type: type,
         payload: payload,
+        addIds: addIds,
         reason: reason,
       );
       project.request = _Extension(
@@ -355,6 +389,12 @@ class _ProjectDetail extends StatelessWidget {
         if (request.newTitle case final title?) project.name = title;
         if (request.newPurpose case final purpose?) project.desc = purpose;
         if (request.newColor case final color?) project.colorHex = color;
+      case ProjectRequestType.members:
+        _log('$label 승인 (${_addedNames(request)}) · $reason');
+        // 서버가 **더하기만** 한다 — 화면도 같게 맞춘다 (갈아끼우면 어긋난다)
+        final ids =
+            (request.payload?['addIds'] as List?)?.cast<String>() ?? const [];
+        project.memberIds = {...project.memberIds, ...ids}.toList();
       case ProjectRequestType.delete:
         // 서버가 지웠다 — 목록에서도 빼고, 폰이면 상세를 닫는다.
         // 여기서 `onChanged` 를 부르면 없는 프로젝트를 다시 그린다
@@ -397,15 +437,21 @@ class _ProjectDetail extends StatelessWidget {
 
   bool get _canExtend => _canExtendProject(project);
 
-  /// 머리말 오른쪽 결재 버튼들 — 담당자에게만 수정·삭제가 붙는다
+  /// 머리말 오른쪽 결재 버튼들 — 담당자에게만 수정·인원 추가·삭제가 붙는다
   ///
-  /// 셋 다 **대표 결재를 받는 것**이라 한자리에 모은다. 대기 중인 결재가
-  /// 있으면 셋 다 사라진다 (프로젝트당 하나뿐이라 올려도 400 이 난다).
+  /// 넷 다 **대표 결재를 받는 것**이라 한자리에 모은다. 대기 중인 결재가
+  /// 있으면 넷 다 사라진다 (프로젝트당 하나뿐이라 올려도 400 이 난다).
+  ///
+  /// `인원 추가` 를 **`수정` 옆에** 둔 이유 — 서버 가드가 수정·삭제와 같고
+  /// (`NOT_PROJECT_OWNER`), 올리는 조건도 `_canRequestEdit` 하나로 같다.
+  /// 따로 떼면 같은 규칙인데 자리만 다른 버튼이 하나 더 생긴다.
   List<Widget> _headActions(BuildContext context) => [
     if (_canExtend) ...[SizedBox(width: 8), _extendButton(context)],
     if (_canRequestEdit(project)) ...[
       SizedBox(width: 4),
       _headButton('수정', () => _requestEdit(context)),
+      SizedBox(width: 4),
+      _headButton('인원 추가', () => _requestMembers(context)),
       SizedBox(width: 4),
       _headButton('삭제', () => _requestDelete(context), danger: true),
     ],
