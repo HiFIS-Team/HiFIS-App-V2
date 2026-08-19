@@ -23,9 +23,20 @@ import '../../core/theme/app_decorations.dart';
 /// 그룹 이름 없이 선택한 멤버 이름 목록을 pop 결과로 돌려준다.
 /// 명단은 서버 직원 목록(`StaffDirectory`)에서 가져온다. **나는 빠진다.**
 class NewMessageScreen extends StatefulWidget {
-  NewMessageScreen({super.key, this.inviteMode = false});
+  NewMessageScreen({
+    super.key,
+    this.inviteMode = false,
+    this.already = const [],
+  });
 
   final bool inviteMode;
+
+  /// 이미 그 방에 있는 사람 — **체크된 채로 잠긴다**
+  ///
+  /// 안 넘겨주면 이미 있는 사람이 안 고른 것처럼 보여서, 다시 골라 보내면
+  /// 서버가 400 으로 막는다. 목록에서 빼지 않고 체크로 두는 이유는
+  /// **누가 이미 있는지가 여기서도 보여야** 하기 때문이다.
+  final List<String> already;
 
   @override
   State<NewMessageScreen> createState() => _NewMessageScreenState();
@@ -76,7 +87,11 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
     super.dispose();
   }
 
+  /// 이미 방에 있는 사람인가 — 체크는 뜨지만 못 고른다
+  bool _locked(String id) => widget.already.contains(id);
+
   void _toggle(_Member member) {
+    if (_locked(member.id)) return;
     setState(() {
       if (!_selected.remove(member.id)) _selected.add(member.id);
     });
@@ -216,7 +231,9 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
                   for (final member in filtered)
                     _MemberTile(
                       member: member,
-                      selected: _selected.contains(member.id),
+                      selected:
+                          _selected.contains(member.id) || _locked(member.id),
+                      locked: _locked(member.id),
                       onTap: () => _toggle(member),
                     ),
               ],
@@ -346,16 +363,22 @@ class _MemberTile extends StatelessWidget {
     required this.member,
     required this.selected,
     required this.onTap,
+    this.locked = false,
   });
 
   final _Member member;
   final bool selected;
+
+  /// 이미 방에 있는 사람 — 체크는 그대로 뜨고 회색이라 못 고르는 게 보인다
+  final bool locked;
+
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final tick = locked ? AppColors.gray300 : AppColors.primary;
     return InkWell(
-      onTap: onTap,
+      onTap: locked ? null : onTap,
       borderRadius: BorderRadius.circular(16),
       child: Padding(
         padding: EdgeInsets.symmetric(vertical: 10),
@@ -402,9 +425,9 @@ class _MemberTile extends StatelessWidget {
               height: 26,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: selected ? AppColors.primary : Colors.transparent,
+                color: selected ? tick : Colors.transparent,
                 border: Border.all(
-                  color: selected ? AppColors.primary : AppColors.gray200,
+                  color: selected ? tick : AppColors.gray200,
                   width: 2,
                 ),
               ),

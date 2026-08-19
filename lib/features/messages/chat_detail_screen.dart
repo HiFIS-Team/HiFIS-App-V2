@@ -2,19 +2,23 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/api/chat/chat_api.dart';
-import '../../core/api/client/api_client.dart' show fileUrl;
 import '../../core/api/client/api_exception.dart';
+import '../../core/data/current_user.dart';
+import '../../core/data/employee.dart';
 import '../../core/data/staff.dart';
+import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/display/avatar.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/glass/top_frost.dart';
 import '../../core/widgets/input/pressable.dart';
+import 'chat_screen.dart';
 import 'chat_store.dart';
 import 'new_message_screen.dart';
 
-/// 채팅방 상세 화면 (이름/멤버 초대/공유된 콘텐츠)
+/// 채팅방 상세 화면 (이름/멤버/공유된 콘텐츠)
 ///
 /// 이름 변경·초대·나가기는 전부 서버로 간다. 서버가 그 사실을 대화에
 /// 회색 안내 한 줄로 남기므로 방에 있는 사람 모두가 바로 본다.
@@ -49,14 +53,34 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   bool get _isGroup => _room?.isGroup ?? false;
 
-  Color get _headColor {
+  /// 이 방에 있는 사람 — **방장 먼저, 그다음 이름순**
+  ///
+  /// 명단에서 못 찾은 id 는 뺀다 (지워진 계정 등). 목록이 비는 것보다
+  /// 아는 사람만 세우는 게 낫다.
+  List<Employee> get _people {
     final room = _room;
-    if (room == null) return AppColors.primary;
-    return chatRoomPeer(room)?.color ?? staffOf(_name).color;
+    if (room == null) return const [];
+    final found = [
+      for (final id in room.memberIds) ?StaffDirectory.instance.byId(id),
+    ];
+    found.sort((a, b) {
+      final owner =
+          (a.id == room.ownerId ? 0 : 1) - (b.id == room.ownerId ? 0 : 1);
+      return owner != 0 ? owner : a.name.compareTo(b.name);
+    });
+    return found;
   }
 
-  /// 이름 칸 인라인 수정용 — 변경 버튼을 눌러야 적용된다
-  late final _nameController = TextEditingController(text: _name);
+  /// '사람' 줄에 적히는 이름들 — **나는 뺀다** (내가 있는 건 아니까)
+  String get _peopleLine {
+    final others = [
+      for (final e in _people)
+        if (e.id != currentUser?.id) e.name,
+    ];
+    if (others.isEmpty) return '나 혼자 있어요';
+    if (others.length <= 2) return others.join(', ');
+    return '${others.take(2).join(', ')} 외 ${others.length - 2}명';
+  }
 
   bool _saving = false;
   bool _muting = false;
@@ -103,28 +127,48 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     _store.removeListener(_onStore);
     _scrollController.dispose();
     _collapse.dispose();
-    _nameController.dispose();
     super.dispose();
   }
 
-  /// 이름 칸에 입력된 값을 적용한다. 빈 값이면 원래 이름으로 되돌린다.
-  Future<void> _applyRename() async {
-    FocusScope.of(context).unfocus();
-    final value = _nameController.text.trim();
-    if (value.isEmpty) {
-      _nameController.text = _name;
-      return;
-    }
-    if (value == _name || _saving) return;
+  /// 방 이름 바꾸기 — **그룹만** (DM 은 상대 이름이 곧 방 이름이라 서버가 막는다)
+  Future<void> _rename() async {
+    if (_saving) return;
+    final controller = TextEditingController(text: _name);
+    final value = await showCupertinoDialog<String>(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: Text('이름 변경'),
+        content: Padding(
+          padding: EdgeInsets.only(top: 12),
+          child: CupertinoTextField(
+            controller: controller,
+            autofocus: true,
+            placeholder: '채팅방 이름',
+            onSubmitted: (v) => Navigator.pop(context, v),
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(context),
+            child: Text('취소'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: Text('변경'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    final next = value?.trim() ?? '';
+    if (next.isEmpty || next == _name || !mounted) return;
+
     setState(() => _saving = true);
     try {
-      await _store.rename(widget.roomId, value);
+      await _store.rename(widget.roomId, next);
       if (mounted) AppToast.show(context, '방 이름을 바꿨어요');
     } catch (error) {
-      if (mounted) {
-        _nameController.text = _name;
-        AppToast.show(context, messageOf(error));
-      }
+      if (mounted) AppToast.show(context, messageOf(error));
     }
     if (mounted) setState(() => _saving = false);
   }
@@ -150,7 +194,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       context,
       CupertinoPageRoute(
         fullscreenDialog: true,
-        builder: (_) => NewMessageScreen(inviteMode: true),
+        // 이미 있는 사람은 체크된 채로 잠긴다 — 안 넘겨주면 다시 고를 수 있고
+        // 그러면 서버가 400 으로 막는다
+        builder: (_) => NewMessageScreen(
+          inviteMode: true,
+          already: _room?.memberIds ?? const [],
+        ),
       ),
     );
     if (picked == null || picked.isEmpty || !mounted) return;
@@ -162,6 +211,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       if (mounted) AppToast.show(context, messageOf(error));
     }
   }
+
+  void _openMembers() => Navigator.push<void>(
+    context,
+    CupertinoPageRoute(builder: (_) => _MembersScreen(roomId: widget.roomId)),
+  );
 
   Future<void> _leave() async {
     final ok = await showCupertinoDialog<bool>(
@@ -198,6 +252,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final muted = _room?.muted ?? false;
     return Scaffold(
       backgroundColor: AppColors.surface,
       body: Stack(
@@ -206,147 +261,119 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             bottom: false,
             child: ListView(
               controller: _scrollController,
-              padding: EdgeInsets.fromLTRB(20, 70, 20, 60),
+              // 좌우 여백을 여기서 안 준다 — 사진 격자가 화면 끝까지 붙어야 해서
+              // 줄마다 따로 넣는다 (`_Pad`)
+              padding: EdgeInsets.fromLTRB(0, 70, 0, 60),
               children: [
                 // 아바타 + 이름
-                Center(
-                  child: Container(
-                    width: 84,
-                    height: 84,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: _headColor.withValues(alpha: _isGroup ? 0.12 : 1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Text(
-                      _isGroup ? '💬' : _name.characters.first,
-                      style: _isGroup
-                          ? TextStyle(fontSize: 36)
-                          : TextStyle(
-                              fontFamily: AppTextStyles.fontFamily,
-                              fontSize: 30,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                    ),
-                  ),
-                ),
+                Center(child: _head()),
                 SizedBox(height: 14),
-                Center(child: Text(_name, style: AppTextStyles.title2)),
-                SizedBox(height: 32),
-                _SectionLabel('이름 변경'),
-                SizedBox(height: 8),
-                _SettingBox(
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _nameController,
-                          style: AppTextStyles.body1.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                          cursorColor: AppColors.primary,
-                          textInputAction: TextInputAction.done,
-                          onSubmitted: (_) => _applyRename(),
-                          decoration: InputDecoration(
-                            hintText: '채팅방 이름',
-                            hintStyle: AppTextStyles.body1.copyWith(
-                              color: AppColors.gray400,
-                            ),
-                            border: InputBorder.none,
-                            isCollapsed: true,
-                          ),
-                        ),
-                      ),
-                      Pressable(
-                        onTap: _applyRename,
-                        scale: 0.9,
-                        child: Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.surface,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.gray100),
-                          ),
-                          child: Text(
-                            '변경',
-                            style: AppTextStyles.label.copyWith(
-                              color: AppColors.textPrimary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                Center(
+                  child: _Pad(
+                    child: Text(
+                      _name,
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.title2,
+                    ),
                   ),
                 ),
-                SizedBox(height: 24),
-                _SectionLabel('알림'),
-                SizedBox(height: 8),
-                _SettingBox(
-                  onTap: _toggleMute,
-                  child: Row(
-                    children: [
-                      Icon(
-                        (_room?.muted ?? false)
-                            ? CupertinoIcons.bell_slash
-                            : CupertinoIcons.bell,
-                        size: 20,
-                        color: AppColors.gray600,
-                      ),
-                      SizedBox(width: 10),
-                      Expanded(
+                // DM 은 상대 이름이 곧 방 이름이라 바꿀 수 없다 (서버가 400)
+                if (_isGroup) ...[
+                  SizedBox(height: 6),
+                  Center(
+                    child: Pressable(
+                      onTap: _rename,
+                      scale: 0.94,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 4,
+                        ),
                         child: Text(
-                          '알림 받기',
-                          style: AppTextStyles.body1.copyWith(
+                          '이름 변경',
+                          style: AppTextStyles.body2.copyWith(
+                            color: AppColors.primary,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
-                      // 끄면 대화는 그대로 오고 푸시만 안 온다
-                      CupertinoSwitch(
-                        value: !(_room?.muted ?? false),
-                        activeTrackColor: AppColors.primary,
-                        onChanged: _muting ? null : (_) => _toggleMute(),
-                      ),
-                    ],
+                    ),
                   ),
+                ],
+                SizedBox(height: 26),
+                // 자주 쓰는 것 두 개 — 나가기는 헤더 오른쪽에 있다
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _ActionItem(
+                      icon: CupertinoIcons.person_add,
+                      label: '추가',
+                      onTap: _invite,
+                    ),
+                    SizedBox(width: 44),
+                    _ActionItem(
+                      icon: muted
+                          ? CupertinoIcons.bell_slash
+                          : CupertinoIcons.bell,
+                      label: muted ? '알림 켜기' : '알림 끄기',
+                      onTap: _muting ? null : _toggleMute,
+                    ),
+                  ],
                 ),
-                SizedBox(height: 24),
-                _SectionLabel('멤버'),
-                SizedBox(height: 8),
-                _SettingBox(
-                  onTap: _invite,
-                  child: Row(
-                    children: [
-                      Icon(
-                        CupertinoIcons.person_add,
-                        size: 20,
-                        color: AppColors.gray600,
+                SizedBox(height: 28),
+                _Pad(
+                  child: Pressable(
+                    onTap: _openMembers,
+                    scale: 0.98,
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 14,
                       ),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          '멤버 초대',
-                          style: AppTextStyles.body1.copyWith(
-                            fontWeight: FontWeight.w600,
+                      decoration: BoxDecoration(
+                        color: AppColors.gray50,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            CupertinoIcons.person_2,
+                            size: 20,
+                            color: AppColors.gray600,
                           ),
-                        ),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '사람',
+                                  style: AppTextStyles.body1.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  _peopleLine,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTextStyles.caption,
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Icon(
+                            CupertinoIcons.chevron_forward,
+                            size: 16,
+                            color: AppColors.gray400,
+                          ),
+                        ],
                       ),
-                      Icon(
-                        CupertinoIcons.chevron_forward,
-                        size: 16,
-                        color: AppColors.gray400,
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-                SizedBox(height: 32),
-                _SectionLabel('공유된 콘텐츠'),
-                SizedBox(height: 4),
+                SizedBox(height: 28),
                 Row(
                   children: [
                     for (var i = 0; i < _shareTabs.length; i++)
@@ -371,13 +398,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       ),
                     ),
                   ),
-                ] else ...[
-                  SizedBox(height: 16),
-                  // 있을 때만 그린다 — 빈 상태 문구는 원래 자리 그대로다
-                  //
+                ] else
                   // 인스타처럼 **한 줄에 3칸**. 칸 크기를 고정하지 않고 폭을
-                  // 3등분하므로 기기 폭이 달라도 줄당 개수가 안 바뀐다
-                  // (`Wrap` + 고정 88 이던 때는 폭에 따라 3개도 4개도 됐다).
+                  // 3등분하므로 기기 폭이 달라도 줄당 개수가 안 바뀐다.
+                  //
+                  // 화면 끝까지 붙이고 사이도 2px 만 띄운다 — 사진이 격자로
+                  // 한 덩어리처럼 보여야 한 눈에 훑어진다
                   GridView.count(
                     // 바깥 ListView 안에 있으므로 자기 높이만 차지하고
                     // 따로 스크롤하지 않는다
@@ -385,14 +411,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     physics: NeverScrollableScrollPhysics(),
                     padding: EdgeInsets.zero,
                     crossAxisCount: 3,
-                    mainAxisSpacing: 8,
-                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 2,
+                    crossAxisSpacing: 2,
                     children: [
                       for (final url in _shared[_shareTab])
                         _SharedThumb(url: url, photo: _shareTab == 0),
                     ],
                   ),
-                ],
               ],
             ),
           ),
@@ -425,6 +450,229 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       ),
     );
   }
+
+  /// 머리말 동그라미 — DM 은 상대 프로필 사진, 그룹은 말풍선
+  Widget _head() {
+    final room = _room;
+    final peer = room == null ? null : chatRoomPeer(room);
+    if (peer != null) return Avatar(name: peer.name, size: 84);
+    return Container(
+      width: 84,
+      height: 84,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: (room == null ? AppColors.primary : staffOf(_name).color)
+            .withValues(alpha: _isGroup ? 0.12 : 1),
+        shape: BoxShape.circle,
+      ),
+      child: Text(
+        _isGroup ? '💬' : _name.characters.first,
+        style: _isGroup
+            ? TextStyle(fontSize: 36)
+            : TextStyle(
+                fontFamily: AppTextStyles.fontFamily,
+                fontSize: 30,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+      ),
+    );
+  }
+}
+
+/// 이 방에 있는 사람 목록
+///
+/// 방을 나가거나 초대하면 [ChatStore] 가 알려 주므로 열어 둔 채로도 갱신된다.
+class _MembersScreen extends StatelessWidget {
+  _MembersScreen({required this.roomId});
+
+  final String roomId;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      body: ListenableBuilder(
+        listenable: ChatStore.instance,
+        builder: (context, _) {
+          final room = ChatStore.instance.roomOf(roomId);
+          final people = [
+            for (final id in room?.memberIds ?? const <String>[])
+              ?StaffDirectory.instance.byId(id),
+          ];
+          people.sort((a, b) {
+            final owner =
+                (a.id == room?.ownerId ? 0 : 1) -
+                (b.id == room?.ownerId ? 0 : 1);
+            return owner != 0 ? owner : a.name.compareTo(b.name);
+          });
+
+          return Stack(
+            children: [
+              SafeArea(
+                bottom: false,
+                child: ListView(
+                  padding: EdgeInsets.fromLTRB(20, 76, 20, 40),
+                  children: [
+                    for (final person in people)
+                      _PersonTile(
+                        person: person,
+                        owner: person.id == room?.ownerId,
+                        me: person.id == currentUser?.id,
+                      ),
+                  ],
+                ),
+              ),
+              // 상단 중앙 고정 타이틀 (터치는 아래 리스트로 통과)
+              IgnorePointer(
+                child: SafeArea(
+                  bottom: false,
+                  child: SizedBox(
+                    height: 56,
+                    child: Center(
+                      child: Text('사람', style: AppTextStyles.title3),
+                    ),
+                  ),
+                ),
+              ),
+              SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: EdgeInsets.only(top: 8, left: 16),
+                  child: GlassIconButton(
+                    symbol: 'chevron.backward',
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _PersonTile extends StatelessWidget {
+  _PersonTile({required this.person, required this.owner, required this.me});
+
+  final Employee person;
+
+  /// 방을 만든 사람
+  final bool owner;
+  final bool me;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          Avatar(name: person.name, size: 48),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        person.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.body1,
+                      ),
+                    ),
+                    if (me) ...[SizedBox(width: 6), _Tag('나')],
+                    if (owner) ...[SizedBox(width: 6), _Tag('방장')],
+                  ],
+                ),
+                SizedBox(height: 2),
+                Text(
+                  '${StaffDirectory.instance.branchName(person.branchId)} · '
+                  '${person.rank.label}',
+                  style: AppTextStyles.caption,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Tag extends StatelessWidget {
+  _Tag(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.gray50,
+        borderRadius: BorderRadius.circular(7),
+      ),
+      child: Text(
+        text,
+        style: AppTextStyles.caption.copyWith(
+          fontSize: 11,
+          color: AppColors.gray600,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+/// 아이콘 + 라벨 세로 한 벌 — 이름 아래 가로로 선다
+class _ActionItem extends StatelessWidget {
+  _ActionItem({required this.icon, required this.label, this.onTap});
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap ?? () {},
+      scale: 0.92,
+      child: SizedBox(
+        // 라벨 길이가 바뀌어도('알림 끄기' ↔ '알림 켜기') 자리가 안 흔들리게
+        width: 76,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 26, color: AppColors.textPrimary),
+            SizedBox(height: 8),
+            Text(
+              label,
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.gray600,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 좌우 여백 — 바깥 ListView 는 여백을 안 줘서(사진 격자가 끝까지 붙는다)
+/// 글이 있는 줄만 이걸로 감싼다
+class _Pad extends StatelessWidget {
+  _Pad({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) =>
+      Padding(padding: EdgeInsets.symmetric(horizontal: 20), child: child);
 }
 
 /// 공유된 콘텐츠 한 칸 — 사진은 미리보기, 그 외는 파일 이름
@@ -437,14 +685,14 @@ class _SharedThumb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (photo) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        // 크기를 안 준다 — 격자 칸이 정해 주는 대로 채운다
-        child: Image.network(
-          fileUrl(url),
-          fit: BoxFit.cover,
-          errorBuilder: (_, _, _) => _box(),
-        ),
+      // 말풍선과 **같은 길**로 그린다 — 한 번 받아 둔 사진은 파일에 남아 있어서
+      // 여기서도 첫 프레임부터 뜬다 (`Image.network` 이던 때는 서명이 갈려
+      // 매번 새로 받았다)
+      return chatPhoto(
+        url,
+        // 한 칸이 폭의 1/3 이라 원본을 그대로 풀면 메모리가 금방 넘친다
+        cacheWidth: 320,
+        onError: (_, _, _) => _box(),
       );
     }
     return _box();
@@ -453,10 +701,7 @@ class _SharedThumb extends StatelessWidget {
   Widget _box() => Container(
     padding: EdgeInsets.all(8),
     alignment: Alignment.center,
-    decoration: BoxDecoration(
-      color: AppColors.gray50,
-      borderRadius: BorderRadius.circular(10),
-    ),
+    color: AppColors.gray50,
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -476,44 +721,6 @@ class _SharedThumb extends StatelessWidget {
   static String _nameOf(String url) {
     final path = url.split('?').first;
     return path.substring(path.lastIndexOf('/') + 1);
-  }
-}
-
-class _SectionLabel extends StatelessWidget {
-  _SectionLabel(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: AppTextStyles.label.copyWith(color: AppColors.gray500),
-    );
-  }
-}
-
-/// 회색 면 설정 박스 — onTap이 있으면 통째로 눌린다.
-/// 내용과 무관하게 높이를 고정해 박스끼리 크기가 같게 유지한다.
-class _SettingBox extends StatelessWidget {
-  _SettingBox({required this.child, this.onTap});
-
-  final Widget child;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final box = Container(
-      height: 64,
-      padding: EdgeInsets.symmetric(horizontal: 18),
-      decoration: BoxDecoration(
-        color: AppColors.gray50,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: child,
-    );
-    if (onTap == null) return box;
-    return Pressable(onTap: onTap!, scale: 0.98, child: box);
   }
 }
 
