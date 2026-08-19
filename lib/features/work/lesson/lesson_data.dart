@@ -18,6 +18,16 @@ part of 'lesson_section.dart';
 /// 대신 **지점 전체 기록**을 조회로 보여준다.
 bool get _viewOnly => !(currentUser?.role.doesFieldWork ?? true);
 
+/// 남의 기록까지 볼 수 있는 사람 — 대표·관리자에 **점장**을 더한 것
+///
+/// [_viewOnly] 와 다르다. 점장은 본인도 수업을 하므로 등록·싸인 버튼은
+/// 그대로 두고, **기록 화면에서만** 지점 전체를 보고 사람으로 걸러 본다
+/// (2026-08-19 대표 요청).
+///
+/// 서버는 원래 지점 전체를 준다 (`GET /session-signs` 는 지점 범위만 건다) —
+/// 앱이 `trainerId` 에 자기 id 를 넣어 본인 것만 달라고 하고 있었다.
+bool get _canSeeOthers => _viewOnly || currentUser?.role == Role.manager;
+
 /// 싸인을 받은 트레이너 이름 — 전사 기록에서 누구 건지 가르는 값
 String _trainerName(SessionSign sign) =>
     StaffDirectory.instance.byId(sign.performedByTrainerId)?.name ?? '알 수 없음';

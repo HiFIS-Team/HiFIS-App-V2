@@ -30,6 +30,7 @@ import '../../core/widgets/input/app_button.dart';
 import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/input/see_all_button.dart';
+import '../../core/widgets/nav/people_filter_button.dart';
 import '../../core/widgets/nav/desktop_header.dart';
 import 'contribution/contribution_section.dart';
 import 'lesson/lesson_section.dart';

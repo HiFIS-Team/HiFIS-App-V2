@@ -23,10 +23,10 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
   /// 새 등록권이 생겨 다시 유효가 된다 — **지난 기록은 그대로 남는다.**
   int _tab = 0;
 
-  /// 이 화면이 보여줄 회원 — 트레이너는 본인 담당, 대표·관리자는 지점 전체
+  /// 이 화면이 보여줄 회원 — 트레이너는 본인 담당, 그 위는 지점 전체
   List<Member> get _members {
     final store = _LessonStore.instance;
-    if (_viewOnly) return store.members;
+    if (_canSeeOthers) return store.members;
     return [
       for (final m in store.members)
         if (m.ownerTrainerId == currentUser?.id) m,
@@ -51,7 +51,7 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
 
   /// 고른 트레이너 — null 이면 전체
   ///
-  /// **대표·관리자에게만 있다.** 트레이너·점장은 서버가 본인 것만 주므로
+  /// **대표·관리자·점장에게만 있다.** 트레이너는 서버가 본인 것만 주므로
   /// 골라도 바뀌는 게 없다 (지점 고르개와 같은 규칙).
   ///
   /// 서버에 다시 묻지 않고 **받아 둔 목록에서 거른다** — 달마다 한 번만
@@ -103,10 +103,10 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
     setState(beginLoad);
     try {
       final rows = await SessionSignApi.list(
-        // **본 화면(`_LessonStore.load`)과 같은 규칙이다.** 예전에는 여기만
-        // 본인으로 못 박혀 있어서, 대표·관리자가 카드에 `세션 기록 18` 을
-        // 보고 전체보기를 열면 0건이었다 (자기 싸인이 없으니까).
-        trainerId: _viewOnly ? null : currentUser?.id,
+        // **이 화면만 지점 전체를 받는다.** 본 화면(`_LessonStore.load`)은
+        // 점장에게도 본인 것만 준다 — 거기는 '내 세션'을 세는 자리다.
+        // 여기는 기록을 훑는 자리라 오른쪽 위 필터로 사람을 골라 본다.
+        trainerId: _canSeeOthers ? null : currentUser?.id,
         period: periodKey(_month),
         // 헤더에서 고른 지점도 따라가야 한다 — 이것도 빠져 있었다
         branchId: branchScopeId,
@@ -159,7 +159,7 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
       itemBuilder: (_, i) => _MemberStateRow(
         member: rows[i],
         registration: _LessonStore.instance.currentRegistrationOf(rows[i].id),
-        showTrainer: _viewOnly,
+        showTrainer: _canSeeOthers,
       ),
     );
   }
@@ -201,7 +201,12 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
         children.add(Divider(height: 1, color: AppColors.divider));
       }
       children.add(
-        _SignRow(sign: sign, onTap: () => _showSignDetail(context, sign)),
+        _SignRow(
+          sign: sign,
+          // 점장도 지점 전체를 보므로 누구 것인지가 있어야 한다
+          showTrainer: _canSeeOthers,
+          onTap: () => _showSignDetail(context, sign),
+        ),
       );
     }
 
@@ -300,18 +305,19 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
               ),
             ),
           ),
-          // 우측 상단 트레이너 필터 — **대표·관리자에게만.** 뒤로가기와
+          // 우측 상단 트레이너 필터 — **대표·관리자·점장에게만.** 뒤로가기와
           // 마주 보는 자리다. 하단 검색바(블러)와는 Stack 의 다른 자식이라
           // 네이티브 버튼이 묻히지 않는다
-          if (_viewOnly)
+          if (_canSeeOthers)
             SafeArea(
               bottom: false,
               child: Align(
                 alignment: Alignment.topRight,
                 child: Padding(
                   padding: EdgeInsets.only(top: 8, right: 16),
-                  child: _TrainerFilterButton(
-                    trainers: _trainers,
+                  child: PeopleFilterButton(
+                    stableId: 'lesson-trainer',
+                    people: _trainers,
                     selected: _trainerId,
                     onSelect: (id) => setState(() => _trainerId = id),
                   ),
@@ -322,120 +328,6 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
           GlassSearchBar(controller: _search, hint: '회원 이름 검색'),
         ],
       ),
-    );
-  }
-}
-
-/// 트레이너 고르개 — 세션 기록 오른쪽 위의 **리퀴드 글래스 필터**
-///
-/// **대표·관리자에게만 뜬다.** 트레이너·점장은 서버가 본인 기록만 주므로
-/// 골라도 바뀌는 게 없다 (지점 고르개와 같은 규칙).
-///
-/// 메뉴는 지점 고르개(`BranchScopeButton`)·랭킹 직군 필터와 같은 부품이다 —
-/// 아이폰은 OS 가 그리는 네이티브 메뉴, 그 외는 [showGlassMenu].
-class _TrainerFilterButton extends StatefulWidget {
-  _TrainerFilterButton({
-    required this.trainers,
-    required this.selected,
-    required this.onSelect,
-  });
-
-  /// 이 달 기록에 이름이 있는 트레이너 (이름순)
-  final List<({String id, String name})> trainers;
-
-  /// null 이면 '전체'
-  final String? selected;
-  final ValueChanged<String?> onSelect;
-
-  @override
-  State<_TrainerFilterButton> createState() => _TrainerFilterButtonState();
-}
-
-class _TrainerFilterButtonState extends State<_TrainerFilterButton> {
-  /// 메뉴를 버튼 아래에 띄우려면 버튼 자리를 알아야 한다
-  final _key = GlobalKey();
-
-  /// 이미 떠 있는지 — 없으면 누를 때마다 하나씩 더 쌓인다
-  bool _open = false;
-
-  static const _allLabel = '전체';
-
-  /// 걸려 있으면 채운 아이콘 — 버튼이 아이콘 하나라 고른 사람 **이름**은
-  /// 메뉴를 열어야 보인다. 최소한 "지금 걸려 있다"는 건 알 수 있게 한다.
-  String get _symbol => widget.selected == null
-      ? 'line.3.horizontal.decrease'
-      : 'line.3.horizontal.decrease.circle.fill';
-
-  Future<void> _openMenu() async {
-    if (_open) return;
-    _open = true;
-    final trainers = widget.trainers;
-    final picked = await showGlassMenu<int>(
-      context: context,
-      anchorKey: _key,
-      width: 200,
-      items: [
-        GlassMenuItem(
-          // null 은 '안 골랐다'와 구분이 안 돼서 전체에 따로 값을 준다
-          value: -1,
-          label: _allLabel,
-          icon: CupertinoIcons.square_grid_2x2,
-          selected: widget.selected == null,
-        ),
-        for (var i = 0; i < trainers.length; i++)
-          GlassMenuItem(
-            value: i,
-            label: trainers[i].name,
-            icon: CupertinoIcons.person,
-            selected: widget.selected == trainers[i].id,
-          ),
-      ],
-    );
-    _open = false;
-    if (!mounted || picked == null) return;
-    widget.onSelect(picked == -1 ? null : trainers[picked].id);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final trainers = widget.trainers;
-    // 아이폰은 OS 가 그리는 네이티브 메뉴. **macOS 는 안 쓴다** — 같은 패키지가
-    // 메뉴를 버튼 왼쪽에 고정해서 창 밖으로 새어 나간다 (지점 고르개와 같은 이유).
-    if (isApple && !isDesktop) {
-      return CNPopupMenuButton.icon(
-        // 테마가 바뀌면 새로 만든다 (패키지의 setBrightness 가 아이콘을 유실).
-        // **고른 사람은 키에 안 넣는다** — 넣으면 고를 때마다 뷰를 새로 만든다.
-        key: ValueKey('lesson-trainer-${AppColors.isDark}'),
-        buttonIcon: CNSymbol(_symbol, size: 16.8, color: AppColors.gray700),
-        size: 40,
-        items: [
-          // 네이티브 메뉴에는 체크마크를 못 단다 — 고른 줄은 **아이콘 자리**가
-          // 체크로 바뀐다
-          CNPopupMenuItem(
-            label: _allLabel,
-            icon: CNSymbol(
-              widget.selected == null ? 'checkmark' : 'square.grid.2x2',
-            ),
-          ),
-          for (final trainer in trainers)
-            CNPopupMenuItem(
-              label: trainer.name,
-              icon: CNSymbol(
-                widget.selected == trainer.id ? 'checkmark' : 'person',
-              ),
-            ),
-        ],
-        onSelected: (index) =>
-            widget.onSelect(index == 0 ? null : trainers[index - 1].id),
-      );
-    }
-
-    return GlassIconButton(
-      key: _key,
-      // 심볼이 바뀌어도 네이티브 버튼을 새로 만들지 않게 고정 식별자를 준다
-      stableId: 'lesson-trainer',
-      symbol: _symbol,
-      onPressed: _openMenu,
     );
   }
 }

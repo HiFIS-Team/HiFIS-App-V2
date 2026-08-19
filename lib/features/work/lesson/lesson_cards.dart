@@ -5,10 +5,17 @@ part of 'lesson_section.dart';
 ///
 /// 데스크톱은 아직 [_SignRow] 를 쓴다 (2단 화면이라 카드가 과하다).
 class _SignCard extends StatelessWidget {
-  _SignCard({required this.sign, required this.onTap});
+  _SignCard({
+    required this.sign,
+    required this.onTap,
+    this.showTrainer = false,
+  });
 
   final SessionSign sign;
   final VoidCallback onTap;
+
+  /// 누가 받은 싸인인지를 같이 적을지 — 남의 기록이 섞여 있을 때만 켠다
+  final bool showTrainer;
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +46,7 @@ class _SignCard extends StatelessWidget {
                       SizedBox(height: 2),
                       Text(
                         // 전사 기록에서는 누가 받았는지가 먼저다
-                        _viewOnly
+                        showTrainer
                             ? '${_trainerName(sign)} · '
                                   '${_formatStamp(sign.signedAt)}'
                             : _formatStamp(sign.signedAt),
@@ -96,10 +103,13 @@ class _SignCard extends StatelessWidget {
 }
 
 class _SignRow extends StatelessWidget {
-  _SignRow({required this.sign, required this.onTap});
+  _SignRow({required this.sign, required this.onTap, this.showTrainer = false});
 
   final SessionSign sign;
   final VoidCallback onTap;
+
+  /// 누가 받은 싸인인지를 같이 적을지 — 남의 기록이 섞여 있을 때만 켠다
+  final bool showTrainer;
 
   @override
   Widget build(BuildContext context) {
@@ -143,7 +153,7 @@ class _SignRow extends StatelessWidget {
                 SizedBox(height: 2),
                 Text(
                   // 전사 기록에서는 누가 받았는지가 먼저다
-                  _viewOnly
+                  showTrainer
                       ? '${_trainerName(sign)} · ${sign.roundLabel}'
                             ' · ${_formatStamp(sign.signedAt)}'
                       : '${sign.roundLabel} · ${_formatStamp(sign.signedAt)}',

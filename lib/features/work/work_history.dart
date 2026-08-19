@@ -162,15 +162,45 @@ class _HistoryScreenState extends State<_HistoryScreen>
   /// 세션 기록·칭찬 목록과 **같은 글래스 검색바**를 쓴다.
   final _search = TextEditingController();
 
+  /// 오른쪽 위 필터로 고른 사람 — null 이면 전체
+  ///
+  /// **직원 말고 다에게 있다** (`_canSeeOthers`). 하루에 100건 넘게 쌓이는
+  /// 지점이 있어서 "그 사람이 오늘 뭘 했나"를 보려면 눈으로 훑어야 했다
+  /// (2026-08-19 대표 요청 — 세션 기록에 있던 것과 같은 부품이다).
+  ///
+  /// 서버에 다시 묻지 않고 **받아 둔 그날 기록에서 거른다.**
+  String? _personId;
+
+  bool get _canSeeOthers => myRole != Role.member;
+
+  /// 고를 수 있는 사람 — 이름순
+  ///
+  /// 명단 전체가 아니라 **그날 기록에 이름이 있는 사람만** 세운다
+  /// (세션 기록과 같은 규칙). 스무 명 메뉴에서 오늘 일한 셋을 찾게 하면
+  /// 고르는 일이 더 번거롭다.
+  List<FilterPerson> get _people {
+    final names = <String, String>{};
+    for (final log in _allLogs) {
+      names[log.employeeId] ??= _logAuthor(log);
+    }
+    return [for (final e in names.entries) (id: e.key, name: e.value)]
+      ..sort((a, b) => a.name.compareTo(b.name));
+  }
+
   /// 공백·대소문자를 지우고 맞춘다 ('화장실 청소' 로 쳐도 찾히게)
+  ///
+  /// 사람 필터는 **전체 내역에서만** 건다 — 내 내역은 어차피 나뿐이다.
   List<EnvTaskLog> _filter(List<EnvTaskLog> rows) {
+    final person = _all ? _personId : null;
     final key = _WorkScreenState._envKey(_search.text.trim());
-    if (key.isEmpty) return rows;
+    if (key.isEmpty && person == null) return rows;
     return [
       for (final log in rows)
-        if (_WorkScreenState._envKey(log.itemName).contains(key) ||
-            _WorkScreenState._envKey(_logAuthor(log)).contains(key))
-          log,
+        if (person == null || log.employeeId == person)
+          if (key.isEmpty ||
+              _WorkScreenState._envKey(log.itemName).contains(key) ||
+              _WorkScreenState._envKey(_logAuthor(log)).contains(key))
+            log,
     ];
   }
 
@@ -400,6 +430,25 @@ class _HistoryScreenState extends State<_HistoryScreen>
               ),
             ),
           ),
+          // 우측 상단 사람 필터 — **전체 내역을 볼 때만.** 뒤로가기와 마주 보는
+          // 자리다. 아래 검색바(블러)와는 Stack 의 다른 자식이라 네이티브
+          // 버튼이 묻히지 않는다 (같은 Row 에 두면 탭이 안 먹는다)
+          if (_canSeeOthers && _all)
+            SafeArea(
+              bottom: false,
+              child: Align(
+                alignment: Alignment.topRight,
+                child: Padding(
+                  padding: EdgeInsets.only(top: 8, right: 16),
+                  child: PeopleFilterButton(
+                    stableId: 'env-person',
+                    people: _people,
+                    selected: _personId,
+                    onSelect: (id) => setState(() => _personId = id),
+                  ),
+                ),
+              ),
+            ),
           // 아래 떠 있는 글래스 검색바 — 세션 기록·칭찬 목록과 같은 부품이다
           GlassSearchBar(controller: _search, hint: '항목·이름 검색'),
         ],
