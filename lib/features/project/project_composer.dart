@@ -3,22 +3,27 @@ part of 'project_screen.dart';
 /// 새 프로젝트 만들기 — 만들면 그 프로젝트를 돌려준다
 ///
 /// [seed] 를 주면 칸이 미리 채워진 채로 열린다 (회의록에서 옮길 때).
+///
+/// [edit] 을 주면 **고치는 화면**이 된다 (2026-08-19). 만들기와 **같은 폼**에
+/// 지금 값이 채워진 채로 열린다 — 예전에는 이름·설명·색만 받는 작은 모달이라
+/// 만들 때와 고칠 때가 다른 화면이었다.
 Future<_Project?> _showProjectComposer(
   BuildContext context, {
   ProjectSeed? seed,
+  _Project? edit,
 }) {
   // 폰은 팝업이 답답해서 오른쪽에서 밀려 들어오는 페이지로 연다
   if (!isDesktop) {
     return Navigator.push<_Project>(
       context,
       CupertinoPageRoute(
-        builder: (_) => _ProjectComposer(phone: true, seed: seed),
+        builder: (_) => _ProjectComposer(phone: true, seed: seed, edit: edit),
       ),
     );
   }
   return showAppDialog<_Project>(
     context,
-    (context) => _ProjectComposer(seed: seed),
+    (context) => _ProjectComposer(seed: seed, edit: edit),
   );
 }
 
@@ -64,7 +69,7 @@ Future<String?> createProjectFrom(
 }
 
 class _ProjectComposer extends StatefulWidget {
-  _ProjectComposer({this.phone = false, this.seed});
+  _ProjectComposer({this.phone = false, this.seed, this.edit});
 
   /// 폰은 팝업이 아니라 밀려 들어오는 페이지로 뜬다
   final bool phone;
@@ -72,17 +77,27 @@ class _ProjectComposer extends StatefulWidget {
   /// 미리 채워 넣을 값 — null 이면 빈 폼이다 (평소 '새 프로젝트')
   final ProjectSeed? seed;
 
+  /// 고칠 프로젝트 — null 이면 새로 만드는 것이다
+  final _Project? edit;
+
   @override
   State<_ProjectComposer> createState() => _ProjectComposerState();
 }
 
 class _ProjectComposerState extends State<_ProjectComposer> {
-  late final _name = TextEditingController(text: widget.seed?.title ?? '');
-  late final _desc = TextEditingController(text: widget.seed?.purpose ?? '');
+  /// 고치는 중인가 — 채워 넣는 값과 버튼 글자가 여기서 갈린다
+  _Project? get _edit => widget.edit;
+
+  late final _name = TextEditingController(
+    text: _edit?.name ?? widget.seed?.title ?? '',
+  );
+  late final _desc = TextEditingController(
+    text: _edit?.desc ?? widget.seed?.purpose ?? '',
+  );
   final _nameFocus = FocusNode();
 
-  /// 기본 마감은 2주 뒤
-  late DateTime _due = DateTime.now().add(Duration(days: 14));
+  /// 기본 마감은 2주 뒤 — 고칠 때는 지금 마감이 든다
+  late DateTime _due = _edit?.due ?? DateTime.now().add(Duration(days: 14));
 
   /// 참여 멤버 — 직원·점장은 본인이 기본으로 든다.
   ///
@@ -92,25 +107,41 @@ class _ProjectComposerState extends State<_ProjectComposer> {
   /// 회의록에서 왔으면 **참석자가 그대로 든다.** 본인 칩은 뺄 수 없게
   /// 해 뒀으므로(`onTap: null`) 겹치지 않게 한 번만 넣는다.
   late final _members = <String>[
-    if (myRole.doesFieldWork) me,
-    for (final name in widget.seed?.members ?? const <String>[])
-      if (name != me) name,
+    if (_edit case final project?) ...[
+      ...project.members,
+    ] else ...[
+      if (myRole.doesFieldWork) me,
+      for (final name in widget.seed?.members ?? const <String>[])
+        if (name != me) name,
+    ],
   ];
 
-  /// 만들면서 같이 등록할 할 일
+  /// 만들면서 같이 등록할 할 일 — **고칠 때는 지금 것을 그대로 든다**
+  ///
+  /// 원본을 안 건드리려고 복사한다. 저장할 때 [_edit] 의 것과 견줘
+  /// 새로 넣을 것·뺄 것·담당자가 바뀐 것을 가른다.
   late final _todos = <_Todo>[
-    for (final text in widget.seed?.todos ?? const <String>[])
-      _Todo(text: text),
+    if (_edit case final project?)
+      for (final todo in project.todos)
+        _Todo(
+          id: todo.id,
+          text: todo.text,
+          assignee: todo.assignee,
+          done: todo.done,
+        )
+    else
+      for (final text in widget.seed?.todos ?? const <String>[])
+        _Todo(text: text),
   ];
 
   /// 맡을 사람 — 비어 있으면 아직 안 골랐다는 뜻이다
   ///
   /// 회의록에서 왔고 본인이 참여자가 아니면(대표·관리자) **첫 참석자**를 세운다
-  late String _owner = myRole.doesFieldWork
-      ? me
-      : (_members.isNotEmpty ? _members.first : '');
+  late String _owner =
+      _edit?.owner ??
+      (myRole.doesFieldWork ? me : (_members.isNotEmpty ? _members.first : ''));
 
-  Color _color = AppColors.primary;
+  late Color _color = _hexColor(_edit?.colorHex) ?? AppColors.primary;
 
   @override
   void initState() {
@@ -400,8 +431,20 @@ class _ProjectComposerState extends State<_ProjectComposer> {
     );
   }
 
-  /// 확인 버튼 글자 — 회의록에서 왔으면 '옮기기' 다 (하는 일이 다르다)
-  String get _submitLabel => widget.seed == null ? '만들기' : '옮기기';
+  /// 확인 버튼 글자 — 하는 일이 셋이라 각각 다르다
+  String get _submitLabel {
+    if (_edit != null) return _needsApproval ? '수정 신청' : '저장';
+    return widget.seed == null ? '만들기' : '옮기기';
+  }
+
+  /// 머리말 — 폰 페이지와 PC 팝업이 같이 쓴다
+  String get _pageTitle => _edit == null ? '새 프로젝트' : '프로젝트 수정';
+
+  /// 이 수정이 대표 결재를 거쳐야 하나 — 할 일이 하나라도 체크됐으면 그렇다
+  bool get _needsApproval {
+    final project = _edit;
+    return project != null && !_canEditNow(project);
+  }
 
   /// 만들기 버튼 (데스크톱 팝업 전용 — 폰은 하단 글래스 버튼을 쓴다)
   Widget _submitButton() {
@@ -435,7 +478,7 @@ class _ProjectComposerState extends State<_ProjectComposer> {
     // 폰은 팝업 대신 오른쪽에서 밀려 들어오는 페이지로 연다
     if (widget.phone) {
       return PhoneDetailScaffold(
-        title: '새 프로젝트',
+        title: _pageTitle,
         // 만들기는 하단 탭바 자리에 글래스 버튼으로 띄운다
         bottomBar: GlassBottomButton(
           label: _submitLabel,
@@ -477,7 +520,7 @@ class _ProjectComposerState extends State<_ProjectComposer> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('새 프로젝트', style: AppTextStyles.title2),
+            Text(_pageTitle, style: AppTextStyles.title2),
             SizedBox(height: 16),
             Flexible(child: SingleChildScrollView(child: _form(context, dday))),
             SizedBox(height: 18),

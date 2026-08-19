@@ -327,13 +327,19 @@ class _ProjectDetail extends StatelessWidget {
   /// 이름이 목록에 뜬다. 바꾸겠다는 값은 신청서(`payload`)가 들고 있다가
   /// 승인되는 순간 옮겨 담긴다.
   Future<void> _requestEdit(BuildContext context) async {
-    final draft = await _showEditDialog(context, project);
-    if (draft == null || !context.mounted) return;
-    // 아직 아무도 체크를 안 했으면(또는 MASTER·참여 ADMIN 이면) 바로 고친다
+    // **결재를 안 거쳐도 되면 만들기 페이지를 그대로 채워서 연다** (2026-08-19).
+    // 이름·설명·색뿐 아니라 마감·담당자·참여 멤버·할 일까지 한 화면에서 고친다.
     if (_canEditNow(project)) {
-      await _applyEdit(context, draft.payload);
+      final draft = await _showProjectComposer(context, edit: project);
+      if (draft == null || !context.mounted) return;
+      await _applyEdit(context, draft);
       return;
     }
+    // 결재를 받아야 하는 자리 — **바꿀 수 있는 건 이름·설명·색뿐**이다.
+    // 마감은 기한 연장 결재, 인원은 인원 추가 결재로 길이 따로 있어서
+    // 전체 폼을 열면 고쳐도 안 올라가는 칸이 생긴다.
+    final draft = await _showEditDialog(context, project);
+    if (draft == null || !context.mounted) return;
     await _sendRequest(
       context,
       type: ProjectRequestType.edit,
@@ -343,29 +349,87 @@ class _ProjectDetail extends StatelessWidget {
   }
 
   /// 결재를 안 거치고 바로 고친다 ([_canEditNow] 인 사람)
-  Future<void> _applyEdit(
-    BuildContext context,
-    Map<String, String> payload,
-  ) async {
+  ///
+  /// 프로젝트 값은 한 번의 `PATCH` 로, 할 일은 [_syncTodos] 가 견줘서 넣고 뺀다.
+  Future<void> _applyEdit(BuildContext context, _Project draft) async {
     final projectId = project.id;
     if (projectId == null) return;
     try {
       final saved = await ProjectApi.update(
         projectId,
-        title: payload['title'],
-        purpose: payload['purpose'],
-        color: payload['color'],
+        title: draft.name,
+        purpose: draft.desc,
+        color: draft.colorHex,
+        due: draft.due,
+        ownerId: StaffDirectory.instance.byName(draft.owner)?.id,
+        assigneeIds: [
+          for (final name in draft.members)
+            ?StaffDirectory.instance.byName(name)?.id,
+        ],
       );
+      await _syncTodos(projectId, draft.todos);
       project
         ..name = saved.title
         ..desc = saved.purpose
-        ..colorHex = saved.color;
+        ..colorHex = saved.color
+        ..due = saved.due
+        ..owner = draft.owner
+        ..ownerId = saved.ownerId
+        ..memberIds = saved.assigneeIds;
+      project.members
+        ..clear()
+        ..addAll(draft.members);
       _log('프로젝트를 수정했어요');
       onChanged();
       if (context.mounted) AppToast.show(context, '수정했어요');
     } catch (error) {
       if (context.mounted) AppToast.show(context, messageOf(error));
     }
+  }
+
+  /// 폼에서 돌아온 할 일을 지금 것과 견줘 서버에 반영한다
+  ///
+  /// **결재를 안 타는 자리다** — 서버가 할 일 편집을 참여자에게 열어 뒀다
+  /// (`_ensure_member` 만 본다). 체크 상태는 안 건드린다.
+  Future<void> _syncTodos(String projectId, List<_Todo> next) async {
+    final keep = {for (final todo in next) ?todo.id};
+    for (final old in [...project.todos]) {
+      if (old.id case final id? when !keep.contains(id)) {
+        await ProjectApi.deleteTodo(projectId, id);
+      }
+    }
+    for (var i = 0; i < next.length; i++) {
+      final todo = next[i];
+      final assigneeId = StaffDirectory.instance
+          .byName(todo.assignee ?? '')
+          ?.id;
+      if (todo.id case final id?) {
+        final before = project.todos.where((t) => t.id == id).firstOrNull;
+        // 안 바뀐 줄은 건드리지 않는다 — 줄 수만큼 요청이 나가면 느리다
+        if (before != null &&
+            before.text == todo.text &&
+            before.assignee == todo.assignee) {
+          continue;
+        }
+        await ProjectApi.updateTodo(
+          projectId,
+          id,
+          content: todo.text,
+          assigneeId: assigneeId,
+        );
+      } else {
+        final saved = await ProjectApi.addTodo(
+          projectId,
+          content: todo.text,
+          assigneeId: assigneeId,
+          sort: i,
+        );
+        todo.id = saved.id;
+      }
+    }
+    project.todos
+      ..clear()
+      ..addAll(next);
   }
 
   /// 인원 추가 신청 — 승인되면 그때 참여 멤버가 늘어난다
@@ -610,16 +674,14 @@ class _ProjectDetail extends StatelessWidget {
   /// 넷 다 **대표 결재를 받는 것**이라 한자리에 모은다. 대기 중인 결재가
   /// 있으면 넷 다 사라진다 (프로젝트당 하나뿐이라 올려도 400 이 난다).
   ///
-  /// `인원 추가` 를 **`수정` 옆에** 둔 이유 — 서버 가드가 수정·삭제와 같고
-  /// (`NOT_PROJECT_OWNER`), 올리는 조건도 `_canRequestEdit` 하나로 같다.
-  /// 따로 떼면 같은 규칙인데 자리만 다른 버튼이 하나 더 생긴다.
+  /// **`인원 추가` 는 여기 없다 (2026-08-19).** 참여자 아바타 옆 `+` 가 같은
+  /// 일을 해서 버튼이 두 개로 보였다 — 눈에 띄는 그쪽만 남겼다
+  /// (폰은 상단 글래스 `사람+`).
   List<Widget> _headActions(BuildContext context) => [
     if (_canExtend) ...[SizedBox(width: 8), _extendButton(context)],
     if (_canTouchProject(project)) ...[
       SizedBox(width: 4),
       _headButton('수정', () => _requestEdit(context)),
-      SizedBox(width: 4),
-      _headButton('인원 추가', () => _requestMembers(context)),
       SizedBox(width: 4),
       _headButton('삭제', () => _requestDelete(context), danger: true),
     ],
