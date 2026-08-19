@@ -11,19 +11,25 @@ Future<_Project?> _showProjectComposer(
   BuildContext context, {
   ProjectSeed? seed,
   _Project? edit,
+  Future<bool> Function()? onDelete,
 }) {
   // 폰은 팝업이 답답해서 오른쪽에서 밀려 들어오는 페이지로 연다
   if (!isDesktop) {
     return Navigator.push<_Project>(
       context,
       CupertinoPageRoute(
-        builder: (_) => _ProjectComposer(phone: true, seed: seed, edit: edit),
+        builder: (_) => _ProjectComposer(
+          phone: true,
+          seed: seed,
+          edit: edit,
+          onDelete: onDelete,
+        ),
       ),
     );
   }
   return showAppDialog<_Project>(
     context,
-    (context) => _ProjectComposer(seed: seed, edit: edit),
+    (context) => _ProjectComposer(seed: seed, edit: edit, onDelete: onDelete),
   );
 }
 
@@ -69,7 +75,7 @@ Future<String?> createProjectFrom(
 }
 
 class _ProjectComposer extends StatefulWidget {
-  _ProjectComposer({this.phone = false, this.seed, this.edit});
+  _ProjectComposer({this.phone = false, this.seed, this.edit, this.onDelete});
 
   /// 폰은 팝업이 아니라 밀려 들어오는 페이지로 뜬다
   final bool phone;
@@ -79,6 +85,12 @@ class _ProjectComposer extends StatefulWidget {
 
   /// 고칠 프로젝트 — null 이면 새로 만드는 것이다
   final _Project? edit;
+
+  /// 삭제 아이콘을 눌렀을 때 — **처리했으면 true** 면 폼을 닫는다 (2026-08-19).
+  ///
+  /// 지우는 일 자체는 부르는 쪽([_ProjectDetail])이 한다 — 확인 창을 띄우고
+  /// 목록에서 빼는 뒷정리가 거기 있다. 폼은 자리만 내준다.
+  final Future<bool> Function()? onDelete;
 
   @override
   State<_ProjectComposer> createState() => _ProjectComposerState();
@@ -440,6 +452,14 @@ class _ProjectComposerState extends State<_ProjectComposer> {
   /// 머리말 — 폰 페이지와 PC 팝업이 같이 쓴다
   String get _pageTitle => _edit == null ? '새 프로젝트' : '프로젝트 수정';
 
+  /// 삭제 아이콘을 그릴까 — 고치는 중일 때만
+  bool get _canDelete => _edit != null && widget.onDelete != null;
+
+  Future<void> _delete() async {
+    final done = await widget.onDelete!.call();
+    if (done && mounted) Navigator.pop(context);
+  }
+
   /// 이 수정이 대표 결재를 거쳐야 하나 — 할 일이 하나라도 체크됐으면 그렇다
   bool get _needsApproval {
     final project = _edit;
@@ -479,6 +499,10 @@ class _ProjectComposerState extends State<_ProjectComposer> {
     if (widget.phone) {
       return PhoneDetailScaffold(
         title: _pageTitle,
+        // 삭제는 여기 하나뿐이다 — 상세 화면에는 안 둔다 (2026-08-19)
+        actions: [
+          if (_canDelete) GlassIconButton(symbol: 'trash', onPressed: _delete),
+        ],
         // 만들기는 하단 탭바 자리에 글래스 버튼으로 띄운다
         bottomBar: GlassBottomButton(
           label: _submitLabel,
@@ -520,7 +544,27 @@ class _ProjectComposerState extends State<_ProjectComposer> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(_pageTitle, style: AppTextStyles.title2),
+            Row(
+              children: [
+                Text(_pageTitle, style: AppTextStyles.title2),
+                Spacer(),
+                // PC 는 팝업이라 글래스(네이티브 뷰)를 안 쓴다 — 같은 자리에
+                // 같은 아이콘만 둔다
+                if (_canDelete)
+                  Pressable(
+                    onTap: _delete,
+                    scale: 0.9,
+                    pressedColor: AppColors.gray100,
+                    borderRadius: BorderRadius.circular(100),
+                    padding: EdgeInsets.all(6),
+                    child: Icon(
+                      CupertinoIcons.trash,
+                      size: 18,
+                      color: AppColors.error,
+                    ),
+                  ),
+              ],
+            ),
             SizedBox(height: 16),
             Flexible(child: SingleChildScrollView(child: _form(context, dday))),
             SizedBox(height: 18),

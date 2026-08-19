@@ -330,7 +330,24 @@ class _ProjectDetail extends StatelessWidget {
     // **결재를 안 거쳐도 되면 만들기 페이지를 그대로 채워서 연다** (2026-08-19).
     // 이름·설명·색뿐 아니라 마감·담당자·참여 멤버·할 일까지 한 화면에서 고친다.
     if (_canEditNow(project)) {
-      final draft = await _showProjectComposer(context, edit: project);
+      var removed = false;
+      final draft = await _showProjectComposer(
+        context,
+        edit: project,
+        // 삭제는 폼 오른쪽 위 휴지통이 맡는다 (2026-08-19)
+        onDelete: () async {
+          removed = await _applyDelete(context, pop: false);
+          return removed;
+        },
+      );
+      if (removed) {
+        // 폼은 스스로 닫혔다 — 폰이면 상세도 같이 닫는다
+        if (context.mounted && Navigator.canPop(context)) {
+          Navigator.pop(context);
+        }
+        onChanged();
+        return;
+      }
       if (draft == null || !context.mounted) return;
       await _applyEdit(context, draft);
       return;
@@ -511,10 +528,6 @@ class _ProjectDetail extends StatelessWidget {
   Future<void> _requestDelete(BuildContext context) async {
     final reason = await _showDeleteDialog(context, project);
     if (reason == null || !context.mounted) return;
-    if (_canEditNow(project)) {
-      await _applyDelete(context);
-      return;
-    }
     await _sendRequest(
       context,
       type: ProjectRequestType.delete,
@@ -522,22 +535,35 @@ class _ProjectDetail extends StatelessWidget {
     );
   }
 
-  /// 결재를 안 거치고 바로 지운다 — 승인 경로와 뒷정리가 같다
-  Future<void> _applyDelete(BuildContext context) async {
+  /// 결재를 안 거치고 바로 지운다 — **한 번 되묻는다** (2026-08-19)
+  ///
+  /// [pop] 은 지운 뒤 이 화면을 닫을지다. 수정 폼에서 부를 때는 폼이 스스로
+  /// 닫으므로 false 로 넘긴다 (안 그러면 폼과 상세가 한꺼번에 닫힌다).
+  /// **지웠으면 true** 를 준다.
+  Future<bool> _applyDelete(BuildContext context, {bool pop = true}) async {
     final projectId = project.id;
-    if (projectId == null) return;
+    if (projectId == null) return false;
+    final yes = await showConfirmDialog(
+      context,
+      title: '프로젝트를 삭제할까요?',
+      message: '삭제 후 되돌릴 수 없습니다.',
+      confirmLabel: '삭제하기',
+      destructive: true,
+    );
+    if (!yes || !context.mounted) return false;
     try {
       await ProjectApi.delete(projectId);
     } catch (error) {
       if (context.mounted) AppToast.show(context, messageOf(error));
-      return;
+      return false;
     }
     _projects.remove(project);
     if (context.mounted) {
       AppToast.show(context, '삭제했어요');
-      if (Navigator.canPop(context)) Navigator.pop(context);
+      if (pop && Navigator.canPop(context)) Navigator.pop(context);
     }
-    onChanged();
+    if (pop) onChanged();
+    return true;
   }
 
   /// 수정·삭제 신청을 올린다 — 둘이 같은 통로라 한 곳에서 보낸다
@@ -682,6 +708,10 @@ class _ProjectDetail extends StatelessWidget {
     if (_canTouchProject(project)) ...[
       SizedBox(width: 4),
       _headButton('수정', () => _requestEdit(context)),
+    ],
+    // 삭제는 **결재가 필요할 때만** 여기 있다 — 그냥 지울 수 있는 사람은
+    // 수정 폼 오른쪽 위 휴지통으로 지운다 (버튼이 두 군데 있으면 안 된다)
+    if (_canRequestEdit(project)) ...[
       SizedBox(width: 4),
       _headButton('삭제', () => _requestDelete(context), danger: true),
     ],
