@@ -102,6 +102,7 @@ class _Project {
     this.serverProgress = 0,
     this.serverTodoCount = 0,
     this.serverDoneCount = 0,
+    this.completedAt,
     this.request,
   });
 
@@ -176,11 +177,28 @@ class _Project {
   double get progress =>
       todoCount == 0 ? serverProgress / 100 : doneCount / todoCount;
 
-  /// 단계는 따로 관리하지 않고 진행률과 마감일에서 끌어낸다.
-  /// 서버 `_status` 와 같은 순서로 판정하되, **서버의 `WAITING`(진행률 0)은
-  /// 진행 중에 합친다** — 앱 탭이 진행 중·완료·누락 셋뿐이다.
+  /// 완료한 시각 — **null 이면 아직 완료가 아니다** (2026-08-19).
+  ///
+  /// 예전에는 진행률 100% 가 곧 완료였다. 마지막 할 일에 체크하는 순간
+  /// 완료되고 점수까지 붙어서 **잘못 누르면 되돌릴 사람이 대표뿐**이었다.
+  /// 이제 담당자가 완료 버튼을 눌러야 채워진다.
+  DateTime? completedAt;
+
+  bool get isDone => completedAt != null;
+
+  /// 할 일이 하나 이상 있고 **전부 체크됐는가** — 완료 버튼이 뜨는 조건
+  ///
+  /// 상세를 아직 안 받았으면 서버가 준 개수로 본다 (`todoCount`·`doneCount`
+  /// 게터가 알아서 갈라 준다).
+  bool get allTodosDone => todoCount > 0 && doneCount == todoCount;
+
+  /// 할 일이 **하나라도 체크됐는가** — 자유 수정·삭제가 닫히는 기준
+  bool get anyTodoDone => doneCount > 0;
+
+  /// 단계는 완료 도장과 마감일에서 끌어낸다. 서버 `_status` 와 같은 순서다.
+  /// **서버의 `WAITING`(진행률 0)은 진행 중에 합친다** — 앱 탭이 셋뿐이다.
   _Phase get phase {
-    if (progress >= 1) return _Phase.done;
+    if (isDone) return _Phase.done;
     if (_dday(due) < 0) return _Phase.missed;
     return _Phase.running;
   }
@@ -252,6 +270,7 @@ _Project _merged(_Project? held, Project row, ProjectRequest? request) {
     ..serverProgress = fresh.serverProgress
     ..serverTodoCount = fresh.serverTodoCount
     ..serverDoneCount = fresh.serverDoneCount
+    ..completedAt = fresh.completedAt
     ..request = fresh.request;
   held.members
     ..clear()
@@ -288,6 +307,7 @@ _Project _fromServer(Project row, ProjectRequest? request) {
     serverProgress: row.progress,
     serverTodoCount: row.todoCount,
     serverDoneCount: row.doneCount,
+    completedAt: row.completedAt,
     request: request == null
         ? null
         : _Extension(

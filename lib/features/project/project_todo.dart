@@ -42,8 +42,12 @@ class _TodoCard extends StatelessWidget {
             for (final todo in todos)
               _TodoRow(
                 todo: todo,
-                // 완료된 프로젝트는 눌러도 서버가 403 을 준다 — 아예 안 먹게 한다
-                onToggle: locked ? null : () => onToggle(todo),
+                // 완료된 프로젝트는 눌러도 서버가 403 을 준다 — 아예 안 먹게 한다.
+                // 체크만 한 겹 더 잠근다 — **대표·관리자는 본인이 맡은 칸만**
+                // 체크할 수 있다 (2026-08-19, 서버 `NOT_TODO_ASSIGNEE`)
+                onToggle: locked || !_canCheckTodo(todo)
+                    ? null
+                    : () => onToggle(todo),
                 onRemove: locked ? null : () => onRemove(todo),
                 onAssign: locked ? null : () => onAssign(todo),
               ),
@@ -233,6 +237,12 @@ class _TodoComposerState extends State<_TodoComposer> {
   void _submit() {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
+    // 담당자를 안 고르면 여기서 막는다 (2026-08-19 대표 결정) — 다 적고 나서
+    // '만들기' 에서 걸리면 어느 줄이 비었는지 되짚어야 한다
+    if (_assignee == null) {
+      AppToast.show(context, '할 일을 맡을 사람을 골라주세요');
+      return;
+    }
     final times = _times;
     for (var i = 1; i <= times; i++) {
       // 여러 개일 때만 번호를 붙인다 — 1개짜리에 `청소 1` 이 뜨면 어색하다

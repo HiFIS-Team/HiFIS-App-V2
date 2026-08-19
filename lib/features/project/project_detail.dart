@@ -97,15 +97,78 @@ String _requestLabel(ProjectRequestType type) => switch (type) {
   ProjectRequestType.members => '인원 추가',
 };
 
-/// 수정·삭제를 올릴 수 있는 사람 — **담당자만** (서버 `NOT_PROJECT_OWNER`)
+/// 수정·삭제·인원 추가를 **결재 없이 바로** 할 수 있는가 (2026-08-19 대표 결정)
 ///
-/// 참여 멤버는 예전에도 못 했다. 완료된 프로젝트는 아무도 못 올린다.
-/// 대기 중인 결재가 있으면 못 올린다 — 프로젝트당 하나뿐이다.
+/// | 누구 | 언제 |
+/// |---|---|
+/// | MASTER | **늘** — 남의 것도, 완료된 것도 |
+/// | ADMIN | **참여 중일 때** (담당자거나 참여 멤버) |
+/// | MANAGER · MEMBER | 참여 중 + **할 일이 하나도 체크 안 됐을 때** |
+///
+/// 아직 아무도 손을 안 댄 프로젝트는 잘못 만든 것일 수 있어서 그냥 고치고
+/// 지운다 — 오타 하나에 대표를 부르지 않는다. 한 칸이라도 체크된 뒤부터는
+/// 남이 한 일이 걸려 있어서 [_canRequestEdit] 쪽(결재)으로 간다.
+///
+/// 서버 `_ensure_can_edit` 과 같은 기준이다.
+bool _canEditNow(_Project project) {
+  if (myRole == Role.master) return true;
+  if (!_isMember(project) || project.isDone) return false;
+  if (myRole == Role.admin) return true;
+  return !project.anyTodoDone;
+}
+
+/// 수정·삭제·인원 추가를 **결재로 올릴 수 있는가** (서버 `NOT_PROJECT_MEMBER`)
+///
+/// **담당자와 참여 멤버 둘 다** 올린다 (2026-08-19 — 예전에는 담당자만).
+/// 완료된 프로젝트는 아무도 못 올리고, 대기 중인 결재가 있으면 못 올린다
+/// (프로젝트당 하나뿐이다).
+///
+/// [_canEditNow] 인 사람은 여기로 안 온다 — 바로 고치면 되는데 결재를 태우면
+/// 결재함만 지저분해진다.
 bool _canRequestEdit(_Project project) =>
+    _isMember(project) &&
+    !project.isDone &&
+    project.request == null &&
+    !_canEditNow(project);
+
+/// 완료 버튼을 누를 수 있는가 — **담당자만** (2026-08-19 대표 결정)
+///
+/// 체크는 다 같이 하지만 '이제 끝났다'고 선언하는 것은 맡은 사람 몫이다.
+/// 할 일이 하나 이상 있고 **전부 체크돼야** 뜬다 (서버 `TODOS_LEFT`).
+bool _canCompleteProject(_Project project) =>
+    !project.isDone &&
     project.ownerId != null &&
     project.ownerId == currentUser?.id &&
-    project.phase != _Phase.done &&
-    project.request == null;
+    project.allTodosDone;
+
+/// 수정·삭제·인원 추가 버튼을 보여줄까 — **바로 하든 결재로 올리든** 되면 뜬다
+///
+/// PC 머리말의 글자 버튼과 폰 상단 글래스 버튼이 같이 쓴다.
+bool _canTouchProject(_Project project) =>
+    _canEditNow(project) || _canRequestEdit(project);
+
+/// 폰 상단 글래스 버튼이 상세 본문과 **같은 동작**을 타게 하는 통로
+///
+/// 수정·인원 추가는 [_ProjectDetail] 안에 있다 (프로젝트와 갱신 콜백을 다 들고
+/// 있어야 해서다). 폰 헤더는 그 위젯 **밖**이라 직접 못 부른다 — 같은 값으로
+/// 하나 더 만들어 그 메서드를 부른다. **그리지 않고 동작만 빌려 쓰는 것**이라
+/// 화면에는 아무 영향이 없다.
+_ProjectDetail _projectActions(_Project project, VoidCallback onChanged) =>
+    _ProjectDetail(project: project, onChanged: onChanged);
+
+/// 이 할 일에 체크할 수 있는가 — **MASTER·ADMIN 은 본인 담당만** (2026-08-19)
+///
+/// 대표·관리자는 프로젝트를 마음대로 고치고 지울 수 있지만 **일을 대신 했다고
+/// 표시하지는 못한다.** 체크가 곧 진행률이고 그게 곧 완료·점수라, 남이 한 일을
+/// 위에서 찍어 주면 그 점수가 뜻을 잃는다.
+///
+/// 서버 `_ensure_can_check` 과 같은 기준이다 (`NOT_TODO_ASSIGNEE`).
+bool _canCheckTodo(_Todo todo) {
+  if (myRole != Role.master && myRole != Role.admin) return true;
+  final name = todo.assignee;
+  if (name == null) return false;
+  return StaffDirectory.instance.byName(name)?.id == currentUser?.id;
+}
 
 /// 결재 카드에서 '무엇이 바뀌나' 한 줄 — 삭제는 견줄 값이 없어 null
 String? _requestChange(_Project project, _Extension request) =>
@@ -144,8 +207,7 @@ String _addedNames(_Extension request) {
 /// **완료 되돌리기는 MASTER 도 자기 프로젝트에서만 된다.** 멤버 잠금이 먼저라
 /// 남의 완료 프로젝트는 대표도 못 푼다 (2026-08-14 결정의 결과다).
 bool _isLocked(_Project project) =>
-    !_isMember(project) ||
-    (project.phase == _Phase.done && myRole != Role.master);
+    !_isMember(project) || (project.isDone && myRole != Role.master);
 
 class _ProjectDetail extends StatelessWidget {
   _ProjectDetail({
@@ -267,12 +329,43 @@ class _ProjectDetail extends StatelessWidget {
   Future<void> _requestEdit(BuildContext context) async {
     final draft = await _showEditDialog(context, project);
     if (draft == null || !context.mounted) return;
+    // 아직 아무도 체크를 안 했으면(또는 MASTER·참여 ADMIN 이면) 바로 고친다
+    if (_canEditNow(project)) {
+      await _applyEdit(context, draft.payload);
+      return;
+    }
     await _sendRequest(
       context,
       type: ProjectRequestType.edit,
       payload: draft.payload,
       reason: draft.reason,
     );
+  }
+
+  /// 결재를 안 거치고 바로 고친다 ([_canEditNow] 인 사람)
+  Future<void> _applyEdit(
+    BuildContext context,
+    Map<String, String> payload,
+  ) async {
+    final projectId = project.id;
+    if (projectId == null) return;
+    try {
+      final saved = await ProjectApi.update(
+        projectId,
+        title: payload['title'],
+        purpose: payload['purpose'],
+        color: payload['color'],
+      );
+      project
+        ..name = saved.title
+        ..desc = saved.purpose
+        ..colorHex = saved.color;
+      _log('프로젝트를 수정했어요');
+      onChanged();
+      if (context.mounted) AppToast.show(context, '수정했어요');
+    } catch (error) {
+      if (context.mounted) AppToast.show(context, messageOf(error));
+    }
   }
 
   /// 인원 추가 신청 — 승인되면 그때 참여 멤버가 늘어난다
@@ -289,6 +382,10 @@ class _ProjectDetail extends StatelessWidget {
       AppToast.show(context, '명단에서 그 사람을 못 찾았어요');
       return;
     }
+    if (_canEditNow(project)) {
+      await _applyMembers(context, ids);
+      return;
+    }
     await _sendRequest(
       context,
       type: ProjectRequestType.members,
@@ -297,15 +394,86 @@ class _ProjectDetail extends StatelessWidget {
     );
   }
 
+  /// 결재를 안 거치고 바로 넣는다 — **더하기만** 한다 (승인 경로와 같은 규칙)
+  Future<void> _applyMembers(BuildContext context, List<String> ids) async {
+    final projectId = project.id;
+    if (projectId == null) return;
+    final merged = {...project.memberIds, ...ids}.toList();
+    try {
+      final saved = await ProjectApi.update(projectId, assigneeIds: merged);
+      project
+        ..memberIds = saved.assigneeIds
+        ..members.clear();
+      project.members.addAll([
+        for (final id in saved.assigneeIds)
+          ?StaffDirectory.instance.byId(id)?.name,
+      ]);
+      _log('인원을 추가했어요');
+      onChanged();
+      if (context.mounted) AppToast.show(context, '인원을 추가했어요');
+    } catch (error) {
+      if (context.mounted) AppToast.show(context, messageOf(error));
+    }
+  }
+
+  /// 프로젝트 완료 — **한 번 되묻는다** (2026-08-19 대표 요청)
+  ///
+  /// 예전에는 마지막 할 일에 체크하는 순간 저절로 완료됐다. 그 한 번에 점수까지
+  /// 붙어서 잘못 눌러도 되돌릴 사람이 대표뿐이었다. 이제 버튼을 따로 두고
+  /// 누르면 확인 창을 띄운다.
+  Future<void> _complete(BuildContext context) async {
+    final yes = await showConfirmDialog(
+      context,
+      title: '프로젝트를 완료할까요?',
+      message: '완료 후 되돌릴 수 없습니다.',
+      confirmLabel: '완료',
+    );
+    if (!yes || !context.mounted) return;
+
+    final projectId = project.id;
+    if (projectId == null) return;
+    try {
+      final saved = await ProjectApi.complete(projectId);
+      project.completedAt = saved.completedAt;
+      _log('프로젝트를 완료했어요');
+      onChanged();
+      if (context.mounted) AppToast.show(context, '프로젝트를 완료했어요');
+    } catch (error) {
+      if (context.mounted) AppToast.show(context, messageOf(error));
+    }
+  }
+
   /// 삭제 신청 — 승인 전까지 프로젝트는 그대로 있고 '삭제 대기'만 붙는다
   Future<void> _requestDelete(BuildContext context) async {
     final reason = await _showDeleteDialog(context, project);
     if (reason == null || !context.mounted) return;
+    if (_canEditNow(project)) {
+      await _applyDelete(context);
+      return;
+    }
     await _sendRequest(
       context,
       type: ProjectRequestType.delete,
       reason: reason,
     );
+  }
+
+  /// 결재를 안 거치고 바로 지운다 — 승인 경로와 뒷정리가 같다
+  Future<void> _applyDelete(BuildContext context) async {
+    final projectId = project.id;
+    if (projectId == null) return;
+    try {
+      await ProjectApi.delete(projectId);
+    } catch (error) {
+      if (context.mounted) AppToast.show(context, messageOf(error));
+      return;
+    }
+    _projects.remove(project);
+    if (context.mounted) {
+      AppToast.show(context, '삭제했어요');
+      if (Navigator.canPop(context)) Navigator.pop(context);
+    }
+    onChanged();
   }
 
   /// 수정·삭제 신청을 올린다 — 둘이 같은 통로라 한 곳에서 보낸다
@@ -447,7 +615,7 @@ class _ProjectDetail extends StatelessWidget {
   /// 따로 떼면 같은 규칙인데 자리만 다른 버튼이 하나 더 생긴다.
   List<Widget> _headActions(BuildContext context) => [
     if (_canExtend) ...[SizedBox(width: 8), _extendButton(context)],
-    if (_canRequestEdit(project)) ...[
+    if (_canTouchProject(project)) ...[
       SizedBox(width: 4),
       _headButton('수정', () => _requestEdit(context)),
       SizedBox(width: 4),
@@ -629,6 +797,15 @@ class _ProjectDetail extends StatelessWidget {
           onRemove: (todo) => _remove(context, todo),
           onAssign: (todo) => _assign(context, todo),
         ),
+        // 할 일을 다 체크하면 담당자에게만 뜬다 — 이걸 눌러야 완료다 (2026-08-19)
+        if (_canCompleteProject(project)) ...[
+          SizedBox(height: 16),
+          AppButton(
+            label: '프로젝트 완료',
+            filled: true,
+            onTap: () => _complete(context),
+          ),
+        ],
         SizedBox(height: 16),
         // 폰은 댓글을 시트로 빼고, 여기엔 눌러서 여는 줄만 둔다
         if (!isDesktop) ...[

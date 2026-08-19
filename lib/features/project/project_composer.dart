@@ -181,6 +181,18 @@ class _ProjectComposerState extends State<_ProjectComposer> {
       AppToast.show(context, '담당자를 정해주세요');
       return;
     }
+    // **할 일을 두 개 이상 받는다 (2026-08-19 대표 결정).** 완료가 곧 점수인데
+    // 할 일이 없으면 무엇을 했는지가 아무 데도 안 남는다. 하나만 받으면
+    // 그 한 칸이 사실상 프로젝트 자체라 나눠 적는 뜻이 없다.
+    if (_todos.length < 2) {
+      AppToast.show(context, '할 일을 두 개 이상 추가해주세요');
+      return;
+    }
+    // 담당자도 필수다 — 비어 있으면 누가 할 일인지 아무도 모른 채로 시작한다
+    if (_todos.any((todo) => todo.assignee == null)) {
+      AppToast.show(context, '할 일마다 담당자를 정해주세요');
+      return;
+    }
     final now = DateTime.now();
     Navigator.pop(
       context,

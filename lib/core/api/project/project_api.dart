@@ -115,6 +115,7 @@ class Project {
     required this.createdAt,
     this.color,
     this.extensionReason,
+    this.completedAt,
   });
 
   factory Project.fromJson(Map<String, dynamic> json) => Project(
@@ -135,6 +136,7 @@ class Project {
     color: json['color'] as String?,
     extensionReason: json['extensionReason'] as String?,
     status: ProjectStatus.parse(json['status'] as String?),
+    completedAt: _time(json['completedAt']),
     createdById: json['createdById'] as String,
     createdAt: _time(json['createdAt'])!,
   );
@@ -173,6 +175,13 @@ class Project {
   final String? extensionReason;
 
   final ProjectStatus status;
+
+  /// 완료한 시각 — **null 이면 아직 완료가 아니다** (2026-08-19).
+  ///
+  /// 예전에는 `progress == 100` 이 곧 완료였다. 이제 할 일을 다 체크해도
+  /// **담당자가 완료를 눌러야** 채워진다 (`POST /projects/{id}/complete`).
+  final DateTime? completedAt;
+
   final String createdById;
   final DateTime createdAt;
 }
@@ -450,6 +459,22 @@ class ProjectApi {
   }
 
   static Future<void> delete(String id) => _client.delete('/projects/$id');
+
+  /// 완료로 찍는다 — **담당자만** (2026-08-19)
+  ///
+  /// 할 일이 하나 이상 있고 **전부 체크돼야** 통과한다 (`TODOS_LEFT`).
+  /// 예전에는 마지막 칸을 체크하는 순간 저절로 완료였다 — 그 한 번에 점수까지
+  /// 붙어서 잘못 눌러도 되돌릴 사람이 대표뿐이었다.
+  static Future<Project> complete(String id) async {
+    final data = await _client.post('/projects/$id/complete');
+    return Project.fromJson(data!);
+  }
+
+  /// 완료를 되돌린다 — **MASTER 만**. 자동으로 준 10점은 회수된다
+  static Future<Project> reopen(String id) async {
+    final data = await _client.post('/projects/$id/reopen');
+    return Project.fromJson(data!);
+  }
 
   // ── 체크리스트 ──
 
