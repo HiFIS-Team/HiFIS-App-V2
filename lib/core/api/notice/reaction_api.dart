@@ -4,7 +4,8 @@ import '../client/api_client.dart';
 enum ReactionTarget {
   notice('NOTICE'),
   meeting('MEETING'),
-  message('MESSAGE');
+  message('MESSAGE'),
+  project('PROJECT');
 
   const ReactionTarget(this.wire);
 

@@ -1,49 +1,28 @@
 part of 'project_screen.dart';
 
-/// 댓글·활동 타임라인
+/// 활동 타임라인 — **시스템 기록만** (2026-08-19)
+///
+/// 예전에는 댓글이 여기 섞여 있고 입력칸도 있었다. 댓글이 오른쪽 세로 줄의
+/// 말풍선(시트)으로 빠지면서 이 카드는 '무슨 일이 있었나' 만 남았다.
 class _ActivityCard extends StatefulWidget {
-  _ActivityCard({required this.project, required this.onComment});
+  _ActivityCard({required this.project});
 
   final _Project project;
-
-  /// 서버에 올리고 오는 동안 기다려야 해서 `ValueChanged` 가 아니다
-  final Future<void> Function(String) onComment;
 
   @override
   State<_ActivityCard> createState() => _ActivityCardState();
 }
 
 class _ActivityCardState extends State<_ActivityCard> {
-  final _controller = TextEditingController();
-  final _focus = FocusNode();
-
   /// 활동은 계속 쌓이므로 처음에는 최근 것만 보여준다
   static const _fold = 5;
   bool _expanded = false;
 
   @override
-  void dispose() {
-    _controller.dispose();
-    _focus.dispose();
-    super.dispose();
-  }
-
-  Future<void> _send() async {
-    final text = _controller.text.trim();
-    if (text.isEmpty) return;
-    // 입력칸은 먼저 비운다 — 서버를 기다리는 동안 두 번 눌리지 않게
-    _controller.clear();
-    // 보낸 뒤에도 계속 쓸 수 있게 포커스를 되돌린다
-    _focus.requestFocus();
-    await widget.onComment(text);
-  }
-
-  @override
   Widget build(BuildContext context) {
-    // 폰은 댓글이 시트로 빠져서 여기엔 시스템 기록만 남는다
-    final all = isDesktop
-        ? widget.project.events
-        : widget.project.events.where((e) => !e.comment).toList();
+    // **댓글은 오른쪽 세로 줄로 빠졌다 (2026-08-19)** — 여기엔 시스템 기록만
+    // 남는다. 서버도 `project_activities` 에 더는 댓글을 안 쌓는다
+    final all = widget.project.events.where((e) => !e.comment).toList();
     final events = _expanded ? all : all.take(_fold).toList();
     final hidden = all.length - events.length;
 
@@ -65,63 +44,6 @@ class _ActivityCardState extends State<_ActivityCard> {
               ),
             ],
           ),
-          // 댓글 입력 — 폰은 시트로 빠져서 데스크톱에서만 둔다
-          if (isDesktop) ...[
-            SizedBox(height: 12),
-            // 댓글 입력
-            Row(
-              children: [
-                // 댓글 줄(project_comments)과 같은 크기 — 같은 카드 안에서
-                // 쓰는 줄과 읽는 줄의 아바타가 다르면 눈에 걸린다
-                Avatar(name: me, size: 32),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: AppColors.gray50,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: TextField(
-                      controller: _controller,
-                      focusNode: _focus,
-                      style: AppTextStyles.body2,
-                      cursorColor: AppColors.primary,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _send(),
-                      decoration: InputDecoration(
-                        hintText: '댓글을 남겨보세요',
-                        hintStyle: AppTextStyles.body2.copyWith(
-                          color: AppColors.gray400,
-                        ),
-                        border: InputBorder.none,
-                        isCollapsed: true,
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(width: 8),
-                Pressable(
-                  onTap: _send,
-                  scale: 0.94,
-                  child: Container(
-                    width: 38,
-                    height: 38,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.arrow_upward_rounded,
-                      size: 18,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
           SizedBox(height: 14),
           if (events.isEmpty)
             Padding(

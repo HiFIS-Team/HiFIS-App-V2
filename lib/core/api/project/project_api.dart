@@ -1,4 +1,5 @@
 import '../client/api_client.dart';
+import '../notice/reaction_api.dart';
 
 /// 프로젝트가 놓인 자리 (서버 `ProjectStatus`) — **서버가 파생시킨다**
 ///
@@ -116,6 +117,8 @@ class Project {
     this.color,
     this.extensionReason,
     this.completedAt,
+    this.reactions = const [],
+    this.commentCount = 0,
   });
 
   factory Project.fromJson(Map<String, dynamic> json) => Project(
@@ -137,6 +140,8 @@ class Project {
     extensionReason: json['extensionReason'] as String?,
     status: ProjectStatus.parse(json['status'] as String?),
     completedAt: _time(json['completedAt']),
+    reactions: reactionsFromJson(json['reactions']),
+    commentCount: json['commentCount'] as int? ?? 0,
     createdById: json['createdById'] as String,
     createdAt: _time(json['createdAt'])!,
   );
@@ -181,6 +186,11 @@ class Project {
   /// 예전에는 `progress == 100` 이 곧 완료였다. 이제 할 일을 다 체크해도
   /// **담당자가 완료를 눌러야** 채워진다 (`POST /projects/{id}/complete`).
   final DateTime? completedAt;
+
+  /// 하트 집계 · 댓글 수 (2026-08-19) — 상세 오른쪽 세로 줄이 쓴다.
+  /// 공지·회의록과 **같은 위젯**이라 같은 이름으로 받는다
+  final List<ReactionAgg> reactions;
+  final int commentCount;
 
   final String createdById;
   final DateTime createdAt;
@@ -535,34 +545,8 @@ class ProjectApi {
     ];
   }
 
-  /// 댓글 달기 — 만들어진 한 줄이 그대로 돌아온다
-  static Future<ProjectActivity> addComment(
-    String projectId, {
-    required String body,
-  }) async {
-    final data = await _client.post(
-      '/projects/$projectId/comments',
-      body: {'body': body},
-    );
-    return ProjectActivity.fromJson(data!);
-  }
-
-  /// 고치기 — **본인 댓글만** 된다 (그 외 403)
-  static Future<ProjectActivity> updateComment(
-    String projectId,
-    String commentId, {
-    required String body,
-  }) async {
-    final data = await _client.patch(
-      '/projects/$projectId/comments/$commentId',
-      body: {'body': body},
-    );
-    return ProjectActivity.fromJson(data!);
-  }
-
-  /// 지우기 — 본인 댓글 또는 관리자·점장
-  static Future<void> deleteComment(String projectId, String commentId) =>
-      _client.delete('/projects/$projectId/comments/$commentId');
+  // 프로젝트 댓글 세 개는 걷어냈다 (2026-08-19) — 저장이 `comments` 로
+  // 옮겨 가면서 공지·회의록과 같은 `CommentApi` 를 쓴다.
 
   // ── 기한 변경 요청 ──
 

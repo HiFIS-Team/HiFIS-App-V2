@@ -303,29 +303,10 @@ class _ProjectDetail extends StatelessWidget {
     }
   }
 
-  /// 댓글 — 서버에 올린 뒤 돌아온 줄을 그대로 얹는다.
-  /// 실패하면 아무것도 안 남는다 (빈 줄이 남아 있다가 사라지는 것보다 낫다)
-  Future<void> _comment(BuildContext context, String text) async {
-    final projectId = project.id;
-    if (projectId == null) return;
-    try {
-      final saved = await ProjectApi.addComment(projectId, body: text);
-      project.events.insert(0, _eventFrom(saved));
-      onChanged();
-    } catch (error) {
-      if (context.mounted) AppToast.show(context, messageOf(error));
-    }
-  }
-
   /// 기한 연장 신청 — 승인 전까지 마감일은 그대로다
   Future<void> _requestExtension(BuildContext context) =>
       _extendProject(context, project, onChanged);
 
-  /// 수정 신청 — **승인 전까지는 아무것도 안 바뀐다**
-  ///
-  /// 신청할 때 프로젝트에 바로 쓰고 '되돌리기'를 두면, 승인 전인데 이미 바뀐
-  /// 이름이 목록에 뜬다. 바꾸겠다는 값은 신청서(`payload`)가 들고 있다가
-  /// 승인되는 순간 옮겨 담긴다.
   /// 프로젝트 수정 — **자유든 결재든 같은 화면**이다 (2026-08-19)
   ///
   /// 만들기와 같은 폼이 지금 값으로 채워진 채 열린다. 갈리는 것은 안쪽뿐이다.
@@ -838,100 +819,114 @@ class _ProjectDetail extends StatelessWidget {
   Widget build(BuildContext context) {
     final dday = _dday(project.due);
 
-    return ListView(
-      padding: phone
-          // 폰 상세는 헤더 뒤로 스크롤되고, 하단바가 없어 화면 아래 여백만 남긴다
-          ? EdgeInsets.fromLTRB(
-              20,
-              PhoneDetailScaffold.topPadding,
-              20,
-              MediaQuery.paddingOf(context).bottom + 32,
-            )
-          : EdgeInsets.fromLTRB(28, 64, 28, bottomBarInset(context)),
+    return Stack(
       children: [
-        if (phone)
-          ..._phoneHead(context, dday)
-        else
-          ..._desktopHead(context, dday),
-        // 완료하면 그 자리가 점수 카드가 된다 — 결재할 기한 연장은 이미 끝났다
-        if (project.phase == _Phase.done && myRole == Role.master) ...[
-          SizedBox(height: 14),
-          _AwardCard(project: project),
-        ] else if (project.request != null) ...[
-          SizedBox(height: 14),
-          _ExtensionCard(
-            project: project,
-            // 대표가 아니면 버튼 없이 '대기 중'만 보인다 (눌러도 403 이다)
-            onApprove: _canDecideRequest
-                ? () => _decide(context, approve: true)
-                : null,
-            onReject: _canDecideRequest
-                ? () => _decide(context, approve: false)
-                : null,
-          ),
-        ],
-        SizedBox(height: 18),
-        // 진행률 — 할 일 진척도를 여기서 한 번만 보여준다
-        Row(
+        ListView(
+          padding: phone
+              // 폰 상세는 헤더 뒤로 스크롤되고, 하단바가 없어 화면 아래 여백만 남긴다
+              ? EdgeInsets.fromLTRB(
+                  20,
+                  PhoneDetailScaffold.topPadding,
+                  20,
+                  MediaQuery.paddingOf(context).bottom + 32,
+                )
+              : EdgeInsets.fromLTRB(28, 64, 28, bottomBarInset(context)),
           children: [
-            Expanded(
-              child: _ProgressBar(
-                value: project.progress,
-                color: project.color,
-                height: 8,
+            if (phone)
+              ..._phoneHead(context, dday)
+            else
+              ..._desktopHead(context, dday),
+            // 완료하면 그 자리가 점수 카드가 된다 — 결재할 기한 연장은 이미 끝났다
+            if (project.phase == _Phase.done && myRole == Role.master) ...[
+              SizedBox(height: 14),
+              _AwardCard(project: project),
+            ] else if (project.request != null) ...[
+              SizedBox(height: 14),
+              _ExtensionCard(
+                project: project,
+                // 대표가 아니면 버튼 없이 '대기 중'만 보인다 (눌러도 403 이다)
+                onApprove: _canDecideRequest
+                    ? () => _decide(context, approve: true)
+                    : null,
+                onReject: _canDecideRequest
+                    ? () => _decide(context, approve: false)
+                    : null,
               ),
+            ],
+            SizedBox(height: 18),
+            // 진행률 — 할 일 진척도를 여기서 한 번만 보여준다
+            Row(
+              children: [
+                Expanded(
+                  child: _ProgressBar(
+                    value: project.progress,
+                    color: project.color,
+                    height: 8,
+                  ),
+                ),
+                SizedBox(width: 12),
+                Text(
+                  '${(project.progress * 100).round()}%',
+                  style: AppTextStyles.body2.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: project.phase == _Phase.done
+                        ? AppColors.success
+                        : project.color,
+                  ),
+                ),
+                SizedBox(width: 8),
+                Text(
+                  '할 일 ${project.doneCount}/${project.todos.length}',
+                  style: AppTextStyles.caption,
+                ),
+              ],
             ),
-            SizedBox(width: 12),
-            Text(
-              '${(project.progress * 100).round()}%',
-              style: AppTextStyles.body2.copyWith(
-                fontWeight: FontWeight.w700,
-                color: project.phase == _Phase.done
-                    ? AppColors.success
-                    : project.color,
+            SizedBox(height: 22),
+            // 좌우로 나누면 짧은 쪽 아래가 비어 보여서 전폭으로 쌓는다.
+            // 칸 안에 스크롤을 넣지 않고 페이지가 늘어나는 쪽을 택했다.
+            _TodoCard(
+              project: project,
+              onToggle: (todo) => _toggle(context, todo),
+              onRemove: (todo) => _remove(context, todo),
+              onAssign: (todo) => _assign(context, todo),
+            ),
+            // 할 일을 다 체크하면 담당자에게만 뜬다 — 이걸 눌러야 완료다 (2026-08-19)
+            if (_canCompleteProject(project)) ...[
+              SizedBox(height: 16),
+              AppButton(
+                label: '프로젝트 완료',
+                filled: true,
+                onTap: () => _complete(context),
               ),
-            ),
-            SizedBox(width: 8),
-            Text(
-              '할 일 ${project.doneCount}/${project.todos.length}',
-              style: AppTextStyles.caption,
-            ),
+            ],
+            SizedBox(height: 16),
+            // 댓글은 오른쪽 세로 줄의 말풍선으로 빠졌다 (2026-08-19) —
+            // 여기 남은 것은 시스템 활동 기록뿐이다
+            _ActivityCard(project: project),
           ],
         ),
-        SizedBox(height: 22),
-        // 좌우로 나누면 짧은 쪽 아래가 비어 보여서 전폭으로 쌓는다.
-        // 칸 안에 스크롤을 넣지 않고 페이지가 늘어나는 쪽을 택했다.
-        _TodoCard(
-          project: project,
-          onToggle: (todo) => _toggle(context, todo),
-          onRemove: (todo) => _remove(context, todo),
-          onAssign: (todo) => _assign(context, todo),
-        ),
-        // 할 일을 다 체크하면 담당자에게만 뜬다 — 이걸 눌러야 완료다 (2026-08-19)
-        if (_canCompleteProject(project)) ...[
-          SizedBox(height: 16),
-          AppButton(
-            label: '프로젝트 완료',
-            filled: true,
-            onTap: () => _complete(context),
-          ),
-        ],
-        SizedBox(height: 16),
-        // 폰은 댓글을 시트로 빼고, 여기엔 눌러서 여는 줄만 둔다
-        if (!isDesktop) ...[
-          _CommentTeaser(
-            project: project,
-            onTap: () => _showComments(
-              context,
-              project,
-              onComment: (text) => _comment(context, text),
+        // 하트·댓글 — 공지·회의록과 같은 위젯, 같은 자리 (2026-08-19).
+        // 예전 댓글 카드·티저는 걷어냈다
+        Positioned(
+          right: phone ? 8 : 20,
+          top: 0,
+          bottom: 0,
+          child: Center(
+            child: PostActions(
+              target: ReactionTarget.project,
+              targetId: project.id,
+              reactions: project.reactions,
+              onToggled: (reactions) {
+                project.reactions = reactions;
+                onChanged();
+              },
+              commentCount: project.commentCount,
+              onCommentCount: (count) {
+                project.commentCount = count;
+                onChanged();
+              },
             ),
           ),
-          SizedBox(height: 16),
-        ],
-        _ActivityCard(
-          project: project,
-          onComment: (text) => _comment(context, text),
         ),
       ],
     );

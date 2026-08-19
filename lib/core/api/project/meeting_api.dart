@@ -37,6 +37,7 @@ class Meeting {
     required this.meetingAt,
     required this.createdAt,
     required this.reactions,
+    this.commentCount = 0,
     this.projectId,
   });
 
@@ -54,6 +55,7 @@ class Meeting {
     meetingAt: DateTime.parse(json['meetingAt'] as String).toLocal(),
     createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
     reactions: reactionsFromJson(json['reactions']),
+    commentCount: json['commentCount'] as int? ?? 0,
   );
 
   final String id;
@@ -80,6 +82,9 @@ class Meeting {
 
   /// 이모지별 누른 사람 — 목록 응답에 같이 실려 온다
   final List<ReactionAgg> reactions;
+
+  /// 달린 댓글 수 (2026-08-19) — 오른쪽 세로 줄의 말풍선 옆 숫자
+  final int commentCount;
 }
 
 /// `/meetings` — 회의록

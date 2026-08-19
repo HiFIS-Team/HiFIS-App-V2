@@ -15,6 +15,7 @@ class _Notice {
     this.read = false,
     this.readCount = 0,
     List<ReactionAgg>? reactions,
+    this.commentCount = 0,
   }) : reactions = reactions ?? [];
 
   /// 서버가 준 uuid — **null 이면 아직 안 올린 새 글이다.**
@@ -41,6 +42,9 @@ class _Notice {
 
   /// 이모지별 누른 사람 — 토글하면 서버가 준 최신 집계로 통째로 갈아끼운다
   List<ReactionAgg> reactions;
+
+  /// 달린 댓글 수 — 오른쪽 세로 줄의 말풍선 옆 숫자
+  int commentCount;
 
   String get displayTitle => title.isEmpty ? '제목 없는 공지' : title;
 
@@ -98,6 +102,7 @@ _Notice _fromServer(Notice row) {
     read: row.readByMe,
     readCount: row.readCount,
     reactions: row.reactions,
+    commentCount: row.commentCount,
   );
 }
 

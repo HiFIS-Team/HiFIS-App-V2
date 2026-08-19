@@ -104,7 +104,9 @@ class _Project {
     this.serverDoneCount = 0,
     this.completedAt,
     this.request,
-  });
+    List<ReactionAgg>? reactions,
+    this.commentCount = 0,
+  }) : reactions = reactions ?? [];
 
   /// 서버 uuid — null 이면 아직 안 올린 것
   String? id;
@@ -183,6 +185,11 @@ class _Project {
   /// 완료되고 점수까지 붙어서 **잘못 누르면 되돌릴 사람이 대표뿐**이었다.
   /// 이제 담당자가 완료 버튼을 눌러야 채워진다.
   DateTime? completedAt;
+
+  /// 하트 집계 · 댓글 수 — 상세 오른쪽 세로 줄이 쓴다 (2026-08-19).
+  /// 공지·회의록과 **같은 위젯**이라 같은 이름으로 든다
+  List<ReactionAgg> reactions;
+  int commentCount;
 
   bool get isDone => completedAt != null;
 
@@ -271,7 +278,11 @@ _Project _merged(_Project? held, Project row, ProjectRequest? request) {
     ..serverTodoCount = fresh.serverTodoCount
     ..serverDoneCount = fresh.serverDoneCount
     ..completedAt = fresh.completedAt
+    ..commentCount = fresh.commentCount
     ..request = fresh.request;
+  held.reactions
+    ..clear()
+    ..addAll(fresh.reactions);
   held.members
     ..clear()
     ..addAll(fresh.members);
@@ -308,6 +319,8 @@ _Project _fromServer(Project row, ProjectRequest? request) {
     serverTodoCount: row.todoCount,
     serverDoneCount: row.doneCount,
     completedAt: row.completedAt,
+    reactions: row.reactions,
+    commentCount: row.commentCount,
     request: request == null
         ? null
         : _Extension(

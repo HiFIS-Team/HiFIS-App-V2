@@ -15,6 +15,7 @@ class Notice {
     required this.readByMe,
     required this.readCount,
     required this.reactions,
+    this.commentCount = 0,
   });
 
   factory Notice.fromJson(Map<String, dynamic> json) => Notice(
@@ -27,6 +28,7 @@ class Notice {
     readByMe: json['readByMe'] as bool? ?? false,
     readCount: json['readCount'] as int? ?? 0,
     reactions: reactionsFromJson(json['reactions']),
+    commentCount: json['commentCount'] as int? ?? 0,
   );
 
   final String id;
@@ -49,6 +51,9 @@ class Notice {
 
   /// 이모지별 누른 사람 — 목록 응답에 같이 실려 온다
   final List<ReactionAgg> reactions;
+
+  /// 달린 댓글 수 (2026-08-19) — 오른쪽 세로 줄의 말풍선 옆 숫자
+  final int commentCount;
 }
 
 /// 확인 현황 한 사람 (서버 `NoticeReaderOut`)

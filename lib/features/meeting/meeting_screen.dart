@@ -18,7 +18,7 @@ import '../../core/widgets/display/avatar.dart';
 import '../../core/widgets/display/scroll_box.dart';
 import '../../core/widgets/editor/block_editor.dart';
 import '../../core/widgets/editor/markdown_view.dart';
-import '../../core/widgets/editor/reaction_row.dart';
+import '../../core/widgets/editor/post_actions.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/feedback/empty_card.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
@@ -769,228 +769,246 @@ class _NoteViewState extends State<_NoteView> {
       ],
     );
 
-    return ListView(
-      padding: phone
-          // 폰 본문은 헤더 뒤로 스크롤되고, 하단바가 없어 화면 아래 여백만 남긴다
-          ? EdgeInsets.fromLTRB(
-              20,
-              PhoneDetailScaffold.topPadding,
-              20,
-              MediaQuery.paddingOf(context).bottom + 32,
-            )
-          : EdgeInsets.fromLTRB(32, 64, 32, bottomBarInset(context)),
+    return Stack(
       children: [
-        // 폰은 편집·삭제가 헤더 글래스 버튼으로 올라가 제목만 남는다
-        if (phone)
-          title
-        else
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: title),
-              SizedBox(width: 16),
-              actions,
-            ],
-          ),
-        SizedBox(height: 10),
-        // 날짜·참석자 — 편집 중에는 바로 고칠 수 있다
-        if (_editing) ...[
-          // 폰에서는 칩 셋이 한 줄에 안 들어가 다음 줄로 흐른다
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              Pressable(
-                onTap: _pickDate,
-                scale: 0.97,
-                pressedColor: AppColors.gray100,
-                borderRadius: BorderRadius.circular(10),
-                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.calendar_today_rounded,
-                      size: 13,
-                      color: AppColors.textSecondary,
-                    ),
-                    SizedBox(width: 6),
-                    Text(
-                      _date(note.date),
-                      style: AppTextStyles.body2.copyWith(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
+        ListView(
+          padding: phone
+              // 폰 본문은 헤더 뒤로 스크롤되고, 하단바가 없어 화면 아래 여백만 남긴다
+              ? EdgeInsets.fromLTRB(
+                  20,
+                  PhoneDetailScaffold.topPadding,
+                  20,
+                  MediaQuery.paddingOf(context).bottom + 32,
+                )
+              : EdgeInsets.fromLTRB(32, 64, 32, bottomBarInset(context)),
+          children: [
+            // 폰은 편집·삭제가 헤더 글래스 버튼으로 올라가 제목만 남는다
+            if (phone)
+              title
+            else
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: title),
+                  SizedBox(width: 16),
+                  actions,
+                ],
               ),
-              // 달력 옆 마크다운 문법 도움말 (펼침)
-              Pressable(
-                onTap: () => setState(() => _help = !_help),
-                scale: 0.97,
-                pressedColor: AppColors.gray100,
-                borderRadius: BorderRadius.circular(10),
-                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.help_outline_rounded,
-                      size: 14,
-                      color: AppColors.textSecondary,
+            SizedBox(height: 10),
+            // 날짜·참석자 — 편집 중에는 바로 고칠 수 있다
+            if (_editing) ...[
+              // 폰에서는 칩 셋이 한 줄에 안 들어가 다음 줄로 흐른다
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  Pressable(
+                    onTap: _pickDate,
+                    scale: 0.97,
+                    pressedColor: AppColors.gray100,
+                    borderRadius: BorderRadius.circular(10),
+                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.calendar_today_rounded,
+                          size: 13,
+                          color: AppColors.textSecondary,
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          _date(note.date),
+                          style: AppTextStyles.body2.copyWith(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
-                    SizedBox(width: 6),
-                    Text(
-                      '마크다운 문법',
-                      style: AppTextStyles.body2.copyWith(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    SizedBox(width: 2),
-                    Icon(
-                      _help
-                          ? Icons.keyboard_arrow_up_rounded
-                          : Icons.keyboard_arrow_down_rounded,
-                      size: 16,
-                      color: AppColors.textSecondary,
-                    ),
-                  ],
-                ),
-              ),
-              // 어느 프로젝트 회의인지 — 안 걸면 전사 회의다
-              Pressable(
-                key: _projectKey,
-                onTap: _pickProject,
-                scale: 0.97,
-                pressedColor: AppColors.gray100,
-                borderRadius: BorderRadius.circular(10),
-                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      linked == null
-                          ? Icons.groups_rounded
-                          : Icons.folder_rounded,
-                      size: 13,
-                      color: AppColors.textSecondary,
-                    ),
-                    SizedBox(width: 6),
-                    Text(
-                      linked?.title ?? '전사 회의',
-                      style: AppTextStyles.body2.copyWith(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    SizedBox(width: 2),
-                    Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      size: 16,
-                      color: AppColors.textSecondary,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          if (_help) ...[SizedBox(height: 10), MarkdownHelpPanel()],
-          SizedBox(height: 10),
-          ScrollBox(
-            maxHeight: kChipBoxHeight,
-            child: Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final staff in staffList)
-                  _PersonChip(
-                    staff: staff,
-                    joined: note.members.contains(staff.name),
-                    onTap: () {
-                      setState(() {
-                        if (note.members.contains(staff.name)) {
-                          note.members.remove(staff.name);
-                        } else {
-                          note.members.add(staff.name);
-                        }
-                      });
-                      widget.onChanged();
-                    },
                   ),
-              ],
+                  // 달력 옆 마크다운 문법 도움말 (펼침)
+                  Pressable(
+                    onTap: () => setState(() => _help = !_help),
+                    scale: 0.97,
+                    pressedColor: AppColors.gray100,
+                    borderRadius: BorderRadius.circular(10),
+                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.help_outline_rounded,
+                          size: 14,
+                          color: AppColors.textSecondary,
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          '마크다운 문법',
+                          style: AppTextStyles.body2.copyWith(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(width: 2),
+                        Icon(
+                          _help
+                              ? Icons.keyboard_arrow_up_rounded
+                              : Icons.keyboard_arrow_down_rounded,
+                          size: 16,
+                          color: AppColors.textSecondary,
+                        ),
+                      ],
+                    ),
+                  ),
+                  // 어느 프로젝트 회의인지 — 안 걸면 전사 회의다
+                  Pressable(
+                    key: _projectKey,
+                    onTap: _pickProject,
+                    scale: 0.97,
+                    pressedColor: AppColors.gray100,
+                    borderRadius: BorderRadius.circular(10),
+                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          linked == null
+                              ? Icons.groups_rounded
+                              : Icons.folder_rounded,
+                          size: 13,
+                          color: AppColors.textSecondary,
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          linked?.title ?? '전사 회의',
+                          style: AppTextStyles.body2.copyWith(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(width: 2),
+                        Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          size: 16,
+                          color: AppColors.textSecondary,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (_help) ...[SizedBox(height: 10), MarkdownHelpPanel()],
+              SizedBox(height: 10),
+              ScrollBox(
+                maxHeight: kChipBoxHeight,
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final staff in staffList)
+                      _PersonChip(
+                        staff: staff,
+                        joined: note.members.contains(staff.name),
+                        onTap: () {
+                          setState(() {
+                            if (note.members.contains(staff.name)) {
+                              note.members.remove(staff.name);
+                            } else {
+                              note.members.add(staff.name);
+                            }
+                          });
+                          widget.onChanged();
+                        },
+                      ),
+                  ],
+                ),
+              ),
+            ] else
+              Row(
+                children: [
+                  Text(
+                    '${_date(note.date)} (${_weekday(note.date)}) · 참석 ${note.members.length}명',
+                    style: AppTextStyles.caption,
+                  ),
+                  SizedBox(width: 10),
+                  AvatarStack(names: note.members, size: 24),
+                  // 프로젝트에 건 회의만 나온다 — 전사 회의에는 이 자리가 없다
+                  if (linked != null) ...[
+                    SizedBox(width: 10),
+                    Flexible(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.folder_rounded,
+                            size: 13,
+                            color: AppColors.textTertiary,
+                          ),
+                          SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              linked.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.caption,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            SizedBox(height: 14),
+            Container(height: 1, color: AppColors.gray100),
+            SizedBox(height: 14),
+            if (_editing)
+              BlockEditor(
+                source: widget.note.body,
+                onChanged: (markdown) {
+                  widget.note
+                    ..body = markdown
+                    ..updated = DateTime.now();
+                  widget.onChanged();
+                },
+              )
+            else if (note.body.trim().isEmpty)
+              Text(
+                '아직 내용이 없어요. 편집을 눌러 적어보세요',
+                style: AppTextStyles.body2.copyWith(
+                  color: AppColors.textTertiary,
+                ),
+              )
+            else
+              MarkdownView(source: note.body, onCheckbox: _toggleCheckbox),
+          ],
+        ),
+        // 하트·댓글 — 공지와 같은 자리, 같은 위젯 (2026-08-19).
+        // **적는 중에는 안 그린다** — 예전 이모지 줄도 그랬다.
+        // `top`·`bottom` 0 + [Center] 로 세로 가운데에 선다
+        if (!_editing)
+          Positioned(
+            right: phone ? 8 : 20,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: PostActions(
+                target: ReactionTarget.meeting,
+                targetId: note.id,
+                reactions: note.reactions,
+                onToggled: (reactions) {
+                  note.reactions = reactions;
+                  widget.onChanged();
+                },
+                commentCount: note.commentCount,
+                onCommentCount: (count) {
+                  note.commentCount = count;
+                  widget.onChanged();
+                },
+              ),
             ),
           ),
-        ] else
-          Row(
-            children: [
-              Text(
-                '${_date(note.date)} (${_weekday(note.date)}) · 참석 ${note.members.length}명',
-                style: AppTextStyles.caption,
-              ),
-              SizedBox(width: 10),
-              AvatarStack(names: note.members, size: 24),
-              // 프로젝트에 건 회의만 나온다 — 전사 회의에는 이 자리가 없다
-              if (linked != null) ...[
-                SizedBox(width: 10),
-                Flexible(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.folder_rounded,
-                        size: 13,
-                        color: AppColors.textTertiary,
-                      ),
-                      SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          linked.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.caption,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ],
-          ),
-        SizedBox(height: 14),
-        Container(height: 1, color: AppColors.gray100),
-        SizedBox(height: 14),
-        if (_editing)
-          BlockEditor(
-            source: widget.note.body,
-            onChanged: (markdown) {
-              widget.note
-                ..body = markdown
-                ..updated = DateTime.now();
-              widget.onChanged();
-            },
-          )
-        else if (note.body.trim().isEmpty)
-          Text(
-            '아직 내용이 없어요. 편집을 눌러 적어보세요',
-            style: AppTextStyles.body2.copyWith(color: AppColors.textTertiary),
-          )
-        else
-          MarkdownView(source: note.body, onCheckbox: _toggleCheckbox),
-        // 반응은 읽을 때만 — 적는 중에 이모지 줄이 끼면 어수선하다
-        if (!_editing && note.id != null) ...[
-          SizedBox(height: 20),
-          ReactionRow(
-            target: ReactionTarget.meeting,
-            targetId: note.id,
-            reactions: note.reactions,
-            onToggled: (reactions) {
-              note.reactions = reactions;
-              widget.onChanged();
-            },
-          ),
-        ],
       ],
     );
   }
@@ -1054,6 +1072,7 @@ class _Note {
     this.scope = MeetingScope.company,
     this.projectId,
     this.reactions = const [],
+    this.commentCount = 0,
   });
 
   /// 서버 uuid — null 이면 아직 안 올린 것
@@ -1082,6 +1101,9 @@ class _Note {
   String? projectId;
 
   List<ReactionAgg> reactions;
+
+  /// 달린 댓글 수 — 오른쪽 세로 줄의 말풍선 옆 숫자
+  int commentCount;
 
   String get displayTitle => title.isEmpty ? '제목 없는 회의록' : title;
 
@@ -1165,6 +1187,7 @@ _Note _fromServer(Meeting row) => _Note(
   scope: row.scope,
   projectId: row.projectId,
   reactions: row.reactions,
+  commentCount: row.commentCount,
 );
 
 /// 편집을 마쳤을 때 — 새 글이면 올리고, 있던 글이면 고친다

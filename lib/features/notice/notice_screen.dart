@@ -15,7 +15,7 @@ import '../../core/widgets/display/avatar.dart';
 import '../../core/widgets/display/progress_bar.dart';
 import '../../core/widgets/editor/block_editor.dart';
 import '../../core/widgets/editor/markdown_view.dart';
-import '../../core/widgets/editor/reaction_row.dart';
+import '../../core/widgets/editor/post_actions.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/feedback/empty_card.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';

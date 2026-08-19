@@ -171,154 +171,167 @@ class _NoticeViewState extends State<_NoticeView> {
       ],
     );
 
-    return ListView(
-      padding: phone
-          // 폰 본문은 헤더 뒤로 스크롤되고, 하단바가 없어 화면 아래 여백만 남긴다
-          ? EdgeInsets.fromLTRB(
-              20,
-              PhoneDetailScaffold.topPadding,
-              20,
-              MediaQuery.paddingOf(context).bottom + 32,
-            )
-          : EdgeInsets.fromLTRB(32, 64, 32, bottomBarInset(context)),
+    return Stack(
       children: [
-        // 폰은 편집·삭제가 헤더 글래스 버튼으로 올라가 제목만 남는다
-        if (phone)
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ?pin,
-              Expanded(child: title),
-            ],
-          )
-        else
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ?pin,
-              Expanded(child: title),
-              SizedBox(width: 16),
-              actions,
-            ],
-          ),
-        SizedBox(height: 10),
-        if (_editing) ...[
-          Row(
-            children: [
-              // 중요 공지는 목록 맨 위에 고정된다
-              Pressable(
-                onTap: () {
-                  setState(() => notice.pinned = !notice.pinned);
+        ListView(
+          padding: phone
+              // 폰 본문은 헤더 뒤로 스크롤되고, 하단바가 없어 화면 아래 여백만 남긴다
+              ? EdgeInsets.fromLTRB(
+                  20,
+                  PhoneDetailScaffold.topPadding,
+                  20,
+                  MediaQuery.paddingOf(context).bottom + 32,
+                )
+              : EdgeInsets.fromLTRB(32, 64, 32, bottomBarInset(context)),
+          children: [
+            // 폰은 편집·삭제가 헤더 글래스 버튼으로 올라가 제목만 남는다
+            if (phone)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ?pin,
+                  Expanded(child: title),
+                ],
+              )
+            else
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ?pin,
+                  Expanded(child: title),
+                  SizedBox(width: 16),
+                  actions,
+                ],
+              ),
+            SizedBox(height: 10),
+            if (_editing) ...[
+              Row(
+                children: [
+                  // 중요 공지는 목록 맨 위에 고정된다
+                  Pressable(
+                    onTap: () {
+                      setState(() => notice.pinned = !notice.pinned);
+                      widget.onChanged();
+                    },
+                    scale: 0.96,
+                    borderRadius: BorderRadius.circular(100),
+                    child: Container(
+                      padding: EdgeInsets.fromLTRB(10, 6, 12, 6),
+                      decoration: BoxDecoration(
+                        color: notice.pinned
+                            ? AppColors.error.withValues(alpha: 0.1)
+                            : AppColors.gray50,
+                        borderRadius: BorderRadius.circular(100),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.push_pin_rounded,
+                            size: 14,
+                            color: notice.pinned
+                                ? AppColors.error
+                                : AppColors.textSecondary,
+                          ),
+                          SizedBox(width: 5),
+                          Text(
+                            '상단 고정',
+                            style: AppTextStyles.body2.copyWith(
+                              fontSize: 14,
+                              color: notice.pinned
+                                  ? AppColors.error
+                                  : AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 6),
+                  // 마크다운 문법 도움말 (펼침)
+                  Pressable(
+                    onTap: () => setState(() => _help = !_help),
+                    scale: 0.97,
+                    pressedColor: AppColors.gray100,
+                    borderRadius: BorderRadius.circular(10),
+                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.help_outline_rounded,
+                          size: 14,
+                          color: AppColors.textSecondary,
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          '마크다운 문법',
+                          style: AppTextStyles.body2.copyWith(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(width: 2),
+                        Icon(
+                          _help
+                              ? Icons.keyboard_arrow_up_rounded
+                              : Icons.keyboard_arrow_down_rounded,
+                          size: 16,
+                          color: AppColors.textSecondary,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (_help) ...[SizedBox(height: 10), MarkdownHelpPanel()],
+            ] else
+              Row(
+                children: [
+                  Avatar(name: notice.author, size: 24),
+                  SizedBox(width: 8),
+                  Text(
+                    '${notice.author} ${staffOf(notice.author).role} · ${_date(notice.date)}',
+                    style: AppTextStyles.caption,
+                  ),
+                ],
+              ),
+            SizedBox(height: 14),
+            Container(height: 1, color: AppColors.gray100),
+            SizedBox(height: 14),
+            if (_editing)
+              BlockEditor(
+                source: notice.body,
+                onChanged: (markdown) {
+                  notice.body = markdown;
                   widget.onChanged();
                 },
-                scale: 0.96,
-                borderRadius: BorderRadius.circular(100),
-                child: Container(
-                  padding: EdgeInsets.fromLTRB(10, 6, 12, 6),
-                  decoration: BoxDecoration(
-                    color: notice.pinned
-                        ? AppColors.error.withValues(alpha: 0.1)
-                        : AppColors.gray50,
-                    borderRadius: BorderRadius.circular(100),
+              )
+            else ...[
+              if (notice.body.trim().isEmpty)
+                Text(
+                  '아직 내용이 없어요. 편집을 눌러 적어보세요',
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.textTertiary,
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.push_pin_rounded,
-                        size: 14,
-                        color: notice.pinned
-                            ? AppColors.error
-                            : AppColors.textSecondary,
-                      ),
-                      SizedBox(width: 5),
-                      Text(
-                        '상단 고정',
-                        style: AppTextStyles.body2.copyWith(
-                          fontSize: 14,
-                          color: notice.pinned
-                              ? AppColors.error
-                              : AppColors.textSecondary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              SizedBox(width: 6),
-              // 마크다운 문법 도움말 (펼침)
-              Pressable(
-                onTap: () => setState(() => _help = !_help),
-                scale: 0.97,
-                pressedColor: AppColors.gray100,
-                borderRadius: BorderRadius.circular(10),
-                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.help_outline_rounded,
-                      size: 14,
-                      color: AppColors.textSecondary,
-                    ),
-                    SizedBox(width: 6),
-                    Text(
-                      '마크다운 문법',
-                      style: AppTextStyles.body2.copyWith(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    SizedBox(width: 2),
-                    Icon(
-                      _help
-                          ? Icons.keyboard_arrow_up_rounded
-                          : Icons.keyboard_arrow_down_rounded,
-                      size: 16,
-                      color: AppColors.textSecondary,
-                    ),
-                  ],
-                ),
-              ),
+                )
+              else
+                MarkdownView(source: notice.body, onCheckbox: _toggleCheckbox),
+              SizedBox(height: 24),
+              _ReadCard(notice: notice),
             ],
-          ),
-          if (_help) ...[SizedBox(height: 10), MarkdownHelpPanel()],
-        ] else
-          Row(
-            children: [
-              Avatar(name: notice.author, size: 24),
-              SizedBox(width: 8),
-              Text(
-                '${notice.author} ${staffOf(notice.author).role} · ${_date(notice.date)}',
-                style: AppTextStyles.caption,
-              ),
-            ],
-          ),
-        SizedBox(height: 14),
-        Container(height: 1, color: AppColors.gray100),
-        SizedBox(height: 14),
-        if (_editing)
-          BlockEditor(
-            source: notice.body,
-            onChanged: (markdown) {
-              notice.body = markdown;
-              widget.onChanged();
-            },
-          )
-        else ...[
-          if (notice.body.trim().isEmpty)
-            Text(
-              '아직 내용이 없어요. 편집을 눌러 적어보세요',
-              style: AppTextStyles.body2.copyWith(
-                color: AppColors.textTertiary,
-              ),
-            )
-          else
-            MarkdownView(source: notice.body, onCheckbox: _toggleCheckbox),
-          if (notice.id != null) ...[
-            SizedBox(height: 18),
-            ReactionRow(
+          ],
+        ),
+        // 하트·댓글 — **화면 오른쪽에 떠 있는다** (2026-08-19).
+        // 본문 안에 넣으면 글과 같이 스크롤돼서 내려야만 보인다.
+        // `top`·`bottom` 을 0 으로 늘려 두고 [Center] 로 **세로 가운데**에 세운다
+        Positioned(
+          right: phone ? 8 : 20,
+          top: 0,
+          bottom: 0,
+          child: Center(
+            child: PostActions(
               target: ReactionTarget.notice,
               targetId: notice.id,
               reactions: notice.reactions,
@@ -326,11 +339,14 @@ class _NoticeViewState extends State<_NoticeView> {
                 notice.reactions = reactions;
                 widget.onChanged();
               },
+              commentCount: notice.commentCount,
+              onCommentCount: (count) {
+                notice.commentCount = count;
+                widget.onChanged();
+              },
             ),
-          ],
-          SizedBox(height: 24),
-          _ReadCard(notice: notice),
-        ],
+          ),
+        ),
       ],
     );
   }
