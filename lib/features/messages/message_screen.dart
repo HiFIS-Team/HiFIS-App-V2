@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/api/chat/chat_api.dart';
 import '../../core/api/client/api_exception.dart';
 import '../../core/data/staff.dart';
+import '../notifications/notification_screen.dart' show requestedRoomId;
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
@@ -68,7 +69,30 @@ class _MessageScreenState extends State<MessageScreen> {
     super.initState();
     _scrollController.addListener(_onScroll);
     _store.addListener(_onStore);
+    // 푸시를 눌러 들어왔으면 그 방까지 연다 (2026-08-19).
+    // **패널·전체보기에서는 안 집는다** — 거기는 방을 오른쪽에 띄우는 구조라
+    // 밀어 올리면 자리가 어긋난다 (폰에서 밀려 들어오는 것과 다르다)
+    _pendingRoomId = widget.embedded ? null : requestedRoomId.value;
+    if (_pendingRoomId != null) requestedRoomId.value = null;
     _load();
+  }
+
+  /// 알림에서 열어달라고 걸어 둔 방 — 목록을 받은 뒤에 연다
+  String? _pendingRoomId;
+
+  /// 목록이 오면 그 방을 밀어 올린다
+  ///
+  /// **목록을 받기 전에는 못 연다** — 방 정보가 없어서 제목도 못 그린다.
+  /// 없는 id 면(나갔거나 지워진 방) 목록만 보여준다 — 프로젝트와 같은 규칙이다.
+  void _openPending() {
+    final id = _pendingRoomId;
+    if (id == null || !mounted) return;
+    _pendingRoomId = null;
+    if (!_store.rooms.any((r) => r.id == id)) return;
+    Navigator.push(
+      context,
+      CupertinoPageRoute(builder: (_) => ChatScreen(roomId: id)),
+    );
   }
 
   void _onStore() {
@@ -82,6 +106,7 @@ class _MessageScreenState extends State<MessageScreen> {
     } catch (error) {
       if (mounted && !_store.loaded) AppToast.show(context, messageOf(error));
     }
+    _openPending();
   }
 
   void _onScroll() => _collapse.update(_scrollController.offset);

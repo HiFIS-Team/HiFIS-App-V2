@@ -6,6 +6,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/input/pressable.dart';
+import '../notifications/notification_screen.dart' show requestedRoomId;
 import 'chat_screen.dart';
 import 'message_screen.dart';
 import 'new_message_screen.dart';
@@ -25,13 +26,29 @@ class _DesktopChatScreenState extends State<DesktopChatScreen> {
   /// 오른쪽 채팅 영역 전용 내비게이터
   final _rightNavKey = GlobalKey<NavigatorState>();
 
-  void _openChat(ChatRoom room) {
-    // 이전에 보던 채팅방은 스택에 쌓지 않고 갈아끼운다
+  @override
+  void initState() {
+    super.initState();
+    // 푸시를 눌러 들어왔으면 그 방을 오른쪽에 띄운다 (2026-08-19).
+    // **왼쪽 목록은 이 값을 안 집는다** (`embedded`) — 거기서 밀어 올리면
+    // 목록 칸 안에 방이 겹쳐 뜬다
+    final id = requestedRoomId.value;
+    if (id == null) return;
+    requestedRoomId.value = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _openRoom(id);
+    });
+  }
+
+  void _openRoom(String roomId) {
     _rightNavKey.currentState?.pushAndRemoveUntil(
-      CupertinoPageRoute(builder: (_) => ChatScreen(roomId: room.id)),
+      CupertinoPageRoute(builder: (_) => ChatScreen(roomId: roomId)),
       (route) => route.isFirst,
     );
   }
+
+  // 이전에 보던 채팅방은 스택에 쌓지 않고 갈아끼운다
+  void _openChat(ChatRoom room) => _openRoom(room.id);
 
   /// 새 사내톡 — **오른쪽 메시지 칸**에 띄운다 (채팅방이 뜨는 그 자리)
   void _newMessage() {

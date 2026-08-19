@@ -85,6 +85,10 @@ dependencies {
     // BoM 이 판을 맞춰 준다 — 개별 라이브러리에는 버전을 안 적는다.
     implementation(platform("com.google.firebase:firebase-bom:34.17.0"))
     implementation("com.google.firebase:firebase-messaging")
+
+    // 앱을 보고 있을 때 배너를 직접 그리는 데 쓴다 (`PushService`) —
+    // `NotificationCompat` 이 여기 있다
+    implementation("androidx.core:core-ktx:1.13.1")
 }
 
 flutter {

@@ -123,8 +123,11 @@ class MainActivity : FlutterActivity() {
     // ── 알림을 눌렀다 ─────────────────────────────────────────────────────
     //
     // FCM 이 `notification` 을 실어 보내면 **안드로이드가 알아서 배너를 띄우고**,
-    // 누르면 이 액티비티가 뜨면서 `data` 가 인텐트에 담겨 온다. 그래서 배너를
-    // 그리는 코드가 따로 없다 (앱이 앞에 떠 있을 때 안 띄우는 것도 iOS 와 같다).
+    // 누르면 이 액티비티가 뜨면서 `data` 가 인텐트에 담겨 온다.
+    //
+    // **앱이 앞에 떠 있을 때만 예외다** — 그때는 시스템이 안 띄우고
+    // `PushService.onMessageReceived` 만 불려서, 거기서 직접 그린다
+    // (2026-08-19). 누르면 결국 이 액티비티로 와서 아래 `deliver` 를 탄다.
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

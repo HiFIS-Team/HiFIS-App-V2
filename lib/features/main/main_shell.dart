@@ -144,6 +144,12 @@ class _MainShellState extends State<MainShell> {
   /// - 안드로이드는 메인 4개 뒤에 서브 4개가 이어진 한 줄
   /// - 아이폰은 메인 바와 서브 바가 갈려서 둘 중 어디인지까지 정해야 한다
   void _go(NotificationTarget target) {
+    // 사내톡은 탭이 아니라 **밀려 들어오는 화면**이다 — 어느 플랫폼이든
+    // 목록을 띄우고, 그 화면이 `requestedRoomId` 를 집어 방까지 연다
+    if (target == NotificationTarget.chat) {
+      _goChat();
+      return;
+    }
     if (isDesktop) {
       // 슬라이드인 화면이 열려 있으면 덮고 있어서 먼저 닫는다
       _paneNavKey.currentState?.popUntil((r) => r.isFirst);
@@ -157,6 +163,8 @@ class _MainShellState extends State<MainShell> {
         NotificationTarget.schedule => 3,
         NotificationTarget.meeting => 4,
         NotificationTarget.staff => 7,
+        // 위에서 이미 처리했다
+        NotificationTarget.chat => _paneIndex.value,
       };
       return;
     }
@@ -180,6 +188,7 @@ class _MainShellState extends State<MainShell> {
           NotificationTarget.approval => _androidTab,
           NotificationTarget.schedule => _androidTab,
           NotificationTarget.staff => _androidTab,
+          NotificationTarget.chat => _androidTab, // 위에서 이미 처리했다
         },
       );
       return;
@@ -208,9 +217,27 @@ class _MainShellState extends State<MainShell> {
         case NotificationTarget.approval:
         case NotificationTarget.schedule:
         case NotificationTarget.staff:
+        case NotificationTarget.chat:
           break; // 위에서 걸러진다
       }
     });
+  }
+
+  /// 사내톡 열기 — 푸시를 눌러 들어왔을 때
+  ///
+  /// 폰은 목록을 밀어 올리고, 데스크톱은 전체보기를 띄운다 (우하단 필을 누른
+  /// 것과 같은 화면이다). 어느 쪽이든 **그 화면이 방까지 연다**.
+  ///
+  /// 이미 열려 있으면 위에 하나 더 쌓지 않고 **맨 아래까지 닫고** 다시 연다 —
+  /// 안 그러면 푸시를 누를 때마다 사내톡이 겹겹이 쌓인다.
+  void _goChat() {
+    final navigator = Navigator.of(context);
+    navigator.popUntil((r) => r.isFirst);
+    navigator.push(
+      CupertinoPageRoute(
+        builder: (_) => isDesktop ? DesktopChatScreen() : MessageScreen(),
+      ),
+    );
   }
 
   List<Widget> get _subPages => [

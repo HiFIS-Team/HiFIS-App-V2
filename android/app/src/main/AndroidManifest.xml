@@ -46,6 +46,19 @@
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="@string/notification_channel_id" />
 
+        <!-- 앱을 보고 있을 때 오는 알림을 직접 그린다 (2026-08-19).
+
+             FCM 은 앱이 **앞에 떠 있으면 배너를 안 띄우고** 이 서비스만 부른다.
+             이게 없으면 그동안 온 알림이 어디에도 안 뜬다.
+             뒤에 있을 때는 시스템이 띄우고 이 서비스는 안 불려서 겹치지 않는다. -->
+        <service
+            android:name=".PushService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

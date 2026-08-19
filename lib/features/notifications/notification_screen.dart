@@ -277,7 +277,16 @@ enum NotificationTarget {
   schedule,
   meeting,
   staff,
+
+  /// 사내톡 — 어느 방인지는 [requestedRoomId] 가 따로 들고 간다 (2026-08-19)
+  chat,
 }
+
+/// 알림에서 열어달라고 요청한 사내톡 방 — [requestedScreen] 보다 **먼저** 세운다
+///
+/// 프로젝트(`requestedProjectId`)와 같은 방식이다. 목록 화면이 뜨면서
+/// 이 값을 집어 그 방을 밀어 올린다.
+final requestedRoomId = ValueNotifier<String?>(null);
 
 /// 알림에서 열어달라고 요청한 화면 — `MainShell` 이 보고 탭을 옮긴다
 final requestedScreen = ValueNotifier<NotificationTarget?>(null);
@@ -294,6 +303,10 @@ bool goToNotificationLink(String? link) {
   if (target == NotificationTarget.project) {
     requestedProjectId.value = _idOf(link);
   }
+  // 사내톡은 `/chat/rooms/{id}` 라 id 가 **세 번째 칸**이다
+  if (target == NotificationTarget.chat) {
+    requestedRoomId.value = _roomIdOf(link);
+  }
   requestedScreen.value = target;
   return true;
 }
@@ -303,12 +316,20 @@ bool goToNotificationLink(String? link) {
 /// **아직 안 잇는 것들이 있다.**
 /// - `/approvals/{id}` — 데스크톱에만 있는 화면이라 폰에서 갈 데가 없다
 /// - `/schedule` — 일정도 데스크톱 전용이라 폰에서는 읽음 처리만 된다
-/// - `/chat/rooms/{id}` — 사내톡이 아직 목업이라 방을 지정해 열 수 없다
 /// 링크 뒤에 붙은 id — `/projects/abc-123` → `abc-123` (없으면 null)
 String? _idOf(String? link) {
   if (link == null) return null;
   final parts = link.split('/').where((s) => s.isNotEmpty).toList();
   return parts.length < 2 ? null : parts[1];
+}
+
+/// 사내톡 방 id — `/chat/rooms/abc-123` → `abc-123`
+///
+/// 한 칸 더 들어가 있어서 [_idOf] 로는 `rooms` 가 잡힌다
+String? _roomIdOf(String? link) {
+  if (link == null) return null;
+  final parts = link.split('/').where((s) => s.isNotEmpty).toList();
+  return parts.length < 3 ? null : parts[2];
 }
 
 NotificationTarget? _targetOf(String? link) {
@@ -323,6 +344,8 @@ NotificationTarget? _targetOf(String? link) {
     'ranking' => NotificationTarget.ranking,
     'schedule' => NotificationTarget.schedule,
     'meetings' => NotificationTarget.meeting,
+    // `/chat/rooms/{id}` — 그 방까지 연다 (2026-08-19)
+    'chat' => NotificationTarget.chat,
     // 조직도는 데스크톱에만 있다 — 폰에서는 읽음 처리만 된다
     'staff' => NotificationTarget.staff,
     _ => null,

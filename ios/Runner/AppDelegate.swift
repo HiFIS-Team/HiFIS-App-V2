@@ -198,6 +198,22 @@ import UserNotifications
     NSLog("푸시 등록 실패: \(error.localizedDescription)")
   }
 
+  /// **앱을 보고 있을 때도 배너를 띄운다** (2026-08-19 대표 요청)
+  ///
+  /// 이걸 구현 안 하면 iOS 가 앞에 떠 있는 앱에는 알림을 **안 보여준다**
+  /// (앱 안 알림함·배지에는 그대로 쌓인다). 사내톡을 보고 있는데 다른 방에
+  /// 온 메시지를 모르는 것이 그 때문이었다.
+  ///
+  /// `.list` 를 같이 주는 이유 — 배너만 주면 못 보고 지나쳤을 때 알림 센터에
+  /// 안 남는다. 소리·배지도 뒤에서 온 것과 같게 맞춘다.
+  override func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    willPresent notification: UNNotification,
+    withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+  ) {
+    completionHandler([.banner, .list, .sound, .badge])
+  }
+
   /// 알림을 눌렀다 — 그 알림이 가리키는 화면으로 보낸다
   override func userNotificationCenter(
     _ center: UNUserNotificationCenter,
