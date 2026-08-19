@@ -99,12 +99,17 @@ class StaffApi {
     return Employee.fromJson(data);
   }
 
-  /// 내가 바꿀 수 있는 것 — 이름·아바타 색·상태
+  /// 내가 바꿀 수 있는 것 — 이름·이메일·전화·아바타 색·상태
   ///
   /// 상태 메시지는 **빈 문자열도 보낼 수 있다** (지우기). 그래서 넘겼는지
   /// 여부로 가르지 않고 `null` 이면 안 건드리는 것으로 둔다.
+  ///
+  /// [email] 은 **로그인 아이디**다. 남이 쓰고 있으면 서버가 409
+  /// `EMAIL_TAKEN` 을 준다. 바꿔도 **다시 로그인할 필요는 없다** —
+  /// 토큰이 이메일이 아니라 id 를 담는다 (2026-08-19).
   static Future<Employee> updateMe({
     String? name,
+    String? email,
     String? phone,
     String? avatarColor,
     String? statusMessage,
@@ -114,6 +119,7 @@ class StaffApi {
       '/employees/me',
       body: {
         'name': ?name,
+        'email': ?email,
         'phone': ?phone,
         'avatarColor': ?avatarColor,
         'statusMessage': ?statusMessage,

@@ -37,6 +37,7 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
   ];
 
   late final _name = TextEditingController(text: me);
+  late final _email = TextEditingController(text: currentUser?.email ?? '');
   late final _phone = TextEditingController(text: currentUser?.phone ?? '');
 
   /// 고른 아바타 색. **null 이면 아직 안 골랐다는 뜻**이다.
@@ -67,13 +68,16 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
   /// 검증에 걸린 칸으로 커서를 옮기려면 필요하다 — 어느 칸인지 알려 주는 게
   /// 토스트 문구만으로는 부족하다 (다른 폼들과 같은 방식)
   final _nameFocus = FocusNode();
+  final _emailFocus = FocusNode();
   final _phoneFocus = FocusNode();
 
   @override
   void dispose() {
     _name.dispose();
+    _email.dispose();
     _phone.dispose();
     _nameFocus.dispose();
+    _emailFocus.dispose();
     _phoneFocus.dispose();
     super.dispose();
   }
@@ -83,6 +87,19 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
     if (name.isEmpty) {
       AppToast.show(context, '이름을 입력해주세요');
       _nameFocus.requestFocus();
+      return;
+    }
+    // **이메일은 로그인 아이디라 비울 수 없다** (2026-08-19)
+    final email = _email.text.trim();
+    if (email.isEmpty) {
+      AppToast.show(context, '이메일을 입력해주세요');
+      _emailFocus.requestFocus();
+      return;
+    }
+    // 가입 화면과 같은 기준 — `@` 앞뒤가 있고 점이 하나는 있어야 한다
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+      AppToast.show(context, '이메일 형식을 확인해주세요');
+      _emailFocus.requestFocus();
       return;
     }
     // 비워 두는 건 괜찮다 — 적었으면 제대로 적어야 한다
@@ -98,6 +115,7 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
       applyCurrentUser(
         await StaffApi.updateMe(
           name: name,
+          email: email,
           phone: phone,
           // 안 골랐으면 안 보낸다 — 서버가 쓰던 색을 그대로 둔다
           avatarColor: picked == null ? null : _hexOf(picked),
@@ -254,10 +272,14 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
           SizedBox(height: 20),
           _FieldLabel('이메일'),
           SizedBox(height: 8),
+          // **본인이 직접 바꾼다** (2026-08-19) — 예전에는 관리자만 되어서
+          // 대표조차 자기 이메일을 못 고쳤다
           _InputBox(
-            value: currentUser?.email ?? '',
-            enabled: false,
-            helper: '이메일은 관리자만 변경할 수 있습니다.',
+            controller: _email,
+            focusNode: _emailFocus,
+            hint: 'name@company.com',
+            keyboardType: TextInputType.emailAddress,
+            helper: '로그인할 때 쓰는 주소예요.',
           ),
           SizedBox(height: 20),
           _FieldLabel('사번'),
