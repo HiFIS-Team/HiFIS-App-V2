@@ -25,7 +25,10 @@ abstract final class PhotoCache {
 
   /// 서명(`?exp=..&sig=..`)은 받을 때마다 갈리므로 **경로 끝 이름만** 키로 쓴다.
   /// 서버가 uuid 로 파일을 만들어서 그 자체로 겹치지 않는다
-  static String _keyOf(String url) {
+  ///
+  /// 밖으로도 연다 — 주소 두 개가 **같은 파일을 가리키는지** 물어보는 자리가
+  /// 있다 ([Avatar]). 글자로 비교하면 서명 때문에 매번 다르다고 나온다
+  static String keyOf(String url) {
     final path = url.split('?').first;
     final name = path.substring(path.lastIndexOf('/') + 1);
     return name.isEmpty ? '${path.hashCode}' : name;
@@ -39,12 +42,12 @@ abstract final class PhotoCache {
     return _dir = dir;
   }
 
-  static File _fileOf(String url) => File('${_folder().path}/${_keyOf(url)}');
+  static File _fileOf(String url) => File('${_folder().path}/${keyOf(url)}');
 
   /// 받아 둔 파일 — **없으면 null.** 그리기 전에 바로 물어보는 자리라
   /// 기다리지 않는다 (있으면 첫 프레임부터 사진이 뜬다)
   static File? ready(String url) {
-    final key = _keyOf(url);
+    final key = keyOf(url);
     final file = _fileOf(url);
     if (_have.contains(key)) return file;
     if (!file.existsSync()) return null;
@@ -54,7 +57,7 @@ abstract final class PhotoCache {
 
   /// 받아서 남긴다 — 이미 있으면 그걸 그대로 준다
   static Future<File?> fetch(String url) {
-    final key = _keyOf(url);
+    final key = keyOf(url);
     final done = ready(url);
     if (done != null) return Future.value(done);
     return _busy[key] ??= _download(url).whenComplete(() => _busy.remove(key));
@@ -66,7 +69,7 @@ abstract final class PhotoCache {
       final file = _fileOf(url);
       // 받다 말고 끊겼을 때 반쪽짜리 파일이 남지 않게 다 받고 한 번에 쓴다
       await file.writeAsBytes(bytes, flush: true);
-      _have.add(_keyOf(url));
+      _have.add(keyOf(url));
       return file;
     } catch (_) {
       return null;

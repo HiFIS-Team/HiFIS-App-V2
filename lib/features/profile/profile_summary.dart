@@ -115,7 +115,11 @@ class _SummaryField extends StatelessWidget {
 }
 
 /// 내 아바타 — 사진이 있으면 사진, 없으면 아바타 색 + 이름 첫 글자
-class _Avatar extends StatelessWidget {
+///
+/// 사진은 [PhotoCache] 로 파일에 남긴다 — 공용 [Avatar] 와 같은 이유다.
+/// 서버가 응답마다 서명을 새로 찍어서 `Image.network` 만으로는 화면을
+/// 옮겼다 올 때마다 다시 내려받고, 그동안 색 동그라미가 보인다 (2026-08-19).
+class _Avatar extends StatefulWidget {
   _Avatar({required this.size, this.color});
 
   final double size;
@@ -124,11 +128,83 @@ class _Avatar extends StatelessWidget {
   final Color? color;
 
   @override
+  State<_Avatar> createState() => _AvatarState();
+}
+
+class _AvatarState extends State<_Avatar> {
+  File? _file;
+  bool _failed = false;
+  String? _key;
+
+  /// 그릴 사진이 바뀌었으면 받기 시작한다 — 빌드 안에서 부른다
+  /// (여기서 `setState` 를 부르지 않는다. 자세한 건 [Avatar] 에 적어 뒀다)
+  void _sync(String? url) {
+    final key = url == null || url.isEmpty ? null : PhotoCache.keyOf(url);
+    if (key == _key) return; // 서명만 갈린 같은 사진
+    _key = key;
+    _file = null;
+    _failed = false;
+    if (url == null || url.isEmpty) return;
+
+    final saved = PhotoCache.ready(url);
+    if (saved != null) {
+      _file = saved;
+      return;
+    }
+    PhotoCache.fetch(url).then((file) {
+      if (!mounted || key != _key) return;
+      setState(() {
+        _file = file;
+        _failed = file == null;
+      });
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final size = widget.size;
     final user = currentUser;
     final url = user?.avatarImageUrl;
-    final fill = color ?? user?.color ?? AppColors.primary;
-    final initial = me.isEmpty ? '·' : me.characters.first;
+    _sync(url);
+
+    final fill = widget.color ?? user?.color ?? AppColors.primary;
+    final letter = Text(
+      me.isEmpty ? '·' : me.characters.first,
+      style: TextStyle(
+        fontFamily: AppTextStyles.fontFamily,
+        fontSize: size * 0.36,
+        fontWeight: FontWeight.w700,
+        color: Colors.white,
+      ),
+    );
+
+    final Widget inner;
+    final file = _file;
+    if (url == null) {
+      inner = letter;
+    } else if (file != null) {
+      inner = Image.file(
+        file,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => letter,
+      );
+    } else if (_failed) {
+      // 파일로 못 남겼을 때만 서버에서 바로 그린다 — 예전 동작 그대로다
+      inner = Image.network(
+        url,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        // 서명이 만료됐거나 못 받으면 색 아바타로 떨어진다
+        errorBuilder: (_, _, _) => letter,
+      );
+    } else {
+      // 아직 받는 중 — 예전에도 이 순간에는 색 동그라미만 보였다.
+      // 첫 글자를 넣으면 **화면이 바뀌는 것**이라 자리만 지킨다
+      inner = SizedBox(width: size, height: size);
+    }
 
     return Container(
       width: size,
@@ -136,32 +212,7 @@ class _Avatar extends StatelessWidget {
       alignment: Alignment.center,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(color: fill, shape: BoxShape.circle),
-      child: url == null
-          ? Text(
-              initial,
-              style: TextStyle(
-                fontFamily: AppTextStyles.fontFamily,
-                fontSize: size * 0.36,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
-            )
-          : Image.network(
-              url,
-              width: size,
-              height: size,
-              fit: BoxFit.cover,
-              // 서명이 만료됐거나 못 받으면 색 아바타로 떨어진다
-              errorBuilder: (_, _, _) => Text(
-                initial,
-                style: TextStyle(
-                  fontFamily: AppTextStyles.fontFamily,
-                  fontSize: size * 0.36,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
-            ),
+      child: inner,
     );
   }
 }
