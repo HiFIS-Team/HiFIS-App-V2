@@ -15,6 +15,13 @@ enum AttendanceStatus {
   overtime('OVERTIME'),
   inProgress('IN_PROGRESS'),
   noCheckout('NO_CHECKOUT'),
+
+  /// 미출근 — **대표 달력(전사)에서만 온다**
+  ///
+  /// 두 자리를 덮는다: 오늘 근무일인데 아직 스캔이 없거나, 퇴근 스캔 없이
+  /// 새벽 5시를 넘겼거나. 사람별 판정에서는 안 오고, 거기서 값이 없는 것
+  /// (`parseOrNull` 의 null)이 같은 뜻이다.
+  notIn('NOT_IN'),
   absent('ABSENT'),
   onLeave('ON_LEAVE'),
   dayOff('DAY_OFF'),

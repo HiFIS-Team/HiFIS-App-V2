@@ -136,7 +136,9 @@ const _workStatusOrder = <(AttendanceStatus, String, Color, bool)>[
   (AttendanceStatus.earlyLeave, '조기퇴근', AppColors.workEarly, false),
   (AttendanceStatus.lateAndEarly, '지각·조퇴', AppColors.workLateEarly, false),
   (AttendanceStatus.late, '지각', AppColors.workLate, false),
-  (AttendanceStatus.noCheckout, '퇴근누락', AppColors.workNoCheckout, false),
+  // 퇴근 스캔이 없는 날도 여기로 온다 — 서버가 새벽 5시를 넘기면 미출근으로
+  // 넘겨준다 (예전에는 `퇴근누락` 알약이 따로 섰다)
+  (AttendanceStatus.notIn, '미출근', AppColors.workNone, false),
   (AttendanceStatus.absent, '결근', AppColors.workAbsent, false),
   (AttendanceStatus.onLeave, '월차', AppColors.workLeave, false),
 ];

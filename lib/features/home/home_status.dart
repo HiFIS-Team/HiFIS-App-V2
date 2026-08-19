@@ -172,6 +172,8 @@ class _HeroStatusCardState extends State<_HeroStatusCard> {
           attendance?.halfPeriod?.label ?? attendance?.leaveType?.label ?? '휴가',
       color: AppColors.primary,
     ),
+    // 대표 달력에서만 오는 값이지만, 값이 없을 때(위 null)와 같은 뜻이라 같게 쓴다
+    AttendanceStatus.notIn => (label: '미출근', color: AppColors.gray500),
     AttendanceStatus.dayOff => (label: '휴무', color: AppColors.gray500),
     AttendanceStatus.unknown => (label: '판정 불가', color: AppColors.gray500),
   };

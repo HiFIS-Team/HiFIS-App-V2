@@ -10,9 +10,13 @@ const _rosterChrome = 33.0;
 
 /// 그날 칸에 설 상태 줄 — `이름 외 N명 상태`
 ///
-/// 다들 출근·퇴근뿐이면 줄을 늘어놓지 않고 `전원 출근` 한 줄로 접는다.
+/// 다들 제때 오고 갔으면 줄을 늘어놓지 않고 `전원 출근`(+`전원 퇴근`)으로 접는다.
 /// **칸 높이를 재는 쪽과 그리는 쪽이 같은 걸 봐야** 해서 밖으로 빼 뒀다 —
 /// 따로 세면 한쪽이 틀려서 칸이 넘친다.
+///
+/// **한 사람이라도 미출근·결근이면 안 접는다** (2026-08-19 대표 지적).
+/// 예전에는 아직 안 온 사람이 서버 명단에서 통째로 빠져서, 남은 사람만 보고
+/// `전원 출근` 으로 접혔다 — 전원이 온 게 아닌데 그렇게 떴다.
 List<(String, Color)> _rosterLines(DateTime date) {
   final groups = _rosterOf(date);
   if (groups.isEmpty) return const [];
@@ -26,7 +30,15 @@ List<(String, Color)> _rosterLines(DateTime date) {
     lines.add(('${_whoIn(names)} $label', color));
   }
   if (lines.isEmpty) return const [];
-  return onlyPlain ? [('전원 출근', AppColors.workIn)] : lines;
+  if (!onlyPlain) return lines;
+
+  // 아직 센터에 있는 사람이 하나도 없어야 `전원 퇴근` 까지 붙는다 —
+  // 다 왔지만 아직 일하는 중이면 `전원 출근` 한 줄이다
+  final working = groups[AttendanceStatus.inProgress] ?? const <String>[];
+  return [
+    ('전원 출근', AppColors.workIn),
+    if (working.isEmpty) ('전원 퇴근', AppColors.workOut),
+  ];
 }
 
 /// `김트레이너` · `김트레이너 외 3명`

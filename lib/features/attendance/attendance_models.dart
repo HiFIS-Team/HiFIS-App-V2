@@ -55,7 +55,11 @@ enum _DayStatus {
     AttendanceStatus.noCheckout => _DayStatus.noCheckout,
     AttendanceStatus.absent => _DayStatus.absent,
     AttendanceStatus.onLeave => _DayStatus.leave,
-    AttendanceStatus.dayOff || AttendanceStatus.unknown => _DayStatus.off,
+    // 미출근은 **대표 달력(전사)에서만** 오는 값이라 여기로 들어올 일이 없다.
+    // switch 를 채우려고 둔 자리다 — 판정이 없는 것이라 휴무 쪽에 붙인다
+    AttendanceStatus.dayOff ||
+    AttendanceStatus.notIn ||
+    AttendanceStatus.unknown => _DayStatus.off,
   };
 }
 
