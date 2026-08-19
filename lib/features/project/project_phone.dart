@@ -226,16 +226,19 @@ class _ProjectDetailScreenState extends State<_ProjectDetailScreen> {
   Widget build(BuildContext context) {
     return PhoneDetailScaffold(
       title: '프로젝트',
-      // 자주 쓰는 동작은 본문 대신 상단 글래스 버튼에 둔다.
-      // 수정·인원 추가는 **담당자·참여 멤버와 대표**에게만 뜬다 (2026-08-19) —
-      // PC 머리말의 글자 버튼과 같은 조건이라 어느 쪽에서 봐도 같다
-      actions: [
+      // **기한 연장은 왼쪽, 나가기 옆이다** (2026-08-19). 오른쪽에 셋이
+      // 몰리면 손이 닿기도 어렵고 제목과 부딪힌다 — 제일 덜 쓰는 것을 옮겼다
+      leadingActions: [
         if (_canExtendProject(widget.project))
           GlassIconButton(
             symbol: 'calendar.badge.plus',
             onPressed: () =>
                 _extendProject(context, widget.project, () => setState(() {})),
           ),
+      ],
+      // 수정·인원 추가는 **담당자·참여 멤버와 대표**에게만 뜬다 (2026-08-19) —
+      // PC 머리말의 글자 버튼과 같은 조건이라 어느 쪽에서 봐도 같다
+      actions: [
         if (_canTouchProject(widget.project)) ...[
           GlassIconButton(
             symbol: 'square.and.pencil',

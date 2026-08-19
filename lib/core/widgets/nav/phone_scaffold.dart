@@ -206,6 +206,7 @@ class PhoneDetailScaffold extends StatefulWidget {
     required this.title,
     required this.child,
     this.actions = const [],
+    this.leadingActions = const [],
     this.bottomBar,
   });
 
@@ -214,6 +215,12 @@ class PhoneDetailScaffold extends StatefulWidget {
 
   /// 우측 상단 글래스 버튼들 (편집·삭제 등)
   final List<Widget> actions;
+
+  /// **좌측** 상단 — 뒤로가기 바로 옆에 붙는 글래스 버튼들
+  ///
+  /// 오른쪽에 셋 넘게 몰리면 손이 닿기도 어렵고 제목과도 부딪힌다.
+  /// 자주 안 쓰는 것 하나쯤은 이쪽으로 나눠 둔다 (2026-08-19).
+  final List<Widget> leadingActions;
 
   /// 하단 탭바 자리에 띄울 버튼 (GlassBottomButton 등)
   final Widget? bottomBar;
@@ -273,9 +280,19 @@ class _PhoneDetailScaffoldState extends State<PhoneDetailScaffold> {
             bottom: false,
             child: Padding(
               padding: EdgeInsets.only(top: 8, left: 16),
-              child: GlassIconButton(
-                symbol: 'chevron.backward',
-                onPressed: () => Navigator.pop(context),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  GlassIconButton(
+                    symbol: 'chevron.backward',
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  // 오른쪽 줄과 같은 간격으로 이어 붙인다
+                  for (final action in widget.leadingActions) ...[
+                    SizedBox(width: 10),
+                    action,
+                  ],
+                ],
               ),
             ),
           ),
