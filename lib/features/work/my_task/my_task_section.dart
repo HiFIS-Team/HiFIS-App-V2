@@ -8,6 +8,7 @@ import '../../../core/widgets/display/avatar.dart';
 import '../../../core/util/layout.dart';
 import '../../../core/data/staff_directory.dart';
 import '../../../core/data/branch_scope.dart';
+import '../../../core/data/current_user.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -52,22 +53,20 @@ void resetMyTaskCache() {
 Future<bool> addMyTasks(BuildContext context) async {
   // 폰은 오른쪽에서 밀려 들어오고, 데스크톱은 가운데 모달이다
   // (프로젝트 만들기·내역 전체보기와 같은 `showFullPage`)
-  // 담은 줄들과 **그 묶음에 걸리는 요일** — 한 자리에서 같이 정한다
-  final made = await showFullPage<(List<String>, List<int>)>(
+  // 업무 이름 → 걸리는 요일. 요일을 하나씩 훑으며 채운 결과다
+  final plan = await showFullPage<Map<String, List<int>>>(
     context,
     (_) => const _AddTaskScreen(),
   );
-  if (made == null || !context.mounted) return false;
-  final (contents, weekdays) = made;
-  if (contents.isEmpty) return false;
+  if (plan == null || plan.isEmpty || !context.mounted) return false;
   try {
     // 여러 줄을 **한 번에** 보낸다 — 줄마다 부르면 중간에 끊겼을 때
     // 반만 들어간 채로 화면이 닫힌다
-    await MyTaskApi.create(contents, weekdays: weekdays);
+    await MyTaskApi.create(plan);
     if (context.mounted) {
       AppToast.show(
         context,
-        contents.length == 1 ? '업무를 추가했어요' : '업무 ${contents.length}개를 추가했어요',
+        plan.length == 1 ? '업무를 추가했어요' : '업무 ${plan.length}개를 추가했어요',
       );
     }
     return true;
@@ -107,6 +106,23 @@ class _MyTaskSectionState extends State<MyTaskSection>
   /// 서버에 보내는 중인 줄 — 답이 오기 전에 또 누르면 두 번 나간다
   final _busy = <String>{};
 
+  /// 보고 있는 요일 (ISO 1=월 … 7=일) — **기본은 오늘**
+  ///
+  /// 업무마다 도는 요일이 달라져서(2026-08-20), 오늘 것만 보면 **다른 요일에
+  /// 뭘 넣어 뒀는지 알 길이 없다.** 줄 오른쪽에 `월·수·금` 을 적는 대신
+  /// 요일을 골라 그날 목록을 본다.
+  int _viewDay = DateTime.now().weekday;
+
+  bool get _isToday => _viewDay == DateTime.now().weekday;
+
+  /// 보고 있는 요일의 **이번 주 날짜** — 서버에 넘길 값
+  DateTime get _viewDate {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day + (_viewDay - now.weekday));
+  }
+
+  static const _dayNames = ['월', '화', '수', '목', '금', '토', '일'];
+
   @override
   void initState() {
     super.initState();
@@ -126,10 +142,14 @@ class _MyTaskSectionState extends State<MyTaskSection>
 
   Future<void> _load() async {
     try {
-      final day = await MyTaskApi.day();
+      final day = await MyTaskApi.day(
+        // 오늘은 날짜를 안 넘긴다 — 서버가 오늘로 본다 (자정을 넘겨도 맞다)
+        date: _isToday ? null : dateKey(_viewDate),
+      );
       if (!mounted) return;
-      // **옛 목록을 안 지운다** — 지우면 그 사이가 빈 화면이라 깜빡인다
-      _cached = day;
+      // **옛 목록을 안 지운다** — 지우면 그 사이가 빈 화면이라 깜빡인다.
+      // 캐시는 오늘 것만 — 다른 요일을 보다 나갔다 오면 오늘로 돌아온다
+      if (_isToday) _cached = day;
       setState(() {
         _day = day;
         endLoad();
@@ -139,6 +159,16 @@ class _MyTaskSectionState extends State<MyTaskSection>
       setState(endLoad);
       AppToast.show(context, messageOf(error));
     }
+  }
+
+  /// 요일을 옮긴다 — 옛 목록을 둔 채로 새 값을 받는다 (`SkeletonDelay`)
+  void _pickDay(int day) {
+    if (day == _viewDay) return;
+    setState(() {
+      _viewDay = day;
+      beginLoad();
+    });
+    _load();
   }
 
   /// 체크/해제 — 서버 답을 받고 나서 목록을 다시 받는다
@@ -196,11 +226,19 @@ class _MyTaskSectionState extends State<MyTaskSection>
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Row(
               children: [
-                Expanded(child: Text('오늘 할 일', style: AppTextStyles.label)),
+                Expanded(
+                  child: Text(
+                    _isToday ? '오늘 할 일' : '${_dayNames[_viewDay - 1]}요일 할 일',
+                    style: AppTextStyles.label,
+                  ),
+                ),
                 _DoneBadge(day: day),
               ],
             ),
           ),
+          const SizedBox(height: 12),
+          // 요일 줄 — 눌러서 그날 목록을 본다
+          _DayTabs(selected: _viewDay, onSelect: _pickDay),
           const SizedBox(height: 12),
           if (day.tasks.isEmpty)
             Padding(
@@ -217,7 +255,10 @@ class _MyTaskSectionState extends State<MyTaskSection>
               if (i > 0) const SizedBox(height: 8),
               _TaskRow(
                 task: day.tasks[i],
-                busy: _busy.contains(day.tasks[i].id),
+                // **오늘이 아니면 못 체크한다.** 서버는 체크를 늘 오늘로 찍어서
+                // (`check_my_task` 가 `_today()`), 다른 요일을 보다 누르면
+                // 엉뚱한 날에 찍힌다
+                busy: _busy.contains(day.tasks[i].id) || !_isToday,
                 onToggle: () => _toggle(day.tasks[i]),
                 onEdit: () => _request(day.tasks[i], MyTaskRequestType.edit),
                 onDelete: () =>
@@ -226,6 +267,64 @@ class _MyTaskSectionState extends State<MyTaskSection>
             ],
         ],
       ),
+    );
+  }
+}
+
+/// 요일 줄 — 누르면 그날 목록으로 갈린다 (2026-08-20 요청)
+///
+/// 업무마다 도는 요일이 달라지면서 **오늘 것만 보면 다른 요일에 뭘 넣어
+/// 뒀는지 알 길이 없어졌다.** 줄마다 `월·수·금` 을 적는 것보다 요일을
+/// 골라 보는 편이 읽을 것이 적다.
+///
+/// **이레를 다 세운다.** 근무일만 세우면 쉬는 날에 넣어 둔 업무(선택)를
+/// 볼 자리가 없어진다.
+class _DayTabs extends StatelessWidget {
+  const _DayTabs({required this.selected, required this.onSelect});
+
+  final int selected;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final today = DateTime.now().weekday;
+    return Row(
+      children: [
+        for (var day = 1; day <= 7; day++) ...[
+          if (day > 1) const SizedBox(width: 5),
+          Expanded(
+            child: Pressable(
+              onTap: () => onSelect(day),
+              scale: 0.92,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 140),
+                height: 36,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: day == selected ? AppColors.primary : AppColors.gray50,
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Text(
+                  _MyTaskSectionState._dayNames[day - 1],
+                  style: AppTextStyles.body2.copyWith(
+                    // 오늘은 안 골랐어도 도드라진다 — 돌아올 자리를 잃지 않게
+                    fontWeight: day == selected || day == today
+                        ? FontWeight.w700
+                        : FontWeight.w500,
+                    color: day == selected
+                        ? Colors.white
+                        : day == today
+                        ? AppColors.primary
+                        : day == 7
+                        ? AppColors.error
+                        : AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -334,21 +433,8 @@ class _TaskRow extends StatelessWidget {
               ],
             ),
           ),
-          // 매일 오는 업무는 **아무것도 안 붙는다** — 대부분이 매일이라
-          // 다 붙이면 줄마다 `월·화·수·목·금·토·일` 이 서서 읽을 것이 는다.
-          // 요일을 줄여 둔 것만 그게 보여야 한다 (2026-08-20)
-          if (weekdayLabel(task.weekdays) case final days when days.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(left: 8),
-              child: Text(
-                days,
-                style: AppTextStyles.caption.copyWith(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: checked ? AppColors.gray300 : AppColors.textSecondary,
-                ),
-              ),
-            ),
+          // 줄에는 요일을 안 적는다 — 목록 위 요일 줄이 이미 어느 요일을
+          // 보고 있는지 말해 준다 (2026-08-20 요청)
           if (pending == null) ...[
             _RowAction(icon: CupertinoIcons.pencil, onTap: onEdit),
             _RowAction(icon: CupertinoIcons.trash, onTap: onDelete),

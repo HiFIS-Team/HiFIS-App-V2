@@ -7,6 +7,24 @@ const _contentMax = 60;
 ///
 /// **팝업이 아니다.** 여러 줄을 쌓아 두고 한 번에 만드는 자리라
 /// 팝업으로는 좁다 (프로젝트 만들기와 같은 방식 — `showFullPage`).
+///
+/// ## 요일을 하나씩 훑는다 (2026-08-20 요청)
+///
+/// **본인 근무일 첫 요일부터 마지막까지** 한 칸씩 넘어가며 담는다.
+///
+/// ```
+/// 월  적기 …            → 다음
+/// 화  [세탁 ☑] [청소 ☐]  + 적기 → 다음      ← 앞 요일에 담은 것을 체크로 고른다
+/// …
+/// 금  …                 → 추가
+/// ```
+///
+/// 앞 요일에 담은 것을 체크로 고르는 것이 핵심이다 — **중복되는 건 중복되게,
+/// 새로운 건 새롭게** 담긴다. 같은 이름이 여러 요일에 걸리면 서버가 요일을
+/// 합쳐 **한 줄**로 만든다 (두 줄이면 어느 쪽을 체크했는지 알 수 없다).
+///
+/// 도는 요일은 **근무일뿐이다.** 쉬는 날은 넣는 것이 선택이라 여기서 안 묻고,
+/// 넣고 싶으면 만든 뒤 수정에서 요일을 더한다.
 class _AddTaskScreen extends StatefulWidget {
   const _AddTaskScreen();
 
@@ -18,12 +36,38 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
   final _text = TextEditingController();
   final _focus = FocusNode();
 
-  /// 아직 안 만든 줄들 — `추가` 를 눌러야 서버로 간다
-  final _staged = <String>[];
+  /// 훑을 요일 — **본인 근무일**을 차례대로.
+  ///
+  /// 근무 설정을 아직 안 한 사람은 이레 다 돈다 — 그 사람은 서버도 전부
+  /// 근무일로 보므로(`_is_workday`) 어느 요일이든 비면 누락이다.
+  static final _stepDays = () {
+    final mine = currentUser?.workDays ?? const <int>[];
+    return (mine.isEmpty ? [...everyWeekday] : [...mine])..sort();
+  }();
 
-  /// 돌아오는 요일 — **기본은 매일**이라 예전과 같게 보인다.
-  /// 한 번에 담은 줄들에 **다 같이** 걸린다 (서버 `MyTaskCreate.weekdays`)
-  final _days = <int>{...everyWeekday};
+  /// 지금 몇 번째 요일인가
+  int _step = 0;
+
+  /// 업무 이름 → 걸리는 요일. **화면 전체가 이 하나를 채운다**
+  final _plan = <String, Set<int>>{};
+
+  int get _day => _stepDays[_step];
+  bool get _last => _step == _stepDays.length - 1;
+
+  static const _dayNames = ['월', '화', '수', '목', '금', '토', '일'];
+  String get _dayName => _dayNames[_day - 1];
+
+  /// 이 요일에 걸린 업무들 (담은 차례대로)
+  List<String> get _todays => [
+    for (final e in _plan.entries)
+      if (e.value.contains(_day)) e.key,
+  ];
+
+  /// 앞 요일에서 담았는데 **이 요일에는 아직 안 건** 것들 — 체크로 고른다
+  List<String> get _others => [
+    for (final e in _plan.entries)
+      if (!e.value.contains(_day)) e.key,
+  ];
 
   @override
   void initState() {
@@ -40,34 +84,105 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
 
   String get _value => _text.text.trim();
 
-  /// 입력칸의 글을 아래 목록으로 옮긴다 — 칸을 비우고 커서를 남겨서
+  /// 입력칸의 글을 이 요일에 담는다 — 칸을 비우고 커서를 남겨서
   /// 엔터만 계속 눌러 여러 줄을 이어 적을 수 있다
   void _stage() {
     if (_value.isEmpty) return;
     setState(() {
-      _staged.add(_value);
+      _plan.putIfAbsent(_value, () => <int>{}).add(_day);
       _text.clear();
     });
     _focus.requestFocus();
   }
 
-  void _submit() {
-    // 적다 만 글도 같이 담는다 — 엔터를 안 누르고 바로 만드는 사람이 많다
-    final all = [..._staged, if (_value.isNotEmpty) _value];
-    if (all.isEmpty) return;
-    // 하나도 안 고르면 영영 안 뜨는 업무가 된다 — 그때는 매일로 본다
-    // (서버도 같은 규칙이다 — `clean_weekdays`)
-    final days = (_days.toList()..sort());
-    Navigator.pop(context, (all, days.isEmpty ? everyWeekday : days));
+  /// 앞 요일 것을 이 요일에도 걸거나 뺀다
+  void _toggle(String content) {
+    setState(() {
+      final days = _plan[content];
+      if (days == null) return;
+      if (!days.remove(_day)) days.add(_day);
+      // 어느 요일에도 안 걸리면 목록에서 뺀다 — 영영 안 뜨는 업무가 된다
+      if (days.isEmpty) _plan.remove(content);
+    });
   }
 
-  int get _count => _staged.length + (_value.isEmpty ? 0 : 1);
+  /// 적다 만 글도 같이 담는다 — 엔터를 안 누르고 바로 넘기는 사람이 많다
+  void _flush() {
+    if (_value.isEmpty) return;
+    _plan.putIfAbsent(_value, () => <int>{}).add(_day);
+    _text.clear();
+  }
+
+  void _next() {
+    setState(() {
+      _flush();
+      _step++;
+    });
+    _focus.requestFocus();
+  }
+
+  void _back() {
+    setState(() {
+      _flush();
+      _step--;
+    });
+  }
+
+  void _submit() {
+    _flush();
+    if (_plan.isEmpty) return;
+    Navigator.pop(context, {
+      for (final e in _plan.entries) e.key: e.value.toList()..sort(),
+    });
+  }
+
+  /// 지금까지 담은 업무 수 — 마지막 칸의 버튼에 쓴다
+  int get _count =>
+      _plan.length + (_value.isEmpty || _plan.containsKey(_value) ? 0 : 1);
 
   @override
   Widget build(BuildContext context) {
     final body = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // 지금 어느 요일을 담고 있는지 — 이 화면에서 제일 먼저 읽혀야 한다
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Text('$_dayName요일', style: AppTextStyles.title2),
+            const SizedBox(width: 8),
+            Text(
+              '${_step + 1} / ${_stepDays.length}',
+              style: AppTextStyles.caption.copyWith(
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
+              ),
+            ),
+            const Spacer(),
+            // 폰은 헤더 뒤로가기가 **화면을 통째로 닫는다** — 앞 요일로
+            // 돌아갈 길이 여기 없으면 처음부터 다시 해야 한다
+            if (!isDesktop && _step > 0)
+              Pressable(
+                onTap: _back,
+                scale: 0.94,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  child: Text(
+                    '이전',
+                    style: AppTextStyles.body2.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 14),
         // 입력칸 — 카드 없이 큼직하게. 이 화면의 주인공이다
         Container(
           padding: const EdgeInsets.fromLTRB(18, 6, 6, 6),
@@ -122,15 +237,8 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
             style: AppTextStyles.caption.copyWith(color: AppColors.gray400),
           ),
         ),
-        const SizedBox(height: 18),
-        // 돌아오는 요일 — 여기서 고른 것이 **담은 줄 전체**에 걸린다
-        WeekdayPicker(
-          selected: _days,
-          onChanged: () => setState(() {}),
-          note: '고른 요일에만 목록에 떠요',
-        ),
         const SizedBox(height: 20),
-        if (_staged.isEmpty)
+        if (_todays.isEmpty && _others.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 28),
             child: Center(
@@ -151,19 +259,34 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
                 ],
               ),
             ),
-          )
-        else ...[
+          ),
+        if (_todays.isNotEmpty) ...[
           Padding(
             padding: const EdgeInsets.only(left: 6, bottom: 10),
-            child: Text('담은 업무 ${_staged.length}개', style: AppTextStyles.label),
+            child: Text(
+              '$_dayName요일 업무 ${_todays.length}개',
+              style: AppTextStyles.label,
+            ),
           ),
-          // **실제 목록과 같은 모양이다** — 만들고 나면 어떻게 보이는지가
-          // 여기서 그대로 보인다
-          for (var i = 0; i < _staged.length; i++) ...[
+          for (var i = 0; i < _todays.length; i++) ...[
             if (i > 0) const SizedBox(height: 8),
-            _StagedRow(
-              text: _staged[i],
-              onRemove: () => setState(() => _staged.removeAt(i)),
+            _StagedRow(text: _todays[i], onRemove: () => _toggle(_todays[i])),
+          ],
+        ],
+        // **앞 요일에 담은 것** — 체크하면 이 요일에도 걸린다.
+        // 같은 이름을 다시 적을 필요가 없다
+        if (_others.isNotEmpty) ...[
+          const SizedBox(height: 18),
+          Padding(
+            padding: const EdgeInsets.only(left: 6, bottom: 10),
+            child: Text('다른 요일에 담은 것', style: AppTextStyles.label),
+          ),
+          for (var i = 0; i < _others.length; i++) ...[
+            if (i > 0) const SizedBox(height: 8),
+            _PickRow(
+              text: _others[i],
+              days: weekdayLabel(_plan[_others[i]]!.toList()..sort()),
+              onTap: () => _toggle(_others[i]),
             ),
           ],
         ],
@@ -173,10 +296,12 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
     if (!isDesktop) {
       return PhoneDetailScaffold(
         title: '업무 추가',
+        // 마지막 요일에서만 만든다 — 그 전까지는 다음 요일로 넘어간다.
+        // **비워 두고 넘어가도 된다** (근무일이면 그날이 누락이라는 뜻이다)
         bottomBar: GlassBottomButton(
-          label: _count > 1 ? '$_count개 추가' : '추가',
-          active: _count > 0,
-          onPressed: _submit,
+          label: _last ? (_count > 1 ? '$_count개 추가' : '추가') : '다음',
+          active: _last ? _count > 0 : true,
+          onPressed: _last ? _submit : _next,
         ),
         child: ListView(
           padding: EdgeInsets.fromLTRB(
@@ -215,16 +340,17 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
               children: [
                 Expanded(
                   child: AppButton(
-                    label: '취소',
-                    onTap: () => Navigator.pop(context),
+                    // 첫 요일에서만 취소다 — 그다음부터는 앞 요일로 돌아간다
+                    label: _step == 0 ? '취소' : '이전',
+                    onTap: _step == 0 ? () => Navigator.pop(context) : _back,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: AppButton(
-                    label: _count > 1 ? '$_count개 추가' : '추가',
-                    filled: _count > 0,
-                    onTap: _submit,
+                    label: _last ? (_count > 1 ? '$_count개 추가' : '추가') : '다음',
+                    filled: _last ? _count > 0 : true,
+                    onTap: _last ? _submit : _next,
                   ),
                 ),
               ],
@@ -274,6 +400,58 @@ class _StagedRow extends StatelessWidget {
           ),
         ),
       ],
+    ),
+  );
+}
+
+/// 앞 요일에 담은 업무 — **누르면 이 요일에도 걸린다**
+///
+/// 같은 이름을 요일마다 다시 적게 하면 오타 하나로 두 줄이 된다
+/// (서버가 막지만 그 전에 손이 더 간다). 체크로 고르는 편이 빠르다.
+class _PickRow extends StatelessWidget {
+  const _PickRow({required this.text, required this.days, required this.onTap});
+
+  final String text;
+
+  /// 지금까지 걸린 요일 — `월·수` (어디에 넣었는지가 보여야 판단이 된다)
+  final String days;
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Pressable(
+    onTap: onTap,
+    scale: 0.99,
+    child: Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        // 담긴 것(`_StagedRow`)과 갈리게 테두리만 두른다 — 회색 면을 또
+        // 쓰면 이 요일에 든 것과 안 든 것이 한눈에 안 갈린다
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.gray100),
+      ),
+      child: Row(
+        children: [
+          Icon(CupertinoIcons.circle, size: 22, color: AppColors.gray300),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: AppTextStyles.body2.copyWith(
+                fontWeight: FontWeight.w500,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          Text(
+            days,
+            style: AppTextStyles.caption.copyWith(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
     ),
   );
 }
