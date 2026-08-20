@@ -55,7 +55,7 @@ class _SchedulePhone extends StatelessWidget {
         .where((e) => !e.date.isAfter(dates.last) && !e.until.isBefore(week))
         .length;
 
-    return PhoneDetailScaffold(
+    final page = PhoneDetailScaffold(
       title: '일정',
       actions: [GlassIconButton(symbol: 'plus', onPressed: onAdd)],
       child: ListView(
@@ -87,14 +87,7 @@ class _SchedulePhone extends StatelessWidget {
               Spacer(),
               // 받아오는 중에는 개수를 감춘다 — 0에서 튀어 오르는 게 보인다
               if (loading)
-                SizedBox(
-                  width: 13,
-                  height: 13,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation(AppColors.gray400),
-                  ),
-                )
+                Skeleton(width: 46, height: 12)
               else
                 Text('일정 $count', style: AppTextStyles.caption),
               SizedBox(width: 10),
@@ -130,26 +123,34 @@ class _SchedulePhone extends StatelessWidget {
             child: Column(
               children: [
                 // 일정이 없는 날도 줄은 세운다 — 주말이 어디인지가 보여야 한다
-                for (final date in dates) _DayRow(date: date, onTap: onPick),
+                for (final date in dates)
+                  _DayRow(date: date, onTap: onPick, skeleton: loading),
               ],
             ),
           ),
         ],
       ),
     );
+
+    // 뼈대가 뜰 때만 감싼다 (PC 달력과 같은 사정 — 반짝임 컨트롤러를 늘 굴리지 않는다)
+    return loading ? SkeletonGroup(child: page) : page;
   }
 }
 
 /// 주 달력의 하루 — 날짜 + 그날 일정 칩
 class _DayRow extends StatelessWidget {
-  _DayRow({required this.date, required this.onTap});
+  _DayRow({required this.date, required this.onTap, this.skeleton = false});
 
   final DateTime date;
   final ValueChanged<DateTime> onTap;
 
+  /// 아직 받아오는 중 — 일정 자리에 회색 칩을 깐다 (날짜·요일은 그대로 둔다)
+  final bool skeleton;
+
   @override
   Widget build(BuildContext context) {
-    final list = eventsOn(date);
+    final list = skeleton ? const <Event>[] : eventsOn(date);
+    final chips = skeleton ? _skeletonChips(date) : 0;
     final today = _isSameDay(date, DateTime.now());
     final sunday = date.weekday == DateTime.sunday;
 
@@ -204,8 +205,18 @@ class _DayRow extends StatelessWidget {
             Expanded(
               child: Padding(
                 // 첫 칩 가운데를 날짜 동그라미 가운데에 맞춘다 (2 + 26/2 = 15 = 30/2)
-                padding: EdgeInsets.only(top: list.isEmpty ? 5 : 2),
-                child: list.isEmpty
+                padding: EdgeInsets.only(
+                  top: (skeleton ? chips == 0 : list.isEmpty) ? 5 : 2,
+                ),
+                child: skeleton
+                    // 빈 날은 뼈대도 비운다 — 칸마다 깔면 '매일 일정이 있다'가 된다
+                    ? Column(
+                        children: [
+                          for (var i = 0; i < chips; i++)
+                            _SkeletonChip(big: true),
+                        ],
+                      )
+                    : list.isEmpty
                     ? Text(
                         '—',
                         style: AppTextStyles.body2.copyWith(

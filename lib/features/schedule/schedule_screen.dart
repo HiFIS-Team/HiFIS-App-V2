@@ -15,6 +15,7 @@ import '../../core/widgets/display/avatar.dart';
 import '../../core/widgets/display/scroll_box.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/feedback/reject_reason_dialog.dart';
+import '../../core/widgets/feedback/skeleton.dart';
 import '../../core/widgets/input/mini_button.dart';
 import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/input/pressable.dart';
@@ -208,7 +209,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
         .length;
 
     // 배경은 다른 화면과 같은 회색, 달력은 그 위에 얹힌 흰 카드로 둔다
-    return Scaffold(
+    final page = Scaffold(
       body: Column(
         children: [
           // 상단 글래스 헤더 버튼 영역만큼 비워둔다
@@ -224,14 +225,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                 SizedBox(width: 10),
                 // 받아오는 중에는 개수를 감춘다 — 0에서 튀어 오르는 게 보인다
                 if (showSkeleton)
-                  SizedBox(
-                    width: 13,
-                    height: 13,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation(AppColors.gray400),
-                    ),
-                  )
+                  Skeleton(width: 46, height: 12)
                 else
                   Text('일정 $monthCount', style: AppTextStyles.caption),
                 SizedBox(width: 14),
@@ -346,6 +340,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                                   lastWeek: w == weeks - 1,
                                   lastColumn: d == 6,
                                   onTap: _openDay,
+                                  skeleton: showSkeleton,
                                 ),
                               ),
                           ],
@@ -359,8 +354,18 @@ class _ScheduleScreenState extends State<ScheduleScreen>
         ],
       ),
     );
+
+    // 뼈대가 뜰 때만 감싼다 — [SkeletonGroup] 은 반짝임을 늘 굴리는 컨트롤러라
+    // 평소에도 두면 안 받아오는 동안 화면이 매 프레임 다시 그려진다
+    return showSkeleton ? SkeletonGroup(child: page) : page;
   }
 }
+
+/// 뼈대일 때 그 칸에 놓을 칩 수 — **날짜에서 뽑아 늘 같은 자리에** 놓는다
+///
+/// 무작위로 흩으면 다시 그릴 때마다 칩이 늘었다 줄었다 해서 그게 곧 깜빡임이다.
+/// 칸마다 하나씩 깔면 "매일 일정이 있다"고 잘못 알려주므로 빈 날도 섞는다.
+int _skeletonChips(DateTime date) => const [1, 0, 2, 1, 1, 0, 1][date.day % 7];
 
 const _weekdays = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -555,6 +560,7 @@ class _DayCell extends StatefulWidget {
     required this.lastWeek,
     required this.lastColumn,
     required this.onTap,
+    this.skeleton = false,
   });
 
   final DateTime date;
@@ -564,6 +570,12 @@ class _DayCell extends StatefulWidget {
   final bool lastWeek;
   final bool lastColumn;
   final ValueChanged<DateTime> onTap;
+
+  /// 아직 받아오는 중 — 일정 자리에 회색 칩을 깐다
+  ///
+  /// **칸 테두리와 날짜는 그대로 둔다.** 달력이 그리는 값이지 서버가 주는 값이
+  /// 아니라, 가려 봐야 아는 것을 감추는 셈이고 다 받았을 때 한 번 더 튄다.
+  final bool skeleton;
 
   @override
   State<_DayCell> createState() => _DayCellState();
@@ -577,7 +589,7 @@ class _DayCellState extends State<_DayCell> {
     final date = widget.date;
     final inMonth = date.month == widget.month;
     final today = _isSameDay(date, DateTime.now());
-    final list = eventsOn(date);
+    final list = widget.skeleton ? const <Event>[] : eventsOn(date);
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -636,6 +648,14 @@ class _DayCellState extends State<_DayCell> {
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final fit = (constraints.maxHeight / 21).floor();
+                    // 칸에 들어가는 만큼만 — 뼈대가 넘쳐서 칸을 밀면 안 된다
+                    if (widget.skeleton) {
+                      final n = _skeletonChips(date).clamp(0, fit);
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [for (var i = 0; i < n; i++) _SkeletonChip()],
+                      );
+                    }
                     final show = list.length <= fit
                         ? list.length
                         : (fit - 1).clamp(0, list.length);
@@ -666,6 +686,24 @@ class _DayCellState extends State<_DayCell> {
       ),
     );
   }
+}
+
+/// 일정 칩이 들어올 자리 — 높이·여백을 [_Chip] 에서 그대로 가져왔다
+///
+/// 안 맞추면 다 받았을 때 칩이 밀려서 그것도 깜빡임이다.
+class _SkeletonChip extends StatelessWidget {
+  _SkeletonChip({this.big = false});
+
+  final bool big;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.only(bottom: big ? 4 : 2),
+    child: SizedBox(
+      width: double.infinity,
+      child: Skeleton(height: big ? 26 : 19, radius: 6),
+    ),
+  );
 }
 
 /// 달력 칸 안의 일정 한 줄
