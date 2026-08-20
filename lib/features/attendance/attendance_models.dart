@@ -236,14 +236,25 @@ final _leaveInbox = <LeaveRequest>[];
 /// 사람마다 캘린더를 부르지 않아도 되게 서버가 명단에 실어 준다.
 final _todayStaff = <Employee>[];
 
+/// 오늘 찍힌 출퇴근 시각 — 사람 id 로 찾는다 (대표·관리자만 채워진다)
+///
+/// 명단(`Employee.todayStatus`)은 **판정 한 글자**뿐이라 '몇 시에 왔나'를
+/// 모른다. 카드의 칸을 눌러 여는 상세가 이 값을 쓴다.
+///
+/// `GET /attendance?month=` 는 employeeId 를 안 주면 **볼 수 있는 만큼 전부**
+/// 준다 — MASTER·ADMIN 만 남의 것이 오고, 그 밖에는 본인 것으로 고정된다
+/// (backend-gap 60). 그래서 대표 화면에서만 부른다.
+final _todayRecords = <String, AttendanceRecord>{};
+
 /// 근태·월차를 서버에서 받아 온다
 ///
 /// 달력이 앞뒤 달을 넘겨볼 수 있어야 해서 이번 달과 지난달을 같이 받는다.
 /// 월차는 기간 필터가 없어 통째로 받아 둔다.
 ///
-/// **일곱 개를 한 번에 던진다.** 서로 상관없는 요청인데 `await` 로 하나씩
+/// **여덟 개를 한 번에 던진다.** 서로 상관없는 요청인데 `await` 로 하나씩
 /// 기다리면 왕복 시간이 그대로 더해진다 — 운영 서버가 요청당 0.2~0.7초라
 /// 이 화면 첫 로딩만 몇 초씩 걸렸다 (제일 오래 걸리는 화면이었다).
+/// 뒤 셋은 대표·관리자만 실제로 나간다.
 Future<void> _loadAttendance() async {
   final now = DateTime.now();
   final thisMonth = _monthKey(now);
@@ -267,6 +278,12 @@ Future<void> _loadAttendance() async {
       AttendanceApi.roster(month: thisMonth, branchId: branchScopeId)
     else
       Future.value(const <AttendanceRosterDay>[]),
+    // 카드의 칸을 눌러 여는 상세가 쓸 오늘 출퇴근 시각.
+    // 날짜 필터가 없어 이번 달을 받아 오늘만 남긴다
+    if (_isBoss)
+      AttendanceApi.list(month: thisMonth)
+    else
+      Future.value(const <AttendanceRecord>[]),
   ]);
 
   final days = <AttendanceDay>[
@@ -278,6 +295,7 @@ Future<void> _loadAttendance() async {
   final inbox = got[4] as List<LeaveRequest>;
   final staff = got[5] as List<Employee>;
   final roster = got[6] as List<AttendanceRosterDay>;
+  final records = got[7] as List<AttendanceRecord>;
 
   _balance = balance;
 
@@ -311,6 +329,13 @@ Future<void> _loadAttendance() async {
             (branchScopeId == null || person.branchId == branchScopeId),
       ),
     );
+
+  _todayRecords
+    ..clear()
+    ..addEntries([
+      for (final record in records)
+        if (_sameDay(record.date, now)) MapEntry(record.employeeId, record),
+    ]);
 
   if (_isBoss) _roster[thisMonth] = roster;
 }

@@ -160,23 +160,33 @@ class _TodayBoard extends StatelessWidget {
     // 지각·조기퇴근을 같이 한 사람은 두 칸에 다 선다 (판정 값은 하나뿐이라)
     final both = _todayWith(AttendanceStatus.lateAndEarly);
     // 색은 달력 칸과 같은 토큰을 쓴다 — 두 자리에서 같은 상태가 다른 색이면 안 된다
-    final cells = <(String, Color, List<Employee>)>[
-      ('출근', AppColors.workIn, _todayWith(AttendanceStatus.inProgress)),
-      ('퇴근', AppColors.workOut, _todayWith(AttendanceStatus.normal)),
-      ('야근', AppColors.workOvertime, _todayWith(AttendanceStatus.overtime)),
+    //
+    // 마지막 값은 **스캔이 없을 때 근무 시간을 대신 보여줄지**다.
+    // 월차는 원래 안 나오는 날이라 '근무 09:00~18:00' 이 뜨면 안 온 것처럼 읽힌다.
+    final cells = <(String, Color, List<Employee>, bool)>[
+      ('출근', AppColors.workIn, _todayWith(AttendanceStatus.inProgress), true),
+      ('퇴근', AppColors.workOut, _todayWith(AttendanceStatus.normal), true),
+      (
+        '야근',
+        AppColors.workOvertime,
+        _todayWith(AttendanceStatus.overtime),
+        true,
+      ),
       (
         '조기퇴근',
         AppColors.workEarly,
         [..._todayWith(AttendanceStatus.earlyLeave), ...both],
+        true,
       ),
       (
         '지각',
         AppColors.workLate,
         [..._todayWith(AttendanceStatus.late), ...both],
+        true,
       ),
-      ('결근', AppColors.workAbsent, _todayWith(AttendanceStatus.absent)),
-      ('월차', AppColors.workLeave, _todayWith(AttendanceStatus.onLeave)),
-      ('미출근', AppColors.workNone, _todayWith(null)),
+      ('결근', AppColors.workAbsent, _todayWith(AttendanceStatus.absent), true),
+      ('월차', AppColors.workLeave, _todayWith(AttendanceStatus.onLeave), false),
+      ('미출근', AppColors.workNone, _todayWith(null), true),
     ];
     // 폰은 칸이 좁아 두 개씩 네 줄, 데스크톱은 네 개씩 두 줄
     final perRow = isDesktop ? 4 : 2;
@@ -208,7 +218,7 @@ class _TodayBoard extends StatelessWidget {
               children: [
                 for (var i = start; i < start + perRow; i++) ...[
                   if (i > start) _divider(),
-                  _cell(cells[i].$1, cells[i].$2, cells[i].$3),
+                  _cell(context, cells[i]),
                 ],
               ],
             ),
@@ -219,8 +229,16 @@ class _TodayBoard extends StatelessWidget {
   }
 
   /// 달 요약의 `_stat` 과 같은 칸 — 숫자 자리에 이름이 들어간다
-  Widget _cell(String label, Color color, List<Employee> people) => Expanded(
-    child: Column(
+  ///
+  /// **누르면 그 칸 사람들이 시각과 함께 펼쳐진다** (2026-08-20 대표 요청).
+  /// 칸에는 `하이여 외 2명` 까지만 들어가서 나머지가 누구인지 알 길이 없었다.
+  /// 아무도 없는 칸은 열어 봐야 빈 목록이라 안 눌린다.
+  Widget _cell(
+    BuildContext context,
+    (String, Color, List<Employee>, bool) cell,
+  ) {
+    final (label, color, people, showShift) = cell;
+    final body = Column(
       children: [
         FittedBox(
           fit: BoxFit.scaleDown,
@@ -237,8 +255,25 @@ class _TodayBoard extends StatelessWidget {
         SizedBox(height: 4),
         Text(label, style: AppTextStyles.caption.copyWith(fontSize: 11)),
       ],
-    ),
-  );
+    );
+
+    if (people.isEmpty) return Expanded(child: body);
+    return Expanded(
+      child: Pressable(
+        scale: 0.96,
+        onTap: () => showAppDialog<void>(
+          context,
+          (_) => _TodayCellCard(
+            label: label,
+            color: color,
+            people: people,
+            showShift: showShift,
+          ),
+        ),
+        child: body,
+      ),
+    );
+  }
 
   Widget _divider() =>
       Container(width: 1, height: 30, color: AppColors.gray100);
@@ -249,4 +284,174 @@ class _TodayBoard extends StatelessWidget {
     if (people.length == 1) return people.first.name;
     return '${people.first.name} 외 ${people.length - 1}명';
   }
+}
+
+/// '오늘 근무' 칸을 눌렀을 때 — 그 상태인 사람과 **찍힌 시각**
+///
+/// 카드에는 `하이여 외 2명` 까지만 들어가서 나머지가 누구인지, 몇 시에
+/// 왔는지를 알 길이 없었다. 여기가 그걸 편다.
+///
+/// 시각은 [_todayRecords] 에서 온다 — 명단(`Employee.todayStatus`)은 판정
+/// 한 글자뿐이라 시각을 모른다.
+class _TodayCellCard extends StatelessWidget {
+  _TodayCellCard({
+    required this.label,
+    required this.color,
+    required this.people,
+    required this.showShift,
+  });
+
+  final String label;
+  final Color color;
+  final List<Employee> people;
+
+  /// 스캔이 없을 때 **설정된 근무 시간**을 대신 보여줄지.
+  /// 월차는 원래 안 나오는 날이라 끈다 — 안 그러면 안 온 것처럼 읽힌다.
+  final bool showShift;
+
+  /// 그 사람의 오늘 한 줄 — 상황에 따라 나오는 값이 다르다
+  ///
+  /// | 언제 | 무엇 |
+  /// |---|---|
+  /// | 출근·퇴근 다 찍음 | `09:00 ~ 18:10` |
+  /// | 출근만 찍음 | `09:02 출근` |
+  /// | 스캔 없음 | `근무 09:00~18:00` (설정된 시간) |
+  /// | 근무 시간도 없음 | `-` |
+  String _line(Employee person) {
+    final record = _todayRecords[person.id];
+    final inAt = record?.checkIn;
+    final outAt = record?.checkOut;
+    if (inAt != null && outAt != null) {
+      return '${_clock(inAt)} ~ ${_clock(outAt)}';
+    }
+    if (inAt != null) return '${_clock(inAt)} 출근';
+    final start = person.shiftStart;
+    final end = person.shiftEnd;
+    if (showShift && start != null && end != null) return '근무 $start~$end';
+    return '-';
+  }
+
+  /// 아래에 붙는 근무 시간 — 퇴근을 찍은 사람만 나온다
+  String? _worked(Employee person) {
+    final minutes = _todayRecords[person.id]?.workMinutes;
+    if (minutes == null || minutes <= 0) return null;
+    return _duration(Duration(minutes: minutes));
+  }
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: dialogWidth(context, 320),
+    padding: EdgeInsets.fromLTRB(20, 18, 20, 14),
+    decoration: BoxDecoration(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(24),
+    ),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
+            SizedBox(width: 8),
+            Text(
+              label,
+              style: AppTextStyles.body1.copyWith(fontWeight: FontWeight.w700),
+            ),
+            SizedBox(width: 8),
+            Text(
+              '${people.length}명',
+              style: AppTextStyles.caption.copyWith(fontSize: 12),
+            ),
+          ],
+        ),
+        SizedBox(height: 14),
+        // 사람이 많아도 창이 화면을 넘지 않게 — 넘으면 안에서 스크롤된다
+        ScrollBox(
+          maxHeight: 320,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < people.length; i++) ...[
+                if (i > 0) Divider(height: 1, color: AppColors.divider),
+                _TodayPersonRow(
+                  person: people[i],
+                  line: _line(people[i]),
+                  worked: _worked(people[i]),
+                  color: color,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+/// 상세의 한 줄 — 아바타 · 이름/직군 · 오른쪽에 시각
+class _TodayPersonRow extends StatelessWidget {
+  _TodayPersonRow({
+    required this.person,
+    required this.line,
+    required this.worked,
+    required this.color,
+  });
+
+  final Employee person;
+  final String line;
+  final String? worked;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.symmetric(vertical: 10),
+    child: Row(
+      children: [
+        Avatar(name: person.name, size: 34),
+        SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                person.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.body2.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              SizedBox(height: 2),
+              Text(
+                person.rank.label,
+                style: AppTextStyles.caption.copyWith(fontSize: 11),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(width: 10),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              line,
+              style: AppTextStyles.body2.copyWith(
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+            if (worked case final total?) ...[
+              SizedBox(height: 2),
+              Text(total, style: AppTextStyles.caption.copyWith(fontSize: 11)),
+            ],
+          ],
+        ),
+      ],
+    ),
+  );
 }

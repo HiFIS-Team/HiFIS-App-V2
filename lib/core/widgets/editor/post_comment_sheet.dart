@@ -217,30 +217,52 @@ class _CommentSheetState extends State<_CommentSheet> {
                 ),
                 SizedBox(height: 12),
                 Container(height: 1, color: AppColors.gray100),
+                // **댓글이 없어도 스크롤이다.** 여기가 [scroll] 을 안 쓰면
+                // 시트의 컨트롤러에 붙는 스크롤이 없어서 `isAttached` 가 false 가
+                // 되고, 키보드가 올라올 때 시트를 키우는 [_onFocus] 가 통째로
+                // 건너뛴다 — 그러면 0.55 짜리 시트를 키보드가 덮어서 **입력칸이
+                // 가린다** (안드로이드에서 실제로 겪었다, 2026-08-20).
+                // 손으로 끌어 올리는 것도 같은 이유로 안 먹었다.
                 Expanded(
-                  child: rows == null
-                      ? (_failed
-                            ? _Empty(text: '댓글을 불러오지 못했어요')
-                            : SizedBox.shrink())
-                      : rows.isEmpty
-                      ? _Empty(text: '첫 댓글을 남겨보세요')
-                      : ListView.builder(
-                          controller: scroll,
-                          padding: EdgeInsets.fromLTRB(
-                            20,
-                            14,
-                            20,
-                            // 아래 떠 있는 글래스 입력바에 가리지 않게
-                            MediaQuery.paddingOf(context).bottom + 96,
-                          ),
-                          itemCount: rows.length,
-                          itemBuilder: (_, i) => _CommentRow(
-                            comment: rows[i],
-                            onRemove: _canRemove(rows[i])
-                                ? () => _remove(rows[i])
-                                : null,
-                          ),
-                        ),
+                  child: LayoutBuilder(
+                    builder: (context, box) {
+                      // 아래 떠 있는 글래스 입력바에 가리지 않게
+                      final under = MediaQuery.paddingOf(context).bottom + 96;
+                      // 빈 상태는 **예전처럼 가운데**에 뜬다 — 스크롤 안에
+                      // 넣으면서 남는 높이를 그대로 채워 준다
+                      final fill = (box.maxHeight - 14 - under).clamp(
+                        0.0,
+                        double.infinity,
+                      );
+                      return ListView(
+                        controller: scroll,
+                        padding: EdgeInsets.fromLTRB(20, 14, 20, under),
+                        children: [
+                          if (rows == null)
+                            // 받아오는 중엔 빈칸 — 실패해야 문구가 뜬다
+                            SizedBox(
+                              height: fill,
+                              child: _failed
+                                  ? _Empty(text: '댓글을 불러오지 못했어요')
+                                  : null,
+                            )
+                          else if (rows.isEmpty)
+                            SizedBox(
+                              height: fill,
+                              child: _Empty(text: '첫 댓글을 남겨보세요'),
+                            )
+                          else
+                            for (final row in rows)
+                              _CommentRow(
+                                comment: row,
+                                onRemove: _canRemove(row)
+                                    ? () => _remove(row)
+                                    : null,
+                              ),
+                        ],
+                      );
+                    },
+                  ),
                 ),
               ],
             ),
