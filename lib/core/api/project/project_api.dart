@@ -199,8 +199,9 @@ class Project {
 /// 체크리스트 한 줄 (서버 `ProjectTodoOut`)
 /// 프로젝트 달성 점수 한 건 (서버 `ProjectAwardOut`)
 ///
-/// 완료(100%)하면 담당자마다 **자동 10점**이 붙고, 그 위에서 MASTER 가
-/// 올리거나 깎는다. 여기서 매긴 값이 그 사람의 **최종 점수**다 (더해지지 않는다).
+/// 완료하면 **담당자(PM)에게 10점 · 참여 멤버에게 5점**이 자동으로 붙고,
+/// 그 위에서 MASTER 가 올리거나 깎는다 (2026-08-20).
+/// 여기서 매긴 값이 그 사람의 **최종 점수**다 (더해지지 않는다).
 class ProjectAward {
   ProjectAward({
     required this.id,
@@ -232,12 +233,12 @@ class ProjectAward {
   /// 점수 사유 — 부여할 때 필수다
   final String? comment;
 
-  /// **null 이면 완료로 자동으로 붙은 10점**이다 (사람이 매기면 그 사람 id)
+  /// **null 이면 완료로 자동으로 붙은 점수**다 (사람이 매기면 그 사람 id)
   final String? createdById;
 
   final DateTime createdAt;
 
-  /// 사람이 매긴 점수인지 — 자동 10점과 갈라 보여준다
+  /// 사람이 매긴 점수인지 — 완료 자동 점수와 갈라 보여준다
   bool get byPerson => createdById != null;
 }
 
@@ -480,7 +481,7 @@ class ProjectApi {
     return Project.fromJson(data!);
   }
 
-  /// 완료를 되돌린다 — **MASTER 만**. 자동으로 준 10점은 회수된다
+  /// 완료를 되돌린다 — **MASTER 만**. 자동으로 준 점수는 회수된다
   static Future<Project> reopen(String id) async {
     final data = await _client.post('/projects/$id/reopen');
     return Project.fromJson(data!);
@@ -616,7 +617,7 @@ class ProjectApi {
     return ProjectRequest.fromJson(data!);
   }
 
-  /// 프로젝트 달성 점수 목록 — 자동 10점과 MASTER 가 매긴 것이 섞여 온다
+  /// 프로젝트 달성 점수 목록 — 완료 자동 점수와 MASTER 가 매긴 것이 섞여 온다
   static Future<List<ProjectAward>> awards(String projectId) async {
     final rows = await _client.getList('/projects/$projectId/awards');
     return [

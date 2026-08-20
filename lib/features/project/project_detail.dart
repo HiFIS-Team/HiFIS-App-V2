@@ -156,18 +156,30 @@ bool _canTouchProject(_Project project) =>
 _ProjectDetail _projectActions(_Project project, VoidCallback onChanged) =>
     _ProjectDetail(project: project, onChanged: onChanged);
 
-/// 이 할 일에 체크할 수 있는가 — **MASTER·ADMIN 은 본인 담당만** (2026-08-19)
+/// 이 할 일에 체크할 수 있는가 — **그 할 일의 담당자와 PM 뿐이다** (2026-08-20)
 ///
-/// 대표·관리자는 프로젝트를 마음대로 고치고 지울 수 있지만 **일을 대신 했다고
-/// 표시하지는 못한다.** 체크가 곧 진행률이고 그게 곧 완료·점수라, 남이 한 일을
-/// 위에서 찍어 주면 그 점수가 뜻을 잃는다.
+/// 체크가 곧 진행률이고 그게 곧 완료·점수라, **남이 한 일을 대신 찍어 주면
+/// 그 점수가 뜻을 잃는다.** 그래서 자기 칸만 체크한다.
+///
+/// **권한을 안 가린다 — MASTER·ADMIN 도 같다.** 예전에는 그 둘만 본인 것으로
+/// 묶고 직원·점장은 참여자면 어느 칸이든 눌렀는데, 같은 프로젝트에 있다는
+/// 이유로 남의 칸을 찍는 것은 대표가 찍는 것과 다를 게 없다.
+///
+/// PM 은 폼 위쪽 `담당` 에 든 한 사람([_Project.ownerId])뿐이다 — 프로젝트를
+/// 끌고 가는 자리라 전체를 마감할 수 있어야 한다. 담당자가 나가거나 못 하게
+/// 됐을 때 이 길이 없으면 프로젝트가 영영 안 끝난다.
+/// **할 일마다 붙는 담당자는 PM 이 아니라 참여 멤버다.**
 ///
 /// 서버 `_ensure_can_check` 과 같은 기준이다 (`NOT_TODO_ASSIGNEE`).
-bool _canCheckTodo(_Todo todo) {
-  if (myRole != Role.master && myRole != Role.admin) return true;
+bool _canCheckTodo(_Project project, _Todo todo) {
+  final me = currentUser?.id;
+  if (me == null) return false;
+  // 담당자가 없는 칸은 PM 만 체크한다
   final name = todo.assignee;
-  if (name == null) return false;
-  return StaffDirectory.instance.byName(name)?.id == currentUser?.id;
+  if (name != null && StaffDirectory.instance.byName(name)?.id == me) {
+    return true;
+  }
+  return project.ownerId == me;
 }
 
 /// 결재 카드에서 '무엇이 바뀌나' 한 줄 — 삭제는 견줄 값이 없어 null

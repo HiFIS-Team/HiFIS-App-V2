@@ -5,9 +5,11 @@ part of 'project_screen.dart';
 /// 기한 연장 결재가 있던 자리를 그대로 쓴다. 완료된 뒤에는 결재할 연장이 없고,
 /// 대신 여기서 점수를 매긴다.
 ///
-/// **참여자 전원에게 같은 점수가 간다.** 프로젝트는 다 같이 하는 일이라
-/// 사람마다 나누지 않는다. 완료하면 자동 10점이 붙고, 그 위에서 대표가
-/// 판단해 올리거나 깎는다 — 매긴 값이 **최종 점수**다 (더해지지 않는다).
+/// **참여자 전원에게 같은 점수가 간다.** 여기서 매기는 것은 대표의 평가라
+/// 사람마다 나누지 않는다 — 매긴 값이 **최종 점수**다 (더해지지 않는다).
+///
+/// 완료하면 서버가 **담당자(PM) 10점 · 참여 멤버 5점**을 먼저 붙이고,
+/// 그 위에서 대표가 판단해 올리거나 깎는다.
 class _AwardCard extends StatefulWidget {
   _AwardCard({required this.project});
 
@@ -48,7 +50,7 @@ class _AwardCardState extends State<_AwardCard> {
   }
 
   /// 대표가 매긴 점수 (전원 같은 값이라 한 건만 봐도 된다).
-  /// null 이면 아직 완료 자동 10점만 붙어 있다
+  /// null 이면 아직 완료 자동 점수(PM 10 · 참여 5)만 붙어 있다
   ProjectAward? get _given => _awards.where((a) => a.byPerson).firstOrNull;
 
   Future<void> _give() async {
@@ -185,7 +187,11 @@ class _AwardCardState extends State<_AwardCard> {
   static void _ignore() {}
 }
 
-/// 완료하면 서버가 자동으로 붙이는 점수 (서버 `PROJECT_POINTS`)
+/// 점수 입력창의 출발값 — 담당자(PM) 몫과 같은 값이다 (서버 `PROJECT_POINTS`).
+///
+/// 참여 멤버는 완료 때 5점(`PROJECT_MEMBER_POINTS`)이 붙지만, 여기서 매기는
+/// 것은 **전원 같은 값**이라 둘 중 하나를 골라야 한다. 대표가 손대는 자리는
+/// 보통 "더 줄까"라서 높은 쪽을 놓는다.
 const _autoPoints = 10;
 
 /// 점수와 사유를 받는다 — 취소하면 null

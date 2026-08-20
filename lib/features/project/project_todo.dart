@@ -43,9 +43,9 @@ class _TodoCard extends StatelessWidget {
               _TodoRow(
                 todo: todo,
                 // 완료된 프로젝트는 눌러도 서버가 403 을 준다 — 아예 안 먹게 한다.
-                // 체크만 한 겹 더 잠근다 — **대표·관리자는 본인이 맡은 칸만**
-                // 체크할 수 있다 (2026-08-19, 서버 `NOT_TODO_ASSIGNEE`)
-                onToggle: locked || !_canCheckTodo(todo)
+                // 체크만 한 겹 더 잠근다 — **그 할 일의 담당자와 PM 만** 누른다
+                // (2026-08-20, 서버 `NOT_TODO_ASSIGNEE`)
+                onToggle: locked || !_canCheckTodo(project, todo)
                     ? null
                     : () => onToggle(todo),
                 onRemove: locked ? null : () => onRemove(todo),
