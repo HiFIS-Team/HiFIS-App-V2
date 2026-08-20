@@ -134,10 +134,16 @@ class _ProjectComposerState extends State<_ProjectComposer> {
   /// 기본 마감은 2주 뒤 — 고칠 때는 지금 마감이 든다
   late DateTime _due = _edit?.due ?? DateTime.now().add(Duration(days: 14));
 
-  /// 참여 멤버 — 직원·점장은 본인이 기본으로 든다.
+  /// 참여 멤버 — **만든 사람이 기본으로 든다. 권한을 안 가린다.**
   ///
-  /// **대표·관리자는 안 든다.** 프로젝트를 만들어 맡기는 자리라 본인이
-  /// 참여자도 담당자도 아니다 (그래서 [_owner] 도 비운 채로 시작한다).
+  /// 예전에는 대표·관리자만 빠졌다. 만들어 남에게 맡기는 자리로 봤는데,
+  /// 본인이 주도하는 프로젝트도 있어서 그때마다 **담당 고르개로 자기를 골라야**
+  /// 참여자가 됐다 (참여 멤버 칩에서는 자기가 안 눌린다). 넷 다 같게 뒀다
+  /// (2026-08-20 대표 결정).
+  ///
+  /// **참여자가 되는 것과 쪼이는 것은 별개다** — 마감 리마인더·마감 임박 모달·
+  /// 점수 셋 다 MASTER·ADMIN 을 따로 뺀다 (서버 `_reminder_targets`·
+  /// `accrue_score`, 앱 [_dueTargets]). 여기를 바꿔도 불이익은 안 온다.
   ///
   /// 회의록에서 왔으면 **참석자가 그대로 든다.** 본인 칩은 뺄 수 없게
   /// 해 뒀으므로(`onTap: null`) 겹치지 않게 한 번만 넣는다.
@@ -145,7 +151,7 @@ class _ProjectComposerState extends State<_ProjectComposer> {
     if (_edit case final project?) ...[
       ...project.members,
     ] else ...[
-      if (myRole.doesFieldWork) me,
+      me,
       for (final name in widget.seed?.members ?? const <String>[])
         if (name != me) name,
     ],
@@ -169,12 +175,14 @@ class _ProjectComposerState extends State<_ProjectComposer> {
         _Todo(text: text),
   ];
 
-  /// 맡을 사람 — 비어 있으면 아직 안 골랐다는 뜻이다
+  /// 맡을 사람 — **만든 사람이 기본이다** (참여 멤버와 같은 기준)
   ///
-  /// 회의록에서 왔고 본인이 참여자가 아니면(대표·관리자) **첫 참석자**를 세운다
-  late String _owner =
-      _edit?.owner ??
-      (myRole.doesFieldWork ? me : (_members.isNotEmpty ? _members.first : ''));
+  /// 남에게 맡기려면 담당 고르개에서 바꾼다. 거기는 참여 멤버가 아니라
+  /// **명단 전체**에서 고르고, 고른 사람을 참여 멤버에 같이 넣어 준다.
+  ///
+  /// 비어 있으면 아직 안 골랐다는 뜻이라 저장에서 막힌다 — 담당을 맡던
+  /// 사람을 참여 멤버에서 빼면 [_toggleMember] 가 이 값을 비운다.
+  late String _owner = _edit?.owner ?? me;
 
   late Color _color = _hexColor(_edit?.colorHex) ?? AppColors.primary;
 
@@ -226,8 +234,8 @@ class _ProjectComposerState extends State<_ProjectComposer> {
     setState(() {
       if (_members.contains(name)) {
         _members.remove(name);
-        // 빠진 사람이 맡기로 한 자리는 정말로 비워둔다 —
-        // 본인으로 되돌리면 대표가 만든 프로젝트의 담당이 대표가 된다
+        // 빠진 사람이 맡기로 한 자리는 정말로 비워둔다 — 만든 사람으로
+        // 되돌리면 남에게 맡기려던 프로젝트가 조용히 자기 것이 된다
         if (_owner == name) _owner = '';
         for (final todo in _todos) {
           if (todo.assignee == name) todo.assignee = null;
@@ -405,9 +413,16 @@ class _ProjectComposerState extends State<_ProjectComposer> {
                 _MemberChip(
                   staff: staff,
                   joined: _members.contains(staff.name),
-                  // 나는 담당 기본값이라 빼지 않는다.
+                  // 직원·점장은 자기를 못 뺀다 — 자기 일을 자기가 올리는 자리다.
+                  //
+                  // **대표·관리자는 뺄 수 있다** (2026-08-20). 만들면서 기본으로
+                  // 들어가는 것은 같지만(`_members`), 남에게 통째로 맡기는
+                  // 프로젝트가 원래 주력 흐름이라 여기까지 막으면 그걸 못 만든다.
+                  // 자기를 빼면 담당 자리도 같이 비어서(`_toggleMember`)
+                  // 저장 전에 누구에게 맡길지 반드시 고르게 된다.
+                  //
                   // 결재 모드에서는 인원 추가 결재가 따로 있어서 잠근다
-                  onTap: staff.name == me
+                  onTap: (staff.name == me && myRole.doesFieldWork)
                       ? null
                       : (_needsApproval
                             ? _lockedNote
