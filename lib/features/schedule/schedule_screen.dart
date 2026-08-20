@@ -10,6 +10,7 @@ import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
+import '../../core/util/skeleton_delay.dart';
 import '../../core/widgets/display/avatar.dart';
 import '../../core/widgets/display/scroll_box.dart';
 import '../../core/widgets/feedback/app_toast.dart';
@@ -47,14 +48,12 @@ class ScheduleScreen extends StatefulWidget {
 }
 
 class _ScheduleScreenState extends State<ScheduleScreen>
-    with ScreenRefresh<ScheduleScreen> {
+    with ScreenRefresh<ScheduleScreen>, SkeletonDelay<ScheduleScreen> {
   /// 보고 있는 달 (1일로 맞춰 둔다) — PC 달력이 쓴다
   late DateTime _month = _monthOf(DateTime.now());
 
   /// 보고 있는 주의 일요일 — 폰 달력이 쓴다
   late DateTime _week = _sundayOf(DateTime.now());
-
-  bool _loading = true;
 
   static DateTime _monthOf(DateTime time) => DateTime(time.year, time.month);
 
@@ -76,13 +75,16 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   }
 
   /// 보고 있는 달을 받는다 — 이미 받은 달이면 바로 끝난다
+  ///
+  /// 로딩 표시는 [SkeletonDelay] 가 가른다 — 앱 안의 깜빡임 문턱이
+  /// 여기만 따로 놀면 안 된다 (예전에는 `bool _loading` 을 직접 들고 있었다).
   Future<void> _load() async {
     try {
       await _loadMonth(_visibleMonth);
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
     }
-    if (mounted) setState(() => _loading = false);
+    if (mounted) setState(endLoad);
   }
 
   void _move(int delta) {
@@ -125,7 +127,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
       // 남의 달력이 그대로 떠 있으면 자기 것으로 착각한다
       if (next == ScheduleScope.company) personalOwnerId = null;
       _resetLoaded();
-      _loading = true;
+      beginLoad();
     });
     _load();
   }
@@ -140,7 +142,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     setState(() {
       personalOwnerId = picked == currentUser?.id ? null : picked;
       _resetLoaded();
-      _loading = true;
+      beginLoad();
     });
     _load();
   }
@@ -185,7 +187,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     if (!isDesktop) {
       return _SchedulePhone(
         week: _week,
-        loading: _loading,
+        loading: showSkeleton,
         onMove: _moveWeek,
         onToday: _goToday,
         onAdd: _add,
@@ -221,7 +223,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                 ),
                 SizedBox(width: 10),
                 // 받아오는 중에는 개수를 감춘다 — 0에서 튀어 오르는 게 보인다
-                if (_loading)
+                if (showSkeleton)
                   SizedBox(
                     width: 13,
                     height: 13,

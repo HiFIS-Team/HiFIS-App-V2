@@ -10,6 +10,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/util/platform.dart';
+import '../../../core/util/skeleton_delay.dart';
 import '../../../core/widgets/display/person_card.dart';
 import '../../../core/widgets/display/section_header.dart';
 import '../../../core/widgets/feedback/app_dialog.dart';
@@ -22,6 +23,7 @@ import '../../../core/widgets/input/pressable.dart';
 import '../../../core/widgets/input/see_all_button.dart';
 import '../../../core/util/when.dart';
 import '../../../core/widgets/nav/pane_transition.dart';
+import '../work_skeleton.dart';
 part 'praise_data.dart';
 part 'praise_feedback.dart';
 part 'praise_survey.dart';
@@ -45,7 +47,8 @@ class PraiseSection extends StatefulWidget {
   State<PraiseSection> createState() => _PraiseSectionState();
 }
 
-class _PraiseSectionState extends State<PraiseSection> {
+class _PraiseSectionState extends State<PraiseSection>
+    with SkeletonDelay<PraiseSection> {
   /// 0 내게 온 칭찬 · 1 컴플레인 · 2 전체(설문 원본)
   int _tab = 0;
 
@@ -64,13 +67,21 @@ class _PraiseSectionState extends State<PraiseSection> {
     if (old.branchId != widget.branchId) _load();
   }
 
+  /// 받아오는 동안 뼈대를 깐다 — 수업·기여도·동료 평가와 같은 방식이다
+  ///
+  /// 안 깔면 그동안 `아직 받은 칭찬이 없어요` 가 떠서 **없다고 잘못 알려준다.**
+  /// 지점을 바꿀 때는 [beginLoad] 를 안 부른다 — 옛 줄을 둔 채로 갈아끼운다
+  /// (다른 업무 칸도 같다).
   Future<void> _load() async {
     try {
       await _loadSurveys(branchId: widget.branchId);
+      if (!mounted) return;
+      setState(endLoad);
     } catch (error) {
-      if (mounted) AppToast.show(context, messageOf(error));
+      if (!mounted) return;
+      setState(endLoad);
+      AppToast.show(context, messageOf(error));
     }
-    if (mounted) setState(() {});
   }
 
   void _openHistory() {
@@ -140,6 +151,8 @@ class _PraiseSectionState extends State<PraiseSection> {
 
   @override
   Widget build(BuildContext context) {
+    if (showSkeleton) return WorkSectionSkeleton();
+
     if (_tab == 2) {
       final sorted = _surveys;
       // 카드에는 최근 5건만 — 나머지는 전체 보기 화면에서

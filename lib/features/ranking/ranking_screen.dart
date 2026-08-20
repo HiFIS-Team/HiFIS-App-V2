@@ -42,6 +42,7 @@ part 'ranking_podium.dart';
 part 'ranking_table.dart';
 part 'ranking_breakdown.dart';
 part 'ranking_env_detail.dart';
+part 'ranking_skeleton.dart';
 
 /// 랭킹 화면
 ///
@@ -58,7 +59,7 @@ class RankingScreen extends StatefulWidget {
 }
 
 class _RankingScreenState extends State<RankingScreen>
-    with ScreenRefresh<RankingScreen> {
+    with ScreenRefresh<RankingScreen>, SkeletonDelay<RankingScreen> {
   /// 고른 항목 ([_Metric] 순서)
   int _tab = 0;
 
@@ -91,13 +92,21 @@ class _RankingScreenState extends State<RankingScreen>
     if (mounted) setState(() {});
   }
 
+  /// 판을 받아온다 — 첫 로딩과 달을 옮길 때는 뼈대가 뜬다 ([SkeletonDelay])
+  ///
+  /// 안 깔면 그동안 `집계된 실적이 없어요` 가 떠서 **없다고 잘못 알려준다.**
+  /// 탭에 다시 들어오는 [onScreenRefresh] 는 [beginLoad] 를 안 불러서
+  /// 옛 판 위에 새 값이 조용히 얹힌다.
   Future<void> _load() async {
     try {
       await _loadRanking(period: _periodKey);
+      if (!mounted) return;
+      setState(endLoad);
     } catch (error) {
-      if (mounted) AppToast.show(context, messageOf(error));
+      if (!mounted) return;
+      setState(endLoad);
+      AppToast.show(context, messageOf(error));
     }
-    if (mounted) setState(() {});
   }
 
   /// 서버에 보낼 달 (`YYYY-MM`)
@@ -114,10 +123,13 @@ class _RankingScreenState extends State<RankingScreen>
   ///
   /// 사람 고른 것(`_pickedId`)은 푼다 — 달이 바뀌면 그 사람의 점수 내역도
   /// 달라지는데, 열린 채로 두면 옛 달 숫자가 잠깐 남는다.
+  /// 달을 옮길 때는 뼈대를 부른다 — 옛 달 숫자가 새 달 머리말 아래에 남으면
+  /// 그 달 실적으로 잘못 읽힌다 (지점을 바꾸는 업무 화면과 같은 사정이다).
   void _moveMonth(int step) {
     setState(() {
       _viewMonth = DateTime(_viewMonth.year, _viewMonth.month + step);
       _pickedId = null;
+      beginLoad();
     });
     _load();
   }
@@ -369,7 +381,9 @@ class _RankingScreenState extends State<RankingScreen>
           SizedBox(height: 14),
           PaneTransition(
             step: _tab,
-            child: entries.isEmpty
+            child: showSkeleton
+                ? _RankingSkeleton()
+                : entries.isEmpty
                 ? EmptyCard(icon: CupertinoIcons.rosette, text: '집계된 실적이 없어요')
                 : Column(children: _body(entries)),
           ),
@@ -401,7 +415,9 @@ class _RankingScreenState extends State<RankingScreen>
             // 탭을 옮길 때 내용이 같이 갈린다 (업무·모니터링과 같은 모션)
             PaneTransition(
               step: _tab,
-              child: entries.isEmpty
+              child: showSkeleton
+                  ? _RankingSkeleton()
+                  : entries.isEmpty
                   ? EmptyCard(icon: CupertinoIcons.rosette, text: '집계된 실적이 없어요')
                   : Column(children: _body(entries)),
             ),

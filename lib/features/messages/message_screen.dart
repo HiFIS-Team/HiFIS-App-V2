@@ -11,7 +11,9 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/util/platform.dart';
 import '../../core/util/app_trail.dart';
 import '../../core/util/sf_symbols.dart';
+import '../../core/util/skeleton_delay.dart';
 import '../../core/widgets/feedback/app_toast.dart';
+import '../../core/widgets/feedback/skeleton.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/glass/glass_menu.dart';
 import '../../core/widgets/glass/glass_surface.dart';
@@ -56,7 +58,8 @@ class MessageScreen extends StatefulWidget {
   State<MessageScreen> createState() => _MessageScreenState();
 }
 
-class _MessageScreenState extends State<MessageScreen> {
+class _MessageScreenState extends State<MessageScreen>
+    with SkeletonDelay<MessageScreen> {
   final _scrollController = ScrollController();
 
   /// 0(펼침) ~ 1(접힘). 큰 타이틀이 스크롤로 사라지는 정도.
@@ -74,6 +77,9 @@ class _MessageScreenState extends State<MessageScreen> {
     // 밀어 올리면 자리가 어긋난다 (폰에서 밀려 들어오는 것과 다르다)
     _pendingRoomId = widget.embedded ? null : requestedRoomId.value;
     if (_pendingRoomId != null) requestedRoomId.value = null;
+    // [ChatStore] 가 이미 목록을 들고 있으면(다시 들어온 것) 뼈대 없이 시작한다 —
+    // 보여줄 옛 방이 있는데 뼈대로 덮으면 그게 깜빡임이다
+    if (_store.loaded) skipFirstSkeleton();
     _load();
   }
 
@@ -106,6 +112,7 @@ class _MessageScreenState extends State<MessageScreen> {
     } catch (error) {
       if (mounted && !_store.loaded) AppToast.show(context, messageOf(error));
     }
+    if (mounted) setState(endLoad);
     _openPending();
   }
 
@@ -300,7 +307,9 @@ class _MessageScreenState extends State<MessageScreen> {
                   ),
                 ),
                 SizedBox(height: 8),
-                if (shown.isEmpty)
+                if (showSkeleton)
+                  _ChatListSkeleton()
+                else if (shown.isEmpty)
                   Padding(
                     padding: EdgeInsets.fromLTRB(20, 40, 20, 40),
                     child: Center(
@@ -472,12 +481,15 @@ class _ArchiveScreen extends StatefulWidget {
   State<_ArchiveScreen> createState() => _ArchiveScreenState();
 }
 
-class _ArchiveScreenState extends State<_ArchiveScreen> {
+class _ArchiveScreenState extends State<_ArchiveScreen>
+    with SkeletonDelay<_ArchiveScreen> {
   List<ChatRoom> _rooms = const [];
 
   @override
   void initState() {
     super.initState();
+    // 받아올 것이 없는 보관함은 뼈대도 없다 — 바로 안내만 뜬다
+    if (widget.load == null) skipFirstSkeleton();
     _load();
   }
 
@@ -486,9 +498,15 @@ class _ArchiveScreenState extends State<_ArchiveScreen> {
     if (load == null) return;
     try {
       final rooms = await load();
-      if (mounted) setState(() => _rooms = rooms);
+      if (!mounted) return;
+      setState(() {
+        _rooms = rooms;
+        endLoad();
+      });
     } catch (error) {
-      if (mounted) AppToast.show(context, messageOf(error));
+      if (!mounted) return;
+      setState(endLoad);
+      AppToast.show(context, messageOf(error));
     }
   }
 
@@ -498,7 +516,12 @@ class _ArchiveScreenState extends State<_ArchiveScreen> {
       backgroundColor: AppColors.surface,
       body: Stack(
         children: [
-          if (_rooms.isEmpty)
+          if (showSkeleton)
+            ListView(
+              padding: EdgeInsets.fromLTRB(0, 68, 0, 40),
+              children: [_ChatListSkeleton(rows: 6)],
+            )
+          else if (_rooms.isEmpty)
             Center(
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: 40),
@@ -547,6 +570,48 @@ class _ArchiveScreenState extends State<_ArchiveScreen> {
       ),
     );
   }
+}
+
+/// 방 목록을 받아오는 동안 자리를 잡아 두는 뼈대
+///
+/// 여백·아바타 크기를 [_ConversationTile] 과 맞춘다 (좌우 20 · 위아래 8 ·
+/// 아바타 54). 안 맞추면 다 받았을 때 줄이 밀린다.
+class _ChatListSkeleton extends StatelessWidget {
+  _ChatListSkeleton({this.rows = 7});
+
+  final int rows;
+
+  @override
+  Widget build(BuildContext context) => SkeletonGroup(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < rows; i++)
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: Row(
+              children: [
+                SkeletonCircle(size: 54),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 줄마다 길이를 조금씩 달리해서 진짜 목록처럼 보이게 한다
+                      Skeleton(width: 92.0 + (i % 3) * 26, height: 13),
+                      SizedBox(height: 9),
+                      Skeleton(width: 136.0 + (i % 2) * 42, height: 11),
+                    ],
+                  ),
+                ),
+                SizedBox(width: 10),
+                Skeleton(width: 38, height: 11),
+              ],
+            ),
+          ),
+      ],
+    ),
+  );
 }
 
 /// 목록의 시각 — 오늘이면 시:분, 어제면 '어제', 그 전이면 날짜
