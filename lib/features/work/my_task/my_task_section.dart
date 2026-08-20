@@ -20,6 +20,7 @@ import '../../../core/widgets/feedback/skeleton.dart';
 import '../../../core/widgets/input/app_button.dart';
 import '../../../core/widgets/glass/glass_bottom_button.dart';
 import '../../../core/widgets/input/pressable.dart';
+import '../../../core/widgets/input/weekday_picker.dart';
 import '../../../core/widgets/nav/phone_scaffold.dart';
 
 part 'my_task_forms.dart';
@@ -51,15 +52,18 @@ void resetMyTaskCache() {
 Future<bool> addMyTasks(BuildContext context) async {
   // 폰은 오른쪽에서 밀려 들어오고, 데스크톱은 가운데 모달이다
   // (프로젝트 만들기·내역 전체보기와 같은 `showFullPage`)
-  final contents = await showFullPage<List<String>>(
+  // 담은 줄들과 **그 묶음에 걸리는 요일** — 한 자리에서 같이 정한다
+  final made = await showFullPage<(List<String>, List<int>)>(
     context,
     (_) => const _AddTaskScreen(),
   );
-  if (contents == null || contents.isEmpty || !context.mounted) return false;
+  if (made == null || !context.mounted) return false;
+  final (contents, weekdays) = made;
+  if (contents.isEmpty) return false;
   try {
     // 여러 줄을 **한 번에** 보낸다 — 줄마다 부르면 중간에 끊겼을 때
     // 반만 들어간 채로 화면이 닫힌다
-    await MyTaskApi.create(contents);
+    await MyTaskApi.create(contents, weekdays: weekdays);
     if (context.mounted) {
       AppToast.show(
         context,
@@ -166,6 +170,7 @@ class _MyTaskSectionState extends State<MyTaskSection>
         type: type,
         reason: result.reason,
         content: result.content,
+        weekdays: result.weekdays,
       );
       await _load();
       if (mounted) AppToast.show(context, '${type.label} 결재를 올렸어요');
@@ -329,6 +334,21 @@ class _TaskRow extends StatelessWidget {
               ],
             ),
           ),
+          // 매일 오는 업무는 **아무것도 안 붙는다** — 대부분이 매일이라
+          // 다 붙이면 줄마다 `월·화·수·목·금·토·일` 이 서서 읽을 것이 는다.
+          // 요일을 줄여 둔 것만 그게 보여야 한다 (2026-08-20)
+          if (weekdayLabel(task.weekdays) case final days when days.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: Text(
+                days,
+                style: AppTextStyles.caption.copyWith(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: checked ? AppColors.gray300 : AppColors.textSecondary,
+                ),
+              ),
+            ),
           if (pending == null) ...[
             _RowAction(icon: CupertinoIcons.pencil, onTap: onEdit),
             _RowAction(icon: CupertinoIcons.trash, onTap: onDelete),

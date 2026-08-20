@@ -21,6 +21,10 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
   /// 아직 안 만든 줄들 — `추가` 를 눌러야 서버로 간다
   final _staged = <String>[];
 
+  /// 돌아오는 요일 — **기본은 매일**이라 예전과 같게 보인다.
+  /// 한 번에 담은 줄들에 **다 같이** 걸린다 (서버 `MyTaskCreate.weekdays`)
+  final _days = <int>{...everyWeekday};
+
   @override
   void initState() {
     super.initState();
@@ -51,7 +55,10 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
     // 적다 만 글도 같이 담는다 — 엔터를 안 누르고 바로 만드는 사람이 많다
     final all = [..._staged, if (_value.isNotEmpty) _value];
     if (all.isEmpty) return;
-    Navigator.pop(context, all);
+    // 하나도 안 고르면 영영 안 뜨는 업무가 된다 — 그때는 매일로 본다
+    // (서버도 같은 규칙이다 — `clean_weekdays`)
+    final days = (_days.toList()..sort());
+    Navigator.pop(context, (all, days.isEmpty ? everyWeekday : days));
   }
 
   int get _count => _staged.length + (_value.isEmpty ? 0 : 1);
@@ -114,6 +121,13 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
             '엔터를 누르면 한 줄씩 더 담을 수 있어요',
             style: AppTextStyles.caption.copyWith(color: AppColors.gray400),
           ),
+        ),
+        const SizedBox(height: 18),
+        // 돌아오는 요일 — 여기서 고른 것이 **담은 줄 전체**에 걸린다
+        WeekdayPicker(
+          selected: _days,
+          onChanged: () => setState(() {}),
+          note: '고른 요일에만 목록에 떠요',
         ),
         const SizedBox(height: 20),
         if (_staged.isEmpty)
@@ -266,12 +280,15 @@ class _StagedRow extends StatelessWidget {
 
 /// 수정·삭제 결재 폼이 돌려주는 값
 class _RequestResult {
-  const _RequestResult({required this.reason, this.content});
+  const _RequestResult({required this.reason, this.content, this.weekdays});
 
   final String reason;
 
   /// 고치겠다는 내용 — 삭제면 null
   final String? content;
+
+  /// 고치겠다는 요일 — 삭제면 null. **내용과 따로 고칠 수 있다**
+  final List<int>? weekdays;
 }
 
 /// 수정·삭제 신청 — **대표가 승인해야 실제로 바뀐다**
@@ -289,7 +306,16 @@ class _RequestCardState extends State<_RequestCard> {
   late final _content = TextEditingController(text: widget.task.content);
   final _reason = TextEditingController();
 
+  /// 지금 걸린 요일에서 시작한다 — 안 건드리면 그대로 간다
+  late final _days = <int>{...widget.task.weekdays};
+
   bool get _isEdit => widget.type == MyTaskRequestType.edit;
+
+  /// 요일을 바꿨나 — 차례를 맞춰 견준다 (서버도 정렬해서 준다)
+  bool get _daysChanged {
+    final now = _days.toList()..sort();
+    return now.join(',') != widget.task.weekdays.join(',');
+  }
 
   @override
   void initState() {
@@ -309,17 +335,22 @@ class _RequestCardState extends State<_RequestCard> {
     if (_reason.text.trim().isEmpty) return false;
     if (!_isEdit) return true;
     final next = _content.text.trim();
-    // 안 바꿨으면 올릴 이유가 없다 — 대표가 무엇을 승인하는지 알 수 없다
-    return next.isNotEmpty && next != widget.task.content;
+    if (next.isEmpty) return false;
+    // 안 바꿨으면 올릴 이유가 없다 — 대표가 무엇을 승인하는지 알 수 없다.
+    // **내용·요일 중 하나만 바꿔도 된다** (2026-08-20)
+    return next != widget.task.content || _daysChanged;
   }
 
   void _submit() {
     if (!_ready) return;
+    // 하나도 안 고르면 매일 — 추가 화면과 같은 규칙이다
+    final days = _days.toList()..sort();
     Navigator.pop(
       context,
       _RequestResult(
         reason: _reason.text.trim(),
         content: _isEdit ? _content.text.trim() : null,
+        weekdays: _isEdit ? (days.isEmpty ? everyWeekday : days) : null,
       ),
     );
   }
@@ -339,6 +370,13 @@ class _RequestCardState extends State<_RequestCard> {
           autofocus: true,
           hintText: '업무 내용',
           maxLength: _contentMax,
+        ),
+        const SizedBox(height: 14),
+        _Label('돌아오는 요일'),
+        WeekdayPicker(
+          selected: _days,
+          onChanged: () => setState(() {}),
+          note: '고른 요일에만 목록에 떠요',
         ),
         const SizedBox(height: 14),
       ] else ...[

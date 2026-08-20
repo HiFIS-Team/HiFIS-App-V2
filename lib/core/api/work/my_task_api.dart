@@ -67,7 +67,10 @@ class MyTaskRequest {
   final String myTaskId;
   final MyTaskRequestType type;
 
-  /// 고치겠다는 값 — 수정일 때만 `{"content": "..."}`
+  /// 고치겠다는 값 — 수정일 때만 `{"content": ..., "weekdays": [...]}`
+  ///
+  /// **둘 다 늘 실려 온다.** 요일만 고쳐도 서버가 지금 내용을 같이 담아 줘서,
+  /// 결재하는 쪽이 바뀐 칸만이 아니라 **최종 모습**을 본다.
   final Map<String, dynamic>? payload;
 
   final String reason;
@@ -82,6 +85,34 @@ class MyTaskRequest {
 
   /// 고치겠다는 내용 — 수정이 아니면 빈 문자열
   String get newContent => (payload?['content'] as String?) ?? '';
+
+  /// 고치겠다는 요일 — 안 실려 있으면 매일 (요일이 생기기 전 결재)
+  List<int> get newWeekdays => parseWeekdays(payload?['weekdays']);
+}
+
+/// 매일 — 요일을 안 고르면 이 값이다 (서버 `EVERY_DAY` 와 같다)
+const everyWeekday = [1, 2, 3, 4, 5, 6, 7];
+
+/// 서버가 준 요일을 추려서 **차례대로** 담는다 (ISO 1=월 … 7=일)
+///
+/// 비어 있거나 없으면 매일로 본다 — 하나도 안 걸린 업무는 영영 안 뜬다.
+List<int> parseWeekdays(Object? raw) {
+  if (raw is! List) return const [...everyWeekday];
+  final days = {
+    for (final d in raw)
+      if (d is int && d >= 1 && d <= 7) d,
+  }.toList()..sort();
+  return days.isEmpty ? const [...everyWeekday] : days;
+}
+
+/// 요일이 매일인가 — 목록 줄에 표시를 붙일지 정한다
+bool isEveryWeekday(List<int> days) => days.length == 7;
+
+/// `금` · `월·수·금` — **매일이면 빈 문자열**이다 (붙일 것이 없다)
+String weekdayLabel(List<int> days) {
+  if (isEveryWeekday(days)) return '';
+  const names = ['월', '화', '수', '목', '금', '토', '일'];
+  return [for (final d in days) names[d - 1]].join('·');
 }
 
 /// 내 업무 한 줄 (서버 `MyTaskOut`)
@@ -92,6 +123,7 @@ class MyTask {
     required this.id,
     required this.employeeId,
     required this.content,
+    required this.weekdays,
     required this.sort,
     required this.checked,
     required this.createdAt,
@@ -102,6 +134,7 @@ class MyTask {
     id: json['id'] as String,
     employeeId: json['employeeId'] as String,
     content: json['content'] as String,
+    weekdays: parseWeekdays(json['weekdays']),
     sort: json['sort'] as int? ?? 0,
     checked: json['checked'] as bool? ?? false,
     createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
@@ -115,6 +148,13 @@ class MyTask {
   final String id;
   final String employeeId;
   final String content;
+
+  /// 돌아오는 요일 (ISO 1=월 … 7=일) — 그날 목록에는 **걸린 것만** 온다
+  ///
+  /// 금요일에만 하는 대청소가 월~목에도 서서 안 누른 나흘이 누락으로 잡히던
+  /// 자리다 (2026-08-20). 기존 업무는 전부 매일이다.
+  final List<int> weekdays;
+
   final int sort;
 
   /// 오늘 했는가
@@ -228,10 +268,16 @@ class MyTaskApi {
   ///
   /// 줄마다 따로 부르면 중간에 끊겼을 때 반만 들어간 채로 화면이 닫힌다.
   /// 서버가 한 트랜잭션으로 만든다.
-  static Future<List<MyTask>> create(List<String> contents) async {
+  ///
+  /// [weekdays] 는 **이 묶음 전체에 걸린다** — 한 번에 적은 줄들은 같은
+  /// 자리에서 같이 정한 것이라 요일도 같다. 안 주면 매일이다.
+  static Future<List<MyTask>> create(
+    List<String> contents, {
+    List<int>? weekdays,
+  }) async {
     final rows = await _client.postList(
       '/my-tasks',
-      body: {'contents': contents},
+      body: {'contents': contents, 'weekdays': ?weekdays},
     );
     return [
       for (final row in rows)
@@ -248,18 +294,23 @@ class MyTaskApi {
       _client.delete('/my-tasks/$id/check').then((_) {});
 
   /// 수정·삭제 신청 — 승인 전에는 항목이 안 바뀐다
+  ///
+  /// **내용·요일 중 하나만 보내도 된다.** 안 보낸 칸은 서버가 지금 값을
+  /// 그대로 채워서, 결재하는 쪽이 최종 모습을 본다. 둘 다 그대로면 400.
   static Future<MyTaskRequest> request(
     String id, {
     required MyTaskRequestType type,
     required String reason,
     String? content,
+    List<int>? weekdays,
   }) async {
     final data = await _client.post(
       '/my-tasks/$id/requests',
       body: {
         'type': type.wire,
         'reason': reason,
-        if (type == MyTaskRequestType.edit) 'payload': {'content': content},
+        if (type == MyTaskRequestType.edit)
+          'payload': {'content': ?content, 'weekdays': ?weekdays},
       },
     );
     return MyTaskRequest.fromJson(data!);
