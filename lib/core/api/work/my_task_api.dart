@@ -126,6 +126,7 @@ class MyTask {
     required this.weekdays,
     required this.sort,
     required this.checked,
+    required this.everChecked,
     required this.createdAt,
     this.pendingRequest,
   });
@@ -137,6 +138,7 @@ class MyTask {
     weekdays: parseWeekdays(json['weekdays']),
     sort: json['sort'] as int? ?? 0,
     checked: json['checked'] as bool? ?? false,
+    everChecked: json['everChecked'] as bool? ?? false,
     createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
     pendingRequest: json['pendingRequest'] == null
         ? null
@@ -159,6 +161,16 @@ class MyTask {
 
   /// 오늘 했는가
   final bool checked;
+
+  /// **한 번이라도 했는가** (오늘이 아니라 통틀어서 — 2026-08-20)
+  ///
+  /// 수정·삭제가 어느 길로 가는지를 이 값이 정한다.
+  ///
+  /// | | 수정·삭제 |
+  /// |---|---|
+  /// | 아직 한 번도 안 함 | **바로** ([update] · [remove]) |
+  /// | 한 번이라도 함 | 대표 결재 ([request]) |
+  final bool everChecked;
 
   /// 결재를 기다리는 수정·삭제 — 있으면 그동안 손댈 수 없다
   final MyTaskRequest? pendingRequest;
@@ -269,15 +281,17 @@ class MyTaskApi {
   /// 줄마다 따로 부르면 중간에 끊겼을 때 반만 들어간 채로 화면이 닫힌다.
   /// 서버가 한 트랜잭션으로 만든다.
   ///
-  /// [weekdays] 는 **이 묶음 전체에 걸린다** — 한 번에 적은 줄들은 같은
-  /// 자리에서 같이 정한 것이라 요일도 같다. 안 주면 매일이다.
-  static Future<List<MyTask>> create(
-    List<String> contents, {
-    List<int>? weekdays,
-  }) async {
+  /// [plan] 은 **업무 이름 → 걸리는 요일**이다. 요일을 하나씩 훑으며 담는
+  /// 화면이 그대로 넘겨준다 — 같은 이름이 여러 요일에 걸리면 서버가 요일을
+  /// 합쳐서 **한 줄로** 만든다 (두 줄이면 어느 쪽을 체크했는지 알 수 없다).
+  static Future<List<MyTask>> create(Map<String, List<int>> plan) async {
     final rows = await _client.postList(
       '/my-tasks',
-      body: {'contents': contents, 'weekdays': ?weekdays},
+      body: {
+        'items': [
+          for (final e in plan.entries) {'content': e.key, 'weekdays': e.value},
+        ],
+      },
     );
     return [
       for (final row in rows)
@@ -286,12 +300,28 @@ class MyTaskApi {
   }
 
   /// 오늘 했다고 표시 (멱등)
+  ///
+  /// **되돌릴 수 없다.** 해제하는 길이 없어서, 누르기 전에 한 번 묻는다.
   static Future<void> check(String id) =>
       _client.post('/my-tasks/$id/check').then((_) {});
 
-  /// 체크 해제 — 오늘 것만
-  static Future<void> uncheck(String id) =>
-      _client.delete('/my-tasks/$id/check').then((_) {});
+  /// 수정 — **한 번도 체크한 적 없을 때만** (그 밖에는 400 `TASK_LOCKED`)
+  ///
+  /// 안 넘긴 칸은 서버가 지금 값을 그대로 둔다.
+  static Future<MyTask> update(
+    String id, {
+    String? content,
+    List<int>? weekdays,
+  }) async {
+    final data = await _client.patch(
+      '/my-tasks/$id',
+      body: {'content': ?content, 'weekdays': ?weekdays},
+    );
+    return MyTask.fromJson(data!);
+  }
+
+  /// 삭제 — **한 번도 체크한 적 없을 때만** (그 밖에는 400 `TASK_LOCKED`)
+  static Future<void> remove(String id) => _client.delete('/my-tasks/$id');
 
   /// 수정·삭제 신청 — 승인 전에는 항목이 안 바뀐다
   ///

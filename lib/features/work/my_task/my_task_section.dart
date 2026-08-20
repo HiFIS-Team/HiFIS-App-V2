@@ -171,21 +171,85 @@ class _MyTaskSectionState extends State<MyTaskSection>
     _load();
   }
 
-  /// 체크/해제 — 서버 답을 받고 나서 목록을 다시 받는다
-  Future<void> _toggle(MyTask task) async {
-    if (_busy.contains(task.id)) return;
+  /// 체크 — **되돌릴 수 없어서 한 번 묻는다** (2026-08-20 요청)
+  ///
+  /// 체크하는 순간 그 업무는 수정·삭제가 결재를 타게 된다. 해제하는 길이
+  /// 없으므로 잘못 누르면 되돌릴 방법이 없다.
+  Future<void> _check(MyTask task) async {
+    if (task.checked || _busy.contains(task.id)) return;
+    final ok = await showConfirmDialog(
+      context,
+      title: '완료하시겠어요?',
+      // 결재를 받게 된다는 말은 **처음 체크할 때만** 한다 (2026-08-20 요청).
+      // 이미 한 번 한 업무는 그때부터 줄곧 결재를 타고 있어서, 매일 다시
+      // 알리면 아는 이야기를 반복하는 것이 된다
+      message: task.everChecked
+          ? '한 번 체크하면 되돌릴 수 없어요.'
+          : '한 번 체크하면 되돌릴 수 없어요.\n그 뒤로는 고치거나 지울 때 대표님 승인이 필요해요.',
+      confirmLabel: '완료',
+    );
+    if (!ok || !mounted) return;
     setState(() => _busy.add(task.id));
     try {
-      if (task.checked) {
-        await MyTaskApi.uncheck(task.id);
-      } else {
-        await MyTaskApi.check(task.id);
-      }
+      await MyTaskApi.check(task.id);
       await _load();
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
     }
     if (mounted) setState(() => _busy.remove(task.id));
+  }
+
+  /// 수정·삭제 — **체크한 적이 있으면 결재, 없으면 바로** (2026-08-20 요청)
+  ///
+  /// 아직 아무 기록이 없는 업무는 잘못 적은 것을 고치는 것뿐이라 막을
+  /// 이유가 없다. 한 번이라도 한 업무는 '한 일을 없던 일로 만드는' 길이
+  /// 되므로 그때부터 결재를 받는다 (프로젝트 할 일과 같은 규칙).
+  Future<void> _change(MyTask task, MyTaskRequestType type) {
+    if (task.everChecked) return _request(task, type);
+    return type == MyTaskRequestType.delete ? _removeNow(task) : _editNow(task);
+  }
+
+  /// 결재 없이 바로 고친다 — 사유를 안 묻는다
+  Future<void> _editNow(MyTask task) async {
+    final result = await showAppDialog<_RequestResult>(
+      context,
+      (_) => _RequestCard(
+        task: task,
+        type: MyTaskRequestType.edit,
+        approval: false,
+      ),
+    );
+    if (result == null || !mounted) return;
+    try {
+      await MyTaskApi.update(
+        task.id,
+        content: result.content,
+        weekdays: result.weekdays,
+      );
+      await _load();
+      if (mounted) AppToast.show(context, '업무를 고쳤어요');
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+  }
+
+  /// 결재 없이 바로 지운다 — 되돌릴 수 없어서 한 번 묻는다
+  Future<void> _removeNow(MyTask task) async {
+    final ok = await showConfirmDialog(
+      context,
+      title: '업무를 지울까요?',
+      message: '${task.content}\n아직 한 번도 안 한 업무라 바로 지워져요.',
+      confirmLabel: '삭제',
+      destructive: true,
+    );
+    if (!ok || !mounted) return;
+    try {
+      await MyTaskApi.remove(task.id);
+      await _load();
+      if (mounted) AppToast.show(context, '업무를 지웠어요');
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
   }
 
   Future<void> _request(MyTask task, MyTaskRequestType type) async {
@@ -259,10 +323,9 @@ class _MyTaskSectionState extends State<MyTaskSection>
                 // (`check_my_task` 가 `_today()`), 다른 요일을 보다 누르면
                 // 엉뚱한 날에 찍힌다
                 busy: _busy.contains(day.tasks[i].id) || !_isToday,
-                onToggle: () => _toggle(day.tasks[i]),
-                onEdit: () => _request(day.tasks[i], MyTaskRequestType.edit),
-                onDelete: () =>
-                    _request(day.tasks[i], MyTaskRequestType.delete),
+                onCheck: () => _check(day.tasks[i]),
+                onEdit: () => _change(day.tasks[i], MyTaskRequestType.edit),
+                onDelete: () => _change(day.tasks[i], MyTaskRequestType.delete),
               ),
             ],
         ],
@@ -362,18 +425,21 @@ class _DoneBadge extends StatelessWidget {
 /// **결재를 기다리는 줄은 잠근다.** 대표가 승인하기 전에 또 올리면
 /// 서버가 `ALREADY_PENDING` 으로 막는데, 눌러 놓고 실패 문구를 보는 것보다
 /// 안 눌리는 편이 낫다 (완료된 프로젝트와 같은 방식).
+///
+/// **다 한 줄도 같이 잠근다 (2026-08-20).** 체크는 되돌릴 수 없어서
+/// 누를 자리가 아니다.
 class _TaskRow extends StatelessWidget {
   const _TaskRow({
     required this.task,
     required this.busy,
-    required this.onToggle,
+    required this.onCheck,
     required this.onEdit,
     required this.onDelete,
   });
 
   final MyTask task;
   final bool busy;
-  final VoidCallback onToggle;
+  final VoidCallback onCheck;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -392,13 +458,13 @@ class _TaskRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // 결재를 기다리는 줄은 **누름 효과도 안 준다** — 눌리는 것처럼
-          // 보이는데 아무 일이 없으면 고장으로 읽힌다
-          if (busy || pending != null)
+          // 결재를 기다리는 줄·다 한 줄은 **누름 효과도 안 준다** — 눌리는
+          // 것처럼 보이는데 아무 일이 없으면 고장으로 읽힌다
+          if (checked || busy || pending != null)
             _CheckMark(checked: checked)
           else
             Pressable(
-              onTap: onToggle,
+              onTap: onCheck,
               scale: 0.9,
               child: _CheckMark(checked: checked),
             ),

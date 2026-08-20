@@ -456,10 +456,11 @@ class _PickRow extends StatelessWidget {
   );
 }
 
-/// 수정·삭제 결재 폼이 돌려주는 값
+/// 수정·삭제 폼이 돌려주는 값
 class _RequestResult {
-  const _RequestResult({required this.reason, this.content, this.weekdays});
+  const _RequestResult({this.reason = '', this.content, this.weekdays});
 
+  /// 결재 사유 — **바로 고치는 길에서는 빈 문자열**이다 (안 묻는다)
   final String reason;
 
   /// 고치겠다는 내용 — 삭제면 null
@@ -469,12 +470,22 @@ class _RequestResult {
   final List<int>? weekdays;
 }
 
-/// 수정·삭제 신청 — **대표가 승인해야 실제로 바뀐다**
+/// 업무 수정·삭제 폼 — 결재로 갈 때와 바로 갈 때가 **같은 모양**이다
+///
+/// 아직 한 번도 체크 안 한 업무는 [approval] 이 false 로 온다. 그때는
+/// **사유 칸이 없다** — 결재가 없으니 사유를 읽을 사람도 없다.
 class _RequestCard extends StatefulWidget {
-  const _RequestCard({required this.task, required this.type});
+  const _RequestCard({
+    required this.task,
+    required this.type,
+    this.approval = true,
+  });
 
   final MyTask task;
   final MyTaskRequestType type;
+
+  /// 대표 결재를 타는가 — false 면 누르는 즉시 반영된다
+  final bool approval;
 
   @override
   State<_RequestCard> createState() => _RequestCardState();
@@ -510,7 +521,7 @@ class _RequestCardState extends State<_RequestCard> {
   }
 
   bool get _ready {
-    if (_reason.text.trim().isEmpty) return false;
+    if (widget.approval && _reason.text.trim().isEmpty) return false;
     if (!_isEdit) return true;
     final next = _content.text.trim();
     if (next.isEmpty) return false;
@@ -535,9 +546,9 @@ class _RequestCardState extends State<_RequestCard> {
 
   @override
   Widget build(BuildContext context) => _FormCard(
-    title: _isEdit ? '업무 수정 신청' : '업무 삭제 신청',
-    hint: '대표님이 승인해야 반영돼요.',
-    confirmLabel: '신청',
+    title: widget.approval ? (_isEdit ? '업무 수정 신청' : '업무 삭제 신청') : '업무 수정',
+    hint: widget.approval ? '대표님이 승인해야 반영돼요.' : '아직 한 번도 안 한 업무라 바로 고칠 수 있어요.',
+    confirmLabel: widget.approval ? '신청' : '저장',
     enabled: _ready,
     onConfirm: _submit,
     body: [
@@ -556,8 +567,7 @@ class _RequestCardState extends State<_RequestCard> {
           onChanged: () => setState(() {}),
           note: '고른 요일에만 목록에 떠요',
         ),
-        const SizedBox(height: 14),
-      ] else ...[
+      ] else
         Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -567,16 +577,18 @@ class _RequestCardState extends State<_RequestCard> {
           ),
           child: Text(widget.task.content, style: AppTextStyles.body1),
         ),
+      // 결재로 갈 때만 사유를 묻는다 — 바로 고치는 길에는 읽을 사람이 없다
+      if (widget.approval) ...[
         const SizedBox(height: 14),
+        _Label('사유'),
+        _Field(
+          controller: _reason,
+          autofocus: !_isEdit,
+          hintText: _isEdit ? '예) 이름이 헷갈려요' : '예) 이제 안 하는 일이에요',
+          maxLength: _contentMax,
+          onSubmitted: (_) => _submit(),
+        ),
       ],
-      _Label('사유'),
-      _Field(
-        controller: _reason,
-        autofocus: !_isEdit,
-        hintText: _isEdit ? '예) 이름이 헷갈려요' : '예) 이제 안 하는 일이에요',
-        maxLength: _contentMax,
-        onSubmitted: (_) => _submit(),
-      ),
     ],
   );
 }
