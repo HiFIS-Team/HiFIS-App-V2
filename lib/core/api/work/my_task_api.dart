@@ -128,6 +128,7 @@ class MyTask {
     required this.checked,
     required this.everChecked,
     required this.createdAt,
+    this.carriedFrom,
     this.pendingRequest,
   });
 
@@ -139,6 +140,9 @@ class MyTask {
     sort: json['sort'] as int? ?? 0,
     checked: json['checked'] as bool? ?? false,
     everChecked: json['everChecked'] as bool? ?? false,
+    carriedFrom: json['carriedFrom'] == null
+        ? null
+        : DateTime.parse(json['carriedFrom'] as String),
     createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
     pendingRequest: json['pendingRequest'] == null
         ? null
@@ -171,6 +175,12 @@ class MyTask {
   /// | 아직 한 번도 안 함 | **바로** ([update] · [remove]) |
   /// | 한 번이라도 함 | 대표 결재 ([request]) |
   final bool everChecked;
+
+  /// **밀려 온 것이면 원래 차례였던 날** — null 이면 그날 제 차례다
+  ///
+  /// 그날 못 한 업무는 **다음 근무일**로 밀린다 (2026-08-20 요청).
+  /// 목록 맨 뒤에 붙어 오고, 앱이 구분선 아래에 그린다.
+  final DateTime? carriedFrom;
 
   /// 결재를 기다리는 수정·삭제 — 있으면 그동안 손댈 수 없다
   final MyTaskRequest? pendingRequest;

@@ -316,7 +316,15 @@ class _MyTaskSectionState extends State<MyTaskSection>
             )
           else
             for (var i = 0; i < day.tasks.length; i++) ...[
-              if (i > 0) const SizedBox(height: 8),
+              // 밀려 온 것이 시작되는 자리에 선을 긋는다 — 서버가 제 차례
+              // 것을 앞에, 밀려 온 것을 뒤에 담아 주므로 첫 줄에서만 걸린다
+              if (day.tasks[i].carriedFrom != null &&
+                  (i == 0 || day.tasks[i - 1].carriedFrom == null)) ...[
+                if (i > 0) const SizedBox(height: 14),
+                const _CarriedDivider(),
+                const SizedBox(height: 10),
+              ] else if (i > 0)
+                const SizedBox(height: 8),
               _TaskRow(
                 task: day.tasks[i],
                 // **오늘이 아니면 못 체크한다.** 서버는 체크를 늘 오늘로 찍어서
@@ -390,6 +398,32 @@ class _DayTabs extends StatelessWidget {
       ],
     );
   }
+}
+
+/// 밀려 온 업무가 시작되는 자리의 구분선 (2026-08-20 요청)
+///
+/// 그날 못 한 일은 **다음 근무일**로 밀려서 목록 뒤에 붙는다. 제 차례로
+/// 서 있는 것과 섞이면 오늘 정한 일이 몇 개인지가 안 보인다.
+///
+/// **`누락` 이라고 안 쓴다** — 종일 월차로 옮겨진 것도 여기 서는데,
+/// 그건 안 한 게 아니라 쉰 것이다.
+class _CarriedDivider extends StatelessWidget {
+  const _CarriedDivider();
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Text(
+        '밀린 일',
+        style: AppTextStyles.caption.copyWith(
+          fontWeight: FontWeight.w700,
+          color: AppColors.textTertiary,
+        ),
+      ),
+      const SizedBox(width: 10),
+      Expanded(child: Container(height: 1, color: AppColors.gray100)),
+    ],
+  );
 }
 
 /// 오른쪽 위 진행 표시 — `3/5` · 다 하면 `완료`
