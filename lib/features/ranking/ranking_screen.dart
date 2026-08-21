@@ -26,6 +26,7 @@ import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/glass/glass_menu.dart';
 import '../../core/widgets/feedback/delayed_spinner.dart';
 import '../../core/widgets/feedback/empty_card.dart';
+import '../../core/widgets/feedback/failed_card.dart';
 import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/nav/desktop_header.dart';
@@ -92,21 +93,39 @@ class _RankingScreenState extends State<RankingScreen>
     if (mounted) setState(() {});
   }
 
+  /// 못 받았다 — **판이 비어 있을 때만** 실패 카드를 낸다 (2026-08-21)
+  ///
+  /// 안 두면 못 받은 것이 `집계된 실적이 없어요` 로 떨어져서 **없는 것처럼
+  /// 보인다.** 공지·알림·프로젝트·조직도가 다 실패 카드를 내는데 랭킹만
+  /// 없었다 — 그래서 여기만 따로 노는 것처럼 보였다.
+  ///
+  /// 받아 둔 판이 있으면 그걸 그대로 보여준다 (공지와 같은 규칙).
+  bool _failed = false;
+
   /// 판을 받아온다 — 첫 로딩과 달을 옮길 때는 뼈대가 뜬다 ([SkeletonDelay])
   ///
   /// 안 깔면 그동안 `집계된 실적이 없어요` 가 떠서 **없다고 잘못 알려준다.**
   /// 탭에 다시 들어오는 [onScreenRefresh] 는 [beginLoad] 를 안 불러서
-  /// 옛 판 위에 새 값이 조용히 얹힌다.
+  /// 옛 판 위에 새 값이 조용히 얹힌다 — **전 화면이 같은 규칙이다**
+  /// (`ScreenRefresh` 주석 참고).
   Future<void> _load() async {
     try {
       await _loadRanking(period: _periodKey);
-      if (!mounted) return;
-      setState(endLoad);
+      _failed = false;
     } catch (error) {
-      if (!mounted) return;
-      setState(endLoad);
-      AppToast.show(context, messageOf(error));
+      _failed = true;
+      if (mounted) AppToast.show(context, messageOf(error));
     }
+    if (mounted) setState(endLoad);
+  }
+
+  /// 다시 시도 — **여기서는 뼈대를 바로 띄운다**
+  ///
+  /// 실패 카드를 뼈대가 덮는 것이라 깜빡임이 아니다. 눌렀는데 아무 표시가
+  /// 없으면 고장으로 보인다 (claude.md 의 `_retry()` 예외).
+  void _retry() {
+    setState(beginLoad);
+    _load();
   }
 
   /// 서버에 보낼 달 (`YYYY-MM`)
@@ -382,7 +401,13 @@ class _RankingScreenState extends State<RankingScreen>
             child: showSkeleton
                 ? _RankingSkeleton()
                 : entries.isEmpty
-                ? EmptyCard(icon: CupertinoIcons.rosette, text: '집계된 실적이 없어요')
+                // 못 받은 것과 없는 것을 가른다 — 다른 화면과 같은 규칙이다
+                ? (_failed
+                      ? FailedCard(onRetry: _retry)
+                      : EmptyCard(
+                          icon: CupertinoIcons.rosette,
+                          text: '집계된 실적이 없어요',
+                        ))
                 : Column(children: _body(entries)),
           ),
         ],
@@ -416,7 +441,12 @@ class _RankingScreenState extends State<RankingScreen>
               child: showSkeleton
                   ? _RankingSkeleton()
                   : entries.isEmpty
-                  ? EmptyCard(icon: CupertinoIcons.rosette, text: '집계된 실적이 없어요')
+                  ? (_failed
+                        ? FailedCard(onRetry: _retry)
+                        : EmptyCard(
+                            icon: CupertinoIcons.rosette,
+                            text: '집계된 실적이 없어요',
+                          ))
                   : Column(children: _body(entries)),
             ),
           ],
