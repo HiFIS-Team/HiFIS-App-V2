@@ -299,6 +299,8 @@ class MemberApi {
     int? totalSessions,
     int? pricePaid,
     int? sessionUnitPrice,
+    DateTime? purchasedAt,
+    int? usedSessions,
   }) async {
     final data = await ApiClient.instance.post(
       '/members',
@@ -316,6 +318,9 @@ class MemberApi {
             'totalSessions': totalSessions,
             'pricePaid': pricePaid ?? 0,
             'sessionUnitPrice': sessionUnitPrice ?? 0,
+            // 기존 회원일 때만 채워 보낸다 — 안 보내면 서버가 '지금·0회' 로 둔다
+            'purchasedAt': ?purchasedAt?.toUtc().toIso8601String(),
+            'usedSessions': ?usedSessions,
           },
       },
     );
@@ -343,6 +348,9 @@ class RegistrationApi {
   }
 
   /// 등록권 발급 — 직원은 본인 담당(`trainerId` = 본인)만 만들 수 있다
+  ///
+  /// [purchasedAt]·[usedSessions] 는 **기존 회원의 지난 등록권**을 뒤늦게 넣을 때만
+  /// 준다. 안 주면 서버가 '지금 결제·0회' 로 두어 예전과 똑같다.
   static Future<Registration> create({
     required String memberId,
     required String trainerId,
@@ -350,6 +358,8 @@ class RegistrationApi {
     required int totalSessions,
     required int pricePaid,
     required int sessionUnitPrice,
+    DateTime? purchasedAt,
+    int? usedSessions,
   }) async {
     final data = await ApiClient.instance.post(
       '/registrations',
@@ -360,6 +370,8 @@ class RegistrationApi {
         'totalSessions': totalSessions,
         'pricePaid': pricePaid,
         'sessionUnitPrice': sessionUnitPrice,
+        'purchasedAt': ?purchasedAt?.toUtc().toIso8601String(),
+        'usedSessions': ?usedSessions,
       },
     );
     return Registration.fromJson(data!);

@@ -31,20 +31,48 @@ class _RegisterScreenState extends State<_RegisterScreen> {
   /// 재등록은 처음 올 때 이미 정해진 값이라 다시 안 묻는다.
   VisitPath? _visitPath;
 
+  /// 앱을 켜기 전에 등록했던 사람인가 (2026-08-21)
+  ///
+  /// **이미 세션이 끝났거나 한참 전에 등록한 회원**을 뒤늦게 넣는 자리다.
+  /// 켜면 결제일·이미 받은 회차를 받고, 그 둘이 지난 실적을 오늘 실적에서
+  /// 갈라 준다.
+  ///
+  /// | | 어떻게 되나 |
+  /// |---|---|
+  /// | 매출 랭킹 | 결제일이 지난 달이면 이번 달에 안 잡힌다 |
+  /// | 방문 경로 점수 | 같은 기준으로 안 붙는다 |
+  /// | 급여 커미션 | **원래 영향 없다** — 등록이 아니라 수업할 때마다 붙는다 |
+  ///
+  /// 끄면 아무것도 안 보내서 예전과 똑같이 동작한다.
+  bool _existing = false;
+
+  /// 실제 결제일 — [_existing] 일 때만 쓴다
+  DateTime? _purchasedAt;
+
+  /// 이미 받은 회차 — [_existing] 일 때만 쓴다
+  final _used = TextEditingController();
+
   bool _saving = false;
 
   @override
   void initState() {
     super.initState();
     // 입력에 따라 등록 버튼·회당 단가·검색 결과가 실시간 갱신되도록 한다
-    for (final controller in [_name, _rounds, _payment, _search]) {
+    for (final controller in [_name, _rounds, _payment, _search, _used]) {
       controller.addListener(() => setState(() {}));
     }
   }
 
   @override
   void dispose() {
-    for (final controller in [_name, _phone, _rounds, _payment, _search]) {
+    for (final controller in [
+      _name,
+      _phone,
+      _rounds,
+      _payment,
+      _search,
+      _used,
+    ]) {
       controller.dispose();
     }
     super.dispose();
@@ -52,6 +80,9 @@ class _RegisterScreenState extends State<_RegisterScreen> {
 
   int get _roundCount => int.tryParse(_rounds.text.trim()) ?? 0;
   int get _paymentWon => int.tryParse(_payment.text.trim()) ?? 0;
+
+  /// 이미 받은 회차 — 기존 회원이 아니면 늘 0
+  int get _usedCount => _existing ? (int.tryParse(_used.text.trim()) ?? 0) : 0;
 
   /// 회당 단가 — 결제액 ÷ 회차
   int get _unitPrice => _roundCount > 0 && _paymentWon > 0
@@ -73,7 +104,24 @@ class _RegisterScreenState extends State<_RegisterScreen> {
                 _phone.text.trim().isNotEmpty &&
                 _visitPath != null) &&
       _roundCount > 0 &&
-      _paymentWon > 0;
+      _paymentWon > 0 &&
+      // 기존 회원이면 결제일이 있어야 한다 — 그게 지난 실적을 가르는 값이다
+      (!_existing || (_purchasedAt != null && _usedCount <= _roundCount));
+
+  /// `2025. 3. 14`
+  String _dateLabel(DateTime d) => '${d.year}. ${d.month}. ${d.day}';
+
+  /// 실제 결제일 — **앞날은 못 고른다** (지난 등록을 넣는 자리다)
+  Future<void> _pickPurchasedAt() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _purchasedAt ?? DateTime(now.year, now.month, now.day),
+      firstDate: DateTime(now.year - 10),
+      lastDate: DateTime(now.year, now.month, now.day),
+    );
+    if (picked != null && mounted) setState(() => _purchasedAt = picked);
+  }
 
   Future<void> _pickReferrer() async {
     final picked = await showFullPage<Member>(
@@ -97,6 +145,11 @@ class _RegisterScreenState extends State<_RegisterScreen> {
     }
     if (_roundCount <= 0) return '회차를 입력해주세요';
     if (_paymentWon <= 0) return '결제액을 입력해주세요';
+    if (_existing) {
+      if (_purchasedAt == null) return '실제 결제일을 골라주세요';
+      // 서버도 `USED_OVER_TOTAL` 로 막지만 그러면 등록을 누른 뒤에야 안다
+      if (_usedCount > _roundCount) return '이미 받은 회차가 총 회차보다 많아요';
+    }
     return null;
   }
 
@@ -128,6 +181,9 @@ class _RegisterScreenState extends State<_RegisterScreen> {
           totalSessions: _roundCount,
           pricePaid: _paymentWon,
           sessionUnitPrice: _unitPrice,
+          // 기존 회원일 때만 보낸다 — 안 보내면 서버가 '지금·0회' 로 둔다
+          purchasedAt: _existing ? _purchasedAt : null,
+          usedSessions: _existing ? _usedCount : null,
         );
         if (!mounted) return;
         AppToast.show(context, '${member.name}님이 재등록되었습니다');
@@ -146,6 +202,8 @@ class _RegisterScreenState extends State<_RegisterScreen> {
           totalSessions: _roundCount,
           pricePaid: _paymentWon,
           sessionUnitPrice: _unitPrice,
+          purchasedAt: _existing ? _purchasedAt : null,
+          usedSessions: _existing ? _usedCount : null,
         );
         if (!mounted) return;
         AppToast.show(context, '$name님이 등록되었습니다');
@@ -373,6 +431,35 @@ class _RegisterScreenState extends State<_RegisterScreen> {
                           ],
                         ),
                       ),
+                      SizedBox(height: 20),
+                      _ExistingToggle(
+                        on: _existing,
+                        onChanged: (v) => setState(() {
+                          _existing = v;
+                          // 끄면 값을 버린다 — 남겨 두면 다시 켰을 때
+                          // 앞서 고른 남의 날짜가 그대로 서 있다
+                          if (!v) {
+                            _purchasedAt = null;
+                            _used.clear();
+                          }
+                        }),
+                      ),
+                      if (_existing) ...[
+                        SizedBox(height: 10),
+                        _PickerField(
+                          label: '실제 결제일',
+                          value: _purchasedAt == null
+                              ? null
+                              : _dateLabel(_purchasedAt!),
+                          onTap: _pickPurchasedAt,
+                        ),
+                        SizedBox(height: 8),
+                        _FormField(
+                          controller: _used,
+                          hint: '이미 받은 회차 (예: 5)',
+                          keyboardType: TextInputType.number,
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -668,6 +755,64 @@ class _FormField extends StatelessWidget {
 ///
 /// [onPick] 이 없으면 **눌리지 않는다** — 재등록 탭에서 높이만 맞추려고
 /// 투명하게 깔 때 쓴다.
+/// 기존 회원 스위치 — 켜면 결제일·이미 받은 회차 칸이 나온다
+///
+/// **꺼져 있을 때는 이 줄 하나뿐이라** 평소 등록하는 화면이 거의 그대로다.
+/// 매일 쓰는 자리에 안 쓰는 칸이 늘 서 있으면 그만큼 느려진다.
+///
+/// 모양은 일정 폼의 `종일` 알약과 같은 결이다 (켜면 `primaryLight` 바탕).
+class _ExistingToggle extends StatelessWidget {
+  _ExistingToggle({required this.on, required this.onChanged});
+
+  final bool on;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: () => onChanged(!on),
+      scale: 0.99,
+      child: AnimatedContainer(
+        duration: Duration(milliseconds: 140),
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: on ? AppColors.primaryLight : AppColors.gray50,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '기존 회원',
+                    style: AppTextStyles.body1.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: on ? AppColors.primary : AppColors.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    '앱 쓰기 전에 등록한 분 · 매출에 안 잡혀요',
+                    style: AppTextStyles.caption.copyWith(fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(width: 12),
+            Icon(
+              on ? CupertinoIcons.checkmark_circle_fill : CupertinoIcons.circle,
+              size: 22,
+              color: on ? AppColors.primary : AppColors.gray300,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _VisitPathPicker extends StatelessWidget {
   _VisitPathPicker({required this.value, this.onPick});
 
