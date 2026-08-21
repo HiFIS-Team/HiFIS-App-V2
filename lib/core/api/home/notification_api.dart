@@ -17,6 +17,12 @@ enum NotificationKind {
   // 아래 둘은 **대표·관리자만** 받는다 (회의록 작성 · 직원 가입·퇴사)
   meeting('MEETING'),
   staff('STAFF'),
+
+  /// 개인 업무를 남기고 퇴근했다 — **이것만 빨갛게 뜬다** (2026-08-21)
+  ///
+  /// 서버가 `MY_TASK` 에서 갈라 보낸다. 같은 `MY_TASK` 에 수정·삭제 결재와
+  /// **승인 알림**이 같이 섞여 있어서, 종류째 빨갛게 하면 승인도 경고로 보인다.
+  myTaskMissing('MY_TASK_MISSING'),
   other('');
 
   const NotificationKind(this.wire);

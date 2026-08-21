@@ -53,7 +53,10 @@ enum InboxKind {
   approval('APPROVAL'),
   event('EVENT'),
   myTask('MY_TASK'),
-  project('PROJECT');
+  project('PROJECT'),
+
+  /// 개인 업무 **누락 사유서** — 주소가 달라서 [myTask] 와 따로다 (2026-08-21)
+  taskMiss('TASK_MISS');
 
   const InboxKind(this.wire);
 

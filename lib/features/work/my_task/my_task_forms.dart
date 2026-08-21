@@ -470,6 +470,101 @@ class _RequestResult {
   final List<int>? weekdays;
 }
 
+/// 누락 사유서 폼 (2026-08-21)
+///
+/// 수정·삭제 신청과 **같은 모양**이다 — 같은 자리에서 올리는 문서라
+/// 생김새가 갈리면 안 된다.
+///
+/// **반려된 것은 다시 낼 수 있다.** 그때는 반려 사유를 위에 보여준다 —
+/// 무엇을 고쳐 적어야 하는지 모르면 같은 것을 또 내게 된다.
+class _ExcuseCard extends StatefulWidget {
+  const _ExcuseCard({required this.miss});
+
+  final MyTaskMiss miss;
+
+  @override
+  State<_ExcuseCard> createState() => _ExcuseCardState();
+}
+
+class _ExcuseCardState extends State<_ExcuseCard> {
+  final _reason = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _reason.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final text = _reason.text.trim();
+    if (text.isEmpty) return;
+    Navigator.pop(context, text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final miss = widget.miss;
+    return _FormCard(
+      title: '누락 사유서',
+      hint: '대표님이 승인하면 깎인 점수가 되돌아와요.',
+      confirmLabel: '제출',
+      enabled: _reason.text.trim().isNotEmpty,
+      onConfirm: _submit,
+      body: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: AppColors.gray50,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${miss.date.month}월 ${miss.date.day}일',
+                style: AppTextStyles.body1,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                miss.contents.join(' · '),
+                style: AppTextStyles.caption.copyWith(height: 1.5),
+              ),
+            ],
+          ),
+        ),
+        // 반려됐던 것이면 왜 반려됐는지 — 안 보여주면 같은 것을 또 낸다
+        if (miss.rejectReason != null && miss.rejectReason!.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          _Label('반려 사유'),
+          Text(
+            miss.rejectReason!,
+            style: AppTextStyles.body2.copyWith(
+              color: AppColors.error,
+              height: 1.5,
+            ),
+          ),
+        ],
+        const SizedBox(height: 14),
+        _Label('사유'),
+        _Field(
+          controller: _reason,
+          autofocus: true,
+          hintText: '예) 그날 정전으로 세탁기를 못 돌렸어요',
+          maxLength: _contentMax,
+          onSubmitted: (_) => _submit(),
+        ),
+      ],
+    );
+  }
+}
+
 /// 업무 수정·삭제 폼 — 결재로 갈 때와 바로 갈 때가 **같은 모양**이다
 ///
 /// 아직 한 번도 체크 안 한 업무는 [approval] 이 false 로 온다. 그때는

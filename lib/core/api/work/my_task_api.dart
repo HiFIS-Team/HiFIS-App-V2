@@ -31,6 +31,12 @@ enum MyTaskRequestStatus {
         (s) => s.wire == value,
         orElse: () => MyTaskRequestStatus.pending,
       );
+
+  /// 누락 사유서는 **안 낸 상태(null)가 따로 있다** — [parse] 처럼 대기로
+  /// 떨구면 안 낸 것이 낸 것으로 보인다
+  static MyTaskRequestStatus? parseOrNull(String? value) => value == null
+      ? null
+      : MyTaskRequestStatus.values.where((s) => s.wire == value).firstOrNull;
 }
 
 /// 내 업무 수정·삭제 결재 (서버 `MyTaskRequestOut`)
@@ -221,6 +227,74 @@ class MyTaskDay {
   bool get missing => total > 0 && done < total;
 }
 
+/// **확정 누락** 한 줄 (서버 `MyTaskMissOut`)
+///
+/// 퇴근할 때 오는 빨간 알림은 아직 누락이 아니다. 그날 못 한 일은 다음
+/// 근무일에 한 번 더 서고, **그 날까지도 안 하면** 확정되어 -20점이 깎인다.
+/// 사유서를 내서 승인받으면 되돌아온다.
+class MyTaskMiss {
+  MyTaskMiss({
+    required this.id,
+    required this.employeeId,
+    required this.date,
+    required this.taskCount,
+    required this.contents,
+    this.excuseReason,
+    this.excuseStatus,
+    this.rejectReason,
+    this.decidedAt,
+    this.employeeName,
+  });
+
+  factory MyTaskMiss.fromJson(Map<String, dynamic> json) => MyTaskMiss(
+    id: json['id'] as String,
+    employeeId: json['employeeId'] as String,
+    date: DateTime.parse(json['date'] as String),
+    taskCount: json['taskCount'] as int? ?? 0,
+    contents: [
+      for (final c in (json['contents'] as List? ?? const [])) c.toString(),
+    ],
+    excuseReason: json['excuseReason'] as String?,
+    excuseStatus: MyTaskRequestStatus.parseOrNull(
+      json['excuseStatus'] as String?,
+    ),
+    rejectReason: json['rejectReason'] as String?,
+    decidedAt: switch (json['decidedAt']) {
+      final String s => DateTime.parse(s).toLocal(),
+      _ => null,
+    },
+    employeeName: json['employeeName'] as String?,
+  );
+
+  final String id;
+  final String employeeId;
+
+  /// **누락한 날** — 밀려 온 날이 아니라 원래 차례였던 날
+  final DateTime date;
+  final int taskCount;
+
+  /// 그날 못 한 업무 이름들 — 업무를 나중에 고쳐도 그때 것이 남는다
+  final List<String> contents;
+
+  /// 사유서 내용 — null 이면 아직 안 냈다
+  final String? excuseReason;
+
+  /// null 안 냄 · 대기 · **승인이면 회복** · 반려면 그대로
+  final MyTaskRequestStatus? excuseStatus;
+  final String? rejectReason;
+  final DateTime? decidedAt;
+
+  /// 결재 화면이 '누가' 를 그릴 수 있게 서버가 채워 준다
+  final String? employeeName;
+
+  /// 사유가 승인돼 없던 일이 됐나
+  bool get excused => excuseStatus == MyTaskRequestStatus.approved;
+
+  /// 사유서를 낼 수 있나 — 대기 중이거나 이미 회복된 것은 못 낸다
+  bool get canExcuse =>
+      excuseStatus == null || excuseStatus == MyTaskRequestStatus.rejected;
+}
+
 /// 대표·관리자가 보는 사람 한 줄 (서버 `MyTaskRosterRow`)
 class MyTaskRosterRow {
   MyTaskRosterRow({
@@ -381,5 +455,46 @@ class MyTaskApi {
       query: {'reason': reason},
     );
     return MyTaskRequest.fromJson(data!);
+  }
+
+  // ── 확정 누락 · 사유서 (2026-08-21) ──
+
+  /// 확정 누락 목록 — **MEMBER 는 본인 것만** (남의 id 를 넣어도 본인 것이 온다).
+  /// 점장은 자기 지점, 대표·관리자는 전원.
+  static Future<List<MyTaskMiss>> misses({
+    String? employeeId,
+    String? since,
+  }) async {
+    final rows = await _client.getList(
+      '/my-task-misses',
+      query: {'employeeId': ?employeeId, 'since': ?since},
+    );
+    return [
+      for (final row in rows)
+        MyTaskMiss.fromJson((row as Map).cast<String, dynamic>()),
+    ];
+  }
+
+  /// 누락 사유서 제출 — 본인만. **반려된 것은 다시 낼 수 있다.**
+  static Future<MyTaskMiss> excuse(String missId, String reason) async {
+    final data = await _client.post(
+      '/my-task-misses/$missId/excuse',
+      body: {'reason': reason},
+    );
+    return MyTaskMiss.fromJson(data!);
+  }
+
+  /// 사유 승인 — **깎였던 점수가 되돌아온다** (대표만)
+  static Future<MyTaskMiss> approveMiss(String missId) async {
+    final data = await _client.post('/my-task-misses/$missId/approve');
+    return MyTaskMiss.fromJson(data!);
+  }
+
+  static Future<MyTaskMiss> rejectMiss(String missId, String reason) async {
+    final data = await _client.post(
+      '/my-task-misses/$missId/reject',
+      query: {'reason': reason},
+    );
+    return MyTaskMiss.fromJson(data!);
   }
 }

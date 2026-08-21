@@ -384,10 +384,15 @@ IconData _iconOf(NotificationKind kind) => switch (kind) {
   NotificationKind.ranking => Icons.emoji_events_rounded,
   NotificationKind.meeting => Icons.event_note_rounded,
   NotificationKind.staff => Icons.badge_rounded,
+  // 누락은 종이 아니라 경고 삼각형이다 — 색만 바꾸면 목록에서 종이 빨간 것으로만 보인다
+  NotificationKind.myTaskMissing => Icons.warning_amber_rounded,
   NotificationKind.other => Icons.notifications_rounded,
 };
 
 /// 종류별 색 — 무채색 원칙을 지키려고 토큰 셋(파랑·주황·초록)만 돌려 쓴다
+///
+/// **빨강은 개인 업무 누락 하나뿐이다** (2026-08-21). 경고를 여기저기 쓰면
+/// 정작 봐야 할 줄이 안 튄다 — 목록에서 빨간 줄은 이것만이어야 한다.
 Color _colorOf(NotificationKind kind) => switch (kind) {
   NotificationKind.attendance ||
   NotificationKind.notice ||
@@ -399,6 +404,7 @@ Color _colorOf(NotificationKind kind) => switch (kind) {
   NotificationKind.project ||
   NotificationKind.ranking => AppColors.warning,
   NotificationKind.approval || NotificationKind.payroll => AppColors.success,
+  NotificationKind.myTaskMissing => AppColors.error,
   NotificationKind.other => AppColors.gray400,
 };
 

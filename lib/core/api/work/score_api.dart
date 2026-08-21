@@ -16,7 +16,9 @@ enum ScoreCategory {
   operator('OPERATOR', '운영자 부여'),
   // 지각 차감 — **늘 음수다.** 출근 스캔이 자동으로 넣는다.
   // 안 적어 두면 `parse` 가 운영자 부여로 떨어져 라벨이 틀리게 뜬다.
-  late('LATE', '지각');
+  late('LATE', '지각'),
+  // 개인 업무 누락 차감 — 늘 음수다. 다음 근무일까지 안 하면 잡이 넣는다.
+  taskMiss('TASK_MISS', '업무 누락');
 
   const ScoreCategory(this.wire, this.label);
 

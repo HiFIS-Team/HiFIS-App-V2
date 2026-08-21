@@ -106,6 +106,12 @@ class _MyTaskSectionState extends State<MyTaskSection>
   /// 서버에 보내는 중인 줄 — 답이 오기 전에 또 누르면 두 번 나간다
   final _busy = <String>{};
 
+  /// **아직 안 풀린 확정 누락** — 사유가 승인된 것은 빼고 온다
+  ///
+  /// 비어 있으면 아래 카드를 아예 안 그린다. 누락이 없는 사람의 화면은
+  /// 예전과 똑같아야 한다.
+  List<MyTaskMiss> _misses = const [];
+
   /// 보고 있는 요일 (ISO 1=월 … 7=일) — **기본은 오늘**
   ///
   /// 업무마다 도는 요일이 달라져서(2026-08-20), 오늘 것만 보면 **다른 요일에
@@ -142,11 +148,24 @@ class _MyTaskSectionState extends State<MyTaskSection>
 
   Future<void> _load() async {
     try {
-      final day = await MyTaskApi.day(
-        // 오늘은 날짜를 안 넘긴다 — 서버가 오늘로 본다 (자정을 넘겨도 맞다)
-        date: _isToday ? null : dateKey(_viewDate),
-      );
+      // 둘을 같이 받는다 — 차례로 부르면 목록이 뜬 뒤 누락 카드가 뒤늦게
+      // 끼어들면서 화면이 한 번 밀린다
+      final (day, misses) = await (
+        MyTaskApi.day(
+          // 오늘은 날짜를 안 넘긴다 — 서버가 오늘로 본다 (자정을 넘겨도 맞다)
+          date: _isToday ? null : dateKey(_viewDate),
+        ),
+        // **내 것만** — 점장에게는 서버가 지점 전체를 준다. 안 걸러 주면
+        // 자기 카드에 남의 누락이 서고, 눌러도 남의 것이라 404 가 난다
+        MyTaskApi.misses(employeeId: currentUser?.id),
+      ).wait;
       if (!mounted) return;
+      // 회복된 것은 안 보여준다 — 이미 없던 일이 되어 점수도 돌아왔다.
+      // 남겨 두면 다 푼 사람의 화면에 빨간 카드가 영영 남는다
+      _misses = [
+        for (final m in misses)
+          if (!m.excused) m,
+      ];
       // **옛 목록을 안 지운다** — 지우면 그 사이가 빈 화면이라 깜빡인다.
       // 캐시는 오늘 것만 — 다른 요일을 보다 나갔다 오면 오늘로 돌아온다
       if (_isToday) _cached = day;
@@ -273,12 +292,42 @@ class _MyTaskSectionState extends State<MyTaskSection>
     }
   }
 
+  /// 누락 사유서를 올린다 — **반려된 것은 다시 낼 수 있다**
+  Future<void> _excuse(MyTaskMiss miss) async {
+    if (!miss.canExcuse) return;
+    final reason = await showAppDialog<String>(
+      context,
+      (_) => _ExcuseCard(miss: miss),
+    );
+    if (reason == null || !mounted) return;
+    try {
+      await MyTaskApi.excuse(miss.id, reason);
+      await _load();
+      if (mounted) AppToast.show(context, '사유서를 올렸어요');
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (showSkeleton) return const _MyTaskSkeleton();
     final day = _day;
     if (day == null) return const SizedBox();
 
+    // 누락이 없으면 카드가 통째로 안 뜬다 — 그때 화면은 예전 그대로다
+    if (_misses.isEmpty) return _card(day);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _card(day),
+        const SizedBox(height: 16),
+        _MissCard(misses: _misses, onExcuse: _excuse),
+      ],
+    );
+  }
+
+  Widget _card(MyTaskDay day) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -336,6 +385,114 @@ class _MyTaskSectionState extends State<MyTaskSection>
                 onDelete: () => _change(day.tasks[i], MyTaskRequestType.delete),
               ),
             ],
+        ],
+      ),
+    );
+  }
+}
+
+/// 확정 누락 카드 — **누락이 있을 때만 뜬다** (2026-08-21)
+///
+/// 퇴근할 때 오는 알림은 아직 기회가 남은 상태고, 여기 서는 것은 다음
+/// 근무일까지도 안 해서 이미 점수가 깎인 날이다. 사유서를 내서 승인받으면
+/// 이 줄이 사라지고 점수도 돌아온다.
+class _MissCard extends StatelessWidget {
+  const _MissCard({required this.misses, required this.onExcuse});
+
+  final List<MyTaskMiss> misses;
+  final ValueChanged<MyTaskMiss> onExcuse;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(20),
+    decoration: AppDecorations.card(),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Row(
+            children: [
+              Icon(
+                Icons.warning_amber_rounded,
+                size: 18,
+                color: AppColors.error,
+              ),
+              const SizedBox(width: 6),
+              Text('누락된 날', style: AppTextStyles.label),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        for (var i = 0; i < misses.length; i++) ...[
+          if (i > 0) const SizedBox(height: 8),
+          _MissRow(miss: misses[i], onTap: () => onExcuse(misses[i])),
+        ],
+      ],
+    ),
+  );
+}
+
+class _MissRow extends StatelessWidget {
+  const _MissRow({required this.miss, required this.onTap});
+
+  final MyTaskMiss miss;
+  final VoidCallback onTap;
+
+  /// 지금 어느 칸에 있나 — 사유서를 낼 수 있을 때만 누를 수 있다
+  (String, Color) get _state => switch (miss.excuseStatus) {
+    null => ('사유서', AppColors.error),
+    MyTaskRequestStatus.pending => ('결재 대기', AppColors.gray400),
+    MyTaskRequestStatus.rejected => ('반려 · 다시', AppColors.error),
+    MyTaskRequestStatus.approved => ('회복', AppColors.success),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, color) = _state;
+    final row = _row(label, color);
+    // 결재를 기다리는 줄은 **누름 효과도 안 준다** — 눌리는 것처럼 보이는데
+    // 아무 일이 없으면 고장으로 읽힌다 (완료된 프로젝트를 잠글 때와 같다)
+    if (!miss.canExcuse) return row;
+    return Pressable(onTap: onTap, scale: 0.98, child: row);
+  }
+
+  Widget _row(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.gray50,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${miss.date.month}월 ${miss.date.day}일',
+                  style: AppTextStyles.body1,
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  miss.contents.join(' · '),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.caption,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            label,
+            style: AppTextStyles.caption.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
