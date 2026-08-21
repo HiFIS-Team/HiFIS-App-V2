@@ -279,8 +279,24 @@ class _LogRow extends StatelessWidget {
     return '$period $hour:$minute';
   }
 
+  /// 남긴 사진이 있는지 — 현수막·족자만 채워진다 ([_photoRequiredItems])
+  bool get _hasPhoto => (log.photoUrl ?? '').isNotEmpty;
+
   @override
   Widget build(BuildContext context) {
+    final row = _row();
+    // **줄 모양은 그대로 둔다.** 사진이 있는 줄만 눌리게 하고, 없는 줄은
+    // 예전처럼 아무 반응이 없다 — 아이콘·썸네일을 붙이면 사진이 있는 줄과
+    // 없는 줄이 다르게 생겨서 목록이 들쭉날쭉해진다.
+    if (!_hasPhoto) return row;
+    return Pressable(
+      onTap: () => showAppDialog<void>(context, (_) => _PhotoLogCard(log: log)),
+      scale: 0.99,
+      child: row,
+    );
+  }
+
+  Widget _row() {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 13),
       child: Row(

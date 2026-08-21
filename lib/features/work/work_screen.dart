@@ -18,6 +18,7 @@ import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/layout.dart';
 import '../../core/util/photo.dart';
+import '../../core/util/photo_cache.dart';
 import '../../core/util/platform.dart';
 import '../../core/util/sf_symbols.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
@@ -726,7 +727,7 @@ class _WriteInCardState extends State<_WriteInCard> {
 ///
 /// 여기서 안 막아도 서버가 400 으로 되돌려 보내지만, 그러면 사용자는 누른 뒤에야
 /// 알게 된다. 한쪽만 늘리면 그 항목이 눌러도 안 되는 칩이 되므로 같이 고친다.
-const _photoRequiredItems = {'현수막'};
+const _photoRequiredItems = {'현수막', '족자'};
 
 bool _needsPhoto(EnvItem item) => _photoRequiredItems
     .map(_WorkScreenState._envKey)
@@ -906,6 +907,115 @@ class _PhotoProofCardState extends State<_PhotoProofCard> {
                 ],
               )
             : Image.file(File(_path!), fit: BoxFit.cover),
+      ),
+    );
+  }
+}
+
+/// 남긴 사진을 보는 창 — 내역 줄을 누르면 뜬다
+///
+/// **한 장짜리라 사내톡 뷰어를 안 쓴다.** 그쪽(`chat_photo_viewer.dart`)은 여러 장을
+/// 좌우로 넘기는 갤러리인 데다 `part of 'chat_screen.dart'` 라 밖에서 못 부른다 —
+/// 꺼내려면 사내톡을 건드려야 해서 그러지 않았다.
+///
+/// 모양은 [_PhotoProofCard] 를 그대로 따라간다 (같은 폭·여백·라운드). 사진을
+/// 남기는 창과 보는 창이 다르게 생기면 같은 것을 다루는 자리로 안 읽힌다.
+class _PhotoLogCard extends StatefulWidget {
+  _PhotoLogCard({required this.log});
+
+  final EnvTaskLog log;
+
+  @override
+  State<_PhotoLogCard> createState() => _PhotoLogCardState();
+}
+
+class _PhotoLogCardState extends State<_PhotoLogCard> {
+  File? _file;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final url = widget.log.photoUrl;
+    if (url == null || url.isEmpty) {
+      _failed = true;
+      return;
+    }
+    // 한 번 받은 사진은 [PhotoCache] 가 들고 있어서 다음부터 바로 뜬다
+    // (아바타·사내톡 사진과 같은 길이다)
+    _file = PhotoCache.ready(url);
+    if (_file != null) return;
+    PhotoCache.fetch(url).then((file) {
+      if (!mounted) return;
+      setState(() {
+        _file = file;
+        _failed = file == null;
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final log = widget.log;
+    final place = log.place;
+    return Container(
+      width: dialogWidth(context, 320),
+      padding: EdgeInsets.fromLTRB(24, 24, 24, 20),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(log.itemName, style: AppTextStyles.title3),
+          SizedBox(height: 6),
+          Text(
+            '${_LogRow.formatTime(log.createdAt)} · ${_logAuthor(log)}',
+            style: AppTextStyles.caption.copyWith(height: 1.5),
+          ),
+          SizedBox(height: 14),
+          // 남길 때 쓰는 자리와 높이를 맞춘다 — 두 창이 같은 크기로 보여야 한다
+          Container(
+            height: 132,
+            width: double.infinity,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: AppColors.gray50,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: _file != null
+                ? Image.file(_file!, fit: BoxFit.cover)
+                : Center(
+                    child: _failed
+                        ? Icon(
+                            CupertinoIcons.photo,
+                            size: 22,
+                            color: AppColors.gray400,
+                          )
+                        : SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                  ),
+          ),
+          if (place != null && place.isNotEmpty) ...[
+            SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.gray50,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(place, style: AppTextStyles.body1),
+            ),
+          ],
+          SizedBox(height: 12),
+          AppButton(label: '닫기', onTap: () => Navigator.pop(context)),
+        ],
       ),
     );
   }
