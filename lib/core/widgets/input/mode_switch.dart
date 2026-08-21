@@ -15,9 +15,11 @@ const slideCurve = Curves.easeOutCubic;
 const _segmentPadding = 18.0;
 
 /// 목록바 글자 — **고른 칸은 굵어진다.** 폭을 잴 때도 이 스타일을 쓴다
-TextStyle segmentTextStyle({required bool selected}) =>
+///
+/// [dense] 는 카드 안이나 좁은 판에 들어가는 바다 (한 칸 작은 글자).
+TextStyle segmentTextStyle({required bool selected, bool dense = false}) =>
     AppTextStyles.body2.copyWith(
-      fontSize: 14,
+      fontSize: dense ? 13 : 14,
       color: selected ? AppColors.primary : AppColors.gray600,
       fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
     );
@@ -27,11 +29,16 @@ TextStyle segmentTextStyle({required bool selected}) =>
 /// 알약을 옮기려면 어느 칸이 어디서 시작해 얼마나 넓은지를 그리기 전에
 /// 알아야 한다. 다 그린 뒤에 재면(`GlobalKey`) 첫 프레임에 알약이 엉뚱한
 /// 자리에 있다가 튄다.
-double measureLabel(BuildContext context, String label, {required bool bold}) {
+double measureLabel(
+  BuildContext context,
+  String label, {
+  required bool bold,
+  bool dense = false,
+}) {
   final painter = TextPainter(
     text: TextSpan(
       text: label,
-      style: segmentTextStyle(selected: bold),
+      style: segmentTextStyle(selected: bold, dense: dense),
     ),
     textDirection: TextDirection.ltr,
     maxLines: 1,
@@ -50,8 +57,9 @@ List<double> _segmentWidths(
   BuildContext context,
   List<String> labels,
   bool expand,
-  double maxWidth,
-) {
+  double maxWidth, {
+  bool dense = false,
+}) {
   if (expand) {
     // 균등하게 나눈다 — 마지막 칸이 반올림으로 삐져나오지 않게 남는 폭을 준다
     final each = maxWidth / labels.length;
@@ -62,7 +70,8 @@ List<double> _segmentWidths(
   }
   return [
     for (final label in labels)
-      measureLabel(context, label, bold: true) + _segmentPadding * 2,
+      measureLabel(context, label, bold: true, dense: dense) +
+          _segmentPadding * 2,
   ];
 }
 
@@ -128,11 +137,19 @@ class SegmentedTabs extends StatefulWidget {
     required this.selected,
     required this.onSelect,
     this.expand = true,
+    this.height = 48,
+    this.dense = false,
   });
 
   final List<String> labels;
   final int selected;
   final ValueChanged<int> onSelect;
+
+  /// 바 높이 — 화면 폭을 채우는 자리는 48, 카드·좁은 판 안은 44
+  final double height;
+
+  /// 글자를 한 칸 작게 (13) — 카드 안에 들어가는 바다
+  final bool dense;
 
   /// 칸을 균등하게 나눌지 — false 면 글자 폭만큼만 차지한다
   ///
@@ -151,7 +168,7 @@ class _SegmentedTabsState extends State<SegmentedTabs> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 48,
+      height: widget.height,
       padding: EdgeInsets.all(4),
       decoration: segmentTrack(),
       child: LayoutBuilder(
@@ -161,6 +178,7 @@ class _SegmentedTabsState extends State<SegmentedTabs> {
             widget.labels,
             widget.expand,
             box.maxWidth,
+            dense: widget.dense,
           );
           final index = widget.selected.clamp(0, widget.labels.length - 1);
           var left = 0.0;
@@ -206,6 +224,7 @@ class _SegmentedTabsState extends State<SegmentedTabs> {
       label: widget.labels[index],
       selected: index == widget.selected,
       hovered: index == _hover,
+      dense: widget.dense,
       onTap: () => widget.onSelect(index),
       onHover: (over) => setState(() {
         if (over) {
@@ -309,6 +328,7 @@ class _Segment extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.hovered,
+    required this.dense,
     required this.onTap,
     required this.onHover,
   });
@@ -316,6 +336,7 @@ class _Segment extends StatelessWidget {
   final String label;
   final bool selected;
   final bool hovered;
+  final bool dense;
   final VoidCallback onTap;
   final ValueChanged<bool> onHover;
 
@@ -327,7 +348,7 @@ class _Segment extends StatelessWidget {
       child: Text(
         label,
         maxLines: 1,
-        style: segmentTextStyle(selected: selected),
+        style: segmentTextStyle(selected: selected, dense: dense),
       ),
     );
 

@@ -409,7 +409,11 @@ class _InboxCardState extends State<_InboxCard> with SkeletonDelay<_InboxCard> {
 ///
 /// **전자결재 폰 목록바(`_StateTabs`)와 같은 토큰**을 쓴다. 같은 결재를
 /// 다루는 두 화면이라 결이 다르면 바로 눈에 띈다.
-/// 공용 [SegmentedTabs] 는 높이가 48 이고 고른 칸 글자가 파랑이라 안 쓴다.
+///
+/// 예전에는 "공용 [SegmentedTabs] 는 높이가 48 이고 고른 칸 글자가 파랑이라
+/// 안 쓴다"고 적혀 있었다. **지금은 둘 다 맞출 수 있다** — 높이(`height`)와
+/// 작은 글자(`dense`)를 넘기면 되고, 공용 쪽도 고른 칸 글자가 파랑이라
+/// 애초에 갈릴 이유가 없었다.
 class _InboxTabs extends StatelessWidget {
   _InboxTabs({required this.selected, required this.onSelect});
 
@@ -418,38 +422,14 @@ class _InboxTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    // 프로젝트·동료평가 목록바와 **같은 것**을 쓴다 (2026-08-21) — 예전에는
+    // 셋이 같은 모양을 각자 그려서 고칠 때 한 곳씩 빠졌다
+    return SegmentedTabs(
+      labels: [for (final status in InboxStatus.values) status.label],
+      selected: InboxStatus.values.indexOf(selected),
+      onSelect: (i) => onSelect(InboxStatus.values[i]),
       height: 44,
-      padding: EdgeInsets.all(4),
-      decoration: segmentTrack(),
-      child: Row(
-        children: [
-          for (final status in InboxStatus.values)
-            Expanded(
-              child: Pressable(
-                onTap: () => onSelect(status),
-                // 배경은 애니메이션 없이 즉시 바꾼다
-                child: Container(
-                  decoration: segmentFill(selected: status == selected),
-                  child: Center(
-                    child: Text(
-                      status.label,
-                      style: AppTextStyles.body2.copyWith(
-                        fontSize: 13,
-                        color: status == selected
-                            ? AppColors.primary
-                            : AppColors.gray600,
-                        fontWeight: status == selected
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
+      dense: true,
     );
   }
 }

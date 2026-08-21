@@ -173,7 +173,9 @@ class _RankChips extends StatelessWidget {
     // 폭이 넉넉하면 지금과 똑같이 한 줄로 보이고, 좁을 때만 밀어서 본다.
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      // 칩이 눌릴 때 살짝 커지는데(Pressable) 잘리지 않게 위아래를 조금 띄운다
+      // 위아래를 조금 띄운다 — 칩 테두리가 스크롤 칸에 딱 붙지 않게.
+      // (예전에는 누를 때 칩이 커져서 띄웠는데, 눌림 효과는 2026-08-21 에
+      // 걷어냈다. 여백은 그대로 두는 것이 보기 낫다)
       padding: EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [

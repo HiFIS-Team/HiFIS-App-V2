@@ -381,39 +381,14 @@ class _PhaseTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    // **공용 목록바를 쓴다** (2026-08-21). 예전에는 같은 모양을 여기·결재함·
+    // 동료평가가 각자 그렸고, 알약이 미끄러지게 고칠 때 한 곳씩 빠뜨렸다.
+    return SegmentedTabs(
+      labels: [for (final phase in _Phase.values) phase.label],
+      selected: _Phase.values.indexOf(selected),
+      onSelect: (i) => onSelect(_Phase.values[i]),
       height: 44,
-      padding: EdgeInsets.all(4),
-      decoration: segmentTrack(),
-      child: Row(
-        children: [
-          for (final phase in _Phase.values)
-            Expanded(
-              child: Pressable(
-                onTap: () => onSelect(phase),
-                // 배경은 애니메이션 없이 즉시 바꾼다 (페이드가 있으면 두 칸이
-                // 같이 눌린 것처럼 보인다)
-                child: Container(
-                  decoration: segmentFill(selected: phase == selected),
-                  child: Center(
-                    child: Text(
-                      phase.label,
-                      style: AppTextStyles.body2.copyWith(
-                        fontSize: 13,
-                        color: phase == selected
-                            ? AppColors.primary
-                            : AppColors.gray600,
-                        fontWeight: phase == selected
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
+      dense: true,
     );
   }
 }

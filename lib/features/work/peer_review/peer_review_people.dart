@@ -83,39 +83,14 @@ class _FilterTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    // 프로젝트·결재함 목록바와 **같은 것**을 쓴다 (2026-08-21) — 예전에는
+    // 셋이 같은 모양을 각자 그려서 고칠 때 한 곳씩 빠졌다
+    return SegmentedTabs(
+      labels: [for (final filter in _Filter.values) filter.label],
+      selected: _Filter.values.indexOf(selected),
+      onSelect: (i) => onSelect(_Filter.values[i]),
       height: 44,
-      padding: EdgeInsets.all(4),
-      decoration: segmentTrack(),
-      child: Row(
-        children: [
-          for (final filter in _Filter.values)
-            Expanded(
-              child: Pressable(
-                onTap: () => onSelect(filter),
-                // 배경은 애니메이션 없이 즉시 바꾼다 (페이드가 있으면 두 칸이
-                // 같이 눌린 것처럼 보인다)
-                child: Container(
-                  decoration: segmentFill(selected: filter == selected),
-                  child: Center(
-                    child: Text(
-                      filter.label,
-                      style: AppTextStyles.body2.copyWith(
-                        fontSize: 13,
-                        color: filter == selected
-                            ? AppColors.primary
-                            : AppColors.gray600,
-                        fontWeight: filter == selected
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
+      dense: true,
     );
   }
 }
