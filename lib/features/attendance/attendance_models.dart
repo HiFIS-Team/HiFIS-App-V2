@@ -314,6 +314,11 @@ Future<void> _loadAttendance() async {
     ..clear()
     ..addAll(days.map(_Day.from));
 
+  // 위에서 받은 두 달을 적어 둔다 — 달을 넘기면 [_loadDays] 가 나머지를 받는다
+  _dayMonths
+    ..clear()
+    ..addAll({_monthKey(DateTime(now.year, now.month - 1)), thisMonth});
+
   _todayStaff
     ..clear()
     // 대표·관리자는 출퇴근을 안 찍는다 — 세면 근무시간이 지나는 순간
@@ -360,6 +365,25 @@ Future<void> _loadRoster(String month) async {
     month: month,
     branchId: branchScopeId,
   );
+}
+
+/// 내 근태를 받아 둔 달 (`2026-08`) — 같은 달을 두 번 받지 않는다
+///
+/// [_loadAttendance] 는 **지난달·이번 달**만 받는다. 달을 넘기면 그 달을
+/// 받아 둔 적이 없어서 칸이 통째로 비는데, 지난 달은 어차피 그릴 것이
+/// 있었으므로 티가 안 났다. **다음 달부터 티가 난다** — 미리 낸 월차가
+/// 거기 있다 (2026-08-21).
+final _dayMonths = <String>{};
+
+/// 그 달의 내 근태를 받아 둔다 (이미 받은 달은 그냥 지나간다)
+Future<void> _loadDays(String month) async {
+  if (_dayMonths.contains(month)) return;
+  final rows = await AttendanceApi.calendar(month: month);
+  // 넣기 전에 그 달을 비운다 — 다시 받는 경우에 두 벌이 되면 안 된다
+  _days
+    ..removeWhere((day) => _monthKey(day.date) == month)
+    ..addAll(rows.map(_Day.from));
+  _dayMonths.add(month);
 }
 
 /// 오늘 이 상태인 사람들 — 대표 화면의 '오늘 근무' 판이 쓴다

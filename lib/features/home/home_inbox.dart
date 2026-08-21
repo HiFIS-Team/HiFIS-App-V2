@@ -374,8 +374,11 @@ class _InboxCardState extends State<_InboxCard> with SkeletonDelay<_InboxCard> {
           _CardHeader(
             title: '결재 대기',
             count: _items.length,
-            // 결재함이 비었으면 열어 봐야 빈 화면이라 버튼을 안 낸다
-            onOpenAll: _items.isEmpty ? null : _openAll,
+            // **대기가 0이어도 낸다.** 전체보기에 `대기 · 승인 · 반려` 목록바가
+            // 붙은 뒤로는 열어 볼 것이 있다 — 오늘 처리를 다 끝낸 사람이
+            // 방금 승인한 것을 되짚을 길이 여기뿐이다.
+            // (예전에는 전체보기가 대기 목록 하나라 비면 빈 화면이었다)
+            onOpenAll: _openAll,
           ),
           SizedBox(height: 14),
           // `Expanded` 는 Column 의 **직계 자식**이어야 해서 여기서 바로 감싼다

@@ -102,7 +102,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     // 지난달에 걸친 날들이 기록 없는 날처럼 빈칸으로 뜬다.
     if (_weekly) {
       final end = DateTime(_week.year, _week.month, _week.day + 6);
-      await _fetchRoster([_week, end]);
+      await _fetchMonths([_week, end]);
     }
     if (mounted) setState(endLoad);
   }
@@ -115,13 +115,18 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       if (mounted) AppToast.show(context, messageOf(error));
     }
     if (mounted) setState(() {});
+    // `_loadAttendance` 는 받아 둔 것을 통째로 비우고 **지난달·이번 달**만 다시
+    // 채운다. 그래서 다른 달을 보고 있으면 승인한 순간 그 칸이 빈칸이 된다 —
+    // **월차는 미리 내는 것이라 결재하는 자리가 다음 달인 경우가 흔하다.**
+    // (이미 받은 달은 그냥 지나가므로 이번 달을 보고 있으면 아무 일도 안 한다)
+    await _fetchMonths([_month]);
   }
 
   Future<void> _moveMonth(int delta) async {
     final month = DateTime(_month.year, _month.month + delta);
     setState(() => _month = month);
     // 대표 달력은 전사 기록이라 달마다 따로 받아야 한다
-    await _fetchRoster([month]);
+    await _fetchMonths([month]);
   }
 
   Future<void> _moveWeek(int delta) async {
@@ -133,13 +138,18 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     });
     // 한 주가 달을 걸칠 수 있다 — 첫날과 마지막 날의 달을 둘 다 받는다
     final end = DateTime(week.year, week.month, week.day + 6);
-    await _fetchRoster([week, end]);
+    await _fetchMonths([week, end]);
   }
 
-  /// 그 달들의 전사 기록을 받아 둔다 (이미 받은 달은 그냥 지나간다)
-  Future<void> _fetchRoster(List<DateTime> months) async {
+  /// 그 달들의 기록을 받아 둔다 (이미 받은 달은 그냥 지나간다)
+  ///
+  /// **둘 다 받는다** — 내 근태(달력 칸)와 전사 기록(대표 달력).
+  /// 예전에는 전사 것만 받아서, 달을 넘기면 **본인 달력이 빈칸**이었다.
+  /// 미래 달에 미리 낸 월차가 뜨기 시작하면서 그게 드러났다 (2026-08-21).
+  Future<void> _fetchMonths(List<DateTime> months) async {
     try {
       for (final key in {for (final m in months) _monthKey(m)}) {
+        await _loadDays(key);
         await _loadRoster(key);
       }
     } catch (error) {
@@ -148,10 +158,26 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     if (mounted) setState(() {});
   }
 
-  /// 보고 있는 달의 기록만 추린다 (요약도 이 달 기준)
-  List<_Day> get _monthDays => _days
-      .where((d) => d.date.year == _month.year && d.date.month == _month.month)
-      .toList();
+  /// 보고 있는 달의 기록만 추린다 (요약 카드가 쓴다)
+  ///
+  /// **오늘까지만 센다.** 서버가 미래 날에도 승인된 월차를 주게 되면서
+  /// (달력 칸에 미리 보이라고 — 2026-08-21) 여기까지 세면 요약 카드의
+  /// `월차` 만 달 전체가 되고 `근무 · 지각 · 결근` 은 오늘까지라
+  /// **한 카드 안에서 기준이 갈린다.**
+  ///
+  /// 달력 칸은 `_dayOf` 가 `_days` 를 직접 보므로 미래 월차는 그대로 뜬다.
+  List<_Day> get _monthDays {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return _days
+        .where(
+          (d) =>
+              d.date.year == _month.year &&
+              d.date.month == _month.month &&
+              !d.date.isAfter(today),
+        )
+        .toList();
+  }
 
   _Day? _dayOf(DateTime date) {
     for (final day in _days) {
