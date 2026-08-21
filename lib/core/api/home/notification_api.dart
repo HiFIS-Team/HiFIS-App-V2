@@ -84,6 +84,11 @@ class NotificationApi {
   static final _client = ApiClient.instance;
 
   /// 최신순. [read] 를 주면 그 상태만 걸러서 준다
+  /// 알림함 — **서버가 최근 7일치만 준다** (2026-08-21 대표 결정)
+  ///
+  /// 날 수를 앱이 정하지 않는다. 안 읽음 배지도 이 목록을 세기 때문에
+  /// 두 곳에서 각자 자르면 **화면에 없는 것이 배지에만 남는다.**
+  /// 며칠치인지는 서버 `NOTIFICATION_DAYS` 한 곳에 있다.
   static Future<List<AppNotification>> list({bool? read}) async {
     final rows = await _client.getList(
       '/notifications',
