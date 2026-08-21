@@ -315,7 +315,13 @@ class _DayCellState extends State<_DayCell> {
                 Spacer(),
                 if (leave != null)
                   _tag(
-                    leave.kind == _LeaveKind.full ? '월차' : '반차',
+                    // 갈래마다 제 이름으로 — 병가·기타가 `반차` 로 뜨면 안 된다
+                    switch (leave.kind) {
+                      _LeaveKind.full => '월차',
+                      _LeaveKind.morning || _LeaveKind.afternoon => '반차',
+                      _LeaveKind.sick => '병가',
+                      _LeaveKind.etc => '휴가',
+                    },
                     AppColors.primary,
                     faded: leave.status == _LeaveStatus.pending,
                   )

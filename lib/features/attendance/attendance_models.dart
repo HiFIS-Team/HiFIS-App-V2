@@ -106,17 +106,32 @@ class _Day {
   }
 }
 
-/// 월차 종류
+/// 월차·휴가 종류
+///
+/// **연차에서 깎이는 것은 앞의 셋뿐이다.** 병가·기타는 서버가 잔여 연차를 셀 때
+/// 아예 안 본다 (`LeaveRequest.type.in_([ANNUAL, HALF])`).
+///
+/// **예비군·경조사는 `기타`로 낸다** (2026-08-21 결정). 갈래를 따로 만들지 않는
+/// 이유는, 하나 만들 때마다 서버 열거형·잔여 연차 계산·달력 라벨이 같이
+/// 늘어나는데 **사유 칸에 적으면 그대로 읽히기 때문**이다.
+///
+/// 어느 갈래든 승인만 되면 그날은 결근으로 안 찍힌다 — 결근 판정은 갈래를
+/// 안 가리고 '승인된 휴가가 걸쳐 있나'만 본다 (서버 `_absent_today`).
 enum _LeaveKind {
   full('종일', 1.0, LeaveType.annual, null),
   morning('오전 반차', 0.5, LeaveType.half, HalfPeriod.am),
-  afternoon('오후 반차', 0.5, LeaveType.half, HalfPeriod.pm);
+  afternoon('오후 반차', 0.5, LeaveType.half, HalfPeriod.pm),
+  sick('병가', 0, LeaveType.sick, null),
+  etc('기타', 0, LeaveType.etc, null);
 
   const _LeaveKind(this.label, this.days, this.type, this.period);
 
   final String label;
 
-  /// 차감되는 일수
+  /// **연차에서 차감되는** 일수 — 병가·기타는 0 이다.
+  ///
+  /// 실제로 며칠 쉬는지(`_Leave.days`)와 다른 값이다. 그쪽은 서버가 기간에서
+  /// 세어 준다 (`_compute_days`).
   final double days;
 
   /// 서버에 보낼 값
@@ -125,10 +140,17 @@ enum _LeaveKind {
   /// 반차일 때 오전·오후 구분
   final HalfPeriod? period;
 
-  static _LeaveKind of(LeaveType type, HalfPeriod? period) {
-    if (type != LeaveType.half) return _LeaveKind.full;
-    return period == HalfPeriod.pm ? _LeaveKind.afternoon : _LeaveKind.morning;
-  }
+  /// 연차에서 깎이나 — 신청 화면의 안내와 잔여 검사가 이걸 본다
+  bool get deducts => days > 0;
+
+  static _LeaveKind of(LeaveType type, HalfPeriod? period) => switch (type) {
+    LeaveType.half =>
+      period == HalfPeriod.pm ? _LeaveKind.afternoon : _LeaveKind.morning,
+    LeaveType.sick => _LeaveKind.sick,
+    // 외근은 앱에서 신청할 수 없지만 서버에 값이 있다 — 받으면 기타로 읽는다
+    LeaveType.field || LeaveType.etc => _LeaveKind.etc,
+    LeaveType.annual => _LeaveKind.full,
+  };
 }
 
 /// 월차 신청 상태

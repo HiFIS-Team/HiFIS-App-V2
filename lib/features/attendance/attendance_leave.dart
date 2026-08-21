@@ -202,7 +202,7 @@ class _LeaveBalanceState extends State<_LeaveBalance> {
                     Icon(Icons.add_rounded, size: 18, color: AppColors.primary),
                     SizedBox(width: 6),
                     Text(
-                      '월차 신청',
+                      '월차 및 휴가 신청',
                       style: AppTextStyles.body2.copyWith(
                         color: AppColors.primary,
                         fontWeight: FontWeight.w700,
@@ -604,14 +604,24 @@ class _LeaveComposerState extends State<_LeaveComposer> {
         SizedBox(height: 20),
         Text('종류', style: AppTextStyles.label),
         SizedBox(height: 8),
-        SegmentedTabs(
-          labels: [for (final kind in _LeaveKind.values) kind.label],
-          selected: _LeaveKind.values.indexOf(_kind),
-          onSelect: (i) => setState(() => _kind = _LeaveKind.values[i]),
+        // **칩이다** — 갈래가 다섯이라 한 줄 분할로는 `오전 반차` 가 짤린다
+        // (2026-08-21). 회원 등록의 방문 경로 고르개와 같은 모양이다.
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final kind in _LeaveKind.values)
+              _KindChip(
+                label: kind.label,
+                selected: kind == _kind,
+                onTap: () => setState(() => _kind = kind),
+              ),
+          ],
         ),
         SizedBox(height: 8),
         Text(
-          '${_dayCount(_kind.days)}일이 차감돼요',
+          // 병가·기타는 연차에서 안 깎인다 — `0일이 차감돼요` 는 말이 안 된다
+          _kind.deducts ? '${_dayCount(_kind.days)}일이 차감돼요' : '연차에서 차감되지 않아요',
           style: AppTextStyles.caption.copyWith(fontSize: 12),
         ),
         SizedBox(height: 20),
@@ -645,7 +655,7 @@ class _LeaveComposerState extends State<_LeaveComposer> {
   Widget build(BuildContext context) {
     if (widget.phone) {
       return PhoneDetailScaffold(
-        title: '월차 신청',
+        title: '월차 및 휴가 신청',
         bottomBar: GlassBottomButton(
           label: '신청하기',
           active: _ready,
@@ -678,7 +688,7 @@ class _LeaveComposerState extends State<_LeaveComposer> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('월차 신청', style: AppTextStyles.title3),
+          Text('월차 및 휴가 신청', style: AppTextStyles.title3),
           SizedBox(height: 18),
           _form(),
           SizedBox(height: 20),
@@ -716,6 +726,39 @@ class _LeaveComposerState extends State<_LeaveComposer> {
 ///
 /// 머티리얼 기본 달력은 결이 달라서 근태 달력과 같은 모양으로 직접 그린다.
 /// 지난 날짜는 고를 수 없다 (월차는 앞으로 쓸 날만 신청한다).
+/// 종류 칩 — 회원 등록의 `_VisitPathPicker` 와 같은 값이다
+///
+/// 갈래가 다섯이라 한 줄 분할(`SegmentedTabs`)로는 폰에서 `오전 반차` 가
+/// 짤린다. 칩은 줄바꿈으로 알아서 접혀서 나중에 갈래를 더해도 안 깨진다.
+class _KindChip extends StatelessWidget {
+  _KindChip({required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Pressable(
+    onTap: onTap,
+    scale: 0.96,
+    child: AnimatedContainer(
+      duration: Duration(milliseconds: 140),
+      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: selected ? AppColors.primary : AppColors.gray50,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        label,
+        style: AppTextStyles.body2.copyWith(
+          fontWeight: FontWeight.w600,
+          color: selected ? AppColors.surface : AppColors.textSecondary,
+        ),
+      ),
+    ),
+  );
+}
+
 class _DatePicker extends StatefulWidget {
   _DatePicker({required this.initial});
 
