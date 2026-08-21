@@ -12,6 +12,7 @@ import '../display/avatar.dart';
 import '../feedback/app_dialog.dart';
 import '../feedback/app_toast.dart';
 import '../glass/glass_input_bar.dart';
+import '../input/pressable.dart';
 
 /// 댓글 시트를 연다
 ///
@@ -175,16 +176,21 @@ class _CommentSheetState extends State<_CommentSheet> {
     if (mounted) setState(() => _sending = false);
   }
 
+  /// 수정 시작 — 입력바에 그 글을 넣고 키보드를 올린다
+  void _startEdit(PostComment comment) {
+    setState(() => _editing = comment);
+    _focus.requestFocus();
+  }
+
   /// 꾹 눌렀을 때 — **수정·삭제를 고른다**
   ///
-  /// 예전에는 꾹 누르면 바로 삭제 확인이 떴다. 수정을 붙이면서 삭제가 갈 곳을
-  /// 잃어서 둘을 한 카드에 세운다 (2026-08-21 요청).
+  /// 줄 오른쪽에 아이콘이 있어도 남겨 둔다. 아이콘이 15픽셀이라 손가락으로
+  /// 정확히 누르기 어려울 때가 있는데, 그때 길게 눌러도 같은 둘이 나온다.
   Future<void> _menu(PostComment comment) async {
     final picked = await showAppDialog<String>(context, (_) => _CommentMenu());
     if (picked == null || !mounted) return;
     if (picked == _CommentMenu.edit) {
-      setState(() => _editing = comment);
-      _focus.requestFocus();
+      _startEdit(comment);
     } else {
       await _remove(comment);
     }
@@ -291,6 +297,12 @@ class _CommentSheetState extends State<_CommentSheet> {
                             for (final row in rows)
                               _CommentRow(
                                 comment: row,
+                                onEdit: _canRemove(row)
+                                    ? () => _startEdit(row)
+                                    : null,
+                                onRemove: _canRemove(row)
+                                    ? () => _remove(row)
+                                    : null,
                                 onMenu: _canRemove(row)
                                     ? () => _menu(row)
                                     : null,
@@ -330,11 +342,20 @@ class _CommentSheetState extends State<_CommentSheet> {
 
 /// 댓글 한 줄 — 아바타 · 이름 · 시각 · 본문
 class _CommentRow extends StatelessWidget {
-  _CommentRow({required this.comment, required this.onMenu});
+  _CommentRow({
+    required this.comment,
+    required this.onEdit,
+    required this.onRemove,
+    required this.onMenu,
+  });
 
   final PostComment comment;
 
-  /// 본인 댓글일 때만 — 꾹 누르면 수정·삭제를 고른다
+  /// 본인 댓글일 때만 — 줄 오른쪽 연필·휴지통 (`내 업무` 할 일 줄과 같다)
+  final VoidCallback? onEdit;
+  final VoidCallback? onRemove;
+
+  /// 꾹 눌러도 같은 둘을 고를 수 있다 — 아이콘이 작아서 길게 누르기도 남긴다
   final VoidCallback? onMenu;
 
   @override
@@ -385,11 +406,38 @@ class _CommentRow extends StatelessWidget {
                 ],
               ),
             ),
+            // 본인 댓글만 — `내 업무` 할 일 줄과 같은 연필·휴지통
+            if (onEdit != null && onRemove != null) ...[
+              SizedBox(width: 4),
+              _RowAction(icon: CupertinoIcons.pencil, onTap: onEdit!),
+              _RowAction(icon: CupertinoIcons.trash, onTap: onRemove!),
+            ],
           ],
         ),
       ),
     );
   }
+}
+
+/// 줄 오른쪽 연필·휴지통 — `내 업무` 의 `_RowAction` 과 크기·색을 맞췄다
+///
+/// 같은 뜻의 버튼이 화면마다 다르게 생기면 안 된다. 그쪽은
+/// `part of 'work_screen.dart'` 라 밖에서 못 써서 여기 같은 값으로 둔다.
+class _RowAction extends StatelessWidget {
+  _RowAction({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Pressable(
+    onTap: onTap,
+    scale: 0.9,
+    child: Padding(
+      padding: EdgeInsets.all(5),
+      child: Icon(icon, size: 15, color: AppColors.textTertiary),
+    ),
+  );
 }
 
 /// 댓글을 꾹 눌렀을 때 뜨는 카드 — `수정` · `삭제`
