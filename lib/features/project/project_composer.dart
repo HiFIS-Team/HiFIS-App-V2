@@ -323,9 +323,6 @@ class _ProjectComposerState extends State<_ProjectComposer> {
               // 결재 모드에서는 마감을 여기서 못 바꾼다 — 기한 연장 결재가
               // 따로 있고, 프로젝트당 대기 중인 결재는 하나뿐이다
               onTap: _needsApproval ? _lockedNote : _pickDue,
-              scale: _needsApproval ? 1 : 0.97,
-              pressedColor: AppColors.gray100,
-              borderRadius: BorderRadius.circular(10),
               padding: EdgeInsets.symmetric(horizontal: 10, vertical: 7),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -383,7 +380,6 @@ class _ProjectComposerState extends State<_ProjectComposer> {
             for (final color in _projectPalette)
               Pressable(
                 onTap: () => setState(() => _color = color),
-                scale: 0.9,
                 child: Container(
                   width: 26,
                   height: 26,
@@ -491,7 +487,6 @@ class _ProjectComposerState extends State<_ProjectComposer> {
                 if (!_needsApproval)
                   Pressable(
                     onTap: () => setState(() => _todos.remove(todo)),
-                    scale: 0.9,
                     child: Icon(
                       Icons.close_rounded,
                       size: 16,
@@ -548,7 +543,6 @@ class _ProjectComposerState extends State<_ProjectComposer> {
 
     return Pressable(
       onTap: _submit,
-      scale: 0.97,
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(
@@ -629,9 +623,6 @@ class _ProjectComposerState extends State<_ProjectComposer> {
                 if (_canDelete)
                   Pressable(
                     onTap: _delete,
-                    scale: 0.9,
-                    pressedColor: AppColors.gray100,
-                    borderRadius: BorderRadius.circular(100),
                     padding: EdgeInsets.all(6),
                     child: Icon(
                       CupertinoIcons.trash,
@@ -649,9 +640,6 @@ class _ProjectComposerState extends State<_ProjectComposer> {
               children: [
                 Pressable(
                   onTap: () => Navigator.pop(context),
-                  scale: 0.97,
-                  pressedColor: AppColors.gray100,
-                  borderRadius: BorderRadius.circular(12),
                   padding: EdgeInsets.symmetric(horizontal: 16, vertical: 11),
                   child: Text(
                     '취소',
@@ -733,8 +721,6 @@ class _MemberChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap ?? () {},
-      scale: onTap == null ? 1 : 0.96,
-      borderRadius: BorderRadius.circular(100),
       child: Container(
         padding: EdgeInsets.fromLTRB(4, 4, 10, 4),
         decoration: BoxDecoration(

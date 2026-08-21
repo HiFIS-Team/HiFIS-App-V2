@@ -200,7 +200,6 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
               SizedBox(width: 14),
               Pressable(
                 onTap: _uploading ? () {} : _pickImage,
-                scale: 0.94,
                 child: Container(
                   height: 48,
                   padding: EdgeInsets.symmetric(horizontal: 18),
@@ -250,7 +249,6 @@ class _BasicInfoCardState extends State<_BasicInfoCard> {
               for (var i = 0; i < _avatarColors.length; i++)
                 Pressable(
                   onTap: () => setState(() => _selectedColor = i),
-                  scale: 0.88,
                   child: Container(
                     width: 40,
                     height: 40,

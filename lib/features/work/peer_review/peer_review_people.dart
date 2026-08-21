@@ -93,7 +93,6 @@ class _FilterTabs extends StatelessWidget {
             Expanded(
               child: Pressable(
                 onTap: () => onSelect(filter),
-                scale: 0.97,
                 // 배경은 애니메이션 없이 즉시 바꾼다 (페이드가 있으면 두 칸이
                 // 같이 눌린 것처럼 보인다)
                 child: Container(
@@ -156,8 +155,6 @@ class _PersonCard extends StatelessWidget {
 
     return Pressable(
       onTap: onTap,
-      scale: 0.98,
-      borderRadius: BorderRadius.circular(24),
       child: Container(
         padding: EdgeInsets.fromLTRB(20, 18, 20, 18),
         decoration: AppDecorations.card(),

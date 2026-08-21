@@ -249,9 +249,6 @@ class _ComposerState extends State<_Composer> {
       children: [
         Pressable(
           onTap: () => Navigator.pop(context),
-          scale: 0.97,
-          pressedColor: AppColors.gray100,
-          borderRadius: BorderRadius.circular(12),
           padding: EdgeInsets.symmetric(horizontal: 16, vertical: 11),
           child: Text(
             '취소',
@@ -264,7 +261,6 @@ class _ComposerState extends State<_Composer> {
         SizedBox(width: 8),
         Pressable(
           onTap: _submit,
-          scale: 0.97,
           child: Container(
             padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             decoration: BoxDecoration(

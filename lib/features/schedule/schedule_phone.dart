@@ -93,9 +93,6 @@ class _SchedulePhone extends StatelessWidget {
               SizedBox(width: 10),
               Pressable(
                 onTap: onToday,
-                scale: 0.95,
-                pressedColor: AppColors.gray100,
-                borderRadius: BorderRadius.circular(100),
                 padding: EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                 child: Text(
                   '오늘',
@@ -156,9 +153,6 @@ class _DayRow extends StatelessWidget {
 
     return Pressable(
       onTap: () => onTap(date),
-      scale: 0.99,
-      pressedColor: AppColors.gray50,
-      borderRadius: BorderRadius.circular(12),
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: 6, vertical: 9),
         child: Row(

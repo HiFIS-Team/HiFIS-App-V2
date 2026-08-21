@@ -206,8 +206,6 @@ class _Row extends StatelessWidget {
 
     return Pressable(
       onTap: onTap,
-      scale: 1,
-      borderRadius: BorderRadius.circular(14),
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(

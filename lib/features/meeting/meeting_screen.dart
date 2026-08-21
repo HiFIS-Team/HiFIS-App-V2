@@ -261,9 +261,6 @@ class _NoteList extends StatelessWidget {
               ),
               Pressable(
                 onTap: onCreate,
-                scale: 0.94,
-                pressedColor: AppColors.primaryLight,
-                borderRadius: BorderRadius.circular(100),
                 padding: EdgeInsets.fromLTRB(8, 5, 10, 5),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -421,7 +418,6 @@ class _EmptyNote extends StatelessWidget {
           SizedBox(height: 24),
           Pressable(
             onTap: onCreate,
-            scale: 0.97,
             child: Container(
               padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               decoration: BoxDecoration(
@@ -684,9 +680,6 @@ class _NoteViewState extends State<_NoteView> {
         if (_editing) ...[
           Pressable(
             onTap: widget.onDelete,
-            scale: 0.95,
-            pressedColor: AppColors.gray100,
-            borderRadius: BorderRadius.circular(10),
             padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Text(
               '삭제',
@@ -705,7 +698,6 @@ class _NoteViewState extends State<_NoteView> {
         if (!_editing && note.id != null && note.projectId == null) ...[
           Pressable(
             onTap: _toProject,
-            scale: 0.95,
             child: Container(
               padding: EdgeInsets.fromLTRB(12, 8, 14, 8),
               decoration: BoxDecoration(
@@ -738,7 +730,6 @@ class _NoteViewState extends State<_NoteView> {
         if (note.canEdit)
           Pressable(
             onTap: _toggleEdit,
-            scale: 0.95,
             child: Container(
               padding: EdgeInsets.fromLTRB(12, 8, 14, 8),
               decoration: BoxDecoration(
@@ -811,9 +802,6 @@ class _NoteViewState extends State<_NoteView> {
                 children: [
                   Pressable(
                     onTap: _pickDate,
-                    scale: 0.97,
-                    pressedColor: AppColors.gray100,
-                    borderRadius: BorderRadius.circular(10),
                     padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -837,9 +825,6 @@ class _NoteViewState extends State<_NoteView> {
                   // 달력 옆 마크다운 문법 도움말 (펼침)
                   Pressable(
                     onTap: () => setState(() => _help = !_help),
-                    scale: 0.97,
-                    pressedColor: AppColors.gray100,
-                    borderRadius: BorderRadius.circular(10),
                     padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -872,9 +857,6 @@ class _NoteViewState extends State<_NoteView> {
                   Pressable(
                     key: _projectKey,
                     onTap: _pickProject,
-                    scale: 0.97,
-                    pressedColor: AppColors.gray100,
-                    borderRadius: BorderRadius.circular(10),
                     padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -1032,8 +1014,6 @@ class _PersonChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.96,
-      borderRadius: BorderRadius.circular(100),
       child: Container(
         padding: EdgeInsets.fromLTRB(4, 4, 10, 4),
         decoration: BoxDecoration(

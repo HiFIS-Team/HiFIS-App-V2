@@ -101,7 +101,6 @@ class BottomActionButton extends StatelessWidget {
 
     final button = Pressable(
       onTap: onPressed,
-      scale: 0.97,
       child: Container(
         height: height,
         alignment: Alignment.center,

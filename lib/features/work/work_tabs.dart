@@ -42,7 +42,6 @@ class _WorkTab extends StatelessWidget {
 
     return Pressable(
       onTap: onTap,
-      scale: 0.94,
       child: Container(
         // 밑줄이 글자보다 살짝 넓게 깔리도록 좌우 여유를 준다
         padding: EdgeInsets.symmetric(vertical: 12, horizontal: 2),

@@ -318,9 +318,6 @@ class _ProjectList extends StatelessWidget {
               ),
               Pressable(
                 onTap: onCreate,
-                scale: 0.94,
-                pressedColor: AppColors.primaryLight,
-                borderRadius: BorderRadius.circular(100),
                 padding: EdgeInsets.fromLTRB(8, 5, 10, 5),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -394,7 +391,6 @@ class _PhaseTabs extends StatelessWidget {
             Expanded(
               child: Pressable(
                 onTap: () => onSelect(phase),
-                scale: 0.97,
                 // 배경은 애니메이션 없이 즉시 바꾼다 (페이드가 있으면 두 칸이
                 // 같이 눌린 것처럼 보인다)
                 child: Container(

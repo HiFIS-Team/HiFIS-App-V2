@@ -151,7 +151,6 @@ class _EmojiTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Pressable(
     onTap: onTap,
-    scale: 0.94,
     child: Container(
       padding: EdgeInsets.fromLTRB(4, 0, 4, 10),
       margin: EdgeInsets.only(right: 18),

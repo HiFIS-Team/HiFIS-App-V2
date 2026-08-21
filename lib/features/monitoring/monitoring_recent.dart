@@ -162,8 +162,6 @@ class _RefreshButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.96,
-      borderRadius: BorderRadius.circular(12),
       child: Container(
         height: 38,
         padding: EdgeInsets.symmetric(horizontal: 14),

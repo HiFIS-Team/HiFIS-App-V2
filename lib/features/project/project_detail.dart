@@ -689,9 +689,6 @@ class _ProjectDetail extends StatelessWidget {
   Widget _headButton(String label, VoidCallback onTap, {bool danger = false}) =>
       Pressable(
         onTap: onTap,
-        scale: 0.94,
-        pressedColor: AppColors.gray100,
-        borderRadius: BorderRadius.circular(100),
         padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         child: Text(
           label,
@@ -1094,9 +1091,6 @@ class _MemberBar extends StatelessWidget {
       children: [
         Pressable(
           onTap: () => _showMemberList(context, project),
-          scale: 0.97,
-          pressedColor: AppColors.gray100,
-          borderRadius: BorderRadius.circular(100),
           // 둘로 나누면서도 **자리는 그대로 둔다** — 예전에는 한 버튼이
           // 좌우 6 을 두고 가운데 틈이 6 이었다. 안쪽을 3+3 으로 나눠 맞춘다
           padding: showAdd
@@ -1107,9 +1101,6 @@ class _MemberBar extends StatelessWidget {
         if (showAdd)
           Pressable(
             onTap: onAdd,
-            scale: 0.9,
-            pressedColor: AppColors.gray100,
-            borderRadius: BorderRadius.circular(100),
             padding: EdgeInsets.fromLTRB(3, 4, 6, 4),
             child: Container(
               width: 28,

@@ -278,9 +278,6 @@ class _PendingCard extends StatelessWidget {
   /// 올린 사람은 아직 아무도 처리하지 않은 결재를 물릴 수 있다
   Widget _withdrawButton() => Pressable(
     onTap: onWithdraw,
-    scale: 0.96,
-    pressedColor: AppColors.gray100,
-    borderRadius: BorderRadius.circular(10),
     padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
     child: Text(
       '회수',

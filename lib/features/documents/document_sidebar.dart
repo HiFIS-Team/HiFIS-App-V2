@@ -126,7 +126,6 @@ class _PlaceRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.98,
       child: Container(
         margin: EdgeInsets.only(bottom: 2),
         padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -169,7 +168,6 @@ class _ScopeRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.98,
       child: Container(
         margin: EdgeInsets.only(bottom: 2),
         padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -226,7 +224,6 @@ class _TreeRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.98,
       child: Container(
         margin: EdgeInsets.only(bottom: 2),
         padding: EdgeInsets.fromLTRB(6.0 + depth * 12, 8, 10, 8),

@@ -35,8 +35,6 @@ class MiniButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: busy ? () {} : onTap,
-      scale: 0.96,
-      borderRadius: BorderRadius.circular(10),
       child: Container(
         height: 32,
         padding: EdgeInsets.symmetric(horizontal: 12),

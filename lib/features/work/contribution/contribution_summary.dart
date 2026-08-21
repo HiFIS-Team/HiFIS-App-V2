@@ -133,7 +133,6 @@ class _GrantBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.98,
       child: Container(
         padding: EdgeInsets.fromLTRB(18, 16, 18, 16),
         decoration: BoxDecoration(

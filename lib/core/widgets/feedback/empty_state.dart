@@ -68,7 +68,6 @@ class EmptyState extends StatelessWidget {
             SizedBox(height: 24),
             Pressable(
               onTap: action,
-              scale: 0.97,
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 decoration: BoxDecoration(

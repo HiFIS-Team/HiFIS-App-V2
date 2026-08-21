@@ -112,10 +112,7 @@ class _TodoRowState extends State<_TodoRow> {
         padding: EdgeInsets.symmetric(vertical: 9),
         child: Row(
           children: [
-            if (toggle == null)
-              box
-            else
-              Pressable(onTap: toggle, scale: 0.9, child: box),
+            if (toggle == null) box else Pressable(onTap: toggle, child: box),
             SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -139,7 +136,6 @@ class _TodoRowState extends State<_TodoRow> {
               child: showRemove
                   ? Pressable(
                       onTap: remove,
-                      scale: 0.9,
                       child: Icon(
                         Icons.close_rounded,
                         size: 16,
@@ -186,14 +182,7 @@ class _AssigneeChip extends StatelessWidget {
     final tap = onTap;
     if (tap == null) return Padding(padding: padding, child: chip);
 
-    return Pressable(
-      onTap: tap,
-      scale: 0.96,
-      pressedColor: AppColors.gray100,
-      borderRadius: BorderRadius.circular(100),
-      padding: padding,
-      child: chip,
-    );
+    return Pressable(onTap: tap, padding: padding, child: chip);
   }
 }
 
@@ -330,7 +319,6 @@ class _TodoComposerState extends State<_TodoComposer> {
         SizedBox(width: 4),
         Pressable(
           onTap: _submit,
-          scale: 0.94,
           child: Container(
             width: 38,
             height: 38,

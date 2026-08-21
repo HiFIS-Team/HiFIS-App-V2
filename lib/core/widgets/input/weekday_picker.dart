@@ -89,7 +89,6 @@ class _Cell extends StatelessWidget {
     final off = day == 7 ? AppColors.error : AppColors.textSecondary;
     return Pressable(
       onTap: () => onTap(day),
-      scale: 0.92,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 140),
         height: 42,

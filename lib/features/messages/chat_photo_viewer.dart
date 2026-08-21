@@ -330,7 +330,6 @@ class _RoundIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Pressable(
     onTap: onTap,
-    scale: 0.9,
     child: Container(
       width: 40,
       height: 40,

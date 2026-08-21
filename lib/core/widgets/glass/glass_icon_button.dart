@@ -88,7 +88,6 @@ class GlassIconButton extends StatelessWidget {
   Widget _fallback() {
     return Pressable(
       onTap: enabled ? (onPressed ?? () {}) : () {},
-      scale: 0.9,
       child: DecoratedBox(
         decoration: BoxDecoration(
           shape: BoxShape.circle,

@@ -199,7 +199,6 @@ class _MonthCalendar extends StatelessWidget {
 
   Widget _arrow(IconData icon, VoidCallback onTap) => Pressable(
     onTap: onTap,
-    scale: 0.9,
     child: Container(
       width: 30,
       height: 30,
@@ -266,7 +265,6 @@ class _DayCellState extends State<_DayCell> {
       onExit: (_) => setState(() => _hover = false),
       child: Pressable(
         onTap: widget.onTap,
-        scale: 0.96,
         child: Container(
           height: widget.height,
           margin: EdgeInsets.all(2),
@@ -513,7 +511,6 @@ class _WeekCalendar extends StatelessWidget {
 
   Widget _arrow(IconData icon, VoidCallback onTap) => Pressable(
     onTap: onTap,
-    scale: 0.9,
     child: Container(
       width: 30,
       height: 30,
@@ -542,9 +539,6 @@ class _WeekRow extends StatelessWidget {
 
     return Pressable(
       onTap: onTap,
-      scale: 0.99,
-      pressedColor: AppColors.gray50,
-      borderRadius: BorderRadius.circular(12),
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: 6, vertical: 9),
         child: Row(

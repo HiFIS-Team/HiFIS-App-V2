@@ -109,7 +109,6 @@ class _DayDialog extends StatelessWidget {
           SizedBox(height: 18),
           Pressable(
             onTap: () => Navigator.pop(context),
-            scale: 0.97,
             child: Container(
               height: 46,
               alignment: Alignment.center,

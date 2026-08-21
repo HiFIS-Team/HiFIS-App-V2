@@ -214,7 +214,6 @@ class _GrantScreenState extends State<_GrantScreen> {
 
     return Pressable(
       onTap: () => setState(() => _kind = kind),
-      scale: 0.97,
       child: Container(
         padding: EdgeInsets.fromLTRB(14, 14, 14, 14),
         decoration: BoxDecoration(
@@ -258,7 +257,6 @@ class _GrantScreenState extends State<_GrantScreen> {
     final on = person.id == _target?.id;
     return Pressable(
       onTap: () => setState(() => _target = person),
-      scale: 0.96,
       child: AnimatedContainer(
         duration: Duration(milliseconds: 140),
         height: 44,

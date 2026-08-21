@@ -84,7 +84,7 @@ class _BranchPickerState extends State<_BranchPicker> {
 
     if (_branches.length < 2) return box;
 
-    return Pressable(onTap: _open, scale: 0.96, child: box);
+    return Pressable(onTap: _open, child: box);
   }
 }
 
@@ -188,7 +188,6 @@ class _RankChips extends StatelessWidget {
 
                 return Pressable(
                   onTap: () => onSelect(rank),
-                  scale: 0.96,
                   child: AnimatedContainer(
                     duration: Duration(milliseconds: 140),
                     height: 38,
@@ -265,7 +264,6 @@ class _ViewToggle extends StatelessWidget {
     final selected = grid == value;
     return Pressable(
       onTap: () => onChanged(value),
-      scale: 0.94,
       child: Container(
         width: 42,
         alignment: Alignment.center,

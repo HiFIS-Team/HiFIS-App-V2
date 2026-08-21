@@ -116,8 +116,6 @@ class _NoticeCard extends StatelessWidget {
 
     return Pressable(
       onTap: onTap,
-      scale: 0.98,
-      borderRadius: BorderRadius.circular(24),
       child: Container(
         padding: EdgeInsets.fromLTRB(20, 18, 20, 18),
         decoration: AppDecorations.card(),

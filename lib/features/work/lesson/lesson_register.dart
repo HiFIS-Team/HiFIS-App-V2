@@ -659,7 +659,6 @@ class _RenewPickRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.97,
       // 배경은 애니메이션 없이 즉시 — 페이드가 있으면 직전에 고른 회원이
       // 서서히 사라지며 둘 다 선택된 것처럼 보인다
       child: Container(
@@ -771,7 +770,6 @@ class _ExistingToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: () => onChanged(!on),
-      scale: 0.99,
       child: AnimatedContainer(
         duration: Duration(milliseconds: 140),
         padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -836,7 +834,6 @@ class _VisitPathPicker extends StatelessWidget {
             for (final path in VisitPath.values)
               Pressable(
                 onTap: onPick == null ? () {} : () => onPick!(path),
-                scale: 0.96,
                 child: AnimatedContainer(
                   duration: Duration(milliseconds: 140),
                   padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -884,7 +881,6 @@ class _PickerField extends StatelessWidget {
 
     return Pressable(
       onTap: onTap ?? () {},
-      scale: 0.99,
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
@@ -904,7 +900,6 @@ class _PickerField extends StatelessWidget {
             if (picked && onClear != null)
               Pressable(
                 onTap: onClear!,
-                scale: 0.9,
                 child: Icon(
                   CupertinoIcons.xmark_circle_fill,
                   size: 17,

@@ -165,7 +165,6 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
             if (!isDesktop && _step > 0)
               Pressable(
                 onTap: _back,
-                scale: 0.94,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
@@ -207,7 +206,6 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
               // 한 줄 더 — 엔터와 같은 일을 한다
               Pressable(
                 onTap: _stage,
-                scale: 0.92,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 160),
                   width: 40,
@@ -389,7 +387,6 @@ class _StagedRow extends StatelessWidget {
         ),
         Pressable(
           onTap: onRemove,
-          scale: 0.9,
           child: Padding(
             padding: const EdgeInsets.all(5),
             child: Icon(
@@ -421,7 +418,6 @@ class _PickRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Pressable(
     onTap: onTap,
-    scale: 0.99,
     child: Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(

@@ -489,7 +489,6 @@ class _StatusNotice extends StatelessWidget {
           if (action != null && onAction != null)
             Pressable(
               onTap: onAction,
-              scale: 0.97,
               child: Container(
                 height: 44,
                 alignment: Alignment.center,

@@ -126,7 +126,6 @@ class _PayButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Pressable(
     onTap: onTap,
-    scale: 0.97,
     child: Container(
       height: 44,
       alignment: Alignment.center,
@@ -238,7 +237,6 @@ class _PayrollDecideRow extends StatelessWidget {
 
   Widget _arrow(IconData icon, VoidCallback onTap) => Pressable(
     onTap: onTap,
-    scale: 0.9,
     child: Padding(
       padding: EdgeInsets.all(5),
       child: Icon(icon, size: 12, color: AppColors.textTertiary),
@@ -456,7 +454,6 @@ class _PayInlineButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.96,
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         alignment: Alignment.center,

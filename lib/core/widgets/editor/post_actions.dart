@@ -205,8 +205,6 @@ class _ActionButton extends StatelessWidget {
     return Pressable(
       onTap: onTap,
       onLongPress: onLongPress,
-      scale: 0.86,
-      borderRadius: BorderRadius.circular(100),
       padding: EdgeInsets.symmetric(horizontal: 18),
       child: Row(
         mainAxisSize: MainAxisSize.min,

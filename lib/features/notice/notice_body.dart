@@ -122,9 +122,6 @@ class _NoticeViewState extends State<_NoticeView> {
         if (_editing) ...[
           Pressable(
             onTap: widget.onDelete,
-            scale: 0.95,
-            pressedColor: AppColors.gray100,
-            borderRadius: BorderRadius.circular(10),
             padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Text(
               '삭제',
@@ -140,7 +137,6 @@ class _NoticeViewState extends State<_NoticeView> {
         if (_canEdit(notice))
           Pressable(
             onTap: _toggleEdit,
-            scale: 0.95,
             child: Container(
               padding: EdgeInsets.fromLTRB(12, 8, 14, 8),
               decoration: BoxDecoration(
@@ -220,8 +216,6 @@ class _NoticeViewState extends State<_NoticeView> {
                       setState(() => notice.pinned = !notice.pinned);
                       widget.onChanged();
                     },
-                    scale: 0.96,
-                    borderRadius: BorderRadius.circular(100),
                     child: Container(
                       padding: EdgeInsets.fromLTRB(10, 6, 12, 6),
                       decoration: BoxDecoration(
@@ -259,9 +253,6 @@ class _NoticeViewState extends State<_NoticeView> {
                   // 마크다운 문법 도움말 (펼침)
                   Pressable(
                     onTap: () => setState(() => _help = !_help),
-                    scale: 0.97,
-                    pressedColor: AppColors.gray100,
-                    borderRadius: BorderRadius.circular(10),
                     padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,

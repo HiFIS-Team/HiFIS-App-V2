@@ -264,7 +264,6 @@ class _HistoryScreenState extends State<_HistoryScreen>
     final enabled = onTap != null;
     return Pressable(
       onTap: onTap ?? () {},
-      scale: enabled ? 0.9 : 1,
       child: Padding(
         padding: EdgeInsets.all(8),
         child: Icon(

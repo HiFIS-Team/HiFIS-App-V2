@@ -879,7 +879,6 @@ class _PhotoProofCardState extends State<_PhotoProofCard> {
   Widget _photoBox() {
     return Pressable(
       onTap: _busy ? () {} : _pick,
-      scale: 0.98,
       child: Container(
         height: 132,
         width: double.infinity,

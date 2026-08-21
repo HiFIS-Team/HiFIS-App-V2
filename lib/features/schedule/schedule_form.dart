@@ -293,8 +293,6 @@ class _EventDialogState extends State<_EventDialog> {
               if (!_locked || kind == _kind)
                 Pressable(
                   onTap: _tap(() => setState(() => _kind = kind)),
-                  scale: 0.96,
-                  borderRadius: BorderRadius.circular(100),
                   child: Container(
                     padding: EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                     decoration: BoxDecoration(
@@ -342,8 +340,6 @@ class _EventDialogState extends State<_EventDialog> {
             SizedBox(width: 62, child: Text('시간', style: AppTextStyles.label)),
             Pressable(
               onTap: _tap(() => setState(() => _allDay = !_allDay)),
-              scale: 0.96,
-              borderRadius: BorderRadius.circular(100),
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                 decoration: BoxDecoration(
@@ -406,9 +402,6 @@ class _EventDialogState extends State<_EventDialog> {
         Spacer(),
         Pressable(
           onTap: () => Navigator.pop(context),
-          scale: 0.97,
-          pressedColor: AppColors.gray100,
-          borderRadius: BorderRadius.circular(12),
           padding: EdgeInsets.symmetric(horizontal: 16, vertical: 11),
           child: Text(
             _locked ? '닫기' : '취소',
@@ -422,7 +415,6 @@ class _EventDialogState extends State<_EventDialog> {
           SizedBox(width: 8),
           Pressable(
             onTap: _submit,
-            scale: 0.97,
             child: Container(
               padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               decoration: BoxDecoration(
@@ -563,9 +555,6 @@ class _TextButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.97,
-      pressedColor: AppColors.gray100,
-      borderRadius: BorderRadius.circular(12),
       padding: EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       child: Text(
         label,
@@ -590,9 +579,6 @@ class _PickButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.97,
-      pressedColor: AppColors.gray100,
-      borderRadius: BorderRadius.circular(10),
       padding: EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -639,8 +625,6 @@ class _PersonChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.96,
-      borderRadius: BorderRadius.circular(100),
       child: Container(
         padding: EdgeInsets.fromLTRB(4, 4, 10, 4),
         decoration: BoxDecoration(

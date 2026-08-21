@@ -102,7 +102,6 @@ class _MemberCardState extends State<_MemberCard> {
       onExit: (_) => setState(() => _hovered = false),
       child: Pressable(
         onTap: widget.onTap,
-        scale: 0.985,
         child: AnimatedContainer(
           duration: Duration(milliseconds: 140),
           padding: EdgeInsets.fromLTRB(18, 18, 18, 16),
@@ -209,7 +208,6 @@ class _MemberRowState extends State<_MemberRow> {
       onExit: (_) => setState(() => _hovered = false),
       child: Pressable(
         onTap: widget.onTap,
-        scale: 0.995,
         child: AnimatedContainer(
           duration: Duration(milliseconds: 140),
           height: 72,
@@ -289,7 +287,6 @@ class _ChatButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.95,
       child: Container(
         height: 40,
         padding: EdgeInsets.symmetric(horizontal: 14),
@@ -334,7 +331,6 @@ class _SmallButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.95,
       child: Container(
         height: 40,
         padding: EdgeInsets.symmetric(horizontal: 14),
@@ -370,7 +366,6 @@ class _IconAction extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.92,
       child: Container(
         width: 40,
         height: 40,

@@ -173,7 +173,6 @@ class _ProjectRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.98,
       child: Row(
         children: [
           // 일정 카드 스타일의 세로 색 막대
@@ -318,7 +317,6 @@ class _NoticeRow extends StatelessWidget {
 
     return Pressable(
       onTap: onTap,
-      scale: 0.99,
       child: Padding(
         padding: EdgeInsets.symmetric(vertical: 14),
         child: Column(

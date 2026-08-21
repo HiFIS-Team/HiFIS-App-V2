@@ -258,7 +258,6 @@ class _ActionButton extends StatelessWidget {
 
     return Pressable(
       onTap: onTap,
-      scale: 0.96,
       child: Container(
         height: 56,
         decoration: BoxDecoration(

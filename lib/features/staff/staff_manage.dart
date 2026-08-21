@@ -34,7 +34,6 @@ class _InviteButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.96,
       child: Container(
         height: 38,
         padding: EdgeInsets.symmetric(horizontal: 14),
@@ -295,7 +294,6 @@ class _PickerCard extends StatelessWidget {
               for (final (value, label) in options)
                 Pressable(
                   onTap: () => onSelect(value),
-                  scale: 0.96,
                   // `alignment` 를 주면 안 된다 — Container 가 부모가 주는
                   // 최대 폭까지 늘어나서 칩이 한 줄에 하나씩 쌓인다
                   // (`Wrap` 을 쓴 뜻이 없어진다). 글자는 padding 이 가운데로 잡는다.
@@ -624,7 +622,6 @@ class _InviteAction extends StatelessWidget {
       message: tooltip,
       child: Pressable(
         onTap: onTap,
-        scale: 0.9,
         child: SizedBox(
           width: 38,
           height: 38,

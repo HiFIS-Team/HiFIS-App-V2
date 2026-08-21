@@ -148,7 +148,6 @@ class _EmptyChatState extends StatelessWidget {
             ),
             SizedBox(height: 24),
             Pressable(
-              scale: 0.97,
               onTap: onNewMessage,
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),

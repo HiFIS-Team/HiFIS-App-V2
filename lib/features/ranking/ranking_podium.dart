@@ -46,7 +46,6 @@ class _Podium extends StatelessWidget {
                 ? _Step(entry: entry, metric: metric, big: big)
                 : Pressable(
                     onTap: () => onPick!(entry.ranker),
-                    scale: 0.97,
                     child: _Step(entry: entry, metric: metric, big: big),
                   ),
           ),

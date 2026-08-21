@@ -101,7 +101,6 @@ class _ScoreBreakdown extends StatelessWidget {
               if (onClose != null)
                 Pressable(
                   onTap: onClose!,
-                  scale: 0.9,
                   child: Icon(
                     CupertinoIcons.xmark,
                     size: 15,

@@ -86,11 +86,7 @@ class _RankRow extends StatelessWidget {
     final row = _row(mine);
     // 누를 수 없는 탭에서는 예전 그대로 — 누름 효과도 안 생긴다
     if (onPick == null) return row;
-    return Pressable(
-      onTap: () => onPick!(entry.ranker),
-      scale: 0.995,
-      child: row,
-    );
+    return Pressable(onTap: () => onPick!(entry.ranker), child: row);
   }
 
   Widget _row(bool mine) {

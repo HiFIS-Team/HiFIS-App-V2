@@ -455,7 +455,7 @@ class _MissRow extends StatelessWidget {
     // 결재를 기다리는 줄은 **누름 효과도 안 준다** — 눌리는 것처럼 보이는데
     // 아무 일이 없으면 고장으로 읽힌다 (완료된 프로젝트를 잠글 때와 같다)
     if (!miss.canExcuse) return row;
-    return Pressable(onTap: onTap, scale: 0.98, child: row);
+    return Pressable(onTap: onTap, child: row);
   }
 
   Widget _row(String label, Color color) {
@@ -523,7 +523,6 @@ class _DayTabs extends StatelessWidget {
           Expanded(
             child: Pressable(
               onTap: () => onSelect(day),
-              scale: 0.92,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 140),
                 height: 36,
@@ -656,7 +655,6 @@ class _TaskRow extends StatelessWidget {
           else
             Pressable(
               onTap: onCheck,
-              scale: 0.9,
               child: _CheckMark(checked: checked),
             ),
           const SizedBox(width: 12),
@@ -726,7 +724,6 @@ class _RowAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Pressable(
     onTap: onTap,
-    scale: 0.9,
     child: Padding(
       padding: const EdgeInsets.all(5),
       child: Icon(icon, size: 15, color: AppColors.textTertiary),

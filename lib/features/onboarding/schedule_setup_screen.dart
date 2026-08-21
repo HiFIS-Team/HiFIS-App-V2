@@ -195,7 +195,6 @@ class _WeekdayPicker extends StatelessWidget {
           Expanded(
             child: Pressable(
               onTap: () => onToggle(day),
-              scale: 0.94,
               child: AnimatedContainer(
                 duration: Duration(milliseconds: 120),
                 height: 46,
@@ -236,7 +235,6 @@ class _TimeBox extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.98,
       child: Container(
         height: 64,
         padding: EdgeInsets.symmetric(horizontal: 16),

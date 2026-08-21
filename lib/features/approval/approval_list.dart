@@ -45,9 +45,6 @@ class _DocList extends StatelessWidget {
               if (onCreate case final create?)
                 Pressable(
                   onTap: create,
-                  scale: 0.94,
-                  pressedColor: AppColors.primaryLight,
-                  borderRadius: BorderRadius.circular(100),
                   padding: EdgeInsets.fromLTRB(8, 5, 10, 5),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -137,7 +134,6 @@ class _StateTabs extends StatelessWidget {
             Expanded(
               child: Pressable(
                 onTap: () => onSelect(state),
-                scale: 0.97,
                 // 배경은 애니메이션 없이 즉시 바꾼다
                 child: Container(
                   decoration: phone
@@ -245,8 +241,6 @@ class _DocTileState extends State<_DocTile> {
     if (!isDesktop) {
       return Pressable(
         onTap: widget.onTap,
-        scale: 0.98,
-        borderRadius: BorderRadius.circular(24),
         child: Container(
           padding: EdgeInsets.fromLTRB(20, 18, 20, 18),
           decoration: AppDecorations.card(),

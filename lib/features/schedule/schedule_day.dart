@@ -137,7 +137,6 @@ class _DayDialogState extends State<_DayDialog> {
                   Spacer(),
                   Pressable(
                     onTap: () => Navigator.pop(context),
-                    scale: 0.9,
                     child: Icon(
                       Icons.close_rounded,
                       size: 20,
@@ -185,9 +184,6 @@ class _DayDialogState extends State<_DayDialog> {
               SizedBox(height: 6),
               Pressable(
                 onTap: _add,
-                scale: 0.99,
-                pressedColor: AppColors.gray50,
-                borderRadius: BorderRadius.circular(10),
                 padding: EdgeInsets.symmetric(vertical: 11),
                 child: Row(
                   children: [
@@ -231,9 +227,6 @@ class _EventRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.99,
-      pressedColor: AppColors.gray50,
-      borderRadius: BorderRadius.circular(12),
       padding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

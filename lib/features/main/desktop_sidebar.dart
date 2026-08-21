@@ -289,9 +289,6 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
           if (_hoverIndex == index) _hoverIndex = null;
         }),
         child: Pressable(
-          scale: 0.97,
-          pressedColor: AppColors.gray100,
-          borderRadius: BorderRadius.circular(10),
           onTap: onTap,
           // 호버 배경은 애니메이션 없이 즉시 — 페이드가 있으면 커서를
           // 빠르게 지나갈 때 이전 항목의 배경이 잔상처럼 깜빡인다

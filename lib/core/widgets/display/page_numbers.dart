@@ -82,9 +82,7 @@ class PageNumbers extends StatelessWidget {
       ),
     );
     // 지금 보고 있는 장은 누를 것이 없다
-    return here
-        ? box
-        : Pressable(onTap: () => onPick(index), scale: 0.9, child: box);
+    return here ? box : Pressable(onTap: () => onPick(index), child: box);
   }
 
   /// 끝에 닿으면 [target]이 null — 자리는 그대로 두고 흐리게만 한다
@@ -104,6 +102,6 @@ class PageNumbers extends StatelessWidget {
       ),
     );
     if (target == null) return box;
-    return Pressable(onTap: () => onPick(target), scale: 0.9, child: box);
+    return Pressable(onTap: () => onPick(target), child: box);
   }
 }

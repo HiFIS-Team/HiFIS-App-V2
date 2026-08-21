@@ -461,7 +461,6 @@ class _NotificationTile extends StatelessWidget {
 
     return Pressable(
       onTap: onTap,
-      scale: 0.98,
       child: Padding(
         padding: EdgeInsets.symmetric(vertical: 12),
         child: Row(

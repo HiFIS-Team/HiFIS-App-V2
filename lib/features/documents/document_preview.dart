@@ -95,7 +95,6 @@ class _FilePreviewCard extends StatelessWidget {
               Expanded(
                 child: Pressable(
                   onTap: () => Navigator.pop(context),
-                  scale: 0.97,
                   child: Container(
                     height: 46,
                     alignment: Alignment.center,
@@ -121,7 +120,6 @@ class _FilePreviewCard extends StatelessWidget {
                     Navigator.pop(context);
                     onDownload();
                   },
-                  scale: 0.97,
                   child: Container(
                     height: 46,
                     alignment: Alignment.center,

@@ -13,8 +13,6 @@ class _DateField extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.98,
-      borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 14, vertical: 15),
         decoration: BoxDecoration(

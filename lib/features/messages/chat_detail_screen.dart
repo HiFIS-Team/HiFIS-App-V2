@@ -283,7 +283,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   Center(
                     child: Pressable(
                       onTap: _rename,
-                      scale: 0.94,
                       child: Padding(
                         padding: EdgeInsets.symmetric(
                           horizontal: 12,
@@ -324,7 +323,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 _Pad(
                   child: Pressable(
                     onTap: _openMembers,
-                    scale: 0.98,
                     child: Container(
                       padding: EdgeInsets.symmetric(
                         horizontal: 18,
@@ -640,7 +638,6 @@ class _ActionItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap ?? () {},
-      scale: 0.92,
       child: SizedBox(
         // 라벨 길이가 바뀌어도('알림 끄기' ↔ '알림 켜기') 자리가 안 흔들리게
         width: 76,
@@ -741,7 +738,6 @@ class _ShareTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.94,
       child: Container(
         padding: EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(

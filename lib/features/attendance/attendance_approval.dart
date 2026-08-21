@@ -130,7 +130,6 @@ class _LeaveDecideRow extends StatelessWidget {
 
   Widget _arrow(IconData icon, VoidCallback onTap) => Pressable(
     onTap: onTap,
-    scale: 0.9,
     child: Padding(
       padding: EdgeInsets.all(5),
       child: Icon(icon, size: 12, color: AppColors.textTertiary),

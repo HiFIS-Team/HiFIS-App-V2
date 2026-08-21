@@ -21,9 +21,6 @@ class SeeAllButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.92,
-      pressedColor: AppColors.gray100,
-      borderRadius: BorderRadius.circular(100),
       padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Row(
         mainAxisSize: MainAxisSize.min,

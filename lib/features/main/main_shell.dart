@@ -678,7 +678,6 @@ class _ChatDockState extends State<_ChatDock> {
   /// 사내톡 필 ↔ X 버튼 모프
   Widget _buildPill() {
     return Pressable(
-      scale: 0.95,
       onTap: () => setState(() => _open = !_open),
       child: DecoratedBox(
         decoration: BoxDecoration(

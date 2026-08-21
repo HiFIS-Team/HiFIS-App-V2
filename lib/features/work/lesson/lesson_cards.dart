@@ -21,8 +21,6 @@ class _SignCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.98,
-      borderRadius: BorderRadius.circular(24),
       child: Container(
         padding: EdgeInsets.fromLTRB(20, 18, 20, 18),
         decoration: AppDecorations.card(),
@@ -115,9 +113,6 @@ class _SignRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.98,
-      pressedColor: AppColors.gray50,
-      borderRadius: BorderRadius.circular(12),
       padding: EdgeInsets.symmetric(horizontal: 4, vertical: 12),
       child: Row(
         children: [
@@ -205,7 +200,6 @@ class _MonthBar extends StatelessWidget {
     final enabled = onTap != null;
     return Pressable(
       onTap: onTap ?? () {},
-      scale: enabled ? 0.9 : 1,
       child: Padding(
         padding: EdgeInsets.all(8),
         child: Icon(

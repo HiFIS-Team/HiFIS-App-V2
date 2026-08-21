@@ -109,8 +109,6 @@ class _SurveyCardItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.98,
-      borderRadius: BorderRadius.circular(24),
       child: Container(
         padding: EdgeInsets.fromLTRB(20, 18, 20, 18),
         decoration: AppDecorations.card(),
@@ -247,9 +245,6 @@ class _SurveyRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.98,
-      pressedColor: AppColors.gray50,
-      borderRadius: BorderRadius.circular(12),
       padding: EdgeInsets.symmetric(horizontal: 4, vertical: 12),
       child: Row(
         children: [

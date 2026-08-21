@@ -432,7 +432,6 @@ class _RowAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Pressable(
     onTap: onTap,
-    scale: 0.9,
     child: Padding(
       padding: EdgeInsets.all(5),
       child: Icon(icon, size: 15, color: AppColors.textTertiary),

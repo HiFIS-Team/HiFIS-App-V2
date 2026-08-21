@@ -38,7 +38,6 @@ class DecideButtons extends StatelessWidget {
   Widget build(BuildContext context) {
     final reject = Pressable(
       onTap: busy ? () {} : onReject,
-      scale: 0.96,
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         alignment: Alignment.center,
@@ -59,7 +58,6 @@ class DecideButtons extends StatelessWidget {
     );
     final approve = Pressable(
       onTap: busy ? () {} : onApprove,
-      scale: 0.96,
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         alignment: Alignment.center,

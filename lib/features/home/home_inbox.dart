@@ -428,7 +428,6 @@ class _InboxTabs extends StatelessWidget {
             Expanded(
               child: Pressable(
                 onTap: () => onSelect(status),
-                scale: 0.97,
                 // 배경은 애니메이션 없이 즉시 바꾼다
                 child: Container(
                   decoration: segmentFill(selected: status == selected),

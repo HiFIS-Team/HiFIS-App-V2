@@ -82,7 +82,6 @@ class _LegalScreenState extends State<LegalScreen> {
                 ),
                 Pressable(
                   onTap: () => Navigator.pop(context),
-                  scale: 0.9,
                   child: SizedBox(
                     width: 36,
                     height: 36,

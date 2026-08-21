@@ -69,7 +69,6 @@ class _PhoneTabs extends StatelessWidget {
   Widget _tab(int i) {
     return Pressable(
       onTap: () => onSelect(i),
-      scale: 0.94,
       child: Container(
         padding: EdgeInsets.only(bottom: 10),
         decoration: BoxDecoration(

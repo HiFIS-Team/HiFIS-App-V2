@@ -123,7 +123,6 @@ class _AwardCardState extends State<_AwardCard> {
 
     final button = Pressable(
       onTap: _loading ? _ignore : _give,
-      scale: 0.96,
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         alignment: Alignment.center,
@@ -248,9 +247,6 @@ Future<(int, String)?> _askAward(
               Spacer(),
               Pressable(
                 onTap: () => Navigator.pop(context),
-                scale: 0.97,
-                pressedColor: AppColors.gray100,
-                borderRadius: BorderRadius.circular(12),
                 // 다른 팝업의 취소와 같은 여백 (전자결재·프로젝트·일정)
                 padding: EdgeInsets.symmetric(horizontal: 16, vertical: 11),
                 child: Text(
@@ -278,7 +274,6 @@ Future<(int, String)?> _askAward(
                   }
                   Navigator.pop(context, (value, text));
                 },
-                scale: 0.97,
                 child: Container(
                   padding: EdgeInsets.symmetric(horizontal: 18, vertical: 11),
                   decoration: BoxDecoration(

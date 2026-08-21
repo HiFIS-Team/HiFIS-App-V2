@@ -21,7 +21,12 @@ abstract final class AppTheme {
       error: AppColors.error,
     ),
     splashFactory: NoSplash.splashFactory,
-    highlightColor: AppColors.gray50,
+    // **눌림 표시를 안 준다** (2026-08-21 대표 결정 — [Pressable] 과 같은 이유).
+    //
+    // 잔물결은 예전부터 껐는데 회색 면은 남아 있었다. 그대로 두면
+    // `InkWell`·`TextButton`·`IconButton` 을 쓰는 자리(사내톡 방 목록·날짜
+    // 고르개 등)**만** 반응해서, 같은 목록인데 화면마다 다르게 느껴진다.
+    highlightColor: Colors.transparent,
     appBarTheme: AppBarTheme(
       backgroundColor: AppColors.background,
       foregroundColor: AppColors.textPrimary,

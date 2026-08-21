@@ -260,7 +260,6 @@ class _TodayBoard extends StatelessWidget {
     if (people.isEmpty) return Expanded(child: body);
     return Expanded(
       child: Pressable(
-        scale: 0.96,
         onTap: () => showAppDialog<void>(
           context,
           (_) => _TodayCellCard(

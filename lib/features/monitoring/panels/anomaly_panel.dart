@@ -256,7 +256,6 @@ class _Row extends StatelessWidget {
                   )
                 : Pressable(
                     onTap: onResolve!,
-                    scale: 0.96,
                     child: Container(
                       height: 30,
                       alignment: Alignment.center,

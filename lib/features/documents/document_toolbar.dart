@@ -93,7 +93,6 @@ class _Toolbar extends StatelessWidget {
           SizedBox(width: 10),
           Pressable(
             onTap: onUpload,
-            scale: 0.95,
             child: Container(
               height: 36,
               padding: EdgeInsets.symmetric(horizontal: 14),
@@ -165,7 +164,6 @@ class _Breadcrumb extends StatelessWidget {
                   radius: 8,
                   child: Pressable(
                     onTap: () => onTap(i),
-                    scale: 0.96,
                     child: Padding(
                       padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                       child: Text(
@@ -214,7 +212,6 @@ class _RoundButton extends StatelessWidget {
 
     final button = Pressable(
       onTap: enabled ? onTap : () {},
-      scale: enabled ? 0.92 : 1,
       child: Container(
         width: 34,
         height: 34,

@@ -91,7 +91,6 @@ class _SignScreenState extends State<_SignScreen> {
                       // 다시 쓰기
                       Pressable(
                         onTap: _clear,
-                        scale: 0.93,
                         child: Container(
                           padding: EdgeInsets.symmetric(
                             horizontal: 12,

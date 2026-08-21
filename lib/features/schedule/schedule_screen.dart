@@ -241,9 +241,6 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                 SizedBox(width: 8),
                 Pressable(
                   onTap: _goToday,
-                  scale: 0.95,
-                  pressedColor: AppColors.gray100,
-                  borderRadius: BorderRadius.circular(100),
                   padding: EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                   child: Text(
                     '오늘',
@@ -256,7 +253,6 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                 Spacer(),
                 Pressable(
                   onTap: _add,
-                  scale: 0.96,
                   child: Container(
                     padding: EdgeInsets.fromLTRB(12, 9, 16, 9),
                     decoration: BoxDecoration(
@@ -404,9 +400,6 @@ class _ScopeBar extends StatelessWidget {
         SizedBox(width: 12),
         Pressable(
           onTap: onPerson,
-          scale: 0.96,
-          pressedColor: AppColors.gray100,
-          borderRadius: BorderRadius.circular(100),
           padding: EdgeInsets.symmetric(horizontal: 12, vertical: 7),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -499,8 +492,6 @@ class _PersonRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Pressable(
     onTap: onTap,
-    scale: 0.98,
-    borderRadius: BorderRadius.circular(12),
     padding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
     child: Row(
       children: [
@@ -537,7 +528,6 @@ class _RoundButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.92,
       child: Container(
         width: 32,
         height: 32,

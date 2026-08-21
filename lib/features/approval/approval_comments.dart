@@ -255,7 +255,6 @@ class _CommentTeaser extends StatelessWidget {
 
     return Pressable(
       onTap: onTap,
-      scale: 0.99,
       child: Container(
         padding: EdgeInsets.fromLTRB(20, 16, 20, 16),
         decoration: AppDecorations.card(),
@@ -427,7 +426,6 @@ class _CommentCardState extends State<_CommentCard> {
               SizedBox(width: 8),
               Pressable(
                 onTap: _send,
-                scale: 0.94,
                 child: Container(
                   width: 38,
                   height: 38,

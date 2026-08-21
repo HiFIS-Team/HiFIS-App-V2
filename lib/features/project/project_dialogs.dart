@@ -46,9 +46,6 @@ Future<String?> _pickMember(
           Divider(height: 12, color: AppColors.divider),
           Pressable(
             onTap: () => Navigator.pop(context, ''),
-            scale: 0.98,
-            pressedColor: AppColors.gray50,
-            borderRadius: BorderRadius.circular(12),
             padding: EdgeInsets.symmetric(horizontal: 6, vertical: 10),
             child: Text(
               '담당자 없음',
@@ -81,9 +78,6 @@ class _PickRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.98,
-      pressedColor: AppColors.gray100,
-      borderRadius: BorderRadius.circular(12),
       padding: EdgeInsets.symmetric(horizontal: 6, vertical: 7),
       child: Row(
         children: [
@@ -236,9 +230,6 @@ class _DecisionDialogState extends State<_DecisionDialog> {
             children: [
               Pressable(
                 onTap: () => Navigator.pop(context),
-                scale: 0.97,
-                pressedColor: AppColors.gray100,
-                borderRadius: BorderRadius.circular(12),
                 padding: EdgeInsets.symmetric(horizontal: 16, vertical: 11),
                 child: Text(
                   '취소',
@@ -251,7 +242,6 @@ class _DecisionDialogState extends State<_DecisionDialog> {
               SizedBox(width: 8),
               Pressable(
                 onTap: _submit,
-                scale: 0.97,
                 child: Container(
                   padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   decoration: BoxDecoration(
@@ -420,9 +410,6 @@ class _ExtensionDialogState extends State<_ExtensionDialog> {
               ),
               Pressable(
                 onTap: _pickDue,
-                scale: 0.97,
-                pressedColor: AppColors.gray100,
-                borderRadius: BorderRadius.circular(10),
                 padding: EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -459,9 +446,6 @@ class _ExtensionDialogState extends State<_ExtensionDialog> {
             children: [
               Pressable(
                 onTap: () => Navigator.pop(context),
-                scale: 0.97,
-                pressedColor: AppColors.gray100,
-                borderRadius: BorderRadius.circular(12),
                 padding: EdgeInsets.symmetric(horizontal: 16, vertical: 11),
                 child: Text(
                   '취소',
@@ -474,7 +458,6 @@ class _ExtensionDialogState extends State<_ExtensionDialog> {
               SizedBox(width: 8),
               Pressable(
                 onTap: _submit,
-                scale: 0.97,
                 child: Container(
                   padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   decoration: BoxDecoration(
@@ -528,9 +511,6 @@ class _DialogActions extends StatelessWidget {
     children: [
       Pressable(
         onTap: () => Navigator.pop(context),
-        scale: 0.97,
-        pressedColor: AppColors.gray100,
-        borderRadius: BorderRadius.circular(12),
         padding: EdgeInsets.symmetric(horizontal: 16, vertical: 11),
         child: Text(
           '취소',
@@ -543,7 +523,6 @@ class _DialogActions extends StatelessWidget {
       SizedBox(width: 8),
       Pressable(
         onTap: onSubmit,
-        scale: 0.97,
         child: Container(
           padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           decoration: BoxDecoration(
@@ -800,7 +779,6 @@ class _PickChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.96,
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(

@@ -46,7 +46,6 @@ class _AuthScaffold extends StatelessWidget {
 
   Widget _backButton() => Pressable(
     onTap: onBack!,
-    scale: 0.9,
     child: SizedBox(
       width: 36,
       height: 36,
@@ -245,7 +244,6 @@ class _AuthFieldState extends State<_AuthField> {
           if (widget.obscure)
             Pressable(
               onTap: () => setState(() => _hidden = !_hidden),
-              scale: 0.9,
               child: Padding(
                 padding: EdgeInsets.only(left: 8),
                 child: Icon(
@@ -365,7 +363,6 @@ class _AuthButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: busy ? () {} : onTap,
-      scale: 0.98,
       child: Container(
         height: 56,
         decoration: BoxDecoration(
@@ -412,7 +409,6 @@ class _AuthTextButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.94,
       child: Padding(
         padding: EdgeInsets.symmetric(vertical: 4, horizontal: 2),
         child: Text(
@@ -443,7 +439,6 @@ class _AuthCheck extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: () => onChanged(!value),
-      scale: 0.97,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -496,7 +491,6 @@ class _AgreeRow extends StatelessWidget {
         Expanded(
           child: Pressable(
             onTap: () => onChanged(!value),
-            scale: 0.98,
             child: Row(
               children: [
                 AnimatedContainer(

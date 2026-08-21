@@ -123,9 +123,6 @@ class _ActivityCardState extends State<_ActivityCard> {
               padding: EdgeInsets.only(top: 6),
               child: Pressable(
                 onTap: () => setState(() => _expanded = true),
-                scale: 0.99,
-                pressedColor: AppColors.gray50,
-                borderRadius: BorderRadius.circular(10),
                 padding: EdgeInsets.symmetric(vertical: 9),
                 child: Text(
                   '이전 활동 $hidden개 더 보기',

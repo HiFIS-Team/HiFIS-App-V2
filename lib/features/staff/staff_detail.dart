@@ -244,7 +244,6 @@ class _ActionButton extends StatelessWidget {
 
     return Pressable(
       onTap: onTap,
-      scale: 0.96,
       child: Container(
         height: 48,
         alignment: Alignment.center,
@@ -298,7 +297,6 @@ class _InfoCard extends StatelessWidget {
                 Spacer(),
                 Pressable(
                   onTap: onTap,
-                  scale: 0.96,
                   child: Padding(
                     padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                     child: Text(

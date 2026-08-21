@@ -185,9 +185,6 @@ class _StatusButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.96,
-      pressedColor: selected ? null : AppColors.gray100,
-      borderRadius: BorderRadius.circular(14),
       // 애니메이션 없이 즉시 바꾼다 (색이 서서히 빠지면 둘 다 눌린 듯 보인다)
       child: Container(
         height: 46,
@@ -233,8 +230,6 @@ class _FeedbackCard extends StatelessWidget {
 
     return Pressable(
       onTap: onTap,
-      scale: 0.98,
-      borderRadius: BorderRadius.circular(24),
       child: Container(
         padding: EdgeInsets.fromLTRB(20, 18, 20, 18),
         decoration: AppDecorations.card(),
@@ -359,9 +354,6 @@ class _FeedbackRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.98,
-      pressedColor: AppColors.gray50,
-      borderRadius: BorderRadius.circular(12),
       padding: EdgeInsets.symmetric(horizontal: 4, vertical: 12),
       child: Row(
         children: [

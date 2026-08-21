@@ -187,7 +187,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               Pressable(
                 onTap: () => showLegalDocument(context, document),
-                scale: 0.94,
                 child: Padding(
                   padding: EdgeInsets.symmetric(vertical: 4, horizontal: 2),
                   child: Text(

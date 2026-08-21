@@ -153,7 +153,6 @@ class _AndroidTabBarState extends State<AndroidTabBar>
     final selected = widget.index == index;
 
     return Pressable(
-      scale: 0.92,
       onTap: () => _select(index),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -181,7 +180,6 @@ class _AndroidTabBarState extends State<AndroidTabBar>
   /// 브랜드 그라데이션 원 — 누르면 반원 메뉴가 펼쳐지고 X로 바뀐다
   Widget _centerButton() {
     return Pressable(
-      scale: 0.92,
       onTap: _toggle,
       child: Transform.translate(
         offset: Offset(0, -10),
@@ -291,7 +289,6 @@ class _AndroidTabBarState extends State<AndroidTabBar>
               width: itemW,
               height: itemH,
               child: Pressable(
-                scale: 0.9,
                 onTap: () => _select(index),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,

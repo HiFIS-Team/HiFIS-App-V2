@@ -549,7 +549,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Widget _hoverIcon(IconData icon, void Function(Offset anchor) onTap) {
     return Builder(
       builder: (context) => Pressable(
-        scale: 0.9,
         onTap: () {
           final box = context.findRenderObject() as RenderBox;
           onTap(box.localToGlobal(box.size.center(Offset.zero)));
@@ -734,9 +733,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   // 이름 영역 탭 → 채팅방 상세로 이동
                   Pressable(
                     onTap: _openDetail,
-                    scale: 0.94,
-                    pressedColor: AppColors.gray100,
-                    borderRadius: BorderRadius.circular(24),
                     padding: EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                     child: Row(
                       children: [

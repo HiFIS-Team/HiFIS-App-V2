@@ -153,7 +153,6 @@ class _PickRow extends StatelessWidget {
 
     return Pressable(
       onTap: onTap,
-      scale: 0.97,
       child: Container(
         padding: EdgeInsets.all(14),
         decoration: BoxDecoration(

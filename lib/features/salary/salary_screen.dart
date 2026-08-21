@@ -791,7 +791,6 @@ class _PayslipRow extends StatelessWidget {
     return Pressable(
       onTap: () =>
           showFullPage<void>(context, (_) => _PayslipDetail(payslip: payslip)),
-      scale: 0.99,
       child: Padding(
         padding: EdgeInsets.symmetric(vertical: 12),
         // 월·세션·상태·금액을 한 줄에 세우면 폰 폭에 100pt 넘게 모자란다.

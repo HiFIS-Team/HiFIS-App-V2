@@ -143,7 +143,7 @@ class _PersonCardState extends State<PersonCard> {
       onExit: (_) => setState(() => _hovered = false),
       child: widget.onTap == null
           ? card
-          : Pressable(onTap: widget.onTap!, scale: 0.985, child: card),
+          : Pressable(onTap: widget.onTap!, child: card),
     );
   }
 

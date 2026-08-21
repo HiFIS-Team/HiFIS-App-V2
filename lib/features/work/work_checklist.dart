@@ -207,8 +207,12 @@ class _CountChip extends StatelessWidget {
   }
 }
 
-/// 스테퍼 버튼 — 누르는 동안 원이 줄어들며 버튼 색으로 물든다
-class _AdjustButton extends StatefulWidget {
+/// 스테퍼 버튼
+///
+/// **눌림 표시를 안 준다** (2026-08-21). 예전에는 누르는 동안 원이 0.82 로
+/// 줄면서 버튼 색으로 물들었다 — [Pressable] 을 걷어낸 것과 같은 이유다.
+/// 누른 결과가 **옆 숫자로 바로 보여서** 따로 표시할 것이 없다.
+class _AdjustButton extends StatelessWidget {
   _AdjustButton({required this.icon, required this.color, required this.onTap});
 
   final IconData icon;
@@ -216,45 +220,22 @@ class _AdjustButton extends StatefulWidget {
   final VoidCallback onTap;
 
   @override
-  State<_AdjustButton> createState() => _AdjustButtonState();
-}
-
-class _AdjustButtonState extends State<_AdjustButton> {
-  bool _pressed = false;
-
-  void _setPressed(bool value) {
-    if (_pressed != value) setState(() => _pressed = value);
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => _setPressed(true),
-      onTapUp: (_) => _setPressed(false),
-      onTapCancel: () => _setPressed(false),
-      onTap: widget.onTap,
+    return Pressable(
+      onTap: onTap,
       child: SizedBox(
         width: _CountChip.buttonWidth,
         height: 48,
         child: Center(
-          child: AnimatedScale(
-            scale: _pressed ? 0.82 : 1.0,
-            duration: Duration(milliseconds: 110),
-            curve: Curves.easeOut,
-            child: AnimatedContainer(
-              duration: Duration(milliseconds: 110),
-              width: 26,
-              height: 26,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: _pressed
-                    ? widget.color.withValues(alpha: 0.18)
-                    : AppColors.surface,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(widget.icon, size: 13, color: widget.color),
+          child: Container(
+            width: 26,
+            height: 26,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              shape: BoxShape.circle,
             ),
+            child: Icon(icon, size: 13, color: color),
           ),
         ),
       ),
@@ -291,7 +272,6 @@ class _LogRow extends StatelessWidget {
     if (!_hasPhoto) return row;
     return Pressable(
       onTap: () => showAppDialog<void>(context, (_) => _PhotoLogCard(log: log)),
-      scale: 0.99,
       child: row,
     );
   }

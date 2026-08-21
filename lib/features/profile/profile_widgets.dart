@@ -107,7 +107,6 @@ class _SmallPrimaryButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: busy ? () {} : onTap,
-      scale: 0.94,
       child: Container(
         height: 48,
         padding: EdgeInsets.symmetric(horizontal: 22),

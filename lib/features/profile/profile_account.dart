@@ -153,7 +153,6 @@ class _LogoutCard extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: Pressable(
               onTap: () => confirmLogout(context),
-              scale: 0.94,
               child: Container(
                 height: 48,
                 padding: EdgeInsets.symmetric(horizontal: 18),
@@ -236,7 +235,6 @@ class _WithdrawCard extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: Pressable(
               onTap: () => _withdraw(context),
-              scale: 0.94,
               child: Container(
                 height: 48,
                 padding: EdgeInsets.symmetric(horizontal: 18),

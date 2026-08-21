@@ -106,7 +106,6 @@ class _ThemeOption extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.97,
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.surface,

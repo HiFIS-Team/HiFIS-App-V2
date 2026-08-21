@@ -54,7 +54,6 @@ class AppButton extends StatelessWidget {
 
     final button = Pressable(
       onTap: busy ? () {} : onTap,
-      scale: 0.96,
       child: Container(
         height: height,
         alignment: Alignment.center,

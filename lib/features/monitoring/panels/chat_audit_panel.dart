@@ -292,8 +292,6 @@ class _RoomRow extends StatelessWidget {
       padding: EdgeInsets.only(bottom: 2),
       child: Pressable(
         onTap: onTap,
-        scale: 0.98,
-        borderRadius: BorderRadius.circular(12),
         child: Container(
           padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           decoration: BoxDecoration(

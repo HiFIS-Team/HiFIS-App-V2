@@ -127,7 +127,6 @@ class _StatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.95,
       child: Container(
         height: 52,
         alignment: Alignment.center,

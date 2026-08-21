@@ -104,7 +104,6 @@ class _FallbackTabBar extends StatelessWidget {
   Widget _item(int index) {
     final selected = index == currentIndex;
     return Pressable(
-      scale: 0.9,
       onTap: () => onTap?.call(index),
       child: SizedBox(
         width: 54,

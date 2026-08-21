@@ -188,7 +188,6 @@ class _LeaveBalanceState extends State<_LeaveBalance> {
           else
             Pressable(
               onTap: widget.onRequest,
-              scale: 0.97,
               child: Container(
                 height: 48,
                 alignment: Alignment.center,
@@ -468,7 +467,6 @@ class _LeaveRow extends StatelessWidget {
                 SizedBox(height: 4),
                 Pressable(
                   onTap: onCancel,
-                  scale: 0.94,
                   child: Padding(
                     padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                     child: Text(
@@ -738,7 +736,6 @@ class _DayField extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Pressable(
     onTap: onTap,
-    scale: 0.99,
     child: Container(
       padding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
@@ -784,7 +781,6 @@ class _KindChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Pressable(
     onTap: onTap,
-    scale: 0.96,
     child: AnimatedContainer(
       duration: Duration(milliseconds: 140),
       padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -937,7 +933,6 @@ class _DatePickerState extends State<_DatePicker> {
 
   Widget _arrow(IconData icon, bool enabled, VoidCallback onTap) => Pressable(
     onTap: enabled ? onTap : () {},
-    scale: enabled ? 0.9 : 1,
     child: Container(
       width: 32,
       height: 32,
@@ -974,7 +969,6 @@ class _PickCell extends StatelessWidget {
 
     return Pressable(
       onTap: enabled ? onTap : () {},
-      scale: enabled ? 0.92 : 1,
       child: SizedBox(
         height: 40,
         child: Center(

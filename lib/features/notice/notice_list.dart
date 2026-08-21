@@ -50,9 +50,6 @@ class _NoticeList extends StatelessWidget {
               ),
               Pressable(
                 onTap: onCreate,
-                scale: 0.94,
-                pressedColor: AppColors.primaryLight,
-                borderRadius: BorderRadius.circular(100),
                 padding: EdgeInsets.fromLTRB(8, 5, 10, 5),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -255,7 +252,6 @@ class _EmptyNotice extends StatelessWidget {
           SizedBox(height: 24),
           Pressable(
             onTap: onCreate,
-            scale: 0.97,
             child: Container(
               padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               decoration: BoxDecoration(

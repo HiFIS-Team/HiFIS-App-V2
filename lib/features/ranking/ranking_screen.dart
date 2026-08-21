@@ -214,9 +214,7 @@ class _RankingScreenState extends State<RankingScreen>
         color: onTap == null ? AppColors.gray300 : AppColors.textSecondary,
       ),
     );
-    return onTap == null
-        ? box
-        : Pressable(onTap: onTap, scale: 0.9, child: box);
+    return onTap == null ? box : Pressable(onTap: onTap, child: box);
   }
 
   Widget _tabs() => SegmentedTabs(
