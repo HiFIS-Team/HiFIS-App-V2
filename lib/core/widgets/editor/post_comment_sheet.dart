@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../api/client/api_exception.dart';
@@ -70,6 +71,12 @@ class _CommentSheetState extends State<_CommentSheet> {
   /// 보내는 중 — 두 번 눌리지 않게
   bool _sending = false;
 
+  /// 지금 고치고 있는 댓글 — null 이면 새로 쓰는 중 (2026-08-21)
+  ///
+  /// 입력바가 이 값으로 갈린다: 위에 `댓글 수정 중` 줄이 뜨고, 보내면
+  /// 새 댓글이 아니라 **그 줄을 갈아끼운다.**
+  PostComment? _editing;
+
   /// 처음 열릴 때 높이 — 화면 절반쯤 (댓글 두어 개 + 입력칸)
   static const _initialSize = 0.55;
 
@@ -138,20 +145,49 @@ class _CommentSheetState extends State<_CommentSheet> {
   Future<void> _send(String text) async {
     final body = text.trim();
     if (body.isEmpty || _sending) return;
+    final editing = _editing;
     setState(() => _sending = true);
     try {
-      final saved = await CommentApi.add(
-        target: widget.target,
-        targetId: widget.targetId,
-        body: body,
-      );
-      if (!mounted) return;
-      setState(() => _rows = [...?_rows, saved]);
-      widget.onCount(_rows!.length);
+      if (editing != null) {
+        // 고친 줄만 갈아끼운다 — 목록을 다시 받으면 스크롤이 위로 튄다
+        final saved = await CommentApi.update(editing.id, body: body);
+        if (!mounted) return;
+        setState(() {
+          _rows = [
+            for (final row in _rows ?? const <PostComment>[])
+              if (row.id == saved.id) saved else row,
+          ];
+          _editing = null;
+        });
+      } else {
+        final saved = await CommentApi.add(
+          target: widget.target,
+          targetId: widget.targetId,
+          body: body,
+        );
+        if (!mounted) return;
+        setState(() => _rows = [...?_rows, saved]);
+        widget.onCount(_rows!.length);
+      }
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
     }
     if (mounted) setState(() => _sending = false);
+  }
+
+  /// 꾹 눌렀을 때 — **수정·삭제를 고른다**
+  ///
+  /// 예전에는 꾹 누르면 바로 삭제 확인이 떴다. 수정을 붙이면서 삭제가 갈 곳을
+  /// 잃어서 둘을 한 카드에 세운다 (2026-08-21 요청).
+  Future<void> _menu(PostComment comment) async {
+    final picked = await showAppDialog<String>(context, (_) => _CommentMenu());
+    if (picked == null || !mounted) return;
+    if (picked == _CommentMenu.edit) {
+      setState(() => _editing = comment);
+      _focus.requestFocus();
+    } else {
+      await _remove(comment);
+    }
   }
 
   Future<void> _remove(PostComment comment) async {
@@ -255,8 +291,8 @@ class _CommentSheetState extends State<_CommentSheet> {
                             for (final row in rows)
                               _CommentRow(
                                 comment: row,
-                                onRemove: _canRemove(row)
-                                    ? () => _remove(row)
+                                onMenu: _canRemove(row)
+                                    ? () => _menu(row)
                                     : null,
                               ),
                         ],
@@ -273,9 +309,16 @@ class _CommentSheetState extends State<_CommentSheet> {
               right: 16,
               bottom: keyboard + MediaQuery.paddingOf(context).bottom + 12,
               child: GlassInputBar(
+                // **키가 바뀌어야 고칠 글이 입력칸에 들어간다** — 안쪽
+                // 컨트롤러가 initState 에서 한 번만 읽는다
+                key: ValueKey(_editing?.id),
                 onSend: _send,
                 focusNode: _focus,
-                hint: '댓글 남기기',
+                hint: _editing == null ? '댓글 남기기' : '댓글 수정',
+                initialText: _editing?.body,
+                replyLabel: _editing == null ? null : '댓글 수정 중',
+                replyIcon: CupertinoIcons.pencil,
+                onCancelReply: () => setState(() => _editing = null),
               ),
             ),
           ],
@@ -287,12 +330,12 @@ class _CommentSheetState extends State<_CommentSheet> {
 
 /// 댓글 한 줄 — 아바타 · 이름 · 시각 · 본문
 class _CommentRow extends StatelessWidget {
-  _CommentRow({required this.comment, required this.onRemove});
+  _CommentRow({required this.comment, required this.onMenu});
 
   final PostComment comment;
 
-  /// 본인 댓글일 때만 — 꾹 누르면 지울 수 있다
-  final VoidCallback? onRemove;
+  /// 본인 댓글일 때만 — 꾹 누르면 수정·삭제를 고른다
+  final VoidCallback? onMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -300,7 +343,7 @@ class _CommentRow extends StatelessWidget {
         StaffDirectory.instance.byId(comment.authorId)?.name ?? '알 수 없음';
 
     return GestureDetector(
-      onLongPress: onRemove,
+      onLongPress: onMenu,
       behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: EdgeInsets.symmetric(vertical: 8),
@@ -342,6 +385,84 @@ class _CommentRow extends StatelessWidget {
                 ],
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 댓글을 꾹 눌렀을 때 뜨는 카드 — `수정` · `삭제`
+///
+/// 모양은 사내톡 말풍선 메뉴(`chat_reactions.dart` 의 액션 카드)와 같다.
+/// 그쪽은 `part of 'chat_screen.dart'` 라 밖에서 못 부르는데, 줄이 둘뿐이라
+/// 꺼내 오는 것보다 여기 두는 편이 싸다.
+class _CommentMenu extends StatelessWidget {
+  static const edit = 'menu:edit';
+  static const remove = 'menu:remove';
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 250,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.gray100),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _MenuRow(
+            label: '수정',
+            icon: CupertinoIcons.pencil,
+            onTap: () => Navigator.pop(context, edit),
+          ),
+          Container(height: 1, color: AppColors.gray100),
+          _MenuRow(
+            label: '삭제',
+            icon: CupertinoIcons.trash,
+            color: AppColors.error,
+            onTap: () => Navigator.pop(context, remove),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MenuRow extends StatelessWidget {
+  _MenuRow({
+    required this.label,
+    required this.icon,
+    this.color,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color? color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 18, vertical: 15),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: AppTextStyles.body1.copyWith(
+                  color: color ?? AppColors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            Icon(icon, size: 19, color: color ?? AppColors.textSecondary),
           ],
         ),
       ),

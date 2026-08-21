@@ -895,7 +895,7 @@ class _ProjectDetail extends StatelessWidget {
                 ),
                 SizedBox(width: 8),
                 Text(
-                  '할 일 ${project.doneCount}/${project.todos.length}',
+                  '할 일 ${project.doneCount}/${project.todoCount}',
                   style: AppTextStyles.caption,
                 ),
               ],

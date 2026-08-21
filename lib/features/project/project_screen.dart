@@ -502,7 +502,7 @@ class _ProjectTileState extends State<_ProjectTile> {
                   AvatarStack(names: project.members, size: 20),
                   Spacer(),
                   Text(
-                    '할 일 ${project.doneCount}/${project.todos.length}',
+                    '할 일 ${project.doneCount}/${project.todoCount}',
                     style: AppTextStyles.caption.copyWith(fontSize: 11),
                   ),
                 ],

@@ -19,6 +19,8 @@ class GlassInputBar extends StatefulWidget {
     this.autofocus = false,
     this.replyLabel,
     this.onCancelReply,
+    this.replyIcon = CupertinoIcons.arrowshape_turn_up_left,
+    this.initialText,
     this.onChanged,
     this.onAttach,
   });
@@ -31,6 +33,16 @@ class GlassInputBar extends StatefulWidget {
   /// 답글 대상 원문. 있으면 입력바 위에 인용 줄이 표시된다.
   final String? replyLabel;
   final VoidCallback? onCancelReply;
+
+  /// 인용 줄 왼쪽 아이콘 — 기본은 답글 화살표.
+  /// **댓글 수정처럼 다른 뜻으로 쓸 때만** 바꾼다 (사내톡은 그대로 답글이다).
+  final IconData replyIcon;
+
+  /// 처음 채워 둘 글 — **댓글 수정**이 쓴다.
+  ///
+  /// 안쪽 컨트롤러가 `initState` 에서 **한 번만** 읽는다. 값이 바뀌면
+  /// `key` 도 같이 바꿔야 새로 그려진다 (안 그러면 앞 글이 그대로 남는다).
+  final String? initialText;
 
   /// 글자가 바뀔 때마다 — 사내톡의 '입력 중' 신호에 쓴다
   final ValueChanged<String>? onChanged;
@@ -49,6 +61,13 @@ class _GlassInputBarState extends State<GlassInputBar> {
   @override
   void initState() {
     super.initState();
+    // **리스너를 붙이기 전에** 채운다 — 붙인 뒤에 넣으면 그 자리에서
+    // `setState` 가 불려서 `initState` 안에서 다시 그리려 든다
+    final initial = widget.initialText;
+    if (initial != null && initial.isNotEmpty) {
+      _controller.text = initial;
+      _hasText = initial.trim().isNotEmpty;
+    }
     _controller.addListener(() {
       final hasText = _controller.text.trim().isNotEmpty;
       if (hasText != _hasText) setState(() => _hasText = hasText);
@@ -98,7 +117,7 @@ class _GlassInputBarState extends State<GlassInputBar> {
                   child: Row(
                     children: [
                       Icon(
-                        CupertinoIcons.arrowshape_turn_up_left,
+                        widget.replyIcon,
                         size: 14,
                         color: AppColors.gray500,
                       ),
