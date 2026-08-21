@@ -117,10 +117,12 @@ class _Day {
 ///
 /// 어느 갈래든 승인만 되면 그날은 결근으로 안 찍힌다 — 결근 판정은 갈래를
 /// 안 가리고 '승인된 휴가가 걸쳐 있나'만 본다 (서버 `_absent_today`).
+/// **반차는 오전·오후를 안 가른다 (2026-08-21 결정).** 반나절이라 일수가 같고
+/// 화면 어디도 그걸로 갈리지 않아서, 고르게 하면 물어보기만 하고 안 쓰는 값이
+/// 된다. 서버는 칸을 남겨 두고 선택으로 받는다 — 다시 나누기로 하면 앱만 고친다.
 enum _LeaveKind {
   full('종일', 1.0, LeaveType.annual, null),
-  morning('오전 반차', 0.5, LeaveType.half, HalfPeriod.am),
-  afternoon('오후 반차', 0.5, LeaveType.half, HalfPeriod.pm),
+  half('반차', 0.5, LeaveType.half, null),
   sick('병가', 0, LeaveType.sick, null),
   etc('기타', 0, LeaveType.etc, null);
 
@@ -143,9 +145,9 @@ enum _LeaveKind {
   /// 연차에서 깎이나 — 신청 화면의 안내와 잔여 검사가 이걸 본다
   bool get deducts => days > 0;
 
+  /// [period] 는 안 본다 — 예전에 오전·오후로 낸 신청도 그냥 `반차`로 읽는다
   static _LeaveKind of(LeaveType type, HalfPeriod? period) => switch (type) {
-    LeaveType.half =>
-      period == HalfPeriod.pm ? _LeaveKind.afternoon : _LeaveKind.morning,
+    LeaveType.half => _LeaveKind.half,
     LeaveType.sick => _LeaveKind.sick,
     // 외근은 앱에서 신청할 수 없지만 서버에 값이 있다 — 받으면 기타로 읽는다
     LeaveType.field || LeaveType.etc => _LeaveKind.etc,

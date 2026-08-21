@@ -515,6 +515,12 @@ class _LeaveComposerState extends State<_LeaveComposer> {
   /// 기본값은 내일 — 오늘 쓰는 월차는 드물다
   late DateTime _date = DateTime.now().add(Duration(days: 1));
 
+  /// 마지막 날 — **하루짜리면 [_date] 와 같다** (기본값이 그렇다).
+  ///
+  /// 병가·예비군처럼 며칠씩 못 나오는 경우가 있어서 기간으로 받는다
+  /// (2026-08-21). 서버·모델은 원래 `endDate` 를 다뤘고 폼만 하루였다.
+  late DateTime _until = _date;
+
   _LeaveKind _kind = _LeaveKind.full;
 
   final _reason = TextEditingController();
@@ -533,16 +539,37 @@ class _LeaveComposerState extends State<_LeaveComposer> {
 
   bool get _ready => _reason.text.trim().isNotEmpty;
 
-  /// 같은 날에 이미 올린 신청이 있으면 막는다 (여러 날짜리 신청도 걸러야 한다)
-  bool get _duplicated =>
-      _leaves.any((l) => l.covers(_date) && l.status.counted);
+  /// 신청하려는 기간에 이미 올린 신청이 걸치면 막는다
+  ///
+  /// **하루가 아니라 기간끼리 겹치는지를 본다** — 3일을 신청하는데 가운데
+  /// 하루만 이미 냈어도 서버에 두 건이 겹쳐 쌓인다.
+  bool get _duplicated => _leaves.any((l) {
+    if (!l.status.counted) return false;
+    for (var d = _date; !d.isAfter(_until); d = d.add(Duration(days: 1))) {
+      if (l.covers(d)) return true;
+    }
+    return false;
+  });
 
-  Future<void> _pickDate() async {
+  Future<void> _pickDate({required bool start}) async {
     final picked = await showAppDialog<DateTime>(
       context,
-      (context) => _DatePicker(initial: _date),
+      // 마지막 날은 시작일보다 앞설 수 없다 — 서버도 `INVALID_RANGE` 로 막는다
+      (context) => _DatePicker(
+        initial: start ? _date : _until,
+        min: start ? null : _date,
+      ),
     );
-    if (picked != null && mounted) setState(() => _date = picked);
+    if (picked == null || !mounted) return;
+    setState(() {
+      if (start) {
+        _date = picked;
+        // 시작일을 뒤로 밀면 마지막 날도 같이 민다 (거꾸로 남으면 안 된다)
+        if (_until.isBefore(picked)) _until = picked;
+      } else {
+        _until = picked;
+      }
+    });
   }
 
   void _submit() {
@@ -551,13 +578,18 @@ class _LeaveComposerState extends State<_LeaveComposer> {
       return;
     }
     if (_duplicated) {
-      AppToast.show(context, '그 날짜에는 이미 신청한 월차가 있어요');
+      AppToast.show(context, '그 기간에는 이미 신청한 것이 있어요');
       return;
     }
     // 아직 서버에 안 보낸 초안 — 부르는 쪽이 이걸로 신청 요청을 만든다
     Navigator.pop(
       context,
-      _Leave(date: _date, kind: _kind, reason: _reason.text.trim()),
+      _Leave(
+        date: _date,
+        endDate: _until,
+        kind: _kind,
+        reason: _reason.text.trim(),
+      ),
     );
   }
 
@@ -566,45 +598,17 @@ class _LeaveComposerState extends State<_LeaveComposer> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text('날짜', style: AppTextStyles.label),
+        Text('기간', style: AppTextStyles.label),
         SizedBox(height: 8),
-        Pressable(
-          onTap: _pickDate,
-          scale: 0.99,
-          child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            decoration: BoxDecoration(
-              color: AppColors.gray50,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.calendar_today_rounded,
-                  size: 16,
-                  color: AppColors.primary,
-                ),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    '${_date.year}년 ${_date.month}월 ${_date.day}일 '
-                    '(${_weekday(_date)})',
-                    style: AppTextStyles.body2,
-                  ),
-                ),
-                Icon(
-                  CupertinoIcons.chevron_right,
-                  size: 14,
-                  color: AppColors.gray400,
-                ),
-              ],
-            ),
-          ),
-        ),
+        // 하루짜리는 두 칸이 같은 날이라 예전과 같게 읽힌다.
+        // 며칠씩 못 나오는 경우(병가·예비군)가 있어서 기간으로 받는다
+        _DayField(date: _date, onTap: () => _pickDate(start: true)),
+        SizedBox(height: 8),
+        _DayField(date: _until, onTap: () => _pickDate(start: false)),
         SizedBox(height: 20),
         Text('종류', style: AppTextStyles.label),
         SizedBox(height: 8),
-        // **칩이다** — 갈래가 다섯이라 한 줄 분할로는 `오전 반차` 가 짤린다
+        // **칩이다** — 갈래가 넷이고 나중에 더 늘 수 있어서 줄바꿈으로 접는다
         // (2026-08-21). 회원 등록의 방문 경로 고르개와 같은 모양이다.
         Wrap(
           spacing: 8,
@@ -618,12 +622,8 @@ class _LeaveComposerState extends State<_LeaveComposer> {
               ),
           ],
         ),
-        SizedBox(height: 8),
-        Text(
-          // 병가·기타는 연차에서 안 깎인다 — `0일이 차감돼요` 는 말이 안 된다
-          _kind.deducts ? '${_dayCount(_kind.days)}일이 차감돼요' : '연차에서 차감되지 않아요',
-          style: AppTextStyles.caption.copyWith(fontSize: 12),
-        ),
+        // 차감 안내는 안 띄운다 (2026-08-21 요청) — 기간까지 받게 되면서
+        // `0.5일이 차감돼요` 한 줄로는 맞는 말을 할 수 없다
         SizedBox(height: 20),
         Text('사유', style: AppTextStyles.label),
         SizedBox(height: 8),
@@ -726,6 +726,50 @@ class _LeaveComposerState extends State<_LeaveComposer> {
 ///
 /// 머티리얼 기본 달력은 결이 달라서 근태 달력과 같은 모양으로 직접 그린다.
 /// 지난 날짜는 고를 수 없다 (월차는 앞으로 쓸 날만 신청한다).
+/// 날짜 한 칸 — 시작일·마지막 날이 같은 모양을 쓴다
+///
+/// 예전 한 칸짜리 날짜 줄을 그대로 떼어 낸 것이다 (여백·아이콘·글꼴 동일).
+class _DayField extends StatelessWidget {
+  _DayField({required this.date, required this.onTap});
+
+  final DateTime date;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Pressable(
+    onTap: onTap,
+    scale: 0.99,
+    child: Container(
+      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      decoration: BoxDecoration(
+        color: AppColors.gray50,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.calendar_today_rounded,
+            size: 16,
+            color: AppColors.primary,
+          ),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '${date.year}년 ${date.month}월 ${date.day}일 (${_weekday(date)})',
+              style: AppTextStyles.body2,
+            ),
+          ),
+          Icon(
+            CupertinoIcons.chevron_right,
+            size: 14,
+            color: AppColors.gray400,
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 /// 종류 칩 — 회원 등록의 `_VisitPathPicker` 와 같은 값이다
 ///
 /// 갈래가 다섯이라 한 줄 분할(`SegmentedTabs`)로는 폰에서 `오전 반차` 가
@@ -760,9 +804,13 @@ class _KindChip extends StatelessWidget {
 }
 
 class _DatePicker extends StatefulWidget {
-  _DatePicker({required this.initial});
+  _DatePicker({required this.initial, this.min});
 
   final DateTime initial;
+
+  /// 이 날 이전은 못 고른다 — **마지막 날 고르개가 시작일을 넘긴다.**
+  /// 안 주면 오늘이 하한이다 (지난 날짜로는 신청하지 않는다).
+  final DateTime? min;
 
   @override
   State<_DatePicker> createState() => _DatePickerState();
@@ -772,11 +820,16 @@ class _DatePickerState extends State<_DatePicker> {
   late DateTime _month = DateTime(widget.initial.year, widget.initial.month);
   late DateTime _picked = widget.initial;
 
-  /// 오늘 이전으로는 못 넘어간다
-  bool get _canGoBack {
+  /// 고를 수 있는 첫날 — 안 주면 오늘
+  DateTime get _floor {
+    final m = widget.min;
+    if (m != null) return DateTime(m.year, m.month, m.day);
     final now = DateTime.now();
-    return _month.isAfter(DateTime(now.year, now.month));
+    return DateTime(now.year, now.month, now.day);
   }
+
+  /// 첫날이 든 달보다 앞으로는 못 넘어간다
+  bool get _canGoBack => _month.isAfter(DateTime(_floor.year, _floor.month));
 
   void _move(int delta) {
     setState(() => _month = DateTime(_month.year, _month.month + delta));
@@ -784,8 +837,8 @@ class _DatePickerState extends State<_DatePicker> {
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    // 시작일 고르개는 오늘, 마지막 날 고르개는 시작일이 하한이다
+    final today = _floor;
     final lastDay = DateTime(_month.year, _month.month + 1, 0).day;
     final lead = _month.weekday % 7;
     final rows = ((lead + lastDay) / 7).ceil();
