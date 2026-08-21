@@ -13,6 +13,8 @@ import '../../core/widgets/display/avatar.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/glass/top_frost.dart';
+import '../../core/widgets/input/mode_switch.dart'
+    show slideCurve, slideDuration;
 import '../../core/widgets/input/pressable.dart';
 import 'chat_screen.dart';
 import 'chat_store.dart';
@@ -372,18 +374,38 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   ),
                 ),
                 SizedBox(height: 28),
-                Row(
-                  children: [
-                    for (var i = 0; i < _shareTabs.length; i++)
-                      Expanded(
-                        child: _ShareTab(
-                          label: _shareTabs[i],
-                          count: _shared[i].length,
-                          selected: _shareTab == i,
-                          onTap: () => setState(() => _shareTab = i),
+                LayoutBuilder(
+                  builder: (context, box) {
+                    final cell = box.maxWidth / _shareTabs.length;
+                    return Stack(
+                      children: [
+                        Row(
+                          children: [
+                            for (var i = 0; i < _shareTabs.length; i++)
+                              Expanded(
+                                child: _ShareTab(
+                                  label: _shareTabs[i],
+                                  count: _shared[i].length,
+                                  selected: _shareTab == i,
+                                  onTap: () => setState(() => _shareTab = i),
+                                ),
+                              ),
+                          ],
                         ),
-                      ),
-                  ],
+                        // 파란 줄 **하나**가 미끄러진다 (2026-08-21 대표 요청).
+                        // 칸마다 테두리를 켰다 껐다 하면 툭 튄다 — 업무·랭킹
+                        // 탭과 같은 빠르기를 쓴다 (`slideDuration`)
+                        AnimatedPositioned(
+                          duration: slideDuration,
+                          curve: slideCurve,
+                          left: cell * _shareTab,
+                          width: cell,
+                          bottom: 0,
+                          child: Container(height: 2, color: AppColors.primary),
+                        ),
+                      ],
+                    );
+                  },
                 ),
                 Container(height: 1, color: AppColors.gray100),
                 if (_shared[_shareTab].isEmpty) ...[
@@ -738,16 +760,10 @@ class _ShareTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: selected ? AppColors.primary : Colors.transparent,
-              width: 2,
-            ),
-          ),
-        ),
+      // **파란 줄은 여기서 안 그린다** — 위에서 줄 하나가 미끄러져 온다.
+      // 아래 여백 14 = 예전 여백 12 + 테두리 2 (자리는 그대로다)
+      child: Padding(
+        padding: EdgeInsets.only(top: 12, bottom: 14),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [

@@ -10,51 +10,7 @@ class _WorkItem {
   final bool checklist;
 }
 
-class _WorkTab extends StatelessWidget {
-  _WorkTab({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-    this.expand = false,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  /// true면 주어진 칸을 채우고 가운데 정렬 (내역 화면처럼 Expanded로 쓸 때)
-  final bool expand;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Text(
-      label,
-      maxLines: 1,
-      style: AppTextStyles.body2.copyWith(
-        fontSize: 14,
-        color: selected ? AppColors.primary : AppColors.gray500,
-        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-      ),
-    );
-
-    // 칸이 좁으면 글자를 줄여서 맞춘다 (옆으로 밀리거나 잘리지 않게)
-    final fitted = FittedBox(fit: BoxFit.scaleDown, child: text);
-
-    return Pressable(
-      onTap: onTap,
-      child: Container(
-        // 밑줄이 글자보다 살짝 넓게 깔리도록 좌우 여유를 준다
-        padding: EdgeInsets.symmetric(vertical: 12, horizontal: 2),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: selected ? AppColors.primary : Colors.transparent,
-              width: 2,
-            ),
-          ),
-        ),
-        child: expand ? Center(child: fitted) : fitted,
-      ),
-    );
-  }
-}
+// 밑줄 탭 위젯(`_WorkTab`)은 [UnderlineTabs] 로 옮겼다 (2026-08-21).
+//
+// 칸마다 아래 테두리를 켰다 껐다 해서 옮길 때 툭 튀었다. 지금은 파란 줄
+// 하나가 미끄러진다 — 내역 탭도 같은 것을 쓰므로 둘이 갈릴 수 없다.

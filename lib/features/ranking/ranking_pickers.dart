@@ -20,77 +20,96 @@ class _PhoneTabs extends StatelessWidget {
   final int selected;
   final ValueChanged<int> onSelect;
 
-  /// 글자 폭을 잴 때 쓰는 스타일 — **늘 굵게** 잰다
-  ///
-  /// 고른 칸만 굵어지는데, 그때그때 재면 탭을 옮길 때마다 칸 폭이 달라져서
-  /// 글자들이 좌우로 흔들린다. 제일 넓은 상태로 고정해 둔다.
-  static TextStyle get _measureStyle =>
-      AppTextStyles.body2.copyWith(fontSize: 14, fontWeight: FontWeight.w700);
-
-  double _widthOf(String text, TextScaler scaler) {
-    final painter = TextPainter(
-      text: TextSpan(text: text, style: _measureStyle),
-      textDirection: TextDirection.ltr,
-      textScaler: scaler,
-      maxLines: 1,
-    )..layout();
-    return painter.width;
-  }
+  /// 글자 위에 두는 여백 — 밑줄까지의 거리
+  static const _bottom = 10.0;
 
   @override
   Widget build(BuildContext context) {
+    final labels = [for (final metric in _Metric.values) metric.short];
     final scaler = MediaQuery.textScalerOf(context);
-    final widths = [
-      for (final metric in _Metric.values) _widthOf(metric.short, scaler),
+    final textWidths = [
+      // **늘 굵게** 잰다 — 고른 칸만 굵어지는데 그때그때 재면 탭을 옮길
+      // 때마다 칸 폭이 달라져서 글자들이 좌우로 흔들린다
+      for (final label in labels) measureLabel(context, label, bold: true),
     ];
-    final textTotal = widths.fold<double>(0, (sum, w) => sum + w);
+    final textTotal = textWidths.fold<double>(0, (sum, w) => sum + w);
+    final line = TextPainter(
+      text: TextSpan(text: '가', style: segmentTextStyle(selected: true)),
+      textDirection: TextDirection.ltr,
+      textScaler: scaler,
+    )..layout();
 
     return LayoutBuilder(
       builder: (context, box) {
         // 글자만으로도 폭이 모자라면(글자 크기를 크게 키운 기기) 예전처럼 등분한다.
         // 그때는 `FittedBox` 가 줄여서 맞춘다 — 넘쳐서 잘리는 것보다 낫다.
-        final gap = (box.maxWidth - textTotal) / widths.length;
-        final last = _Metric.values.length - 1;
-        return Row(
-          children: [
-            for (var i = 0; i < _Metric.values.length; i++)
-              // 마지막 칸은 남는 폭을 그대로 받는다 — 소수점이 쌓여 1px 넘치면
-              // 줄이 통째로 빨간 넘침 줄무늬가 된다
-              if (gap <= 0 || i == last)
-                Expanded(child: _tab(i))
-              else
-                SizedBox(width: widths[i] + gap, child: _tab(i)),
-          ],
+        final gap = (box.maxWidth - textTotal) / labels.length;
+        final even = gap <= 0;
+        // 칸마다의 폭 — 마지막 칸은 남는 폭을 그대로 받는다. 소수점이 쌓여
+        // 1px 넘치면 줄이 통째로 빨간 넘침 줄무늬가 된다
+        final cells = <double>[];
+        for (var i = 0; i < labels.length; i++) {
+          if (i == labels.length - 1) {
+            cells.add(box.maxWidth - cells.fold<double>(0, (a, b) => a + b));
+          } else {
+            cells.add(
+              even ? box.maxWidth / labels.length : textWidths[i] + gap,
+            );
+          }
+        }
+        final index = selected.clamp(0, labels.length - 1);
+        var left = 0.0;
+        for (var i = 0; i < index; i++) {
+          left += cells[i];
+        }
+
+        return SizedBox(
+          height: line.height + _bottom + 2,
+          child: Stack(
+            children: [
+              // 회색 밑줄은 **한 줄로 쭉** 이어진다 — 예전에는 칸마다 그렸다
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Container(height: 2, color: AppColors.gray100),
+              ),
+              Row(
+                children: [
+                  for (var i = 0; i < labels.length; i++)
+                    SizedBox(width: cells[i], child: _tab(i, labels[i])),
+                ],
+              ),
+              // 파란 줄 **하나**가 미끄러진다 (2026-08-21 대표 요청).
+              // 목록바가 도는 자리는 다 같은 빠르기를 쓴다 (`slideDuration`)
+              AnimatedPositioned(
+                duration: slideDuration,
+                curve: slideCurve,
+                left: left,
+                width: cells[index],
+                bottom: 0,
+                child: Container(height: 2, color: AppColors.primary),
+              ),
+            ],
+          ),
         );
       },
     );
   }
 
-  Widget _tab(int i) {
+  Widget _tab(int i, String label) {
     return Pressable(
       onTap: () => onSelect(i),
-      child: Container(
-        padding: EdgeInsets.only(bottom: 10),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: i == selected ? AppColors.primary : AppColors.gray100,
-              width: 2,
-            ),
-          ),
-        ),
+      child: Padding(
+        padding: EdgeInsets.only(bottom: _bottom + 2),
         child: Center(
           // 칸보다 이름이 길면 줄여서 맞춘다 (칸을 등분으로 되돌린 경우)
           child: FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
-              _Metric.values[i].short,
+              label,
               maxLines: 1,
-              style: AppTextStyles.body2.copyWith(
-                fontSize: 14,
-                color: i == selected ? AppColors.primary : AppColors.gray500,
-                fontWeight: i == selected ? FontWeight.w700 : FontWeight.w500,
-              ),
+              style: segmentTextStyle(selected: i == selected),
             ),
           ),
         ),

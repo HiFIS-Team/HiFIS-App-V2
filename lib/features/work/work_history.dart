@@ -334,25 +334,10 @@ class _HistoryScreenState extends State<_HistoryScreen>
                   SizedBox(height: widget.tabs ? 8 : 14),
                   // 내 내역 / 전체 내역 전환 탭 (업무 탭과 같은 밑줄 스타일)
                   if (widget.tabs)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _WorkTab(
-                            label: '내 내역',
-                            selected: !_all,
-                            expand: true,
-                            onTap: () => setState(() => _all = false),
-                          ),
-                        ),
-                        Expanded(
-                          child: _WorkTab(
-                            label: '전체 내역',
-                            selected: _all,
-                            expand: true,
-                            onTap: () => setState(() => _all = true),
-                          ),
-                        ),
-                      ],
+                    UnderlineTabs(
+                      labels: const ['내 내역', '전체 내역'],
+                      selected: _all ? 1 : 0,
+                      onSelect: (i) => setState(() => _all = i == 1),
                     ),
                   Container(height: 1, color: AppColors.gray100),
                   if (showSkeleton)

@@ -245,17 +245,37 @@ class _ViewToggle extends StatelessWidget {
   final bool grid;
   final ValueChanged<bool> onChanged;
 
+  /// 칸 하나의 폭 — 흰 알약을 옮기려면 미리 알아야 한다
+  static const _cell = 42.0;
+
   @override
   Widget build(BuildContext context) {
     return Container(
       height: 38,
       padding: EdgeInsets.all(4),
       decoration: segmentTrack(),
-      child: Row(
-        children: [
-          _button(Icons.grid_view_rounded, true),
-          _button(Icons.format_list_bulleted_rounded, false),
-        ],
+      child: SizedBox(
+        width: _cell * 2,
+        child: Stack(
+          children: [
+            // 흰 알약 **하나**가 자리를 옮긴다 — 목록바와 같은 빠르기다
+            AnimatedPositioned(
+              duration: slideDuration,
+              curve: slideCurve,
+              left: grid ? 0 : _cell,
+              width: _cell,
+              top: 0,
+              bottom: 0,
+              child: DecoratedBox(decoration: segmentFill(selected: true)),
+            ),
+            Row(
+              children: [
+                _button(Icons.grid_view_rounded, true),
+                _button(Icons.format_list_bulleted_rounded, false),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -264,14 +284,14 @@ class _ViewToggle extends StatelessWidget {
     final selected = grid == value;
     return Pressable(
       onTap: () => onChanged(value),
-      child: Container(
-        width: 42,
-        alignment: Alignment.center,
-        decoration: segmentFill(selected: selected),
-        child: Icon(
-          icon,
-          size: 17,
-          color: selected ? AppColors.primary : AppColors.gray500,
+      child: SizedBox(
+        width: _cell,
+        child: Center(
+          child: Icon(
+            icon,
+            size: 17,
+            color: selected ? AppColors.primary : AppColors.gray500,
+          ),
         ),
       ),
     );

@@ -357,25 +357,15 @@ class _WorkScreenState extends State<WorkScreen>
     // 좁은 화면에서는 글자를 살짝 줄여서라도 옆으로 밀리지 않게 한다.
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 10),
-      child: Row(
-        children: [
-          for (var i = 0; i < _items.length; i++)
-            Expanded(
-              // 밑줄은 칸 전체가 아니라 글자 폭에 맞춘다
-              child: Center(
-                child: _WorkTab(
-                  label: _items[i].label,
-                  selected: _tab == i,
-                  // 데스크톱 탭(`SegmentedTabs`)과 **같이** 헤더를 맞춘다.
-                  // 한쪽만 고쳐서 다른 항목에도 `+` 가 남았던 자리다.
-                  onTap: () => setState(() {
-                    _tab = i;
-                    _syncHeaderAction();
-                  }),
-                ),
-              ),
-            ),
-        ],
+      child: UnderlineTabs(
+        labels: [for (final item in _items) item.label],
+        selected: _tab,
+        // 데스크톱 탭(`SegmentedTabs`)과 **같이** 헤더를 맞춘다.
+        // 한쪽만 고쳐서 다른 항목에도 `+` 가 남았던 자리다.
+        onSelect: (i) => setState(() {
+          _tab = i;
+          _syncHeaderAction();
+        }),
       ),
     );
   }
