@@ -17,6 +17,7 @@ import '../../core/widgets/display/avatar.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/feedback/empty_card.dart';
+import '../../core/widgets/feedback/failed_card.dart';
 import '../../core/widgets/feedback/empty_state.dart';
 import '../../core/widgets/glass/glass_bottom_button.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
@@ -76,13 +77,28 @@ class _ApprovalScreenState extends State<ApprovalScreen>
     _load();
   }
 
+  /// 못 받았다 — **목록이 비어 있을 때만** 실패 카드를 낸다 (2026-08-21)
+  ///
+  /// 안 두면 못 받은 것이 `대기 결재가 없어요` 로 떨어져서 **없는 것처럼
+  /// 보인다.** 랭킹이 같은 자리에서 걸렸다 — 공지·알림·프로젝트·조직도는
+  /// 다 실패 카드를 낸다.
+  bool _failed = false;
+
   Future<void> _load() async {
     try {
       await _loadDocs();
+      _failed = false;
     } catch (error) {
+      _failed = true;
       if (mounted) AppToast.show(context, messageOf(error));
     }
     if (mounted) setState(endLoad);
+  }
+
+  /// 다시 시도 — **여기서는 뼈대를 바로 띄운다** (claude.md 의 `_retry()` 예외)
+  void _retry() {
+    setState(beginLoad);
+    _load();
   }
 
   List<_Doc> get _visible {
@@ -233,6 +249,8 @@ class _ApprovalScreenState extends State<ApprovalScreen>
         onFilter: (v) => setState(() => _filter = v),
         onCreate: _canWrite ? _create : null,
         onOpen: _openDoc,
+        // 받아 둔 것이 있으면 그대로 보여준다 — 실패 카드는 빌 때만
+        onRetry: _failed && _docs.isEmpty ? _retry : null,
       );
     }
 
@@ -255,6 +273,7 @@ class _ApprovalScreenState extends State<ApprovalScreen>
                 }),
                 onSelect: (doc) => setState(() => _selectedId = doc.id),
                 onCreate: _canWrite ? _create : null,
+                onRetry: _failed && _docs.isEmpty ? _retry : null,
               ),
             ),
           ),

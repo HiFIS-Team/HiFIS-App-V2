@@ -10,6 +10,7 @@ class _DocList extends StatelessWidget {
     required this.onFilter,
     required this.onSelect,
     required this.onCreate,
+    this.onRetry,
   });
 
   final List<_Doc> docs;
@@ -20,6 +21,9 @@ class _DocList extends StatelessWidget {
 
   /// null 이면 올리기 버튼을 안 그린다 (MASTER·ADMIN)
   final VoidCallback? onCreate;
+
+  /// 못 받았다 — 넘어오면 빈 문구 대신 **다시 시도**를 낸다 (2026-08-21)
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -74,14 +78,17 @@ class _DocList extends StatelessWidget {
         ),
         Expanded(
           child: docs.isEmpty
+              // 못 받은 것과 없는 것을 가른다 — 다른 화면과 같은 규칙이다
               ? Padding(
                   padding: EdgeInsets.fromLTRB(20, 12, 20, 0),
-                  child: Text(
-                    '${filter.label} 결재가 없어요',
-                    style: AppTextStyles.body2.copyWith(
-                      color: AppColors.textTertiary,
-                    ),
-                  ),
+                  child: onRetry == null
+                      ? Text(
+                          '${filter.label} 결재가 없어요',
+                          style: AppTextStyles.body2.copyWith(
+                            color: AppColors.textTertiary,
+                          ),
+                        )
+                      : FailedCard(onRetry: onRetry!),
                 )
               : ListView.separated(
                   padding: EdgeInsets.fromLTRB(12, 0, 12, 24),
@@ -114,9 +121,19 @@ class _StateTabs extends StatelessWidget {
   final _State selected;
   final ValueChanged<_State> onSelect;
 
+  /// 고른 칸에 깔리는 면 — 폰과 PC 가 모양이 다르다 (테두리 유무)
+  BoxDecoration _fill(bool phone) => phone
+      ? segmentFill(selected: true)
+      : BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.gray100),
+        );
+
   @override
   Widget build(BuildContext context) {
     final phone = !isDesktop;
+    final index = _State.tabs.indexOf(selected);
 
     return Container(
       height: 44,
@@ -127,46 +144,53 @@ class _StateTabs extends StatelessWidget {
               color: AppColors.gray50,
               borderRadius: BorderRadius.circular(14),
             ),
-      child: Row(
-        children: [
-          // 회수는 탭을 따로 두지 않는다 — 반려 칸에 같이 들어간다
-          for (final state in _State.tabs)
-            Expanded(
-              child: Pressable(
-                onTap: () => onSelect(state),
-                // 배경은 애니메이션 없이 즉시 바꾼다
-                child: Container(
-                  decoration: phone
-                      ? segmentFill(selected: state == selected)
-                      : BoxDecoration(
-                          color: state == selected
-                              ? AppColors.surface
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: state == selected
-                                ? AppColors.gray100
-                                : Colors.transparent,
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final cell = box.maxWidth / _State.tabs.length;
+          return Stack(
+            children: [
+              // 고른 면 **하나**가 미끄러진다 (2026-08-21 대표 요청).
+              // 칸마다 켰다 껐다 하면 툭 튄다 — 다른 목록바와 같은 빠르기다
+              if (index >= 0)
+                AnimatedPositioned(
+                  duration: slideDuration,
+                  curve: slideCurve,
+                  left: cell * index,
+                  width: cell,
+                  top: 0,
+                  bottom: 0,
+                  child: DecoratedBox(decoration: _fill(phone)),
+                ),
+              Row(
+                children: [
+                  // 회수는 탭을 따로 두지 않는다 — 반려 칸에 같이 들어간다
+                  for (final state in _State.tabs)
+                    Expanded(
+                      child: Pressable(
+                        onTap: () => onSelect(state),
+                        child: Center(
+                          child: Text(
+                            state.label,
+                            style: AppTextStyles.body2.copyWith(
+                              fontSize: 13,
+                              color: state == selected
+                                  ? AppColors.primary
+                                  : (phone
+                                        ? AppColors.gray600
+                                        : AppColors.gray500),
+                              fontWeight: state == selected
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                            ),
                           ),
                         ),
-                  child: Center(
-                    child: Text(
-                      state.label,
-                      style: AppTextStyles.body2.copyWith(
-                        fontSize: 13,
-                        color: state == selected
-                            ? AppColors.primary
-                            : (phone ? AppColors.gray600 : AppColors.gray500),
-                        fontWeight: state == selected
-                            ? FontWeight.w700
-                            : FontWeight.w500,
                       ),
                     ),
-                  ),
-                ),
+                ],
               ),
-            ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }

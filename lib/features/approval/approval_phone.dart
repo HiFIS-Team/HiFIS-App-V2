@@ -17,11 +17,16 @@ class _ApprovalPhone extends StatelessWidget {
     required this.onFilter,
     required this.onCreate,
     required this.onOpen,
+    this.onRetry,
   });
 
   final List<_Doc> docs;
   final _State filter;
   final ValueChanged<_State> onFilter;
+
+  /// 못 받았다 — 넘어오면 빈 카드 대신 **다시 시도**를 낸다 (2026-08-21).
+  /// null 이면 그냥 비어 있는 것이다
+  final VoidCallback? onRetry;
 
   /// null 이면 올릴 수 없는 사람이라 `+` 를 안 그린다 (MASTER·ADMIN)
   final VoidCallback? onCreate;
@@ -48,10 +53,14 @@ class _ApprovalPhone extends StatelessWidget {
           _StateTabs(selected: filter, onSelect: onFilter),
           SizedBox(height: 16),
           if (docs.isEmpty)
-            EmptyCard(
-              icon: CupertinoIcons.tray,
-              text: '${filter.label} 결재가 없어요',
-            )
+            // 못 받은 것과 없는 것을 가른다 — 다른 화면과 같은 규칙이다
+            if (onRetry case final retry?)
+              FailedCard(onRetry: retry)
+            else
+              EmptyCard(
+                icon: CupertinoIcons.tray,
+                text: '${filter.label} 결재가 없어요',
+              )
           else
             for (var i = 0; i < docs.length; i++) ...[
               if (i > 0) SizedBox(height: 12),
