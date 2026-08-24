@@ -463,7 +463,6 @@ class ProjectApi {
         'assigneeIds': ?assigneeIds,
         'ownerId': ?ownerId,
         'color': ?color,
-        'todos': todos,
       },
     );
     return Project.fromJson(data!);
