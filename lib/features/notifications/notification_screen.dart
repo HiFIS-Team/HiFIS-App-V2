@@ -237,6 +237,22 @@ class _NotificationScreenState extends State<NotificationScreen>
 /// 받아 둔 알림 — 헤더 종 배지가 화면 밖에서도 세어야 해서 모듈 전역으로 둔다
 final _items = <AppNotification>[];
 
+/// 홈 미리보기에서 특정 항목과 연결된 알림 중 가장 최근 시각을 찾는다.
+/// 알림 링크가 없는 항목은 null을 돌려줘 생성 시각으로 정렬하게 한다.
+DateTime? latestNotificationAt(String prefix, String id) {
+  DateTime? latest;
+  for (final item in _items) {
+    final link = item.link;
+    if (link == null || !link.startsWith('/$prefix/')) continue;
+    final linkedId = link.substring('/$prefix/'.length).split('/').first;
+    if (linkedId != id) continue;
+    if (latest == null || item.createdAt.isAfter(latest)) {
+      latest = item.createdAt;
+    }
+  }
+  return latest;
+}
+
 Future<void> _loadNotifications() async {
   final rows = await NotificationApi.list();
   _items

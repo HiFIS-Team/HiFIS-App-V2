@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
@@ -197,29 +198,43 @@ class ChatStore extends ChangeNotifier {
     _append(roomId, draft);
 
     try {
-      // **한꺼번에 올린다.** 하나씩 기다리면 장수만큼 시간이 곱해진다.
-      // 올리기 전에 줄인다 — 사진첩 원본은 3~5MB 라 LTE 에서 장당 10초가 넘는다
-      final uploaded = await Future.wait([
-        for (final (path, name) in files)
-          shrinkPhoto(path, name).then((small) async {
-            final at = await ChatApi.uploadAttachment(
+      // 압축은 메인 isolate에서 큰 버퍼를 만들기 때문에 한 장씩 처리한다.
+      // 동시에 돌리면 여러 장의 원본·디코드·JPEG 버퍼가 겹쳐 UI가 끊긴다.
+      final prepared = <(String original, String path, String name)>[];
+      try {
+        for (final (path, name) in files) {
+          final small = await shrinkPhoto(path, name);
+          prepared.add((path, small.$1, small.$2));
+        }
+
+        // 압축이 끝난 작은 파일만 동시에 올려 네트워크 대기 시간을 줄인다.
+        final uploaded = await Future.wait([
+          for (final (original, path, name) in prepared)
+            ChatApi.uploadAttachment(
               roomId,
-              small.$1,
-              filename: small.$2,
-            );
-            return (at.url, small.$1);
-          }),
-      ]);
-      // 올린 사진은 기기에 그대로 있다 — 서버 주소로 바뀐 뒤에도 이걸로 그린다
-      for (final (url, local) in uploaded) {
-        _rememberLocal(url, local);
+              path,
+              filename: name,
+            ).then((at) => (at.url, original)),
+        ]);
+        // 서버 전송에는 압축본을 쓰고, 전송 뒤에도 미리보기는 원본을 유지한다.
+        for (final (url, local) in uploaded) {
+          _rememberLocal(url, local);
+        }
+        final sent = await ChatApi.send(
+          roomId,
+          body: '',
+          attachments: [for (final (url, _) in uploaded) url],
+        );
+        _replaceDraft(roomId, draft.id, sent);
+      } finally {
+        for (final (original, path, _) in prepared) {
+          if (path != original) {
+            try {
+              await File(path).delete();
+            } catch (_) {}
+          }
+        }
       }
-      final sent = await ChatApi.send(
-        roomId,
-        body: '',
-        attachments: [for (final (url, _) in uploaded) url],
-      );
-      _replaceDraft(roomId, draft.id, sent);
     } catch (error) {
       // 실패하면 임시 말풍선을 걷어낸다 — 안 간 사진이 간 것처럼 남으면 안 된다
       _remove(roomId, draft.id);

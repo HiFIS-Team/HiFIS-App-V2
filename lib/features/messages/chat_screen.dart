@@ -585,8 +585,32 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     return '읽음';
   }
 
+  bool _sameMessageMinute(ChatMessage previous, ChatMessage message) {
+    final previousTime = previous.createdAt;
+    final messageTime = message.createdAt;
+    return !previous.isSystem &&
+        !message.isSystem &&
+        previous.senderId == message.senderId &&
+        previousTime.year == messageTime.year &&
+        previousTime.month == messageTime.month &&
+        previousTime.day == messageTime.day &&
+        previousTime.hour == messageTime.hour &&
+        previousTime.minute == messageTime.minute;
+  }
+
+  String _messageTime(DateTime time) {
+    final hour = time.hour % 12 == 0 ? 12 : time.hour % 12;
+    final minute = time.minute.toString().padLeft(2, '0');
+    return '${time.hour < 12 ? '오전' : '오후'} $hour:$minute';
+  }
+
   /// 말풍선 한 줄 — 시스템 안내는 가운데 회색 글로 그린다
-  Widget _messageRow(ChatMessage message, bool desktop) {
+  Widget _messageRow(
+    ChatMessage message,
+    bool desktop,
+    bool showSender,
+    bool showTime,
+  ) {
     if (message.isSystem) {
       return Padding(
         padding: EdgeInsets.symmetric(vertical: 10),
@@ -624,6 +648,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     text: message.body,
                     sender: name,
                     sentAt: message.createdAt,
+                    timeLabel: _messageTime(message.createdAt),
+                    showTime: showTime,
                     attachments: message.attachments,
                     replyTo: message.replyTo?.preview,
                     reaction: reaction,
@@ -638,6 +664,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     color: sender?.color ?? staffOf(name).color,
                     emoji: null,
                     text: message.body,
+                    timeLabel: _messageTime(message.createdAt),
+                    showProfile: showSender,
+                    showTime: showTime,
                     attachments: message.attachments,
                     replyTo: message.replyTo?.preview,
                     reaction: reaction,
@@ -680,7 +709,21 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               children: [
                 Center(child: Text('오늘', style: AppTextStyles.caption)),
                 SizedBox(height: 16),
-                for (final message in _messages) _messageRow(message, desktop),
+                for (var index = 0; index < _messages.length; index++)
+                  _messageRow(
+                    _messages[index],
+                    desktop,
+                    index == 0 ||
+                        !_sameMessageMinute(
+                          _messages[index - 1],
+                          _messages[index],
+                        ),
+                    index == _messages.length - 1 ||
+                        !_sameMessageMinute(
+                          _messages[index],
+                          _messages[index + 1],
+                        ),
+                  ),
                 if (_readLabel case final label?)
                   Align(
                     alignment: Alignment.centerRight,
@@ -731,45 +774,51 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   ),
                   SizedBox(width: 4),
                   // 이름 영역 탭 → 채팅방 상세로 이동
-                  Pressable(
-                    onTap: _openDetail,
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 36,
-                          height: 36,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: _headColor.withValues(
-                              alpha: _isGroup ? 0.12 : 1,
+                  Expanded(
+                    child: Pressable(
+                      onTap: _openDetail,
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 36,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: _headColor.withValues(
+                                alpha: _isGroup ? 0.12 : 1,
+                              ),
+                              shape: BoxShape.circle,
                             ),
-                            shape: BoxShape.circle,
+                            child: Text(
+                              _isGroup ? '💬' : _title.characters.first,
+                              style: _isGroup
+                                  ? TextStyle(fontSize: 15)
+                                  : TextStyle(
+                                      fontFamily: AppTextStyles.fontFamily,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                            ),
                           ),
-                          child: Text(
-                            _isGroup ? '💬' : _title.characters.first,
-                            style: _isGroup
-                                ? TextStyle(fontSize: 15)
-                                : TextStyle(
-                                    fontFamily: AppTextStyles.fontFamily,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.title3,
+                            ),
                           ),
-                        ),
-                        SizedBox(width: 10),
-                        // **Flexible 로 감싸지 않는다** — 이 Row 는 폭이 무한대라
-                        // flex 를 주면 레이아웃이 실패하고 화면 전체가 안 그려진다
-                        // (실제 발생: 입력칸이 안 보이고 멈춘 것처럼 됐다)
-                        Text(_title, style: AppTextStyles.title3),
-                        SizedBox(width: 2),
-                        Icon(
-                          CupertinoIcons.chevron_forward,
-                          size: 15,
-                          color: AppColors.gray400,
-                        ),
-                      ],
+                          SizedBox(width: 2),
+                          Icon(
+                            CupertinoIcons.chevron_forward,
+                            size: 15,
+                            color: AppColors.gray400,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],

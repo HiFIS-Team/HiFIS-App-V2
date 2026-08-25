@@ -291,6 +291,7 @@ class _ProjectComposerState extends State<_ProjectComposer> {
     owner: _owner,
     start: _edit?.start ?? DateTime.now(),
     due: _due,
+    createdAt: _edit?.createdAt ?? DateTime.now(),
     // 명단 순서대로 정렬해 두면 아바타 줄이 화면마다 같은 순서로 보인다
     members: [
       for (final staff in staffList)

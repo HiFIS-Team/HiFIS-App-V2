@@ -116,7 +116,7 @@ class _ProjectsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 진행 중인 프로젝트를 마감 임박순으로
+    // 관련 알림 최신순, 알림이 없으면 프로젝트 생성순
     final briefs = projectBriefs(count);
 
     final rows = [
@@ -244,7 +244,7 @@ class _NoticeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 고정 공지가 위, 그다음 최신순으로 5개
+    // 관련 알림 최신순, 알림이 없으면 공지 생성순
     // 폰은 네 장을 같은 줄 수로 맞춘다 — PC 는 옆 카드에 높이를 맞추므로 더 세운다
     final briefs = noticeBriefs(isDesktop ? 5 : phoneCardRows);
 

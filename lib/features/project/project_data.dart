@@ -91,6 +91,7 @@ class _Project {
     required this.owner,
     required this.start,
     required this.due,
+    required this.createdAt,
     required this.members,
     required this.todos,
     required this.events,
@@ -132,6 +133,7 @@ class _Project {
 
   /// 마감일 — 기한 연장이 승인되면 늘어난다
   DateTime due;
+  DateTime createdAt;
 
   final List<String> members;
 
@@ -273,6 +275,7 @@ _Project _merged(_Project? held, Project row, ProjectRequest? request) {
     ..createdById = fresh.createdById
     ..start = fresh.start
     ..due = fresh.due
+    ..createdAt = fresh.createdAt
     ..memberIds = fresh.memberIds
     ..serverProgress = fresh.serverProgress
     ..serverTodoCount = fresh.serverTodoCount
@@ -310,6 +313,7 @@ _Project _fromServer(Project row, ProjectRequest? request) {
     ownerId: row.ownerId,
     start: row.startAt,
     due: row.due,
+    createdAt: row.createdAt,
     members: [for (final id in row.assigneeIds) _nameOf(id)]
       ..removeWhere((name) => name.isEmpty),
     memberIds: row.assigneeIds,

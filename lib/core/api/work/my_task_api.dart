@@ -335,7 +335,7 @@ class MyTaskApi {
 
   /// 하루치 목록 — [date] 를 비우면 오늘
   ///
-  /// [employeeId] 는 **대표·관리자만** 쓴다 (남의 것 보기). 그 밖이 넣으면
+  /// [employeeId] 는 **대표·관리자·매니저**가 쓴다 (남의 것 보기). 그 밖에는 넣으면
   /// 서버가 조용히 본인 것을 준다.
   static Future<MyTaskDay> day({String? date, String? employeeId}) async {
     final data = await _client.get(
@@ -345,7 +345,7 @@ class MyTaskApi {
     return MyTaskDay.fromJson(data);
   }
 
-  /// 오늘 누가 몇 개 중 몇 개를 했나 — **대표·관리자만** (그 밖에는 403)
+  /// 오늘 누가 몇 개 중 몇 개를 했나 — **대표·관리자·매니저** (그 밖에는 403)
   static Future<List<MyTaskRosterRow>> roster({
     String? date,
     String? branchId,

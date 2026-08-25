@@ -33,7 +33,7 @@ import '../../core/widgets/feedback/failed_card.dart';
 import '../../core/widgets/feedback/skeleton.dart';
 import '../../core/widgets/input/app_button.dart';
 import '../notifications/notification_screen.dart'
-    show NotificationTarget, requestedScreen;
+    show NotificationTarget, latestNotificationAt, requestedScreen;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/util/screen_refresh.dart';
 import '../../core/util/skeleton_delay.dart';
@@ -683,9 +683,17 @@ Future<void> loadProjectsIfNeeded() async {
   }
 }
 
-/// 홈 카드용 — 진행 중인 프로젝트를 마감 임박순으로 [count]개까지
+/// 홈 카드용 — 관련 알림 최신순, 없으면 생성순으로 [count]개까지
 List<ProjectBrief> projectBriefs(int count) {
   final list = _projects.where((p) => p.phase == _Phase.running).toList()
-    ..sort((a, b) => a.due.compareTo(b.due));
+    ..sort((a, b) {
+      final aActivity = a.id == null
+          ? null
+          : latestNotificationAt('projects', a.id!);
+      final bActivity = b.id == null
+          ? null
+          : latestNotificationAt('projects', b.id!);
+      return (bActivity ?? b.createdAt).compareTo(aActivity ?? a.createdAt);
+    });
   return list.take(count).map(ProjectBrief._).toList();
 }

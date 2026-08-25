@@ -28,6 +28,7 @@ import '../../core/widgets/feedback/failed_card.dart';
 import '../../core/widgets/feedback/skeleton.dart';
 import '../../core/util/screen_refresh.dart';
 import '../../core/util/skeleton_delay.dart';
+import '../notifications/notification_screen.dart';
 
 part 'notice_phone.dart';
 part 'notice_list.dart';
@@ -321,12 +322,17 @@ class NoticeBrief {
   }
 }
 
-/// 홈 카드용 — 고정 공지가 위, 그다음 최신순으로 [count]개까지
+/// 홈 카드용 — 관련 알림 최신순, 없으면 생성순으로 [count]개까지
 List<NoticeBrief> noticeBriefs(int count) {
   final list = [..._notices]
     ..sort((a, b) {
-      if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
-      return b.date.compareTo(a.date);
+      final aActivity = a.id == null
+          ? null
+          : latestNotificationAt('notices', a.id!);
+      final bActivity = b.id == null
+          ? null
+          : latestNotificationAt('notices', b.id!);
+      return (bActivity ?? b.date).compareTo(aActivity ?? a.date);
     });
   return list.take(count).map(NoticeBrief._).toList();
 }

@@ -85,7 +85,7 @@ class _WorkScreenState extends State<WorkScreen>
   /// 켰다 껐다 하면 버튼이 생겼다 없어져서 그게 곧 깜빡임이다.
   /// 공통 업무를 보다가 눌러도 되게, 만들고 나면 내 업무 칸으로 옮겨 준다.
   void _syncHeaderAction() => _setHeaderAction(
-    _canDoEnv && _items[_tab].checklist
+    _canDoEnv && _envTab != 2 && _items[_tab].checklist
         ? HeaderAction(symbol: 'plus', onPressed: _addMyTask)
         : null,
   );
@@ -451,6 +451,9 @@ class _WorkScreenState extends State<WorkScreen>
   /// 대표·관리자에게 칩을 보여줘 봐야 누르면 '권한이 없습니다' 만 뜬다.
   bool get _canDoEnv => myRole == Role.member || myRole == Role.manager;
 
+  bool get _canSeeOthersTasks =>
+      myRole == Role.master || myRole == Role.admin || myRole == Role.manager;
+
   Widget get _myHistoryCard => _HistoryCard(
     title: '내 내역',
     logs: _myLogs,
@@ -490,7 +493,9 @@ class _WorkScreenState extends State<WorkScreen>
                         // 라벨이 권한마다 다르다 — 대표·관리자에게 `내 업무` 는
                         // 자기 것이 아니라 **직원들 것**이라 말이 안 맞는다.
                         SegmentedTabs(
-                          labels: _canDoEnv
+                          labels: myRole == Role.manager
+                              ? const ['공통 업무', '내 업무', '직원 업무']
+                              : _canDoEnv
                               ? const ['공통 업무', '내 업무']
                               : const ['지점 업무', '개인 업무'],
                           selected: _envTab,
@@ -519,8 +524,15 @@ class _WorkScreenState extends State<WorkScreen>
                                     // 누르면 그 사람 업무가 밀려 들어온다
                                     : MyTaskRoster(),
                               ),
+                              if (_canSeeOthersTasks && myRole == Role.manager)
+                                Offstage(
+                                  offstage: _envTab != 2,
+                                  child: MyTaskRoster(),
+                                ),
                               Offstage(
-                                offstage: _envTab == 1,
+                                offstage: myRole == Role.manager
+                                    ? _envTab != 0
+                                    : _envTab == 1,
                                 child: Column(
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,

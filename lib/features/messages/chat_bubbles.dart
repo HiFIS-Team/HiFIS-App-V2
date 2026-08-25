@@ -37,11 +37,6 @@ class _RemovableMessage extends StatelessWidget {
   }
 }
 
-/// 사진만 보낸 메시지인지 — 그러면 **말풍선을 안 씌운다**
-///
-/// 사진은 대개 말풍선 없이 그림만 보내는 것이라 그 결로 맞췄다.
-/// 글이 같이 있거나, 답글 인용이 붙었거나, 사진이 아닌 파일이 섞였으면
-/// 예전처럼 말풍선 안에 담는다 — 담을 것이 그림만이 아니기 때문이다.
 bool _photoOnly(String text, String? replyTo, List<String> attachments) =>
     text.isEmpty &&
     replyTo == null &&
@@ -340,6 +335,8 @@ class _MyBubble extends StatelessWidget {
     required this.text,
     required this.sender,
     required this.sentAt,
+    required this.timeLabel,
+    required this.showTime,
     this.attachments = const [],
     this.replyTo,
     this.reaction,
@@ -354,6 +351,8 @@ class _MyBubble extends StatelessWidget {
   /// 사진 크게 보기 머리말에 쓴다 (보낸 사람·시각)
   final String sender;
   final DateTime sentAt;
+  final String timeLabel;
+  final bool showTime;
 
   final List<String> attachments;
   final String? replyTo;
@@ -372,9 +371,17 @@ class _MyBubble extends StatelessWidget {
     return Align(
       alignment: Alignment.centerRight,
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
         mainAxisSize: MainAxisSize.min,
         children: [
           if (actions != null) ...[actions!, SizedBox(width: 4)],
+          if (showTime) ...[
+            Text(
+              timeLabel,
+              style: AppTextStyles.caption.copyWith(fontSize: 10),
+            ),
+            SizedBox(width: 6),
+          ],
           Flexible(child: _bubble()),
         ],
       ),
@@ -409,9 +416,9 @@ class _MyBubble extends StatelessWidget {
                       color: AppColors.primary,
                       borderRadius: BorderRadius.only(
                         topLeft: Radius.circular(20),
-                        topRight: Radius.circular(20),
+                        topRight: Radius.circular(6),
                         bottomLeft: Radius.circular(20),
-                        bottomRight: Radius.circular(6),
+                        bottomRight: Radius.circular(20),
                       ),
                     ),
                     child: Column(
@@ -485,6 +492,9 @@ class _TheirBubble extends StatelessWidget {
     required this.sentAt,
     required this.color,
     required this.text,
+    required this.timeLabel,
+    required this.showProfile,
+    required this.showTime,
     this.attachments = const [],
     this.emoji,
     this.replyTo,
@@ -502,6 +512,9 @@ class _TheirBubble extends StatelessWidget {
   final Color color;
   final String? emoji;
   final String text;
+  final String timeLabel;
+  final bool showProfile;
+  final bool showTime;
   final List<String> attachments;
   final String? replyTo;
   final String? reaction;
@@ -513,117 +526,159 @@ class _TheirBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      mainAxisSize: MainAxisSize.min,
+    return Stack(
+      clipBehavior: Clip.none,
       children: [
-        Container(
-          width: 28,
-          height: 28,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: emoji != null ? 0.12 : 1),
-            shape: BoxShape.circle,
-          ),
-          child: Text(
-            emoji ?? name.characters.first,
-            style: emoji != null
-                ? TextStyle(fontSize: 12)
-                : TextStyle(
-                    fontFamily: AppTextStyles.fontFamily,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-          ),
-        ),
-        SizedBox(width: 8),
-        Flexible(
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              GestureDetector(
-                onDoubleTap: onDoubleTap,
-                onLongPress: onLongPress,
-                // 사진만 왔으면 말풍선 없이 그림만 (내 쪽과 같은 기준)
-                child: _photoOnly(text, replyTo, attachments)
-                    ? _Attachments(
-                        urls: attachments,
-                        mine: false,
-                        sender: name,
-                        sentAt: sentAt,
-                        bare: true,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 프로필이 뜨는 줄은 최소 40 — 짧은 말풍선에서 동그라미가 삐져나오지 않게
+            SizedBox(width: 48, height: showProfile ? 40 : 0),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (showProfile)
+                    Padding(
+                      padding: EdgeInsets.only(left: 4, bottom: 4),
+                      child: Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.caption.copyWith(fontSize: 11),
+                      ),
+                    ),
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      GestureDetector(
                         onDoubleTap: onDoubleTap,
                         onLongPress: onLongPress,
-                      )
-                    : Container(
-                        constraints: BoxConstraints(maxWidth: 260),
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.gray50,
-                          borderRadius: BorderRadius.only(
-                            topLeft: Radius.circular(20),
-                            topRight: Radius.circular(20),
-                            bottomLeft: Radius.circular(6),
-                            bottomRight: Radius.circular(20),
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (replyTo != null)
-                              Container(
-                                margin: EdgeInsets.only(bottom: 6),
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.gray100,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Text(
-                                  replyTo!,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: AppTextStyles.caption,
-                                ),
-                              ),
-                            if (attachments.isNotEmpty)
-                              _Attachments(
+                        // 사진만 왔으면 말풍선 없이 그림만 (내 쪽과 같은 기준)
+                        child: _photoOnly(text, replyTo, attachments)
+                            ? _Attachments(
                                 urls: attachments,
                                 mine: false,
                                 sender: name,
                                 sentAt: sentAt,
+                                bare: true,
                                 onDoubleTap: onDoubleTap,
                                 onLongPress: onLongPress,
+                              )
+                            : Container(
+                                constraints: BoxConstraints(maxWidth: 260),
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.gray50,
+                                  borderRadius: BorderRadius.only(
+                                    topLeft: Radius.circular(6),
+                                    topRight: Radius.circular(20),
+                                    bottomLeft: Radius.circular(20),
+                                    bottomRight: Radius.circular(20),
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (replyTo != null)
+                                      Container(
+                                        margin: EdgeInsets.only(bottom: 6),
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.gray100,
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          replyTo!,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: AppTextStyles.caption,
+                                        ),
+                                      ),
+                                    if (attachments.isNotEmpty)
+                                      _Attachments(
+                                        urls: attachments,
+                                        mine: false,
+                                        sender: name,
+                                        sentAt: sentAt,
+                                        onDoubleTap: onDoubleTap,
+                                        onLongPress: onLongPress,
+                                      ),
+                                    if (text.isNotEmpty) ...[
+                                      if (attachments.isNotEmpty)
+                                        SizedBox(height: 6),
+                                      Text(text, style: AppTextStyles.body2),
+                                    ],
+                                  ],
+                                ),
                               ),
-                            if (text.isNotEmpty) ...[
-                              if (attachments.isNotEmpty) SizedBox(height: 6),
-                              Text(text, style: AppTextStyles.body2),
-                            ],
-                          ],
-                        ),
                       ),
-              ),
-              if (reaction != null)
-                Positioned(
-                  bottom: -14,
-                  left: 10,
-                  child: _ReactionPill(
-                    key: ValueKey(reaction!),
-                    emoji: reaction!,
-                    onTap: onLongPress,
+                      if (reaction != null)
+                        Positioned(
+                          bottom: -14,
+                          left: 10,
+                          child: _ReactionPill(
+                            key: ValueKey(reaction!),
+                            emoji: reaction!,
+                            onTap: onLongPress,
+                          ),
+                        ),
+                    ],
                   ),
+                ],
+              ),
+            ),
+            if (showTime) ...[
+              SizedBox(width: 6),
+              Padding(
+                padding: EdgeInsets.only(bottom: 3),
+                child: Text(
+                  timeLabel,
+                  style: AppTextStyles.caption.copyWith(fontSize: 10),
                 ),
+              ),
             ],
-          ),
+            if (actions != null) ...[SizedBox(width: 4), actions!],
+          ],
         ),
-        if (actions != null) ...[SizedBox(width: 4), actions!],
+        if (showProfile)
+          Positioned(
+            left: 0,
+            top: 0,
+            child: SizedBox(
+              width: 40,
+              height: 40,
+              child: Container(
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: emoji != null ? 0.12 : 1),
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  emoji ?? name.characters.first,
+                  style: emoji != null
+                      ? TextStyle(fontSize: 17)
+                      : TextStyle(
+                          fontFamily: AppTextStyles.fontFamily,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
