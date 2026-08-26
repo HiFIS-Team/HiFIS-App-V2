@@ -22,6 +22,7 @@ $ErrorActionPreference = 'Continue'
 $BaudRate   = 9600
 $RetrySec   = 5      # 포트를 못 찾거나 끊겼을 때 다시 볼 간격
 $RepeatSec  = 10     # 같은 사번이 이 안에 또 오면 버린다 (아래 설명)
+$BeatSec    = 300    # 생존 신호 간격(5분) — 서버의 판정 기준(20분)보다 넉넉히 짧게
 
 function Write-Log($message) {
     $line = "{0}  {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $message
@@ -47,6 +48,55 @@ if (-not $apiBase -or -not $token) {
     exit 1
 }
 Write-Log "시작 — 서버 $apiBase"
+
+# ---------------------------------------------------------------------------
+# 생존 신호 (2026-08-26)
+#
+# 화순에서 "바코드가 안 된다"는 말이 왔는데 **서버 쪽에 아무 흔적이 없었다.**
+# 이 프로그램이 안 돌면 스캐너가 읽은 값이 PC 밖으로 못 나가기 때문이다.
+# 제일 나쁜 건 **스캐너 부저가 그때도 삑 소리를 낸다**는 것 — 찍은 사람은
+# 됐다고 믿고 가고, 저녁에 결근 알림이 나가서 안 나온 사람처럼 보인다.
+#
+# 그래서 "나 살아 있다"를 따로 말한다. 스캔이 없는 것과 프로그램이 죽은 것을
+# 서버가 가를 수 있어야 대표에게 맞는 말을 보낸다.
+#
+# **실패해도 그냥 넘어간다.** 이건 곁다리라, 여기서 막히면 정작 출퇴근이 안 찍힌다.
+# ---------------------------------------------------------------------------
+
+function Send-Signal($path, $body) {
+    try {
+        # 이름이 $args 면 안 된다 — PowerShell 자동 변수(함수 인자)와 겹친다
+        $req = @{
+            Uri        = "$apiBase/scan-terminals/$path"
+            Method     = 'Post'
+            Headers    = @{ 'X-Terminal-Token' = $token }
+            TimeoutSec = 10
+        }
+        if ($body) {
+            $req['ContentType'] = 'application/json'
+            $req['Body'] = $body
+        }
+        Invoke-RestMethod @req | Out-Null
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+# 지금 잡고 있는 포트를 같이 보낸다 — null 이면 서버가 '스캐너를 못 찾는 중'으로 읽는다
+function Send-Beat($portName) {
+    $body = @{ scannerPort = $portName } | ConvertTo-Json -Compress
+    Send-Signal 'heartbeat' $body | Out-Null
+    $script:lastBeat = Get-Date
+}
+
+$script:lastBeat = Get-Date
+if (Send-Signal 'startup' $null) {
+    Write-Log "시작 신호 전송"
+} else {
+    # 서버에 못 닿아도 계속 돈다 — 스캔은 나중에 붙을 수 있다
+    Write-Log "시작 신호 실패 (서버에 못 닿음) — 계속 진행합니다"
+}
 
 # 사번 -> 마지막으로 보낸 시각
 #
@@ -111,6 +161,10 @@ function Find-ScannerPort {
 while ($true) {
     $portName = Find-ScannerPort
     if (-not $portName) {
+        # 스캐너를 못 찾는 동안에도 신호는 보낸다 — **여기가 제일 중요하다.**
+        # 프로그램은 도는데 스캐너만 죽은 경우라, 신호가 끊기면 서버가
+        # 'PC 가 꺼졌다'고 잘못 말한다. 포트는 null 로 보낸다.
+        if (((Get-Date) - $script:lastBeat).TotalSeconds -ge $BeatSec) { Send-Beat $null }
         Start-Sleep -Seconds $RetrySec
         continue
     }
@@ -119,6 +173,7 @@ while ($true) {
     try {
         $port.Open()
         Write-Log "$portName 연결됨"
+        Send-Beat $portName   # 붙자마자 알린다 — 다음 주기(5분)를 기다리지 않는다
     } catch {
         Write-Log "$portName 열기 실패 — $($_.Exception.Message)"
         Start-Sleep -Seconds $RetrySec
@@ -141,6 +196,7 @@ while ($true) {
                 # 터미네이터가 영영 안 오는 쓰레기가 쌓이지 않게 자른다
                 if ($buffer.Length -gt 128) { $buffer = '' }
             }
+            if (((Get-Date) - $script:lastBeat).TotalSeconds -ge $BeatSec) { Send-Beat $portName }
             Start-Sleep -Milliseconds 50
         } catch {
             # 케이블이 빠지면 여기로 온다 — 다시 꽂으면 바깥 while 이 이어 붙인다
