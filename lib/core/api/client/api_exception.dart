@@ -57,9 +57,13 @@ class ApiException implements Exception {
 
     return ApiException(
       code: 'UNKNOWN',
-      message: status == 429
-          ? '요청이 너무 잦아요. 잠시 후 다시 시도해 주세요.'
-          : '요청을 처리하지 못했어요. (오류 $status)',
+      message: switch (status ?? 0) {
+        429 => '요청이 너무 잦아요. 잠시 후 다시 시도해 주세요.',
+        // 5xx 는 에러 봉투 없이 Caddy 의 기본 HTML 이 오기도 한다 — 그때
+        // "오류 502" 만 띄우면 쓰는 사람은 뭘 해야 할지 모른다
+        >= 500 => '서버가 잠시 응답하지 못했어요. 잠시 후 다시 시도해 주세요. (오류 $status)',
+        _ => '요청을 처리하지 못했어요. (오류 $status)',
+      },
       status: status,
     );
   }

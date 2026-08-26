@@ -91,7 +91,11 @@ class ApiClient {
       connectTimeout: Duration(seconds: 10),
       receiveTimeout: Duration(seconds: 20),
       // 상태 코드로 던지지 않고 우리가 직접 판단한다 (에러 봉투를 읽어야 해서)
-      validateStatus: (status) => status != null && status < 500,
+      //
+      // 5xx 도 포함이다. `< 500` 이었을 때는 서버가 뭐라고 적어 보내든
+      // Dio 가 먼저 가로채서 "알 수 없는 오류"만 떴다 — 대표 전용 잠금(503
+      // `LOCKED_DOWN`) 안내 문구가 사용자에게 한 번도 닿은 적이 없다.
+      validateStatus: (status) => status != null && status < 600,
     ),
   );
 
@@ -165,8 +169,11 @@ class ApiClient {
       '/auth/refresh',
       data: {'refreshToken': refreshToken},
     );
-    if (response.statusCode != 200) {
-      await TokenStore.instance.clear();
+    final status = response.statusCode ?? 0;
+    if (status != 200) {
+      // **서버 잘못과 토큰 잘못을 구분한다.** 5xx 까지 토큰을 지우면 서버가
+      // 잠깐 재시작하는 사이에 쓰던 사람 전원이 로그아웃된다.
+      if (status == 401 || status == 403) await TokenStore.instance.clear();
       return false;
     }
     final data = response.data as Map<String, dynamic>;

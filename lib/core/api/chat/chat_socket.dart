@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../client/api_client.dart';
 import '../client/token_store.dart';
@@ -56,12 +56,16 @@ class ChatReadEvent extends ChatEvent {
 ///
 /// 끊기면 스스로 다시 붙는다. 붙는 동안에도 메시지 전송은 REST 로 나가므로
 /// (`ChatApi.send`) 글이 막히지는 않는다 — 남의 글이 늦게 올 뿐이다.
+///
+/// `dart:io` 가 아니라 `web_socket_channel` 을 쓴다. 앱 본체는 `kIsWeb` 길을
+/// 따로 두고 있는데 여기만 `dart:io` 를 썼어서, 웹 빌드가 이 파일 하나 때문에
+/// 컴파일조차 안 됐다.
 class ChatSocket {
   ChatSocket._();
 
   static final ChatSocket instance = ChatSocket._();
 
-  WebSocket? _socket;
+  WebSocketChannel? _socket;
   StreamSubscription<dynamic>? _sub;
   Timer? _retry;
 
@@ -92,17 +96,19 @@ class ChatSocket {
     try {
       // 서버가 안 받으면 OS 타임아웃(수십 초)까지 매달린다 — 짧게 끊고
       // 백오프로 다시 시도한다
-      final socket = await WebSocket.connect(
-        '$base/ws/chat?token=${Uri.encodeQueryComponent(token)}',
-      ).timeout(const Duration(seconds: 6));
+      final socket = WebSocketChannel.connect(
+        Uri.parse('$base/ws/chat?token=${Uri.encodeQueryComponent(token)}'),
+      );
+      // handshake 가 끝나야 거절(4401)인지 알 수 있다
+      await socket.ready.timeout(const Duration(seconds: 6));
       if (_closed) {
-        await socket.close();
+        await socket.sink.close();
         return;
       }
       _socket = socket;
       _backoff = const Duration(seconds: 1);
       _refreshed = false;
-      _sub = socket.listen(
+      _sub = socket.stream.listen(
         _onFrame,
         onDone: _onDropped,
         onError: (_) => _onDropped(),
@@ -110,11 +116,11 @@ class ChatSocket {
       );
     } catch (error) {
       debugPrint('사내톡 연결 실패: $error');
-      // 서버가 handshake 를 거절한 것(403)은 대개 **access 토큰 만료**다.
+      // 서버가 handshake 를 거절한 것은 대개 **access 토큰 만료**다.
       // REST 는 401 을 받고 스스로 되살리는데 소켓은 그 길이 없어서,
       // 앱을 켜 두고 아무것도 안 누르면 30분 뒤부터 영영 못 붙는다.
-      // 끊긴 것(네트워크·서버 다운)은 토큰 문제가 아니므로 건드리지 않는다.
-      if (error is WebSocketException && !_refreshed) {
+      // 시간초과는 네트워크 문제라 토큰을 건드리지 않는다.
+      if (error is WebSocketChannelException && !_refreshed) {
         _refreshed = true;
         if (await ApiClient.instance.refreshAccessToken()) {
           await connect();
@@ -132,7 +138,7 @@ class ChatSocket {
     _retry = null;
     await _sub?.cancel();
     _sub = null;
-    await _socket?.close();
+    await _socket?.sink.close();
     _socket = null;
   }
 
@@ -205,7 +211,7 @@ class ChatSocket {
     final socket = _socket;
     if (socket == null) return; // 끊겨 있으면 조용히 버린다
     try {
-      socket.add(jsonEncode(frame));
+      socket.sink.add(jsonEncode(frame));
     } catch (_) {
       _onDropped();
     }

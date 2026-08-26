@@ -36,15 +36,16 @@ Role get myRole => currentUser?.role ?? Role.member;
 
 /// 직원 명단
 ///
-/// 서버에서 받아온 게 있으면 그걸 쓰고, 없으면 목업으로 떨어진다
-/// (로그인 전이거나 서버가 꺼져 있을 때).
+/// 서버에서 받아온 명단이 전부다. **비어 있으면 비어 둔다.**
+/// 예전엔 비면 가짜 이름 10명으로 떨어졌는데, 명단 로드가 한 번 실패하면
+/// 사내톡·평가·결재 화면에 존재하지 않는 사람이 진짜처럼 떴다(그 사람을
+/// 고르면 서버에서 404 로 막힐 뿐이다).
 ///
 /// getter 인 이유는 두 가지다 — 명단을 받아오면 곧바로 반영돼야 하고,
 /// 첫 줄이 로그인한 사람이라 [me]가 바뀌면 같이 바뀌어야 한다.
 /// 상수로 두면 앱 시작 시점(로그아웃 상태)에 굳어 버린다.
 List<Staff> get staffList {
   final employees = StaffDirectory.instance.employees;
-  if (employees.isEmpty) return _mockStaffList;
   return [
     for (final employee in employees)
       Staff(
@@ -80,20 +81,6 @@ const _avatarPalette = [
   Color(0xFFB44BD9),
   Color(0xFF0F9BD7),
   Color(0xFFD9822B),
-];
-
-/// 서버 명단이 없을 때 쓰는 화면 확인용 명단
-List<Staff> get _mockStaffList => [
-  Staff(me, '트레이너', AppColors.primary),
-  Staff('이준승', '대표', AppColors.violet),
-  Staff('이준경', '개발', AppColors.teal),
-  Staff('민중기', '점장', AppColors.success),
-  Staff('박준현', '트레이너', AppColors.warning),
-  Staff('유찬빈', '트레이너', Color(0xFF5C7CFA)),
-  Staff('전상현', 'FC', AppColors.pink),
-  Staff('문명진', '마케터', Color(0xFFB44BD9)),
-  Staff('이지영', '트레이너', Color(0xFF0F9BD7)),
-  Staff('김재훈', 'FC', Color(0xFFD9822B)),
 ];
 
 /// 명단에 없는 이름이면 이름에서 만든 색을 쓴다

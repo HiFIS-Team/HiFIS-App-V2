@@ -123,8 +123,13 @@ class _SignupScreenState extends State<_SignupScreen> {
         password: _password.text,
         phone: _phone.text,
         inviteKey: invite,
+        // 동의는 **가입 요청에 같이 실어 보낸다** — 서버가 같은 트랜잭션에
+        // 남기므로, 가입은 됐는데 동의 기록만 없는 상태가 아예 생기지 않는다
+        consents: [
+          for (final document in LegalDocument.values)
+            (docType: document.wire, docVersion: document.version),
+        ],
       );
-      await _recordConsents(email, _password.text);
       if (!mounted) return;
       Navigator.pop(context, email);
     } catch (error) {
@@ -139,37 +144,6 @@ class _SignupScreenState extends State<_SignupScreen> {
         // 폰은 단계로 나뉘어 있어서, 오류가 난 칸이 있는 단계로 되돌아가야 보인다
         if (!isDesktop) _step = aboutInvite ? 0 : 1;
       });
-    }
-  }
-
-  /// 화면에서 받은 동의를 서버에 남긴다 (backend-gap.md 12번)
-  ///
-  /// 동의 이력은 **토큰이 있어야** 남길 수 있는데 가입 시점에는 없다
-  /// (서버가 `SignupRequest` 가 아니라 별도 엔드포인트로 받는다).
-  /// 그래서 방금 만든 계정으로 잠깐 로그인해 두 건을 남기고 되돌린다 —
-  /// 기기에 저장하지 않으므로 화면은 여전히 로그인 전이다.
-  ///
-  /// **실패해도 가입은 그대로 둔다.** 계정은 이미 만들어졌고, 여기서 막으면
-  /// 다시 가입할 수도 없다(이메일 중복). 대신 기록이 빈 채로 남으므로,
-  /// 로그인할 때 빠진 동의를 다시 받는 길이 있어야 완전해진다.
-  Future<void> _recordConsents(String email, String password) async {
-    final store = TokenStore.instance;
-    final access = store.accessToken;
-    final refresh = store.refreshToken;
-    try {
-      final session = await AuthApi.login(email: email, password: password);
-      store.accessToken = session.accessToken;
-      for (final document in LegalDocument.values) {
-        await ConsentApi.agree(
-          docType: document.wire,
-          docVersion: document.version,
-        );
-      }
-    } catch (_) {
-      // 동의 기록만 못 남긴 것이라 가입 자체는 살린다
-    } finally {
-      store.accessToken = access;
-      store.refreshToken = refresh;
     }
   }
 

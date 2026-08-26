@@ -22,5 +22,11 @@
 	     `com.apple.developer.` 가 앞에 붙는다. 틀리면 서명에서 조용히 빠진다. -->
 	<key>com.apple.developer.aps-environment</key>
 	<string>development</string>
+	<!-- 로그인 토큰을 키체인에 넣는다 — 샌드박스 앱은 이 게 없으면
+	     키체인 접근이 전부 실패해서 매번 다시 로그인해야 한다 -->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)app.hifis.hifis</string>
+	</array>
 </dict>
 </plist>

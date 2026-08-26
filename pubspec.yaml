@@ -39,7 +39,11 @@ dependencies:
   file_picker: ^11.0.2
   desktop_drop: ^0.7.1
   shared_preferences: ^2.5.5
+  # 로그인 토큰 보관 — 키체인/Keystore/DPAPI (lib/core/api/client/token_store.dart)
+  flutter_secure_storage: ^9.2.4
   dio: ^5.11.0
+  # 사내톡 실시간 연결 — dart:io 대신 써야 웹 빌드가 깨지지 않는다
+  web_socket_channel: ^3.0.3
   # 올리기 전에 사진을 줄인다 (lib/core/util/photo.dart)
   # 네이티브 압축 패키지는 윈도우 지원이 불확실해서 순수 Dart 로 간다
   image: ^4.5.4

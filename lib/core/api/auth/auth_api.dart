@@ -38,12 +38,16 @@ class AuthApi {
   }
 
   /// 회원가입 — 유효한 초대키가 있어야 한다 (없으면 서버가 400)
+  ///
+  /// [consents] 는 약관·개인정보 동의다. **가입과 한 번에 보낸다** — 서버가
+  /// 같은 트랜잭션에 남기므로 동의 없는 계정이 만들어질 수 없다.
   static Future<void> signup({
     required String name,
     required String email,
     required String password,
     required String phone,
     required String inviteKey,
+    required List<({String docType, String docVersion})> consents,
   }) => _client.post(
     '/auth/signup',
     body: {
@@ -52,6 +56,10 @@ class AuthApi {
       'password': password,
       'phone': phone,
       'inviteKey': inviteKey,
+      'consents': [
+        for (final consent in consents)
+          {'docType': consent.docType, 'docVersion': consent.docVersion},
+      ],
     },
   );
 

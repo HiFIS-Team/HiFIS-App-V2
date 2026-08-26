@@ -14,5 +14,11 @@
 	     **키 이름이 iOS 와 다르다** — macOS 는 `com.apple.developer.` 가 붙는다 -->
 	<key>com.apple.developer.aps-environment</key>
 	<string>production</string>
+	<!-- 로그인 토큰을 키체인에 넣는다 — 샌드박스 앱은 이 게 없으면
+	     키체인 접근이 전부 실패해서 매번 다시 로그인해야 한다 -->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)app.hifis.hifis</string>
+	</array>
 </dict>
 </plist>

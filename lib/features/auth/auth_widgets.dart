@@ -472,7 +472,8 @@ class _AuthCheck extends StatelessWidget {
 /// 약관 동의 한 줄 — 체크 + 문서 이름 + 전문 보기
 ///
 /// 동의는 받았다는 **기록**이 남아야 의미가 있으므로, 화면에서 누른 값은
-/// 가입 요청에 실어 보낸다. 서버 저장은 아직 미구현 (backend-gap.md 12번).
+/// 가입 요청(`POST /auth/signup`)의 `consents` 에 실려 계정과 같은
+/// 트랜잭션으로 `employee_consents` 에 저장된다.
 class _AgreeRow extends StatelessWidget {
   _AgreeRow({
     required this.document,

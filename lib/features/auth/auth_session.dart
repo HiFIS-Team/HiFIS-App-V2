@@ -1,11 +1,13 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/api/auth/auth_api.dart';
 import '../../core/api/chat/chat_socket.dart';
 import '../../core/api/client/api_client.dart';
+import '../../core/api/client/api_exception.dart';
 import '../../core/api/client/token_store.dart';
 import '../../core/data/branch_scope.dart';
 import '../../core/data/header_action.dart';
@@ -85,10 +87,28 @@ class AuthSession extends ValueNotifier<bool> {
       // 안 뜬다 (헤더 메시지 버튼·우하단 필의 빨간 점이 이 값을 본다)
       unawaited(ChatStore.instance.loadRooms().catchError((_) {}));
       value = true;
-    } catch (_) {
-      // 서버가 꺼져 있거나 토큰이 죽었다 — 조용히 로그인 화면부터 시작한다
-      await TokenStore.instance.clear();
+    } catch (error) {
+      // **토큰이 죽은 것과 서버에 못 닿은 것은 다르다.**
+      // 예전엔 둘 다 토큰을 지웠다 — 지하 주차장에서 앱을 한 번 켜면 그것만으로
+      // 로그아웃돼서, 와이파이가 잡힌 뒤 다시 비밀번호를 쳐야 했다.
+      // 인증이 실제로 거절당했을 때만 지우고, 통신 실패면 토큰을 남긴 채
+      // 이번 실행만 로그인 화면에서 시작한다(다음에 켜면 그대로 들어간다).
+      if (_isAuthFailure(error)) await TokenStore.instance.clear();
     }
+  }
+
+  /// 서버가 "이 토큰 못 쓴다"고 답한 경우인가 (통신 실패와 구분)
+  static bool _isAuthFailure(Object error) {
+    final api = error is ApiException
+        ? error
+        : (error is DioException && error.error is ApiException)
+        ? error.error as ApiException
+        : null;
+    if (api == null) return false;
+    return api.status == 401 ||
+        api.status == 403 ||
+        api.code == 'TOKEN_REVOKED' ||
+        api.code == 'INVALID_TOKEN';
   }
 
   /// 로그인 — 실패하면 예외가 그대로 올라간다 (화면이 메시지를 보여준다)
