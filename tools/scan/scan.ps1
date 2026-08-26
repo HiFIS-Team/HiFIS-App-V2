@@ -23,6 +23,7 @@ $BaudRate   = 9600
 $RetrySec   = 5      # 포트를 못 찾거나 끊겼을 때 다시 볼 간격
 $RepeatSec  = 10     # 같은 사번이 이 안에 또 오면 버린다 (아래 설명)
 $BeatSec    = 300    # 생존 신호 간격(5분) — 서버의 판정 기준(20분)보다 넉넉히 짧게
+$WatchSec   = 60     # 포트가 아직 살아 있는지 다시 확인하는 간격 (아래 설명)
 
 function Write-Log($message) {
     $line = "{0}  {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $message
@@ -180,9 +181,29 @@ while ($true) {
         continue
     }
 
+    # ------------------------------------------------------------------
+    # 워치독 — **포트가 사라졌는데 우리는 열려 있다고 믿는 상태**를 잡는다
+    #
+    # USB 가 절전으로 잠들거나 장치가 다시 붙으면(re-enumerate) OS 의 COM 목록에서
+    # 포트가 빠진다. 그런데 우리가 쥐고 있는 SerialPort 객체는 **예외를 안 던지고
+    # `IsOpen` 도 계속 true** 라, 아래 루프가 영영 돌면서 아무것도 못 받는다.
+    # 케이블이 빠지면 예외가 나서 걸리는데, 이 경우는 조용히 죽는다.
+    #
+    # "데이터가 안 온다"로는 못 잰다 — 밤에는 원래 조용하다. 그래서 값이 아니라
+    # **OS 가 아직 그 포트를 갖고 있나**를 본다. 없어졌으면 닫고 다시 찾는다.
+    # ------------------------------------------------------------------
+    $lastWatch = Get-Date
     $buffer = ''
     while ($port.IsOpen) {
         try {
+            if (((Get-Date) - $lastWatch).TotalSeconds -ge $WatchSec) {
+                $lastWatch = Get-Date
+                if ([System.IO.Ports.SerialPort]::GetPortNames() -notcontains $portName) {
+                    Write-Log "$portName 이 사라졌습니다 — 다시 찾습니다"
+                    Send-Beat $null   # 서버에 '스캐너를 못 찾는 중'으로 알린다
+                    break
+                }
+            }
             if ($port.BytesToRead -gt 0) {
                 $buffer += $port.ReadExisting()
                 # 스캐너가 붙여 보내는 터미네이터는 LF(0x0A) — CR 도 같이 받아 준다

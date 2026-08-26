@@ -139,3 +139,6 @@ tools/scan/config.json
 tools/scan/*.log
 tools/scan/config-*.json
 tools/scan/설치-*.ps1.txt
+# 갱신 덩어리는 토큰이 없어 안전하지만 scan.ps1 을 base64 로 품고 있어
+# **낡으면 옛 스크립트를 깔게 된다.** 필요할 때 `python3 tools/scan/갱신.py` 로 만든다
+tools/scan/갱신.ps1.txt

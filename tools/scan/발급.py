@@ -18,6 +18,8 @@ import sys
 import urllib.error
 import urllib.request
 
+from installer import build, script_b64
+
 API = "https://api.hifis.app"
 
 
@@ -75,43 +77,13 @@ out = f"config-{branch['name']}.json"
 with open(out, "w", encoding="utf-8") as f:
     json.dump({"apiBase": API, "terminalToken": created["token"]}, f, ensure_ascii=False, indent=2)
 
-# 센터 PC 에 파일을 옮길 방법이 마땅치 않다 (Git 도 USB 도 없을 수 있다).
-# scan.ps1 을 통째로 base64 로 실어서 **한 번 붙여넣으면 설치가 끝나는** 덩어리를 만든다.
-#
-# ⚠️ **바이트 그대로 실어야 한다 — scan.ps1 앞의 UTF-8 BOM 을 떼면 안 된다.**
-# Windows PowerShell 5.1 은 `.ps1` 에 BOM 이 없으면 UTF-8 이 아니라 시스템
-# 코드페이지(한국어 윈도우면 CP949)로 읽는다. 그러면 주석·로그 문구의 한글이
-# 깨지고, 깨진 바이트가 따옴표를 먹어서 **파일 전체가 파싱 에러**가 난다
-# (2026-08-07 화순점에서 실제로 겪었다 — `Try 문에 해당 Catch 블록이 없습니다`).
+# 붙여넣기 덩어리는 `installer.py` 가 만든다 — 갱신.py 와 같은 조각을 쓴다.
+# (작업 스케줄러 강화·USB 절전 끄기가 그 안에 들어 있다)
 here = os.path.dirname(os.path.abspath(__file__))
-script_b64 = base64.b64encode(
-    open(os.path.join(here, "scan.ps1"), "rb").read()
-).decode()
 config_b64 = base64.b64encode(
     json.dumps({"apiBase": API, "terminalToken": created["token"]}, ensure_ascii=False).encode()
 ).decode()
-
-# **한 줄로 만들면 안 된다** — 윈도우 콘솔은 한 번에 붙여넣는 줄이 8192자를
-# 넘으면 잘라 버린다. base64 가 그보다 길어서 여러 줄로 쪼개 이어 붙인다.
-def chunk(text, width=200):
-    return "\n".join(
-        f"'{text[i:i + width]}'" for i in range(0, len(text), width)
-    )
-
-
-installer = f"""$d='C:\\HiFIS'; New-Item -ItemType Directory -Force -Path $d | Out-Null
-$s = @(
-{chunk(script_b64)}
-) -join ''
-$c = @(
-{chunk(config_b64)}
-) -join ''
-[IO.File]::WriteAllBytes("$d\\scan.ps1", [Convert]::FromBase64String($s))
-[IO.File]::WriteAllBytes("$d\\config.json", [Convert]::FromBase64String($c))
-schtasks /create /tn "HiFIS 출퇴근" /sc onstart /ru SYSTEM /rl HIGHEST /f /tr "powershell -WindowStyle Hidden -ExecutionPolicy Bypass -File $d\\scan.ps1" | Out-Null
-Write-Host "설치됨. 먼저 눈으로 확인하려면:"
-Write-Host "  powershell -ExecutionPolicy Bypass -File $d\\scan.ps1"
-"""
+installer = build(script_b64(os.path.join(here, "scan.ps1")), config_b64)
 
 installer_path = f"설치-{branch['name']}.ps1.txt"
 with open(installer_path, "w", encoding="utf-8") as f:
