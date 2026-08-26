@@ -29,29 +29,34 @@ import base64
 # 있으면 새로 안 띄운다** — 10분마다 확인만 하고 지나간다.
 TASK_BLOCK = r"""
 $taskName = 'HiFIS 출퇴근'
-$act = New-ScheduledTaskAction -Execute 'powershell.exe' `
-    -Argument "-WindowStyle Hidden -ExecutionPolicy Bypass -File $d\scan.ps1"
+$act = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-WindowStyle Hidden -ExecutionPolicy Bypass -File $d\scan.ps1"
 $prn = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
-
-# 켤 때 + 10분마다 (죽어 있으면 다시 뜬다)
+$set = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1)
 $trgBoot = New-ScheduledTaskTrigger -AtStartup
-try {
-    $trgRep = New-ScheduledTaskTrigger -Once -At (Get-Date) `
-        -RepetitionInterval (New-TimeSpan -Minutes 10) -RepetitionDuration ([TimeSpan]::MaxValue)
-} catch {
-    # 옛 윈도우는 MaxValue 를 못 받는다 — 사실상 무한인 값으로 떨어진다
-    $trgRep = New-ScheduledTaskTrigger -Once -At (Get-Date) `
-        -RepetitionInterval (New-TimeSpan -Minutes 10) -RepetitionDuration (New-TimeSpan -Days 3650)
+
+# 반복 트리거의 기간 — **`[TimeSpan]::MaxValue` 를 쓰면 안 된다.**
+# `P99999999DT23H59M59S` 로 펼쳐져서 작업 스케줄러가 거부한다
+# (2026-08-26 화순에서 실제로 겪었다 — HRESULT 0x80041318).
+# 게다가 그 오류는 트리거를 만들 때가 아니라 **등록할 때** 나서,
+# 트리거 생성만 try 로 감싸면 안 걸린다. 등록까지 감싸야 한다.
+$ok = $false
+foreach ($days in 3650, 365, 30) {
+    try {
+        $rep = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 10) -RepetitionDuration (New-TimeSpan -Days $days)
+        Register-ScheduledTask -TaskName $taskName -Action $act -Trigger @($trgBoot, $rep) -Principal $prn -Settings $set -Force -ErrorAction Stop | Out-Null
+        Write-Host "작업 등록됨 — 켤 때 + 10분마다 (반복 $days 일)"
+        $ok = $true
+        break
+    } catch { }
 }
-
-$set = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -StartWhenAvailable `
-    -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
-    -ExecutionTimeLimit ([TimeSpan]::Zero) `
-    -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1)
-
-Register-ScheduledTask -TaskName $taskName -Action $act -Trigger @($trgBoot, $trgRep) `
-    -Principal $prn -Settings $set -Force | Out-Null
+if (-not $ok) {
+    # 반복 트리거가 어떤 값으로도 안 되면, **최소한 실행시간 제한 해제는 살린다.**
+    # 그것만으로도 사흘마다 죽는 것은 막힌다.
+    Register-ScheduledTask -TaskName $taskName -Action $act -Trigger @($trgBoot) -Principal $prn -Settings $set -Force | Out-Null
+    Write-Host "주의: 반복 트리거를 못 걸었습니다 — 켤 때만 뜹니다 (실행시간 제한 해제는 적용됨)"
+}
 """
+
 
 # ---------------------------------------------------------------------------
 # USB 절전 끄기 — 스캐너가 잠들어 사라지는 것을 막는다
@@ -111,6 +116,36 @@ def script_b64(path):
         return base64.b64encode(f.read()).decode()
 
 
+#: 끝에서 **실제로 걸렸는지 확인해서 보여준다.**
+#
+# 2026-08-26 화순에서 작업 등록이 실패했는데도 `설치됨.` 이 떠서, 현장에서는
+# 다 된 줄 알고 나왔다. **하고 나서 확인하지 않으면 실패가 성공처럼 보인다.**
+VERIFY_BLOCK = r"""
+Write-Host ""
+Write-Host "===== 확인 ====="
+$chk = Get-ScheduledTask -TaskName 'HiFIS 출퇴근' -ErrorAction SilentlyContinue
+if ($chk) {
+    $x = [xml](Export-ScheduledTask -TaskName 'HiFIS 출퇴근')
+    $limit = $x.Task.Settings.ExecutionTimeLimit
+    $hasRep = [bool]$x.Task.Triggers.TimeTrigger.Repetition
+    Write-Host "작업 상태     : $($chk.State)"
+    Write-Host "실행시간 제한 : $limit $(if ($limit -eq 'PT0S') {'(정상)'} else {'<-- 안 걸렸습니다'})"
+    Write-Host "반복 트리거   : $(if ($hasRep) {'있음 (정상)'} else {'없음 <-- 안 걸렸습니다'})"
+    if ($limit -eq 'PT0S' -and $hasRep) {
+        Write-Host "-> 설정 정상" -ForegroundColor Green
+    } else {
+        Write-Host "-> 설정이 덜 걸렸습니다. 이 화면을 그대로 알려 주세요" -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "작업이 등록되지 않았습니다 <-- 이 화면을 그대로 알려 주세요" -ForegroundColor Red
+}
+$run = Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*scan.ps1*' }
+Write-Host "프로그램      : $(if ($run) {'돌고 있음 (정상)'} else {'안 돌고 있음 <-- 알려 주세요'})"
+Write-Host ""
+Write-Host "로그를 보려면:  Get-Content C:\HiFIS\scan.log -Wait -Tail 20"
+"""
+
+
 def build(script_base64, config_base64=None):
     """붙여넣기 덩어리 한 장.
 
@@ -143,8 +178,24 @@ def build(script_base64, config_base64=None):
         # 지금 도는 것을 끊고 새 스크립트로 다시 띄운다 — 안 그러면 옛 코드가 계속 돈다
         'Stop-ScheduledTask -TaskName "HiFIS 출퇴근" -ErrorAction SilentlyContinue',
         'Start-ScheduledTask -TaskName "HiFIS 출퇴근"',
-        'Write-Host "설치됨. 로그를 보려면:"',
-        'Write-Host "  Get-Content C:\\HiFIS\\scan.log -Wait -Tail 20"',
+        'Start-Sleep -Seconds 3',
+        VERIFY_BLOCK.strip(),
         "",
     ]
-    return "\n".join(lines)
+    inner = "\n".join(lines)
+
+    # **덩어리 전체를 다시 base64 로 싼다.**
+    #
+    # 그냥 적어 보내면 받는 쪽에서 서식 있는 곳(카톡·메모)을 거치며 RTF 로 변해
+    # 붙여넣기가 깨진다 — 2026-08-26 현장에서 겪었다. 줄 끝마다 `\`, 한글이
+    # `\uc0\u52636`, `$_` 의 밑줄이 먹혀 `$.` 이 됐다.
+    #
+    # base64 는 **영문·숫자·`+/=` 뿐**이라 한글도 밑줄도 없다. 바깥 껍데기에도
+    # 그 둘이 안 들어가게 영어로만 쓴다.
+    payload = base64.b64encode("\ufeff".encode("utf-8") + inner.encode("utf-8")).decode()
+    return (
+        '$f = "$env:TEMP\\hifis-setup.ps1"\n'
+        "$b = @(\n" + chunk(payload) + "\n) -join ''\n"
+        "[IO.File]::WriteAllBytes($f, [Convert]::FromBase64String($b))\n"
+        "powershell -ExecutionPolicy Bypass -File $f\n"
+    )
