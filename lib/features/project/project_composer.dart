@@ -433,7 +433,7 @@ class _ProjectComposerState extends State<_ProjectComposer> {
                 for (final staff in staffList)
                   SizedBox(
                     width: width,
-                    child: _MemberCard(
+                    child: PersonCard(
                       staff: staff,
                       joined: _members.contains(staff.name),
                       // 직원·점장은 자기를 못 뺀다 — 자기 일을 자기가 올리는 자리다.
@@ -729,61 +729,6 @@ class _Field extends StatelessWidget {
               .copyWith(color: AppColors.gray400),
           border: InputBorder.none,
           isCollapsed: true,
-        ),
-      ),
-    );
-  }
-}
-
-/// 참여 멤버 한 칸 — 아바타 위, 이름 아래 (생성 폼)
-///
-/// **알약이 아니라 카드다** (2026-08-28). 알약은 이름 길이만큼 폭이 달라서
-/// 줄이 들쭉날쭉했다 — 칸을 고정하면 세로 줄이 맞고 훑기가 쉽다.
-///
-/// 고른 것은 **테두리로** 가른다. 배경만으로는 `primaryLight`(옅은 파랑)와
-/// `gray50`(옅은 회색)이 둘 다 옅어서 훑어서 안 잡힌다. 파랑을 꽉 채우지
-/// 않는 이유는 안에 **색이 저마다 다른 아바타**가 있어서다 — 배경을 진하게
-/// 하면 그 색들과 부딪힌다.
-class _MemberCard extends StatelessWidget {
-  _MemberCard({required this.staff, required this.joined, this.onTap});
-
-  final Staff staff;
-  final bool joined;
-
-  /// null 이면 못 뺀다 (본인) — 모양은 그대로 두고 안 눌리게만 한다
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Pressable(
-      onTap: onTap ?? () {},
-      child: Container(
-        padding: EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: joined ? AppColors.primaryLight : AppColors.gray50,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: joined ? AppColors.primary : Colors.transparent,
-            width: 1.5,
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Avatar(name: staff.name, size: 34),
-            SizedBox(height: 7),
-            Text(
-              staff.name == me ? '나' : staff.name,
-              maxLines: 1,
-              // 이름이 길면 칸을 넘치는 대신 줄인다 — 칸 폭이 고정이라 밀 수 없다
-              overflow: TextOverflow.ellipsis,
-              style: AppTextStyles.caption.copyWith(
-                fontSize: 12,
-                color: joined ? AppColors.primary : AppColors.textSecondary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
         ),
       ),
     );

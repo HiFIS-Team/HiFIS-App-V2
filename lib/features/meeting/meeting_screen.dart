@@ -15,7 +15,6 @@ import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
 import '../../core/util/rich_blocks.dart';
 import '../../core/widgets/display/avatar.dart';
-import '../../core/widgets/display/scroll_box.dart';
 import '../../core/widgets/editor/block_editor.dart';
 import '../../core/widgets/editor/markdown_view.dart';
 import '../../core/widgets/editor/post_actions.dart';
@@ -23,6 +22,7 @@ import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/feedback/empty_card.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/glass/glass_menu.dart';
+import '../../core/widgets/input/person_picker.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/nav/phone_scaffold.dart';
 import '../../core/util/when.dart';
@@ -889,29 +889,28 @@ class _NoteViewState extends State<_NoteView> {
               ),
               if (_help) ...[SizedBox(height: 10), MarkdownHelpPanel()],
               SizedBox(height: 10),
-              ScrollBox(
-                maxHeight: kChipBoxHeight,
-                child: Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    for (final staff in staffList)
-                      _PersonChip(
-                        staff: staff,
-                        joined: note.members.contains(staff.name),
-                        onTap: () {
-                          setState(() {
-                            if (note.members.contains(staff.name)) {
-                              note.members.remove(staff.name);
-                            } else {
-                              note.members.add(staff.name);
-                            }
-                          });
-                          widget.onChanged();
-                        },
-                      ),
-                  ],
-                ),
+              // **명단을 여기 펴지 않는다** (2026-08-28 대표 요청).
+              //
+              // 예전에는 전 직원 알약을 상자 안에 흘려 놓았는데, 제목·날짜·
+              // 프로젝트·본문이 다 있는 화면이라 **그것만으로 한 판이 찼다.**
+              // 프로젝트 생성 폼처럼 펴 두는 자리와 다르다 — 거기는 폼이
+              // 한 페이지를 다 쓴다.
+              _AttendeeRow(
+                names: note.members,
+                onTap: () async {
+                  final picked = await showPersonPicker(
+                    context,
+                    people: staffList,
+                    selected: note.members,
+                  );
+                  if (picked == null || !mounted) return;
+                  setState(() {
+                    note.members
+                      ..clear()
+                      ..addAll(picked);
+                  });
+                  widget.onChanged();
+                },
               ),
             ] else
               Row(
@@ -1003,38 +1002,49 @@ class _NoteViewState extends State<_NoteView> {
   }
 }
 
-class _PersonChip extends StatelessWidget {
-  _PersonChip({required this.staff, required this.joined, required this.onTap});
+/// 참석자 한 줄 — 몇 명인지와 얼굴 몇 개, 누르면 고르는 창이 뜬다
+///
+/// 위의 프로젝트 고르개와 **같은 모양**이다 (아이콘 · 글자 · 화살표).
+/// 머리말에 두 줄이 나란히 서는데 생김새가 갈리면 하나만 눌러도 되는
+/// 것처럼 보인다.
+class _AttendeeRow extends StatelessWidget {
+  _AttendeeRow({required this.names, required this.onTap});
 
-  final Staff staff;
-  final bool joined;
+  final List<String> names;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.fromLTRB(4, 4, 10, 4),
-        decoration: BoxDecoration(
-          color: joined ? AppColors.primaryLight : AppColors.gray50,
-          borderRadius: BorderRadius.circular(100),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Avatar(name: staff.name, size: 22),
-            SizedBox(width: 6),
-            Text(
-              staff.name == me ? '나' : staff.name,
-              style: AppTextStyles.caption.copyWith(
-                fontSize: 12,
-                color: joined ? AppColors.primary : AppColors.textSecondary,
-                fontWeight: FontWeight.w600,
-              ),
+      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.person_add_alt_1_rounded,
+            size: 13,
+            color: AppColors.textSecondary,
+          ),
+          SizedBox(width: 6),
+          Text(
+            names.isEmpty ? '참석자 고르기' : '참석 ${names.length}명',
+            style: AppTextStyles.body2.copyWith(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
             ),
+          ),
+          if (names.isNotEmpty) ...[
+            SizedBox(width: 8),
+            AvatarStack(names: names, size: 22),
           ],
-        ),
+          SizedBox(width: 2),
+          Icon(
+            Icons.keyboard_arrow_down_rounded,
+            size: 16,
+            color: AppColors.textSecondary,
+          ),
+        ],
       ),
     );
   }

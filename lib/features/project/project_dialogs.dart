@@ -747,7 +747,7 @@ class _MembersDialogState extends State<_MembersDialog> {
                         for (final staff in _candidates)
                           SizedBox(
                             width: width,
-                            child: _MemberCard(
+                            child: PersonCard(
                               staff: staff,
                               joined: _picked.contains(staff.name),
                               onTap: () => setState(() {

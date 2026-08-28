@@ -248,7 +248,7 @@ class _EventDialogState extends State<_EventDialog> {
                   child: switch (row * _perRow + col) {
                     // 마지막 줄의 빈칸 — 자리를 차지해야 폭이 안 늘어난다
                     final i when i >= people.length => SizedBox.shrink(),
-                    final i => _PersonChip(
+                    final i => PersonCard(
                       staff: people[i],
                       joined: _members.contains(people[i].name),
                       onTap: _tap(
@@ -692,54 +692,6 @@ class _KindCard extends StatelessWidget {
 }
 
 const _perRow = 3;
-
-/// 참석자 고르는 알약
-class _PersonChip extends StatelessWidget {
-  _PersonChip({required this.staff, required this.joined, required this.onTap});
-
-  final Staff staff;
-  final bool joined;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Pressable(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: joined ? AppColors.primaryLight : AppColors.gray50,
-          borderRadius: BorderRadius.circular(14),
-          // 고른 것은 **테두리로** 가른다 — 배경만으로는 `primaryLight` 와
-          // `gray50` 이 둘 다 옅어서 훑어서 안 잡힌다. 파랑을 꽉 안 채우는
-          // 이유는 안에 색이 저마다 다른 아바타가 있어서다
-          border: Border.all(
-            color: joined ? AppColors.primary : Colors.transparent,
-            width: 1.5,
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Avatar(name: staff.name, size: 34),
-            SizedBox(height: 7),
-            // 칸 폭이 정해져 있어 긴 이름은 말줄임으로 자른다
-            Text(
-              staff.name == me ? '나' : staff.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppTextStyles.caption.copyWith(
-                fontSize: 12,
-                color: joined ? AppColors.primary : AppColors.textSecondary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 /// 폼 입력칸
 class _Field extends StatelessWidget {

@@ -27,6 +27,7 @@ import '../../core/widgets/glass/glass_bottom_button.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/input/decide_buttons.dart';
 import '../../core/widgets/input/mode_switch.dart';
+import '../../core/widgets/input/person_picker.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/nav/phone_scaffold.dart';
 import '../../core/util/when.dart';
