@@ -255,13 +255,12 @@ class AttendanceApi {
   ///
   /// [code]에 사번을 주면 지점 스캐너처럼 그 사람 것을 찍고,
   /// 안 주면 로그인한 본인 것을 찍는다.
-  /// [qr] 을 주면 **로그인한 본인**을 찍는다 (매장 카운터 QR, 2026-08-28).
-  /// [code] 는 지점 스캐너가 남의 사번을 읽었을 때 쓴다 — 둘은 같이 못 준다.
-  static Future<AttendanceRecord> scan({String? code, String? qr}) async {
-    final data = await _client.post(
-      '/attendance/scan',
-      body: {'code': ?code, 'qr': ?qr},
-    );
+  /// 매장 카운터 QR 을 찍는다 — **로그인한 본인**이 찍힌다 (2026-08-28)
+  ///
+  /// 사번(`code`)으로 남을 찍던 지점 단말 길은 카운터 PC 를 걷어내면서
+  /// 서버에서도 없앴다. QR 이 없으면 서버가 422 로 되돌린다.
+  static Future<AttendanceRecord> scan({required String qr}) async {
+    final data = await _client.post('/attendance/scan', body: {'qr': qr});
     return AttendanceRecord.fromJson(data!);
   }
 

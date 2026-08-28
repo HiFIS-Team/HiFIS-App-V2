@@ -416,14 +416,11 @@
   },
   "AttendanceScanRequest": {
    "properties": {
-    "code": {
-     "nullable": true
-    },
-    "qr": {
-     "nullable": true
-    }
+    "qr": {}
    },
-   "required": []
+   "required": [
+    "qr"
+   ]
   },
   "AttendanceSource": {
    "properties": {},
@@ -3181,94 +3178,6 @@
     "branchName",
     "payload",
     "allowedIps"
-   ]
-  },
-  "ScanTerminalCreate": {
-   "properties": {
-    "branchId": {},
-    "name": {}
-   },
-   "required": [
-    "branchId",
-    "name"
-   ]
-  },
-  "ScanTerminalCreated": {
-   "properties": {
-    "branchId": {},
-    "createdAt": {},
-    "heartbeatAt": {
-     "nullable": true
-    },
-    "id": {},
-    "issuedById": {},
-    "lastUsedAt": {
-     "nullable": true
-    },
-    "name": {},
-    "revokedAt": {
-     "nullable": true
-    },
-    "scannerAt": {
-     "nullable": true
-    },
-    "scannerPort": {
-     "nullable": true
-    },
-    "startedAt": {
-     "nullable": true
-    },
-    "token": {}
-   },
-   "required": [
-    "id",
-    "branchId",
-    "name",
-    "issuedById",
-    "createdAt",
-    "token"
-   ]
-  },
-  "ScanTerminalHeartbeat": {
-   "properties": {
-    "scannerPort": {
-     "nullable": true
-    }
-   },
-   "required": []
-  },
-  "ScanTerminalOut": {
-   "properties": {
-    "branchId": {},
-    "createdAt": {},
-    "heartbeatAt": {
-     "nullable": true
-    },
-    "id": {},
-    "issuedById": {},
-    "lastUsedAt": {
-     "nullable": true
-    },
-    "name": {},
-    "revokedAt": {
-     "nullable": true
-    },
-    "scannerAt": {
-     "nullable": true
-    },
-    "scannerPort": {
-     "nullable": true
-    },
-    "startedAt": {
-     "nullable": true
-    }
-   },
-   "required": [
-    "id",
-    "branchId",
-    "name",
-    "issuedById",
-    "createdAt"
    ]
   },
   "ScheduleSet": {

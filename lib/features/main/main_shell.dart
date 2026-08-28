@@ -20,7 +20,7 @@ import '../../core/widgets/nav/app_tab_bar.dart';
 import '../../core/widgets/nav/branch_scope_button.dart';
 import '../../core/widgets/nav/lazy_indexed_stack.dart';
 import '../approval/approval_screen.dart';
-import '../attendance/attendance_barcode_overlay.dart';
+import '../attendance/attendance_qr_scan.dart';
 import '../attendance/attendance_screen.dart';
 import '../documents/document_screen.dart';
 import '../home/home_screen.dart';
@@ -894,9 +894,13 @@ class _HeaderButtons extends StatefulWidget {
 class _HeaderButtonsState extends State<_HeaderButtons> {
   bool _overlayOpen = false;
 
-  Future<void> _openBarcode() async {
+  /// 카운터 QR 을 찍는다 (2026-08-28)
+  ///
+  /// 예전에는 **자기 바코드를 띄우는 창**이었다. 카운터 스캐너가 그걸 읽었는데
+  /// 그 기계를 걷어내면서 띄울 이유가 없어졌다 — 이제 바로 카메라가 열린다.
+  Future<void> _openScan() async {
     setState(() => _overlayOpen = true);
-    await showAttendanceBarcode(context);
+    await showAttendanceQrScan(context);
     if (mounted) setState(() => _overlayOpen = false);
   }
 
@@ -938,7 +942,7 @@ class _HeaderButtonsState extends State<_HeaderButtons> {
 
   @override
   Widget build(BuildContext context) {
-    // 출퇴근 바코드는 폰을 매장 리더기에 찍는 용도라 데스크톱에서는 뺀다.
+    // 출퇴근 QR 은 매장 카운터에서 폰으로 찍는 것이라 데스크톱에서는 뺀다.
     //
     // **MASTER·ADMIN 에게도 안 보인다.** 출퇴근을 찍는 건 현장에서 일하는
     // 사람(MANAGER·MEMBER)이고, 대표·관리자는 운영 전담이라 스캔할 일이 없다.
@@ -950,9 +954,11 @@ class _HeaderButtonsState extends State<_HeaderButtons> {
         if (!desktop) ...[
           if (myRole.doesFieldWork) ...[
             GlassIconButton(
+              // 심볼은 그대로 둔다 — 찍는다는 뜻이 QR 에도 그대로 맞고,
+              // 자리를 외운 사람에게 아이콘이 바뀌면 못 찾는다
               symbol: 'barcode.viewfinder',
               enabled: !_overlayOpen,
-              onPressed: _openBarcode,
+              onPressed: _openScan,
             ),
             SizedBox(width: 10),
           ],

@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
@@ -19,9 +22,15 @@ import '../../core/widgets/input/app_button.dart';
 ///
 /// 고정 QR 이라 사진을 찍어 두면 어디서든 읽히지만, **서버가 매장 인터넷에서
 /// 온 요청인지 본다** — 집이나 LTE 면 `NOT_AT_BRANCH` 로 되돌아온다.
+///
+/// **머리말 바코드 버튼이 곧장 이걸 연다** (2026-08-28). 예전에는 자기 바코드를
+/// 띄우는 창이 먼저 떴는데, 그 바코드를 읽던 카운터 스캐너를 걷어내면서
+/// 한 단계가 통째로 뜻을 잃었다.
 Future<void> showAttendanceQrScan(BuildContext context) => Navigator.push<void>(
   context,
-  MaterialPageRoute(fullscreenDialog: true, builder: (_) => _QrScanScreen()),
+  // 다른 상세 화면처럼 옆에서 밀려 들어온다 — 아래에서 올라오는 모달로 두면
+  // 이 화면만 결이 다르다
+  CupertinoPageRoute(builder: (_) => _QrScanScreen()),
 );
 
 class _QrScanScreen extends StatefulWidget {
@@ -44,6 +53,12 @@ class _QrScanScreenState extends State<_QrScanScreen> {
   /// 찍힌 결과 — 채워지면 카메라를 덮고 이것만 보여준다
   AttendanceRecord? _done;
   String? _error;
+
+  /// 카메라 자체를 못 여는 상태 — 권한을 막았거나 카메라가 없다
+  ///
+  /// **시뮬레이터가 여기 걸린다** (카메라가 아예 없다). 그냥 두면 패키지가
+  /// 네모 안에 영어 문구를 그려서 화면이 고장 난 것처럼 보인다.
+  bool _noCamera = false;
 
   @override
   void dispose() {
@@ -96,10 +111,29 @@ class _QrScanScreenState extends State<_QrScanScreen> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          MobileScanner(controller: _camera, onDetect: _onDetect),
+          MobileScanner(
+            controller: _camera,
+            onDetect: _onDetect,
+            // 패키지 기본 화면은 영어라 우리 말로 갈아 끼운다.
+            // 여기서 `setState` 를 바로 부르면 빌드 도중이라 터진다 —
+            // 값만 세우고 다음 프레임에 알린다
+            errorBuilder: (context, error) {
+              if (!_noCamera) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) setState(() => _noCamera = true);
+                });
+              }
+              return const SizedBox.shrink();
+            },
+          ),
           // 찍히면 카메라를 덮는다 — 결과를 보는 자리에서 다음 QR 이 또
           // 물리면 방금 뭘 했는지 못 읽는다
-          if (_done != null) _result() else _guide(),
+          if (_done != null)
+            _result()
+          else if (_noCamera)
+            _cameraOff()
+          else
+            _guide(),
           Positioned(
             top: 0,
             left: 0,
@@ -109,7 +143,10 @@ class _QrScanScreenState extends State<_QrScanScreen> {
                 alignment: Alignment.centerLeft,
                 child: IconButton(
                   onPressed: () => Navigator.pop(context),
-                  icon: Icon(Icons.close_rounded, color: Colors.white),
+                  icon: Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
@@ -125,13 +162,9 @@ class _QrScanScreenState extends State<_QrScanScreen> {
       child: Column(
         children: [
           Spacer(),
-          Container(
-            width: 240,
-            height: 240,
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.white, width: 3),
-              borderRadius: BorderRadius.circular(24),
-            ),
+          CustomPaint(
+            size: Size.square(_ScanFrame.side),
+            painter: _ScanFrame(),
           ),
           SizedBox(height: 24),
           Text(
@@ -155,6 +188,42 @@ class _QrScanScreenState extends State<_QrScanScreen> {
           ],
           Spacer(),
         ],
+      ),
+    );
+  }
+
+  /// 카메라를 못 열었다 — 권한을 막았거나 (시뮬레이터처럼) 카메라가 없다
+  Widget _cameraOff() {
+    return SafeArea(
+      child: Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 40),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.no_photography_rounded,
+                size: 44,
+                color: Colors.white.withValues(alpha: 0.7),
+              ),
+              SizedBox(height: 18),
+              Text(
+                '카메라를 열 수 없어요',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.title3.copyWith(color: Colors.white),
+              ),
+              SizedBox(height: 8),
+              Text(
+                '설정에서 HiFIS 의 카메라 권한을 켜주세요.',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.body2.copyWith(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  height: 1.5,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -200,4 +269,49 @@ class _QrScanScreenState extends State<_QrScanScreen> {
       ),
     );
   }
+}
+
+/// 조준 규격 — **네 모서리만** 그린다 (2026-08-28 대표 요청)
+///
+/// 네모를 통째로 두르면 그 선이 QR 테두리처럼 보여서, 카메라가 무엇을 읽는지
+/// 헷갈린다. 모서리만 두면 "이 안에 넣어라"는 뜻은 그대로고 화면은 비운다.
+///
+/// **네 조각을 따로 그리지 않는다.** 한 조각을 만들어 가운데를 축으로 90도씩
+/// 돌려 찍는다 — 값을 하나만 고치면 넷이 같이 움직인다.
+class _ScanFrame extends CustomPainter {
+  /// 규격 한 변 — 여기에 QR 을 채우면 읽힌다
+  static const side = 240.0;
+
+  /// 모서리 곡률과 뻗는 길이
+  static const _radius = 28.0;
+  static const _arm = 40.0;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4
+      // 끝을 둥글려야 잘린 선처럼 안 보인다
+      ..strokeCap = StrokeCap.round;
+
+    // 왼쪽 위 한 조각 — 아래에서 올라와 모서리를 돌아 오른쪽으로 뻗는다
+    final corner = Path()
+      ..moveTo(0, _radius + _arm)
+      ..lineTo(0, _radius)
+      ..arcToPoint(Offset(_radius, 0), radius: Radius.circular(_radius))
+      ..lineTo(_radius + _arm, 0);
+
+    for (var turn = 0; turn < 4; turn++) {
+      canvas.save();
+      canvas.translate(size.width / 2, size.height / 2);
+      canvas.rotate(turn * math.pi / 2);
+      canvas.translate(-size.width / 2, -size.height / 2);
+      canvas.drawPath(corner, paint);
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => false;
 }
