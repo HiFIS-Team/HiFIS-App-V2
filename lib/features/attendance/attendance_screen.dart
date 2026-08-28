@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import '../../core/data/data_signal.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/api/client/api_exception.dart';
@@ -71,6 +72,13 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   /// 탭에 다시 들어오거나 앱이 다시 앞으로 나왔을 때 조용히 다시 받는다
   @override
   Future<void> onScreenRefresh() => _load();
+
+  /// 월차 결재함·남은 월차가 바뀐다 (근태는 카운터 스캐너가 찍는다)
+  @override
+  List<ValueNotifier<int>> get watchSignals => [
+    attendanceChanged,
+    approvalChanged,
+  ];
 
   @override
   void initState() {

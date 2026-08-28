@@ -1,3 +1,4 @@
+import '../../data/data_signal.dart';
 import '../client/api_client.dart';
 import '../notice/reaction_api.dart';
 
@@ -595,12 +596,14 @@ class ProjectApi {
         'reason': reason,
       },
     );
+    notifyApprovalChanged();
     return ProjectRequest.fromJson(data!);
   }
 
   /// 승인 (MASTER 전용) — 프로젝트 마감일이 새 날짜로 바뀐다
   static Future<ProjectRequest> approve(String requestId) async {
     final data = await _client.post('/projects/requests/$requestId/approve');
+    notifyApprovalChanged();
     return ProjectRequest.fromJson(data!);
   }
 
@@ -613,6 +616,7 @@ class ProjectApi {
       '/projects/requests/$requestId/reject',
       body: {'reason': reason},
     );
+    notifyApprovalChanged();
     return ProjectRequest.fromJson(data!);
   }
 

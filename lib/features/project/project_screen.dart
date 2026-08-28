@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../../core/data/data_signal.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -71,6 +72,10 @@ class _ProjectScreenState extends State<ProjectScreen>
   /// 탭에 다시 들어오거나 앱이 다시 앞으로 나왔을 때 조용히 다시 받는다
   @override
   Future<void> onScreenRefresh() => _load();
+
+  /// 기한 연장 신청 상태가 바뀐다
+  @override
+  List<ValueNotifier<int>> get watchSignals => [approvalChanged];
 
   @override
   void initState() {

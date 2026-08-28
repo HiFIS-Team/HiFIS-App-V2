@@ -1,3 +1,4 @@
+import '../../data/data_signal.dart';
 import '../client/api_client.dart';
 
 /// 일정 한 건 (서버 `EventOut`)
@@ -143,10 +144,14 @@ class EventApi {
         'memo': ?memo,
       },
     );
+    notifyApprovalChanged();
     return CalendarEvent.fromJson(data!);
   }
 
   /// 고치기 — 넘긴 값만 바뀐다
+  ///
+  /// **승인받은 일정을 고치면 서버가 다시 대기로 되돌린다** (승인해 준 내용과
+  /// 달라지므로). 결재함에 줄이 다시 서는 것이라 신호를 쏜다.
   static Future<CalendarEvent> update(
     String id, {
     String? title,
@@ -175,18 +180,26 @@ class EventApi {
         'memo': ?memo,
       },
     );
+    notifyApprovalChanged();
     return CalendarEvent.fromJson(data!);
   }
 
   /// 신청 승인 — 이때부터 전 직원 달력에 뜬다 (MASTER·ADMIN)
   static Future<CalendarEvent> approve(String id) async {
     final data = await _client.post('/events/$id/approve');
+    notifyApprovalChanged();
     return CalendarEvent.fromJson(data!);
   }
 
   /// 신청 반려 — **서버가 일정을 지운다.** 신청자에게는 알림이 간다
-  static Future<void> reject(String id, {String? reason}) =>
-      _client.post('/events/$id/reject', query: {'reason': ?reason});
+  static Future<void> reject(String id, {String? reason}) async {
+    await _client.post('/events/$id/reject', query: {'reason': ?reason});
+    notifyApprovalChanged();
+  }
 
-  static Future<void> delete(String id) => _client.delete('/events/$id');
+  /// 삭제 — 대기 중인 일정이면 **결재함에서도 빠진다**
+  static Future<void> delete(String id) async {
+    await _client.delete('/events/$id');
+    notifyApprovalChanged();
+  }
 }

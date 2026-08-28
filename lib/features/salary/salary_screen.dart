@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import '../../core/data/data_signal.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/util/skeleton_delay.dart';
@@ -65,6 +66,10 @@ class _SalaryScreenState extends State<SalaryScreen>
   /// 탭에 다시 들어오거나 앱이 다시 앞으로 나왔을 때 조용히 다시 받는다
   @override
   Future<void> onScreenRefresh() => _load();
+
+  /// 급여 결재함·내 명세서 상태가 바뀐다
+  @override
+  List<ValueNotifier<int>> get watchSignals => [approvalChanged];
 
   @override
   void initState() {

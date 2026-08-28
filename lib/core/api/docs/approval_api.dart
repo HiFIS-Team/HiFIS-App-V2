@@ -1,3 +1,4 @@
+import '../../data/data_signal.dart';
 import '../client/api_client.dart';
 
 /// 문서 전체의 진행 상태 (서버 `ApprovalStatus`)
@@ -249,6 +250,7 @@ class ApprovalApi {
         'place': ?place,
       },
     );
+    notifyApprovalChanged();
     return Approval.fromJson(data!);
   }
 
@@ -259,6 +261,7 @@ class ApprovalApi {
       '/approvals/$id/approve',
       body: {'comment': ?comment},
     );
+    notifyApprovalChanged();
     return Approval.fromJson(data!);
   }
 
@@ -268,12 +271,14 @@ class ApprovalApi {
       '/approvals/$id/reject',
       body: {'comment': ?comment},
     );
+    notifyApprovalChanged();
     return Approval.fromJson(data!);
   }
 
   /// 회수 — **신청자 본인만**, 진행 중일 때만
   static Future<Approval> withdraw(String id) async {
     final data = await _client.post('/approvals/$id/withdraw');
+    notifyApprovalChanged();
     return Approval.fromJson(data!);
   }
 

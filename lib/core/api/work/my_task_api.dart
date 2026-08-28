@@ -1,3 +1,4 @@
+import '../../data/data_signal.dart';
 import '../client/api_client.dart';
 
 export '../client/period.dart' show dateKey;
@@ -427,6 +428,7 @@ class MyTaskApi {
           'payload': {'content': ?content, 'weekdays': ?weekdays},
       },
     );
+    notifyApprovalChanged();
     return MyTaskRequest.fromJson(data!);
   }
 
@@ -446,6 +448,7 @@ class MyTaskApi {
 
   static Future<MyTaskRequest> approve(String requestId) async {
     final data = await _client.post('/my-task-requests/$requestId/approve');
+    notifyApprovalChanged();
     return MyTaskRequest.fromJson(data!);
   }
 
@@ -454,6 +457,7 @@ class MyTaskApi {
       '/my-task-requests/$requestId/reject',
       query: {'reason': reason},
     );
+    notifyApprovalChanged();
     return MyTaskRequest.fromJson(data!);
   }
 
@@ -481,12 +485,14 @@ class MyTaskApi {
       '/my-task-misses/$missId/excuse',
       body: {'reason': reason},
     );
+    notifyApprovalChanged();
     return MyTaskMiss.fromJson(data!);
   }
 
   /// 사유 승인 — **깎였던 점수가 되돌아온다** (대표만)
   static Future<MyTaskMiss> approveMiss(String missId) async {
     final data = await _client.post('/my-task-misses/$missId/approve');
+    notifyApprovalChanged();
     return MyTaskMiss.fromJson(data!);
   }
 
@@ -495,6 +501,7 @@ class MyTaskApi {
       '/my-task-misses/$missId/reject',
       query: {'reason': reason},
     );
+    notifyApprovalChanged();
     return MyTaskMiss.fromJson(data!);
   }
 }

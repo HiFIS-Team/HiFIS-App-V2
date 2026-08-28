@@ -11,7 +11,7 @@ import '../../core/api/project/project_api.dart';
 import '../../core/api/staff/attendance_api.dart';
 import '../../core/api/staff/payroll_api.dart';
 import '../../core/api/work/my_task_api.dart';
-import '../../core/data/attendance_signal.dart';
+import '../../core/data/data_signal.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
 import '../../core/data/staff.dart';
@@ -124,24 +124,17 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   Future<void> onScreenRefresh() => _load();
 
+  /// 결재 대기 카드가 여섯 갈래를 다 세운다
+  @override
+  List<ValueNotifier<int>> get watchSignals => [
+    attendanceChanged,
+    approvalChanged,
+  ];
+
   @override
   void initState() {
     super.initState();
-    // 바코드 화면이 '방금 찍혔다'고 알려 주면 **간격을 안 따지고** 바로 받는다.
-    // 안 걸면 찍고 홈으로 와도 '오늘 근무' 가 한동안 미출근 그대로다.
-    attendanceChanged.addListener(_reload);
     _load();
-  }
-
-  @override
-  void dispose() {
-    attendanceChanged.removeListener(_reload);
-    super.dispose();
-  }
-
-  /// 근태가 바뀌었다는 신호 — 간격을 안 따지고 바로 받는다
-  void _reload() {
-    if (mounted) _load();
   }
 
   Future<void> _load() async {

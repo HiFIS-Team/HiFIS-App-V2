@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/api/client/api_exception.dart';
 import '../../core/api/staff/attendance_api.dart';
-import '../../core/data/attendance_signal.dart';
+import '../../core/data/data_signal.dart';
 import '../../core/data/current_user.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';

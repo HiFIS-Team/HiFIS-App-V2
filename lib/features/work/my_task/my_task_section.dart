@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import '../../../core/data/data_signal.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/api/client/api_exception.dart';
@@ -145,6 +146,10 @@ class _MyTaskSectionState extends State<MyTaskSection>
 
   @override
   Future<void> onScreenRefresh() => _load();
+
+  /// 신청·누락 사유가 처리되면 줄이 바뀐다
+  @override
+  List<ValueNotifier<int>> get watchSignals => [approvalChanged];
 
   Future<void> _load() async {
     try {

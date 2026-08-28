@@ -31,12 +31,37 @@ final appResumed = ValueNotifier<int>(0);
 /// **화면에 새로 생기는 요소는 없다.** [onScreenRefresh] 에는 로딩 표시를
 /// 켜지 않는 조용한 로드 함수를 준다 — 스켈레톤이 다시 뜨면 탭을 옮길 때마다
 /// 화면이 깜빡인다.
+///
+/// **간격이 문제가 되는 자리가 하나 있다** — 다른 화면에서 값이 바뀌었을 때다.
+/// 홈 결재함에서 승인하고 1분 안에 급여 탭으로 가면 이미 처리한 건이 대기로
+/// 남아 있고, 다시 누르면 400 이 난다. 그 자리는 [watchSignals] 로 푼다.
 mixin ScreenRefresh<T extends StatefulWidget> on State<T> {
   /// 다시 받을 때 부를 것 — 화면이 이미 쓰는 조용한 로드 함수를 그대로 준다
   Future<void> onScreenRefresh();
 
   /// 이 간격 안에는 다시 받지 않는다
   Duration get screenRefreshGap => const Duration(minutes: 1);
+
+  /// 지켜볼 갈래 신호 (`lib/core/data/data_signal.dart`)
+  ///
+  /// 신호가 오면 **[screenRefreshGap] 을 안 따진다.** 다른 화면이 방금 바꾼
+  /// 값이라 간격을 지키면 낡은 줄을 그대로 보여주게 된다.
+  ///
+  /// **안 보이는 탭은 그 자리에서 받지 않는다** — 결재 한 건에 탭 열두 개가
+  /// 동시에 요청을 내면 안 된다. 표시만 해 두었다가 **다시 보일 때** 받는다.
+  ///
+  /// ```dart
+  /// @override
+  /// List<ValueNotifier<int>> get watchSignals => [approvalChanged];
+  /// ```
+  List<ValueNotifier<int>> get watchSignals => const [];
+
+  /// 안 보이는 동안 신호를 받았다 — 다시 보이면 간격을 건너뛰고 받는다
+  bool _stale = false;
+
+  /// `initState` 에서 한 번 읽어 둔다 — getter 가 매번 새 목록을 돌려줘도
+  /// **붙인 것과 떼는 것이 같아야** 한다
+  List<ValueNotifier<int>> _signals = const [];
 
   /// 마지막으로 받은 때 — 화면이 만들어질 때가 곧 첫 로드라 그 시각으로 시작한다
   /// (안 그러면 화면을 열자마자 한 번 더 받는다)
@@ -54,6 +79,10 @@ mixin ScreenRefresh<T extends StatefulWidget> on State<T> {
   void initState() {
     super.initState();
     appResumed.addListener(_onResumed);
+    _signals = watchSignals;
+    for (final signal in _signals) {
+      signal.addListener(_onSignal);
+    }
   }
 
   @override
@@ -68,6 +97,9 @@ mixin ScreenRefresh<T extends StatefulWidget> on State<T> {
   @override
   void dispose() {
     appResumed.removeListener(_onResumed);
+    for (final signal in _signals) {
+      signal.removeListener(_onSignal);
+    }
     _visible?.removeListener(_onVisible);
     super.dispose();
   }
@@ -84,7 +116,25 @@ mixin ScreenRefresh<T extends StatefulWidget> on State<T> {
   /// 탭이 다시 보이게 됐다 (가려질 때도 불린다)
   void _onVisible() {
     onScreenVisibility(_isVisible);
-    if (_isVisible) _refresh();
+    if (!_isVisible) return;
+    // 안 보이는 동안 다른 화면이 값을 바꿨으면 간격을 안 따진다
+    if (_stale) {
+      _stale = false;
+      _refresh(force: true);
+    } else {
+      _refresh();
+    }
+  }
+
+  /// 다른 화면이 값을 바꿨다
+  void _onSignal() {
+    if (!mounted) return;
+    // 지금 안 보이면 요청을 아끼고 표시만 해 둔다 — 다시 보일 때 받는다
+    if (!_isVisible) {
+      _stale = true;
+      return;
+    }
+    _refresh(force: true);
   }
 
   /// 앱이 다시 앞으로 나왔다 — 보고 있는 탭만 받는다
@@ -92,10 +142,10 @@ mixin ScreenRefresh<T extends StatefulWidget> on State<T> {
     if (_isVisible) _refresh();
   }
 
-  void _refresh() {
+  void _refresh({bool force = false}) {
     if (!mounted) return;
     final now = DateTime.now();
-    if (now.difference(_lastAt) < screenRefreshGap) return;
+    if (!force && now.difference(_lastAt) < screenRefreshGap) return;
     _lastAt = now;
     // `TickerMode` 알림은 **빌드 도중**에 온다 — 그 자리에서 바로 부르면
     // 로드 함수가 setState 를 만나는 순간 `called during build` 로 터진다.

@@ -1,3 +1,4 @@
+import '../../data/data_signal.dart';
 import '../client/api_client.dart';
 
 /// 급여 명세서 상태 — 서버 `PayslipStatus`
@@ -364,6 +365,7 @@ class PayrollApi {
         'incentiveRenewal': ?incentiveRenewal,
       },
     );
+    notifyApprovalChanged();
     return Payslip.fromJson(data!);
   }
 
@@ -375,6 +377,7 @@ class PayrollApi {
       '/payslips/me/cancel',
       query: {'yearMonth': yearMonth},
     );
+    notifyApprovalChanged();
     return Payslip.fromJson(data!);
   }
 
@@ -404,6 +407,7 @@ class PayrollApi {
   /// 승인 — 제출된 것만 된다. **본인 명세서는 못 한다** (403 SELF_DECIDE)
   static Future<Payslip> approve(String id) async {
     final data = await _client.post('/payslips/$id/approve');
+    notifyApprovalChanged();
     return Payslip.fromJson(data!);
   }
 
@@ -413,6 +417,7 @@ class PayrollApi {
       '/payslips/$id/reject',
       body: {'reason': reason},
     );
+    notifyApprovalChanged();
     return Payslip.fromJson(data!);
   }
 
@@ -422,6 +427,7 @@ class PayrollApi {
   /// 이체를 확인한 사람만 아니까 여기서 눌러야 `paidAt` 이 남는다.
   static Future<Payslip> pay(String id) async {
     final data = await _client.post('/payslips/$id/pay');
+    notifyApprovalChanged();
     return Payslip.fromJson(data!);
   }
 }

@@ -1,3 +1,4 @@
+import '../../data/data_signal.dart';
 import '../../data/attendance_status.dart';
 import '../../data/employee.dart';
 import '../client/api_client.dart';
@@ -311,6 +312,7 @@ class AttendanceApi {
   /// 휴가 승인 — **MASTER · MANAGER 만** 된다 (ADMIN 은 보기만)
   static Future<LeaveRequest> approveLeave(String id) async {
     final data = await _client.post('/leaves/$id/approve');
+    notifyApprovalChanged();
     return LeaveRequest.fromJson(data!);
   }
 
@@ -320,6 +322,7 @@ class AttendanceApi {
       '/leaves/$id/reject',
       body: {'reason': reason},
     );
+    notifyApprovalChanged();
     return LeaveRequest.fromJson(data!);
   }
 
@@ -367,6 +370,7 @@ class AttendanceApi {
         'reason': ?reason,
       },
     );
+    notifyApprovalChanged();
     return LeaveRequest.fromJson(data!);
   }
 
@@ -393,6 +397,7 @@ class AttendanceApi {
   /// 신청자 본인이 대기중인 신청을 물린다 (이력은 남는다)
   static Future<LeaveRequest> cancelLeave(String id) async {
     final data = await _client.post('/leaves/$id/cancel');
+    notifyApprovalChanged();
     return LeaveRequest.fromJson(data!);
   }
 }

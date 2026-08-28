@@ -49,6 +49,10 @@ class _MyTaskRosterState extends State<MyTaskRoster>
   @override
   Future<void> onScreenRefresh() => _load();
 
+  /// 지점원 줄의 누락·사유 표시가 바뀐다
+  @override
+  List<ValueNotifier<int>> get watchSignals => [approvalChanged];
+
   Future<void> _load() async {
     try {
       final rows = await MyTaskApi.roster(branchId: branchScopeId);
