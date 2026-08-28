@@ -449,10 +449,7 @@ class _WorkScreenState extends State<WorkScreen>
   /// 서버가 `POST /env-logs` 를 **MEMBER·MANAGER 에게만** 열어 둔다
   /// (ADMIN·MASTER 는 운영 전담이라 403 — 세션 싸인과 같은 기준).
   /// 대표·관리자에게 칩을 보여줘 봐야 누르면 '권한이 없습니다' 만 뜬다.
-  bool get _canDoEnv => myRole == Role.member || myRole == Role.manager;
-
-  bool get _canSeeOthersTasks =>
-      myRole == Role.master || myRole == Role.admin || myRole == Role.manager;
+  bool get _canDoEnv => myRole.doesFieldWork;
 
   Widget get _myHistoryCard => _HistoryCard(
     title: '내 내역',
@@ -524,7 +521,10 @@ class _WorkScreenState extends State<WorkScreen>
                                     // 누르면 그 사람 업무가 밀려 들어온다
                                     : MyTaskRoster(),
                               ),
-                              if (_canSeeOthersTasks && myRole == Role.manager)
+                              // 점장만 세 번째 칸이 있다 — 본인 업무(1번)도
+                              // 하면서 지점원 업무(2번)도 본다. 대표·관리자는
+                              // 위 Offstage 가 이미 사람 목록을 그린다
+                              if (myRole == Role.manager)
                                 Offstage(
                                   offstage: _envTab != 2,
                                   child: MyTaskRoster(),

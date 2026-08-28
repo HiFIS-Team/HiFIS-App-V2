@@ -81,7 +81,7 @@ class _ContributionSectionState extends State<ContributionSection>
   /// 기여도는 자기보다 아래에만 주는 것이라(서버 `GRANTABLE`) 그 둘은 받을
   /// 일이 없다. 본인 것으로 거르면 늘 비어서, 대신 **내가 준 내역**을 본다.
   /// 점장은 주기도 받기도 해서 둘을 한 목록에 담는다.
-  static bool get _givenOnly => myRole == Role.master || myRole == Role.admin;
+  static bool get _givenOnly => myRole.boss;
 
   Future<void> _load() async {
     final me = currentUser;

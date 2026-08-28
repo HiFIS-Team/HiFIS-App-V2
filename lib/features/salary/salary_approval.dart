@@ -29,7 +29,7 @@ bool get _canDecide => myRole.canApprove;
 ///
 /// 이 사람들 자리에서는 '급여 신청서 작성' 칸이 결재함으로 바뀐다.
 /// MANAGER 는 본인도 급여를 신청해서 예전 화면 그대로다 (근태와 같은 기준).
-bool get _isPayBoss => myRole == Role.master || myRole == Role.admin;
+bool get _isPayBoss => myRole.boss;
 
 /// 급여 결재 카드 — '급여 신청서 작성' 자리를 대신한다
 ///

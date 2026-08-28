@@ -30,7 +30,7 @@ bool get _canDecideLeave => myRole.canApprove;
 /// 달 요약 자리에 오늘 전 직원 현황, 쓴 월차 자리에 월차 결재,
 /// 달력 칸에 그날 전 직원 기록이 들어간다.
 /// MANAGER 는 본인도 현장 근무를 해서 예전 화면 그대로다.
-bool get _isBoss => myRole == Role.master || myRole == Role.admin;
+bool get _isBoss => myRole.boss;
 
 /// 결재 대기 한 건 — 누가 · 언제 · 어떤 휴가 · 사유
 ///

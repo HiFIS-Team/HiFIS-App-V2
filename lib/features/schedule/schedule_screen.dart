@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import '../../core/api/client/api_exception.dart';
 import '../../core/api/project/event_api.dart';
 import '../../core/data/current_user.dart';
-import '../../core/data/employee.dart';
 import '../../core/data/staff.dart';
 import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
@@ -367,7 +366,7 @@ const _weekdays = ['일', '월', '화', '수', '목', '금', '토'];
 
 /// 헤더의 달 이동 버튼
 /// 남의 개인 일정을 볼 수 있는 권한 — **MASTER·ADMIN 만** (서버와 같은 기준)
-bool get _canSeeOthers => myRole == Role.master || myRole == Role.admin;
+bool get _isBoss => myRole.boss;
 
 /// `공통 일정 / 개인 일정` 목록바 — 달력 위 한 줄
 ///
@@ -396,7 +395,7 @@ class _ScopeBar extends StatelessWidget {
         onSelect: onScope,
         expand: false,
       ),
-      if (scheduleScope == ScheduleScope.personal && _canSeeOthers) ...[
+      if (scheduleScope == ScheduleScope.personal && _isBoss) ...[
         SizedBox(width: 12),
         Pressable(
           onTap: onPerson,

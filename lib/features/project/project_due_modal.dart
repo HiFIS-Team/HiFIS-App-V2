@@ -102,7 +102,7 @@ Future<void> showProjectDueModal(BuildContext context) async {
 /// 알림함으로 따로 온다. 서버 리마인더도 같은 기준으로 빠진다
 /// (`_reminder_targets`).
 List<_Project> _dueTargets() {
-  if (myRole == Role.master || myRole == Role.admin) return const [];
+  if (myRole.boss) return const [];
   final me = currentUser?.id;
   return [
     for (final project in _projects)

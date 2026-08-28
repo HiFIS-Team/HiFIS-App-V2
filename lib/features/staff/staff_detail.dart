@@ -33,8 +33,7 @@ class _MemberDetailState extends State<_MemberDetail>
   ///
   /// **MANAGER 는 뺐다 (2026-08-14).** 결재가 대표 전용이 되면서 점장이
   /// 남의 근태를 볼 자리가 없어졌다 — 월차 결재함·급여 결재 탭과 같은 정리다.
-  bool get _canSeeMonth =>
-      member.isMe || myRole == Role.master || myRole == Role.admin;
+  bool get _canSeeMonth => member.isMe || myRole.boss;
 
   @override
   void initState() {

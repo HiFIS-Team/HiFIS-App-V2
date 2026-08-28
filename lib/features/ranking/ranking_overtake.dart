@@ -8,7 +8,7 @@ part of 'ranking_screen.dart';
 ///
 /// 이 사람들은 매출·수업 실적이 없어서 '내 순위' 자리가 늘 비어 있다.
 /// 그 자리에 **누가 누구를 앞질렀는지**를 대신 놓는다.
-bool get _isRankBoss => myRole == Role.master || myRole == Role.admin;
+bool get _isRankBoss => myRole.boss;
 
 /// 누가 누구를 무슨 차이로 앞질렀나 — '내 순위' 자리를 대신한다
 ///
