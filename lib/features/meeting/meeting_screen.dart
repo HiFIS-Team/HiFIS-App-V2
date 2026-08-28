@@ -21,7 +21,6 @@ import '../../core/widgets/editor/post_actions.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/feedback/empty_card.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
-import '../../core/widgets/glass/glass_menu.dart';
 import '../../core/widgets/input/person_picker.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/nav/phone_scaffold.dart';
@@ -526,7 +525,6 @@ class _NoteViewState extends State<_NoteView> {
   final _titleFocus = FocusNode();
 
   /// 프로젝트 고르개가 뜰 자리 — 그 칩 아래에 붙는다
-  final _projectKey = GlobalKey();
 
   bool get _editing => widget.editing;
 
@@ -591,43 +589,6 @@ class _NoteViewState extends State<_NoteView> {
     );
     if (picked == null) return;
     setState(() => note.date = picked);
-    widget.onChanged();
-  }
-
-  /// 이 회의록을 프로젝트에 건다 — 빼려면 맨 위 '전사 회의'를 고른다
-  ///
-  /// **공개 범위가 같이 간다.** 서버에서 `scope=PROJECT` 는 `projectId` 와 한 쌍이라
-  /// 걸면 그 프로젝트 담당자·참석자·작성자·MASTER·ADMIN 만 보게 된다
-  /// (backend-gap.md 44번). 따로 고르는 자리를 두면 둘이 어긋난다.
-  Future<void> _pickProject() async {
-    final note = widget.note;
-    final picked = await showGlassMenu<String>(
-      context: context,
-      anchorKey: _projectKey,
-      alignRight: false,
-      width: 240,
-      items: [
-        GlassMenuItem(
-          value: '',
-          label: '전사 회의',
-          icon: Icons.groups_rounded,
-          selected: note.projectId == null,
-        ),
-        if (_projects.isNotEmpty) GlassMenuDivider<String>(),
-        for (final project in _projects)
-          GlassMenuItem(
-            value: project.id,
-            label: project.title,
-            icon: Icons.folder_rounded,
-            selected: note.projectId == project.id,
-          ),
-      ],
-    );
-    if (picked == null || !mounted) return;
-    setState(() {
-      note.projectId = picked.isEmpty ? null : picked;
-      note.scope = picked.isEmpty ? MeetingScope.company : MeetingScope.project;
-    });
     widget.onChanged();
   }
 
@@ -853,38 +814,6 @@ class _NoteViewState extends State<_NoteView> {
                       ],
                     ),
                   ),
-                  // 어느 프로젝트 회의인지 — 안 걸면 전사 회의다
-                  Pressable(
-                    key: _projectKey,
-                    onTap: _pickProject,
-                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          linked == null
-                              ? Icons.groups_rounded
-                              : Icons.folder_rounded,
-                          size: 13,
-                          color: AppColors.textSecondary,
-                        ),
-                        SizedBox(width: 6),
-                        Text(
-                          linked?.title ?? '전사 회의',
-                          style: AppTextStyles.body2.copyWith(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        SizedBox(width: 2),
-                        Icon(
-                          Icons.keyboard_arrow_down_rounded,
-                          size: 16,
-                          color: AppColors.textSecondary,
-                        ),
-                      ],
-                    ),
-                  ),
                 ],
               ),
               if (_help) ...[SizedBox(height: 10), MarkdownHelpPanel()],
@@ -1090,8 +1019,10 @@ class _Note {
   String body;
   DateTime updated;
 
-  /// 공개 범위 — **프로젝트를 걸면 [MeetingScope.project] 로 간다.**
-  /// 짝이라 따로 고르지 않는다 (서버 `scope=PROJECT` 는 `projectId` 와 한 쌍이다)
+  /// 공개 범위 — **서버가 준 값을 들고만 있는다.**
+  ///
+  /// 앱에서 이 값을 바꾸는 자리가 없다 (2026-08-28). 저장할 때는 늘
+  /// [MeetingScope.company] 를 보낸다 — 좁히는 자리를 없앴다.
   MeetingScope scope;
 
   /// 묶인 프로젝트 — null 이면 전사 회의다
@@ -1205,7 +1136,10 @@ Future<void> _saveNote(_Note note) async {
       title: note.title,
       blocks: blocks,
       meetingAt: note.date,
-      scope: note.scope,
+      // **늘 전사다** (2026-08-28 대표 결정). 공개 범위를 고르는 자리를
+      // 없앴다 — `scope=PROJECT` 는 그 프로젝트 사람들만 보게 만드는데
+      // (backend-gap 44번), 그걸 프로젝트 고르개 하나로 조용히 바꾸고 있었다.
+      scope: MeetingScope.company,
       attendeeIds: attendeeIds,
       projectId: note.projectId,
     );
@@ -1222,7 +1156,9 @@ Future<void> _saveNote(_Note note) async {
     blocks: blocks,
     meetingAt: note.date,
     attendeeIds: attendeeIds,
-    scope: note.scope,
+    // 늘 전사다 (위 `create` 와 같은 이유). 예전에 좁혀 둔 회의록이 있으면
+    // **한 번 고쳐 저장하는 순간 전사로 돌아온다** — 풀 자리가 없어서 갇히면 안 된다
+    scope: MeetingScope.company,
     // 뺐으면 빈 문자열로 보내야 서버가 푼다 (null 은 "안 건드림")
     projectId: note.projectId ?? '',
   );
