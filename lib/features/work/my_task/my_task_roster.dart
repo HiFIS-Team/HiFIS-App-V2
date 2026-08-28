@@ -231,15 +231,44 @@ class _PersonTaskScreenState extends State<_PersonTaskScreen>
     with SkeletonDelay<_PersonTaskScreen> {
   MyTaskDay? _day;
 
+  /// 보고 있는 요일 (ISO 1~7) — **직원 본인 화면과 같은 값**이다
+  ///
+  /// 예전에는 여기가 오늘 것만 보여줬다. 그런데 업무마다 도는 요일이 달라서
+  /// (`월·수·금` 처럼), 대표가 **누가 무슨 요일에 뭘 하기로 했는지**를 볼 길이
+  /// 없었다 — 오늘 안 도는 업무는 아예 안 뜬다 (2026-08-28 대표 지적).
+  int _viewDay = DateTime.now().weekday;
+
+  bool get _isToday => _viewDay == DateTime.now().weekday;
+
+  /// 보고 있는 요일의 **이번 주 날짜** — 서버에 넘길 값
+  DateTime get _viewDate {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day + (_viewDay - now.weekday));
+  }
+
   @override
   void initState() {
     super.initState();
     _load();
   }
 
+  /// 요일을 옮긴다 — 옛 목록을 둔 채로 새 값을 받는다 (`SkeletonDelay`)
+  void _pickDay(int day) {
+    if (day == _viewDay) return;
+    setState(() {
+      _viewDay = day;
+      beginLoad();
+    });
+    _load();
+  }
+
   Future<void> _load() async {
     try {
-      final day = await MyTaskApi.day(employeeId: widget.row.employeeId);
+      final day = await MyTaskApi.day(
+        employeeId: widget.row.employeeId,
+        // 오늘은 날짜를 안 넘긴다 — 서버가 오늘로 본다 (자정을 넘겨도 맞다)
+        date: _isToday ? null : dateKey(_viewDate),
+      );
       if (!mounted) return;
       setState(() {
         _day = day;
@@ -256,7 +285,12 @@ class _PersonTaskScreenState extends State<_PersonTaskScreen>
   Widget build(BuildContext context) {
     final body = showSkeleton
         ? const _MyTaskSkeleton()
-        : _PersonTaskCardBody(row: widget.row, day: _day);
+        : _PersonTaskCardBody(
+            row: widget.row,
+            day: _day,
+            viewDay: _viewDay,
+            onPickDay: _pickDay,
+          );
 
     if (!isDesktop) {
       return PhoneDetailScaffold(
@@ -288,12 +322,21 @@ class _PersonTaskScreenState extends State<_PersonTaskScreen>
   }
 }
 
-/// 그 사람의 오늘 할 일 — 직원 화면과 **같은 줄 모양**이되 안 눌린다
+/// 그 사람의 할 일 — 직원 화면과 **같은 줄 모양**이되 안 눌린다
 class _PersonTaskCardBody extends StatelessWidget {
-  const _PersonTaskCardBody({required this.row, required this.day});
+  const _PersonTaskCardBody({
+    required this.row,
+    required this.day,
+    required this.viewDay,
+    required this.onPickDay,
+  });
 
   final MyTaskRosterRow row;
   final MyTaskDay? day;
+
+  /// 보고 있는 요일 (ISO 1~7)
+  final int viewDay;
+  final ValueChanged<int> onPickDay;
 
   @override
   Widget build(BuildContext context) {
@@ -309,7 +352,14 @@ class _PersonTaskCardBody extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Row(
               children: [
-                Expanded(child: Text('오늘 할 일', style: AppTextStyles.label)),
+                Expanded(
+                  child: Text(
+                    viewDay == DateTime.now().weekday
+                        ? '오늘 할 일'
+                        : '${_MyTaskSectionState._dayNames[viewDay - 1]}요일 할 일',
+                    style: AppTextStyles.label,
+                  ),
+                ),
                 if (day != null) _DoneBadge(day: day!),
               ],
             ),
@@ -324,14 +374,22 @@ class _PersonTaskCardBody extends StatelessWidget {
                 height: 6,
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 18),
           ],
+          // 요일 줄 — **직원 본인 화면과 같은 위젯**이다. 업무마다 도는 요일이
+          // 달라서, 오늘 것만 보면 그 사람이 무슨 요일에 뭘 하는지 알 수 없다
+          _DayTabs(selected: viewDay, onSelect: onPickDay),
+          const SizedBox(height: 6),
           if (tasks.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: Center(
                 child: Text(
-                  '아직 정한 업무가 없어요',
+                  // 요일을 옮길 수 있게 되면서 '없다'는 말이 두 가지가 됐다 —
+                  // 아무것도 안 정한 것과 그 요일만 비어 있는 것
+                  viewDay == DateTime.now().weekday
+                      ? '아직 정한 업무가 없어요'
+                      : '${_MyTaskSectionState._dayNames[viewDay - 1]}요일에는 정한 업무가 없어요',
                   style: AppTextStyles.body2.copyWith(color: AppColors.gray400),
                 ),
               ),
