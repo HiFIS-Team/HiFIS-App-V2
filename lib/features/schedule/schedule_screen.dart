@@ -692,10 +692,10 @@ class _SkeletonChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: EdgeInsets.only(bottom: big ? 4 : 2),
+    padding: EdgeInsets.only(bottom: big ? 5 : 2),
     child: SizedBox(
       width: double.infinity,
-      child: Skeleton(height: big ? 26 : 19, radius: 6),
+      child: Skeleton(height: big ? 34 : 19, radius: 6),
     ),
   );
 }
@@ -707,6 +707,10 @@ class _Chip extends StatelessWidget {
   final Event event;
 
   /// 폰 주 달력용 — 줄이 가로로 길어서 칩도 크게 잡는다.
+  ///
+  /// **한 번 더 키웠다** (2026-08-28 대표 요청). 한 주는 늘 일곱 줄이라
+  /// 데이터가 아무리 많아도 화면 아래가 남는다 — 줄을 키워서 채운다.
+  ///
   /// PC 달 격자는 칸이 좁아 예전 크기 그대로다
   /// (칸에 몇 개 들어가는지 재는 `_DayCell` 의 21 이 그 크기를 본다).
   final bool big;
@@ -714,10 +718,10 @@ class _Chip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: big ? 26 : 19,
+      height: big ? 34 : 19,
       width: double.infinity,
-      margin: EdgeInsets.only(bottom: big ? 4 : 2),
-      padding: EdgeInsets.symmetric(horizontal: big ? 10 : 6),
+      margin: EdgeInsets.only(bottom: big ? 5 : 2),
+      padding: EdgeInsets.symmetric(horizontal: big ? 12 : 6),
       alignment: Alignment.centerLeft,
       decoration: BoxDecoration(
         // 대기 중인 것은 옅게 깔고 테두리로 가른다 — 아직 확정이 아니다
@@ -732,7 +736,7 @@ class _Chip extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: AppTextStyles.caption.copyWith(
-          fontSize: big ? 13 : 11,
+          fontSize: big ? 14 : 11,
           color: event.kind.color.withValues(alpha: event.pending ? 0.6 : 1),
           fontWeight: FontWeight.w600,
         ),

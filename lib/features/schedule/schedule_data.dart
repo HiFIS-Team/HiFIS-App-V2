@@ -7,15 +7,21 @@ part of 'schedule_screen.dart';
 /// 서버는 종류를 enum 이 아니라 **자유 문자열**로 받는다. [label] 을 그대로
 /// 주고받으므로 라벨을 고치면 이미 쌓인 일정이 '기타'로 떨어진다.
 enum Kind {
-  meeting('회의'),
-  lesson('수업'),
-  event('이벤트'),
-  off('휴무'),
-  etc('기타');
+  meeting('회의', Icons.groups_rounded),
+  lesson('수업', Icons.fitness_center_rounded),
+  event('이벤트', Icons.campaign_rounded),
+  off('휴무', Icons.bedtime_rounded),
+  etc('기타', Icons.more_horiz_rounded);
 
-  const Kind(this.label);
+  const Kind(this.label, this.icon);
 
   final String label;
+
+  /// 종류 고르는 카드에 얹는 아이콘 — 전자결재 종류와 같은 방식이다
+  ///
+  /// **[label] 과 달리 서버에 안 간다.** 서버는 종류를 자유 문자열로 받고
+  /// 라벨만 오간다 — 아이콘은 화면에서만 쓴다.
+  final IconData icon;
 
   static Kind parse(String? value) =>
       Kind.values.firstWhere((k) => k.label == value, orElse: () => Kind.etc);

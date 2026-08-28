@@ -184,9 +184,50 @@ class _EventDialogState extends State<_EventDialog> {
     );
   }
 
-  /// 참석자 알약 — 한 줄에 [_perRow]개씩 **같은 폭**으로 세운다
+  /// 참석자 한 칸 — 아바타 위, 이름 아래 (프로젝트 `_MemberCard` 와 같은 모양)
+  ///
+  /// **알약이 아니라 카드다** (2026-08-28). 알약은 이름 길이만큼 폭이 달라서
+  /// 줄이 들쭉날쭉했다 — 칸을 고정하면 세로 줄이 맞는다.
+  /// 한 줄에 [_perRow]개씩 **같은 폭**으로 세운다
   ///
   /// 이름 길이대로 흘려 보내면(Wrap) 줄 끝이 들쭉날쭉해 오른쪽이 비어 보인다.
+  /// 종류 고르개 — 한 줄에 셋, 마지막 줄 빈칸은 자리만 차지한다
+  ///
+  /// 잠겼으면(남의 일정) 고른 것 하나만 남긴다 — 못 누르는 카드가 줄줄이
+  /// 남아 있으면 고를 수 있는 것처럼 보인다.
+  Widget _kindCards() {
+    final kinds = [
+      for (final kind in Kind.values)
+        if (!_locked || kind == _kind) kind,
+    ];
+
+    return Column(
+      children: [
+        for (var row = 0; row * _perRow < kinds.length; row++) ...[
+          if (row > 0) SizedBox(height: 8),
+          Row(
+            children: [
+              for (var col = 0; col < _perRow; col++) ...[
+                if (col > 0) SizedBox(width: 8),
+                Expanded(
+                  child: switch (row * _perRow + col) {
+                    // 마지막 줄의 빈칸 — 자리를 차지해야 폭이 안 늘어난다
+                    final i when i >= kinds.length => SizedBox(height: 72),
+                    final i => _KindCard(
+                      kind: kinds[i],
+                      selected: kinds[i] == _kind,
+                      onTap: _tap(() => setState(() => _kind = kinds[i])),
+                    ),
+                  },
+                ),
+              ],
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _personGrid() {
     final people = [
       for (final staff in staffList)
@@ -198,11 +239,11 @@ class _EventDialogState extends State<_EventDialog> {
     return Column(
       children: [
         for (var row = 0; row * _perRow < people.length; row++) ...[
-          if (row > 0) SizedBox(height: 6),
+          if (row > 0) SizedBox(height: 8),
           Row(
             children: [
               for (var col = 0; col < _perRow; col++) ...[
-                if (col > 0) SizedBox(width: 6),
+                if (col > 0) SizedBox(width: 8),
                 Expanded(
                   child: switch (row * _perRow + col) {
                     // 마지막 줄의 빈칸 — 자리를 차지해야 폭이 안 늘어난다
@@ -282,39 +323,16 @@ class _EventDialogState extends State<_EventDialog> {
           readOnly: _locked,
           onSubmitted: _submit,
         ),
-        SizedBox(height: 12),
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: [
-            for (final kind in Kind.values)
-              // 잠겼으면 고른 것만 남긴다 — 못 누르는 칩이 줄줄이
-              // 남아 있으면 고를 수 있는 것처럼 보인다
-              if (!_locked || kind == _kind)
-                Pressable(
-                  onTap: _tap(() => setState(() => _kind = kind)),
-                  child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: kind == _kind
-                          ? kind.color.withValues(alpha: 0.14)
-                          : AppColors.gray50,
-                      borderRadius: BorderRadius.circular(100),
-                    ),
-                    child: Text(
-                      kind.label,
-                      style: AppTextStyles.body2.copyWith(
-                        fontSize: 13,
-                        color: kind == _kind
-                            ? kind.color
-                            : AppColors.textSecondary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-          ],
-        ),
+        SizedBox(height: 14),
+        // **전자결재 신청과 같은 카드로 고른다** (2026-08-28 대표 결정).
+        //
+        // 예전에는 작은 알약 다섯 개가 흘러 있었다 — 종류가 이 폼에서 제일
+        // 먼저 정하는 값인데 제목 밑에 조용히 붙어 있어서 눈에 안 들어왔다.
+        // 아이콘이 붙으면 글자를 안 읽어도 무엇인지 보인다.
+        //
+        // 결재는 두 칸씩인데(`지출결의`·`외근·출장` 처럼 라벨이 길다)
+        // 여기는 두 글자라 **셋씩**이 맞는다 — 참석자 카드와 같은 칸 수다.
+        _kindCards(),
         SizedBox(height: 16),
         Row(
           children: [
@@ -379,9 +397,24 @@ class _EventDialogState extends State<_EventDialog> {
         SizedBox(height: 12),
         _Field(controller: _place, hint: '장소 (선택)', readOnly: _locked),
         SizedBox(height: 14),
-        Text('참석자', style: AppTextStyles.label),
+        // 프로젝트 참여 멤버와 **같은 카드**다 — 사람을 고르는 자리가 앱에
+        // 둘인데 모양이 다르면 같은 일인지 모른다
+        Row(
+          children: [
+            Text('참석자', style: AppTextStyles.label),
+            SizedBox(width: 6),
+            Text(
+              '${_members.length}',
+              style: AppTextStyles.label.copyWith(
+                color: AppColors.textTertiary,
+              ),
+            ),
+          ],
+        ),
         SizedBox(height: 8),
-        ScrollBox(maxHeight: kChipBoxHeight, child: _personGrid()),
+        // 안쪽 스크롤을 안 쓴다 — 카드는 키가 커서 140 안에 두 줄밖에 안
+        // 들어간다. 다 펼치고 페이지가 스크롤한다 (프로젝트와 같다)
+        _personGrid(),
         SizedBox(height: 14),
         _Field(controller: _memo, hint: '메모 (선택)', lines: 2, readOnly: _locked),
       ],
@@ -604,6 +637,60 @@ enum EventDecision { approve, reject }
 const _rejectHint = '예) 그날은 이미 다른 행사가 있어요';
 
 /// 참석자 알약을 한 줄에 몇 개 세울지 (폼 폭 440 기준)
+/// 일정 종류 카드 — 아이콘 위, 이름 아래. 고르면 그 종류 색으로 찬다
+///
+/// 전자결재의 같은 이름 위젯과 **모양은 같고 색만 다르다.** 결재는 종류가
+/// 다 같은 성격이라 파랑 하나로 칠하는데, 일정은 종류마다 색이 정해져 있고
+/// (`Kind.color`) 그 색이 달력 칩에도 그대로 쓰인다 — 여기서 파랑으로
+/// 칠하면 고르고 나서 달력에 뜨는 색과 달라진다.
+class _KindCard extends StatelessWidget {
+  _KindCard({required this.kind, required this.selected, required this.onTap});
+
+  final Kind kind;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      child: Container(
+        height: 72,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected
+              ? kind.color.withValues(alpha: 0.12)
+              : AppColors.gray50,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? kind.color : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              kind.icon,
+              size: 20,
+              color: selected ? kind.color : AppColors.textSecondary,
+            ),
+            SizedBox(height: 6),
+            Text(
+              kind.label,
+              style: AppTextStyles.body2.copyWith(
+                fontSize: 13,
+                color: selected ? kind.color : AppColors.textPrimary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 const _perRow = 3;
 
 /// 참석자 고르는 알약
@@ -619,26 +706,32 @@ class _PersonChip extends StatelessWidget {
     return Pressable(
       onTap: onTap,
       child: Container(
-        padding: EdgeInsets.fromLTRB(4, 4, 10, 4),
+        padding: EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
           color: joined ? AppColors.primaryLight : AppColors.gray50,
-          borderRadius: BorderRadius.circular(100),
+          borderRadius: BorderRadius.circular(14),
+          // 고른 것은 **테두리로** 가른다 — 배경만으로는 `primaryLight` 와
+          // `gray50` 이 둘 다 옅어서 훑어서 안 잡힌다. 파랑을 꽉 안 채우는
+          // 이유는 안에 색이 저마다 다른 아바타가 있어서다
+          border: Border.all(
+            color: joined ? AppColors.primary : Colors.transparent,
+            width: 1.5,
+          ),
         ),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Avatar(name: staff.name, size: 22),
-            SizedBox(width: 6),
+            Avatar(name: staff.name, size: 34),
+            SizedBox(height: 7),
             // 칸 폭이 정해져 있어 긴 이름은 말줄임으로 자른다
-            Expanded(
-              child: Text(
-                staff.name == me ? '나' : staff.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppTextStyles.caption.copyWith(
-                  fontSize: 12,
-                  color: joined ? AppColors.primary : AppColors.textSecondary,
-                  fontWeight: FontWeight.w600,
-                ),
+            Text(
+              staff.name == me ? '나' : staff.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.caption.copyWith(
+                fontSize: 12,
+                color: joined ? AppColors.primary : AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],

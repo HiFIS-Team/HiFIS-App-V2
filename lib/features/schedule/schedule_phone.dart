@@ -154,14 +154,16 @@ class _DayRow extends StatelessWidget {
     return Pressable(
       onTap: () => onTap(date),
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 9),
+        // 위아래를 늘린다 — 한 주는 늘 일곱 줄이라 줄이 낮으면 화면 아래가
+        // 통째로 빈다 (2026-08-28 대표 요청)
+        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 14),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // 오늘은 달 달력 칸과 같은 파란 동그라미
             Container(
-              width: 30,
-              height: 30,
+              width: 34,
+              height: 34,
               alignment: Alignment.center,
               decoration: today
                   ? BoxDecoration(
@@ -185,11 +187,11 @@ class _DayRow extends StatelessWidget {
             SizedBox(
               width: 20,
               child: Padding(
-                padding: EdgeInsets.only(top: 6),
+                padding: EdgeInsets.only(top: 8),
                 child: Text(
                   _weekdays[date.weekday % 7],
                   style: AppTextStyles.caption.copyWith(
-                    fontSize: 11,
+                    fontSize: 12,
                     color: sunday ? AppColors.error : AppColors.textTertiary,
                   ),
                 ),
@@ -198,9 +200,9 @@ class _DayRow extends StatelessWidget {
             SizedBox(width: 8),
             Expanded(
               child: Padding(
-                // 첫 칩 가운데를 날짜 동그라미 가운데에 맞춘다 (2 + 26/2 = 15 = 30/2)
+                // 첫 칩 가운데를 날짜 동그라미 가운데에 맞춘다 (0 + 34/2 = 34/2)
                 padding: EdgeInsets.only(
-                  top: (skeleton ? chips == 0 : list.isEmpty) ? 5 : 2,
+                  top: (skeleton ? chips == 0 : list.isEmpty) ? 7 : 0,
                 ),
                 child: skeleton
                     // 빈 날은 뼈대도 비운다 — 칸마다 깔면 '매일 일정이 있다'가 된다
