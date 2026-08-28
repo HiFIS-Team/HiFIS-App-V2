@@ -272,6 +272,66 @@ _Item? _parentOf(_Item folder, _Item target) {
 }
 
 /// 올리는·받는 중임을 알리는 작은 알약 (우하단)
+/// 오른쪽 아래 알약에 무엇을 적을지 — 할 일이 없으면 null
+///
+/// **겹치는 것을 센다.** 단순 bool 로 두면 먼저 끝난 쪽이 알약을 내려서
+/// **아직 하는 중인데 사라진다.** 두 가지 방식으로 겹친다.
+///
+/// | | 어떻게 겹치나 |
+/// |---|---|
+/// | 올리기 | 폴더째 놓으면 **폴더 만들기 + 폴더마다 파일 올리기**가 중첩된다 |
+/// | 받기 | 저장 위치를 고른 뒤 받는 것은 비동기라, 그 사이에 다른 파일을 또 받을 수 있다 |
+///
+/// 올리기가 원래 세고 있었고(`_busy`), **받기는 단순 bool 이라 껌뻑였다.**
+/// 둘을 한 자리로 모으면서 같이 세게 했다.
+///
+/// 둘이 겹치면 **올리는 중**으로 적는다 — 예전 `_uploading ? … : …` 과 같다.
+class BusyLabel extends ValueNotifier<String?> {
+  BusyLabel() : super(null);
+
+  int _uploads = 0;
+  int _downloads = 0;
+
+  /// 화면이 사라진 뒤에는 값을 안 바꾼다 — 받는 도중에 탭을 옮기면
+  /// 끝나는 시점에 이미 `dispose` 된 뒤라 그대로 두면 던진다
+  bool _gone = false;
+
+  void beginUpload() {
+    _uploads++;
+    _sync();
+  }
+
+  void endUpload() {
+    _uploads--;
+    _sync();
+  }
+
+  void beginDownload() {
+    _downloads++;
+    _sync();
+  }
+
+  void endDownload() {
+    _downloads--;
+    _sync();
+  }
+
+  void _sync() {
+    if (_gone) return;
+    value = _uploads > 0
+        ? '올리는 중…'
+        : _downloads > 0
+        ? '받는 중…'
+        : null;
+  }
+
+  @override
+  void dispose() {
+    _gone = true;
+    super.dispose();
+  }
+}
+
 class _UploadingChip extends StatelessWidget {
   _UploadingChip({required this.label});
 

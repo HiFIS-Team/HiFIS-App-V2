@@ -63,25 +63,13 @@ class _DocumentScreenState extends State<DocumentScreen>
   bool _listView = false;
 
   /// 파일을 끌어와 창 위에 올려둔 상태
-  bool _dragging = false;
+  ///
+  /// **`setState` 를 안 쓴다.** 끌고 들어오고 나갈 때마다 화면 전체
+  /// (사이드바 폴더 트리까지)를 다시 그릴 이유가 없다 — 덮개 하나만 바뀐다.
+  final _dragging = ValueNotifier<bool>(false);
 
-  /// 서버에 올리는 중 — 여러 개면 한 개씩 올라간다
-  bool _uploading = false;
-
-  /// 올리는 일이 몇 겹 겹쳐 있는지. 폴더째 올리면 폴더 만들기 + 폴더마다 파일
-  /// 올리기가 중첩돼서, 단순 bool 이면 중간에 알약이 껌뻑인다
-  int _busy = 0;
-
-  /// 파일을 받아 오는 중 — 큰 파일이면 시간이 걸린다
-  bool _downloading = false;
-
-  void _beginBusy() {
-    if (_busy++ == 0) setState(() => _uploading = true);
-  }
-
-  void _endBusy() {
-    if (--_busy == 0 && mounted) setState(() => _uploading = false);
-  }
+  /// 오른쪽 아래 알약 — 올리는 중 · 받는 중. 같은 이유로 `setState` 를 안 쓴다
+  final _busy = BusyLabel();
 
   String _query = '';
 
@@ -89,6 +77,13 @@ class _DocumentScreenState extends State<DocumentScreen>
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _dragging.dispose();
+    _busy.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -299,7 +294,7 @@ class _DocumentScreenState extends State<DocumentScreen>
 
   /// 끌어다 놓은 폴더들을 구조째 담는다
   Future<void> _dropFolders(List<String> paths, _Item target) async {
-    _beginBusy();
+    _busy.beginUpload();
     var added = 0;
     try {
       // 1) 폴더 구조만 먼저 훑어서 한 번에 만든다
@@ -333,7 +328,7 @@ class _DocumentScreenState extends State<DocumentScreen>
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
     }
-    _endBusy();
+    _busy.endUpload();
   }
 
   /// 디렉터리를 재귀로 훑어 폴더 구조만 뽑는다 (파일은 뒤에 따로 올린다)
@@ -397,7 +392,7 @@ class _DocumentScreenState extends State<DocumentScreen>
     bool announce = true,
   }) async {
     if (files.isEmpty) return 0;
-    _beginBusy();
+    _busy.beginUpload();
 
     var added = 0;
     Object? failure;
@@ -420,7 +415,7 @@ class _DocumentScreenState extends State<DocumentScreen>
       }
     }
 
-    _endBusy();
+    _busy.endUpload();
     if (!mounted) return added;
     setState(() => _place = _Place.all);
     if (announce && added > 0) AppToast.show(context, '$added개 파일을 올렸어요');
@@ -619,7 +614,7 @@ class _DocumentScreenState extends State<DocumentScreen>
     // 파일을 받아 간 흔적이 어디에도 안 남는다
     AppTrail.view('문서 내려받기', target: item.name, id: item.id);
 
-    setState(() => _downloading = true);
+    _busy.beginDownload();
     try {
       final bytes = await DocumentApi.download(item.id);
       await File(target).writeAsBytes(bytes);
@@ -627,7 +622,7 @@ class _DocumentScreenState extends State<DocumentScreen>
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
     }
-    if (mounted) setState(() => _downloading = false);
+    _busy.endDownload();
   }
 
   // ── 우클릭 메뉴 ──
@@ -764,25 +759,34 @@ class _DocumentScreenState extends State<DocumentScreen>
           Expanded(
             // 창에 파일을 끌어다 놓으면 지금 폴더에 담긴다 (데스크톱 전용)
             child: DropTarget(
-              onDragEntered: (_) => setState(() => _dragging = true),
-              onDragExited: (_) => setState(() => _dragging = false),
+              onDragEntered: (_) => _dragging.value = true,
+              onDragExited: (_) => _dragging.value = false,
               onDragDone: (detail) {
-                setState(() => _dragging = false);
+                _dragging.value = false;
                 _drop([for (final file in detail.files) file.path]);
               },
               child: Stack(
                 children: [
                   _pane(items),
-                  if (_dragging) _DropOverlay(folder: _current.name),
+                  // 아래 둘은 **자기 것만 다시 그린다** — 끌어놓기·올리는 중은
+                  // 겉도는 표시라 사이드바·목록까지 흔들 이유가 없다
+                  ValueListenableBuilder<bool>(
+                    valueListenable: _dragging,
+                    builder: (_, on, _) => on
+                        ? _DropOverlay(folder: _current.name)
+                        : SizedBox.shrink(),
+                  ),
                   // 여러 개면 한 개씩 올라가서 시간이 걸린다 — 진행 중임을 알린다
-                  if (_uploading || _downloading)
-                    Positioned(
-                      right: 24,
-                      bottom: 24,
-                      child: _UploadingChip(
-                        label: _uploading ? '올리는 중…' : '받는 중…',
-                      ),
+                  Positioned(
+                    right: 24,
+                    bottom: 24,
+                    child: ValueListenableBuilder<String?>(
+                      valueListenable: _busy,
+                      builder: (_, label, _) => label == null
+                          ? SizedBox.shrink()
+                          : _UploadingChip(label: label),
                     ),
+                  ),
                 ],
               ),
             ),
