@@ -669,7 +669,7 @@ class _MembersDialogState extends State<_MembersDialog> {
   /// 넣어 봐야 서버가 `ALREADY_MEMBER` 로 되돌린다
   late final _candidates = [
     for (final staff in staffList)
-      if (!widget.project.members.contains(staff.name)) staff.name,
+      if (!widget.project.members.contains(staff.name)) staff,
   ];
 
   @override
@@ -729,22 +729,37 @@ class _MembersDialogState extends State<_MembersDialog> {
           if (_candidates.isEmpty)
             Text('더 넣을 사람이 없어요', style: AppTextStyles.caption)
           else
+            // **생성 폼의 참여 멤버와 같은 칸이다** (2026-08-28).
+            // 여기만 이름 알약을 흘려 놓아서 사람을 고르는 자리가 앱 안에
+            // 두 모양으로 갈려 있었다. 폭을 재서 셋으로 나누는 것까지 같다.
             ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: 180),
+              constraints: BoxConstraints(maxHeight: 260),
               child: SingleChildScrollView(
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final name in _candidates)
-                      _PickChip(
-                        name: name,
-                        on: _picked.contains(name),
-                        onTap: () => setState(() {
-                          if (!_picked.remove(name)) _picked.add(name);
-                        }),
-                      ),
-                  ],
+                child: LayoutBuilder(
+                  builder: (context, box) {
+                    const gap = 8.0;
+                    final width = (box.maxWidth - gap * 2) / 3;
+                    return Wrap(
+                      spacing: gap,
+                      runSpacing: gap,
+                      children: [
+                        // 명단 차례 그대로 — 누를 때마다 자리가 바뀌면 안 된다
+                        for (final staff in _candidates)
+                          SizedBox(
+                            width: width,
+                            child: _MemberCard(
+                              staff: staff,
+                              joined: _picked.contains(staff.name),
+                              onTap: () => setState(() {
+                                if (!_picked.remove(staff.name)) {
+                                  _picked.add(staff.name);
+                                }
+                              }),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ),
@@ -762,36 +777,6 @@ class _MembersDialogState extends State<_MembersDialog> {
             onSubmit: _submit,
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// 고르는 알약 하나 — 누르면 켜고 꺼진다
-class _PickChip extends StatelessWidget {
-  const _PickChip({required this.name, required this.on, required this.onTap});
-
-  final String name;
-  final bool on;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Pressable(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: on ? AppColors.primary : AppColors.gray50,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Text(
-          name,
-          style: AppTextStyles.body2.copyWith(
-            color: on ? Colors.white : AppColors.textSecondary,
-            fontWeight: on ? FontWeight.w600 : FontWeight.w500,
-          ),
-        ),
       ),
     );
   }
