@@ -36,6 +36,53 @@ class BranchApi {
         Branch.fromJson((row as Map).cast<String, dynamic>()),
     ];
   }
+
+  /// 카운터에 붙일 출퇴근 QR 과 지금 등록된 매장 IP — **MASTER 만** (2026-08-28)
+  static Future<ScanQr> scanQr(String branchId) async {
+    final data = await ApiClient.instance.get('/branches/$branchId/scan-qr');
+    return ScanQr.fromJson(data);
+  }
+
+  /// **지금 이 폰이 쓰는 인터넷**을 그 지점 것으로 등록한다 — MASTER 만
+  ///
+  /// 지점에 가서 매장 와이파이에 붙은 채로 눌러야 한다. 공인 IP 를 손으로
+  /// 적게 하지 않으려고 서버가 요청이 온 자리를 그대로 담는다.
+  static Future<ScanQr> registerScanIp(String branchId) async {
+    final data = await ApiClient.instance.post('/branches/$branchId/scan-ip');
+    return ScanQr.fromJson(data!);
+  }
+
+  /// 등록된 매장 IP 하나를 지운다 — 회선을 바꿨을 때 옛것을 걷는다
+  ///
+  /// 지운 뒤 목록은 [scanQr] 로 다시 받는다 (`delete` 는 본문을 안 돌려준다)
+  static Future<void> forgetScanIp(String branchId, String ip) =>
+      ApiClient.instance.delete('/branches/$branchId/scan-ip?ip=$ip');
+}
+
+/// 지점 출퇴근 QR (서버 `ScanQrOut`)
+class ScanQr {
+  ScanQr({
+    required this.branchName,
+    required this.payload,
+    required this.allowedIps,
+  });
+
+  factory ScanQr.fromJson(Map<String, dynamic> json) => ScanQr(
+    branchName: json['branchName'] as String,
+    payload: json['payload'] as String,
+    allowedIps: [
+      for (final ip in (json['allowedIps'] as List<dynamic>? ?? const []))
+        ip as String,
+    ],
+  );
+
+  final String branchName;
+
+  /// QR 에 넣을 글자 — `HIFIS-SCAN:<지점>:<시크릿>`
+  final String payload;
+
+  /// 이 지점 인터넷으로 인정하는 공인 IP 들 — **비어 있으면 아무도 못 찍는다**
+  final List<String> allowedIps;
 }
 
 /// `/employees` — 전사 인원 디렉터리와 내 계정

@@ -355,7 +355,8 @@ class ScoreApi {
   /// 없다 (사유서 승인이 같은 이유로 그렇게 한다).
   ///
   /// 되돌렸다는 사실은 서버 활동 기록에 남는다.
-  static Future<void> revert(String eventId) => _client.delete('/scores/$eventId');
+  static Future<void> revert(String eventId) =>
+      _client.delete('/scores/$eventId');
 
   /// 분류별 합계 — 직원은 **본인 것만** 볼 수 있다 (남의 것은 403)
   static Future<ScoreSummary> summary({

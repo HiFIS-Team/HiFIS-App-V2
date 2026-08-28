@@ -418,6 +418,9 @@
    "properties": {
     "code": {
      "nullable": true
+    },
+    "qr": {
+     "nullable": true
     }
    },
    "required": []
@@ -3167,6 +3170,18 @@
     "total": {}
    },
    "required": []
+  },
+  "ScanQrOut": {
+   "properties": {
+    "allowedIps": {},
+    "branchName": {},
+    "payload": {}
+   },
+   "required": [
+    "branchName",
+    "payload",
+    "allowedIps"
+   ]
   },
   "ScanTerminalCreate": {
    "properties": {

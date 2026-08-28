@@ -10,6 +10,8 @@ import '../../core/data/current_user.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/feedback/app_toast.dart';
+import '../../core/widgets/input/pressable.dart';
+import 'attendance_qr_scan.dart';
 
 /// 출퇴근 바코드 오버레이
 ///
@@ -204,6 +206,43 @@ class _BarcodeOverlayState extends State<_BarcodeOverlay> {
                       Text(
                         employeeNo,
                         style: AppTextStyles.label.copyWith(letterSpacing: 2),
+                      ),
+                      // 카운터 QR 로 찍는 길 (2026-08-28) — 카운터 기계가
+                      // 잠들거나 부팅 중이면 위 바코드는 **삑 소리만 나고
+                      // 값이 증발한다.** 이쪽은 찍히는 순간 화면에 뜬다.
+                      //
+                      // **바코드를 안 걷어냈다.** 아직 세 지점에 스캐너가
+                      // 붙어 있어서 둘 다 되어야 한다.
+                      SizedBox(height: 20),
+                      Container(height: 1, color: AppColors.divider),
+                      SizedBox(height: 16),
+                      Pressable(
+                        onTap: () {
+                          Navigator.pop(context);
+                          showAttendanceQrScan(context);
+                        },
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.qr_code_scanner_rounded,
+                              size: 18,
+                              color: AppColors.primary,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              '카운터 QR 찍기',
+                              style: AppTextStyles.body2.copyWith(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
             ),

@@ -255,8 +255,13 @@ class AttendanceApi {
   ///
   /// [code]에 사번을 주면 지점 스캐너처럼 그 사람 것을 찍고,
   /// 안 주면 로그인한 본인 것을 찍는다.
-  static Future<AttendanceRecord> scan({String? code}) async {
-    final data = await _client.post('/attendance/scan', body: {'code': ?code});
+  /// [qr] 을 주면 **로그인한 본인**을 찍는다 (매장 카운터 QR, 2026-08-28).
+  /// [code] 는 지점 스캐너가 남의 사번을 읽었을 때 쓴다 — 둘은 같이 못 준다.
+  static Future<AttendanceRecord> scan({String? code, String? qr}) async {
+    final data = await _client.post(
+      '/attendance/scan',
+      body: {'code': ?code, 'qr': ?qr},
+    );
     return AttendanceRecord.fromJson(data!);
   }
 

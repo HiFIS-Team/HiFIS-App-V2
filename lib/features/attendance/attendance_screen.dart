@@ -19,6 +19,7 @@ import '../../core/widgets/display/scroll_box.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/feedback/empty_card.dart';
+import 'attendance_qr_admin.dart';
 import '../../core/widgets/feedback/reject_reason_dialog.dart';
 import '../../core/widgets/glass/glass_bottom_button.dart';
 import '../../core/widgets/input/decide_buttons.dart';
@@ -58,6 +59,25 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
   /// 주 달력이 보고 있는 주의 **일요일** — 폰 대표 화면에서만 쓴다
   late DateTime _week = _sundayOf(DateTime.now());
+
+  /// 출퇴근 QR 을 발급·관리할 수 있는가 — **MASTER 만이다**
+  ///
+  /// QR 값이 곧 그 지점 출퇴근의 열쇠이고, 매장 IP 를 잘못 등록하면 집에서도
+  /// 찍힌다. `boss`(대표·관리자)가 아니라 한 사람만 여는 자리다.
+  bool get _canQrAdmin => myRole == Role.master;
+
+  /// 지금 보고 있는 지점의 QR 관리 화면을 연다
+  void _openQrAdmin() {
+    final branchId = branchScopeId ?? currentUser?.branchId;
+    if (branchId == null) {
+      AppToast.show(context, '지점을 먼저 골라주세요');
+      return;
+    }
+    Navigator.push<void>(
+      context,
+      MaterialPageRoute(builder: (_) => AttendanceQrAdmin(branchId: branchId)),
+    );
+  }
 
   /// 폰에서 대표·관리자는 달 대신 주로 본다
   ///
@@ -335,6 +355,19 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     if (!isDesktop) {
       return PhoneListScaffold(
         title: '근태·월차',
+        // 카운터에 붙일 QR 과 매장 인터넷 등록 — **MASTER 만** (2026-08-28).
+        // 근태를 보는 화면이라 여기 둔다. 조직도는 사람 화면이라 자리가 아니다
+        trailing: _canQrAdmin
+            ? Pressable(
+                onTap: _openQrAdmin,
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                child: Icon(
+                  Icons.qr_code_2_rounded,
+                  size: 22,
+                  color: AppColors.textSecondary,
+                ),
+              )
+            : null,
         children: [
           _MonthSummary(days: _monthDays, month: _month),
           SizedBox(height: 12),
