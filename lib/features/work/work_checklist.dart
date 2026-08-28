@@ -245,7 +245,7 @@ class _AdjustButton extends StatelessWidget {
 
 /// 수행 기록 한 줄 — 시각 · (이름) · 항목 · 완료 체크.
 /// 내역 화면과 데스크톱 인라인 내역 카드가 함께 쓴다.
-class _LogRow extends StatelessWidget {
+class _LogRow extends StatefulWidget {
   _LogRow({required this.log, required this.showName});
 
   final EnvTaskLog log;
@@ -260,18 +260,48 @@ class _LogRow extends StatelessWidget {
     return '$period $hour:$minute';
   }
 
+  @override
+  State<_LogRow> createState() => _LogRowState();
+}
+
+class _LogRowState extends State<_LogRow> {
+  /// 이 줄이 그리는 기록 — **가산점을 매기면 여기서 갈린다**
+  ///
+  /// 부모가 목록을 다시 받아 올 때까지 기다리면, 창을 닫고 나서도 줄에는
+  /// 옛 점수가 남는다 (기록 목록이 세 화면에 흩어져 있어서 부모마다 다시
+  /// 받게 하면 그중 하나를 반드시 빠뜨린다).
+  late EnvTaskLog _log = widget.log;
+
+  @override
+  void didUpdateWidget(covariant _LogRow old) {
+    super.didUpdateWidget(old);
+    // 목록을 다시 받았으면 새 값이 이긴다
+    if (!identical(widget.log, old.log)) _log = widget.log;
+  }
+
   /// 남긴 사진이 있는지 — 현수막·족자만 채워진다 ([_photoRequiredItems])
-  bool get _hasPhoto => (log.photoUrl ?? '').isNotEmpty;
+  bool get _hasPhoto => (_log.photoUrl ?? '').isNotEmpty;
+
+  /// 눌러서 볼 것이 있는지 — 블로그는 주소와 가산점이 창에 있다
+  bool get _hasBlog => _isAwardable(_log);
 
   @override
   Widget build(BuildContext context) {
     final row = _row();
-    // **줄 모양은 그대로 둔다.** 사진이 있는 줄만 눌리게 하고, 없는 줄은
+    // **줄 모양은 그대로 둔다.** 볼 것이 있는 줄만 눌리게 하고, 없는 줄은
     // 예전처럼 아무 반응이 없다 — 아이콘·썸네일을 붙이면 사진이 있는 줄과
     // 없는 줄이 다르게 생겨서 목록이 들쭉날쭉해진다.
-    if (!_hasPhoto) return row;
+    if (!_hasPhoto && !_hasBlog) return row;
     return Pressable(
-      onTap: () => showAppDialog<void>(context, (_) => _PhotoLogCard(log: log)),
+      onTap: () => showAppDialog<void>(
+        context,
+        (_) => _hasBlog
+            ? _BlogLogCard(
+                log: _log,
+                onAwarded: (saved) => setState(() => _log = saved),
+              )
+            : _PhotoLogCard(log: _log),
+      ),
       child: row,
     );
   }
@@ -284,20 +314,20 @@ class _LogRow extends StatelessWidget {
           SizedBox(
             width: 64,
             child: Text(
-              formatTime(log.createdAt),
+              _LogRow.formatTime(_log.createdAt),
               style: AppTextStyles.caption,
             ),
           ),
           SizedBox(width: 8),
-          if (showName) ...[
+          if (widget.showName) ...[
             Text(
-              _logAuthor(log),
+              _logAuthor(_log),
               style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w600),
             ),
             SizedBox(width: 8),
             Expanded(
               child: Text(
-                log.itemName,
+                _log.itemName,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: AppTextStyles.body2.copyWith(
@@ -308,7 +338,7 @@ class _LogRow extends StatelessWidget {
           ] else
             Expanded(
               child: Text(
-                log.itemName,
+                _log.itemName,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: AppTextStyles.body2.copyWith(
@@ -318,7 +348,7 @@ class _LogRow extends StatelessWidget {
             ),
           // 그때 받은 점수 — 항목 배점이 나중에 바뀌어도 이 값은 안 바뀐다
           Text(
-            '+${log.points}',
+            '+${_log.totalPoints}',
             style: AppTextStyles.caption.copyWith(
               color: AppColors.primary,
               fontWeight: FontWeight.w700,

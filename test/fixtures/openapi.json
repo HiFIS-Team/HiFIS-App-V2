@@ -1106,9 +1106,22 @@
    },
    "required": []
   },
+  "EnvLogAward": {
+   "properties": {
+    "comment": {},
+    "points": {}
+   },
+   "required": [
+    "points",
+    "comment"
+   ]
+  },
   "EnvLogCreate": {
    "properties": {
     "envItemId": {},
+    "link": {
+     "nullable": true
+    },
     "note": {
      "nullable": true
     },
@@ -1133,12 +1146,25 @@
   },
   "EnvTaskLogOut": {
    "properties": {
+    "bonusAt": {
+     "nullable": true
+    },
+    "bonusById": {
+     "nullable": true
+    },
+    "bonusPoints": {},
+    "bonusReason": {
+     "nullable": true
+    },
     "branchId": {},
     "createdAt": {},
     "employeeId": {},
     "envItemId": {},
     "id": {},
     "itemName": {},
+    "link": {
+     "nullable": true
+    },
     "note": {
      "nullable": true
     },
@@ -1148,7 +1174,8 @@
     "place": {
      "nullable": true
     },
-    "points": {}
+    "points": {},
+    "totalPoints": {}
    },
    "required": [
     "id",
@@ -1157,7 +1184,8 @@
     "envItemId",
     "itemName",
     "points",
-    "createdAt"
+    "createdAt",
+    "totalPoints"
    ]
   },
   "EventCreate": {

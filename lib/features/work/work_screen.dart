@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/api/client/api_exception.dart';
 import '../../core/api/work/env_api.dart';
@@ -263,11 +264,24 @@ class _WorkScreenState extends State<WorkScreen>
           photoUrl = proof.url;
           place = proof.place;
         }
+        // 블로그는 글 주소를 같이 받는다 — 대표가 그 글을 보고 가산점을
+        // 얹는 자리라, 주소가 없으면 무엇을 보고 매길지가 없다.
+        // **다만 안 적어도 남길 수 있다** (창에서 비워 두면 그냥 넘어간다)
+        String? link;
+        if (_takesLink(item)) {
+          final typed = await showAppDialog<String>(
+            context,
+            (_) => _LinkCard(item: item),
+          );
+          if (typed == null || !mounted) return;
+          link = typed.isEmpty ? null : typed;
+        }
         final log = await EnvApi.createLog(
           item.id,
           note: note,
           photoUrl: photoUrl,
           place: place,
+          link: link,
         );
         if (!mounted) return;
         setState(() => _logs = [log, ..._logs]);
@@ -735,6 +749,34 @@ bool _needsPhoto(EnvItem item) => _photoRequiredItems
     .map(_WorkScreenState._envKey)
     .contains(_WorkScreenState._envKey(item.name));
 
+/// 글 주소를 같이 받는 항목 — **서버의 `LINK_ITEMS` 와 같아야 한다**
+///
+/// 사진과 달리 **필수가 아니다.** 주소가 아직 없어도 남길 수는 있어야 한다 —
+/// 막으면 글은 썼는데 기록을 못 하는 날이 생긴다.
+const _linkItems = {'블로그'};
+
+/// 대표가 가산점을 얹을 수 있는 항목 — **서버의 `AWARDABLE_ITEMS` 와 같아야 한다**
+const _awardableItems = {'블로그'};
+
+bool _takesLink(EnvItem item) => _linkItems
+    .map(_WorkScreenState._envKey)
+    .contains(_WorkScreenState._envKey(item.name));
+
+/// 이 기록에 가산점을 매길 수 있는가 — 항목 이름으로 가른다
+///
+/// `기타(창고정리)` 처럼 메모가 접혀 들어갈 수 있어서 **괄호 앞까지만** 본다
+/// (서버는 `env_item_id` 로 정확히 보는데, 앱에는 그 항목이 목록에 없을 수도
+/// 있어서 — 지난달 기록을 볼 때 — 이름으로 본다).
+bool _isAwardable(EnvTaskLog log) => _awardableItems
+    .map(_WorkScreenState._envKey)
+    .contains(_WorkScreenState._envKey(log.itemName.split('(').first));
+
+/// 블로그 가산점을 매길 수 있는가 — **MASTER 만이다**
+///
+/// 프로젝트 점수 부여와 같은 자리다 — 잘 썼는지를 판단하는 일이라 한 사람이
+/// 한다. `canApprove` 와 지금은 값이 같지만 **이유가 달라서** 따로 둔다.
+bool get _canAwardEnv => myRole == Role.master;
+
 /// 현수막처럼 확인이 필요한 항목의 `+` 를 눌렀을 때 뜨는 창
 ///
 /// **사진과 위치를 둘 다 채워야 완료가 눌린다.** 걸었다고 칩만 누르면 실제로
@@ -1028,3 +1070,434 @@ const _placeMaxLength = 30;
 /// 수행 기록을 누가 남겼는지 — 서버는 직원 id 만 준다
 String _logAuthor(EnvTaskLog log) =>
     StaffDirectory.instance.byId(log.employeeId)?.name ?? '알 수 없음';
+
+/// 블로그를 누르면 뜨는 창 — 글 주소를 받는다 (2026-08-28 대표 요청)
+///
+/// **비워 두고 완료해도 된다.** 배점을 10 → 3 으로 내린 대신 대표가 글을 보고
+/// 가산점을 얹기로 했는데, 주소가 없으면 볼 데가 없다. 그래도 막지는 않는다 —
+/// 주소가 아직 없는데 글은 올린 날이 있다.
+///
+/// 사진 창([_PhotoProofCard])과 달리 **올릴 것이 없어서** 바로 닫는다.
+class _LinkCard extends StatefulWidget {
+  _LinkCard({required this.item});
+
+  final EnvItem item;
+
+  @override
+  State<_LinkCard> createState() => _LinkCardState();
+}
+
+class _LinkCardState extends State<_LinkCard> {
+  final _link = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _link.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _link.dispose();
+    super.dispose();
+  }
+
+  /// 적었으면 주소 꼴이어야 한다 — 서버도 같은 것을 본다
+  String? get _typed {
+    final text = _link.text.trim();
+    if (text.isEmpty) return '';
+    final lower = text.toLowerCase();
+    if (!lower.startsWith('http://') && !lower.startsWith('https://')) {
+      return null;
+    }
+    return text;
+  }
+
+  void _submit() {
+    final link = _typed;
+    if (link == null) {
+      AppToast.show(context, '주소는 http:// 또는 https:// 로 시작해야 해요');
+      return;
+    }
+    Navigator.pop(context, link);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: dialogWidth(context, 320),
+      padding: EdgeInsets.fromLTRB(24, 24, 24, 20),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('글 주소를 남겨주세요', style: AppTextStyles.title3),
+          SizedBox(height: 6),
+          Text(
+            '대표님이 글을 보고 점수를 더 줄 수 있어요.\n아직 주소가 없으면 비워 두고 완료해도 돼요.',
+            style: AppTextStyles.caption.copyWith(height: 1.5),
+          ),
+          SizedBox(height: 14),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppColors.gray50,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: TextField(
+              controller: _link,
+              maxLength: 500,
+              autocorrect: false,
+              keyboardType: TextInputType.url,
+              style: AppTextStyles.body1,
+              cursorColor: AppColors.primary,
+              onSubmitted: (_) => _submit(),
+              decoration: InputDecoration(
+                hintText: 'https://blog.naver.com/...',
+                hintStyle: AppTextStyles.body1.copyWith(
+                  color: AppColors.gray400,
+                ),
+                border: InputBorder.none,
+                isCollapsed: true,
+                counterText: '',
+              ),
+            ),
+          ),
+          SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: AppButton(
+                  label: '취소',
+                  onTap: () => Navigator.pop(context),
+                ),
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                child: AppButton(label: '완료', filled: true, onTap: _submit),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 블로그 기록을 누르면 뜨는 창 — 글 주소와 대표 가산점 (2026-08-28)
+///
+/// 사진 창([_PhotoLogCard])과 짝이다. 저쪽은 걸어 둔 것을 눈으로 확인하는
+/// 자리고, 여기는 **글을 읽고 점수를 매기는** 자리다.
+class _BlogLogCard extends StatefulWidget {
+  _BlogLogCard({required this.log, required this.onAwarded});
+
+  final EnvTaskLog log;
+
+  /// 매기고 나면 목록 줄도 같이 갈린다 — 창을 어떻게 닫든 반영되게
+  /// 돌려주는 값이 아니라 콜백으로 넘긴다 (바깥을 눌러 닫으면 값이 안 온다)
+  final ValueChanged<EnvTaskLog> onAwarded;
+
+  @override
+  State<_BlogLogCard> createState() => _BlogLogCardState();
+}
+
+class _BlogLogCardState extends State<_BlogLogCard> {
+  late EnvTaskLog _log = widget.log;
+  bool _busy = false;
+
+  Future<void> _award() async {
+    final result = await _askEnvAward(context, _log);
+    if (result == null || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      final saved = await EnvApi.award(
+        _log.id,
+        points: result.$1,
+        comment: result.$2,
+      );
+      if (!mounted) return;
+      setState(() {
+        _log = saved;
+        _busy = false;
+      });
+      widget.onAwarded(saved);
+      AppToast.show(context, '${saved.totalPoints}점으로 매겼어요');
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      AppToast.show(context, messageOf(error));
+    }
+  }
+
+  /// 주소를 눌러 복사한다 — **브라우저로 바로 못 연다**
+  ///
+  /// 앱에 `url_launcher` 가 없다. 넣으려면 네 플랫폼을 다시 빌드해야 해서,
+  /// 지금은 복사해서 붙여 넣는 것으로 둔다.
+  Future<void> _copy(String link) async {
+    await Clipboard.setData(ClipboardData(text: link));
+    if (mounted) AppToast.show(context, '주소를 복사했어요');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final log = _log;
+    final link = log.link;
+    return Container(
+      width: dialogWidth(context, 320),
+      padding: EdgeInsets.fromLTRB(24, 24, 24, 20),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(log.itemName, style: AppTextStyles.title3),
+          SizedBox(height: 6),
+          Text(
+            '${_LogRow.formatTime(log.createdAt)} · ${_logAuthor(log)}',
+            style: AppTextStyles.caption.copyWith(height: 1.5),
+          ),
+          SizedBox(height: 14),
+          if (link == null || link.isEmpty)
+            Text(
+              '글 주소를 안 남겼어요',
+              style: AppTextStyles.body2.copyWith(
+                color: AppColors.textTertiary,
+              ),
+            )
+          else
+            Pressable(
+              onTap: () => _copy(link),
+              child: Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.gray50,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        link,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.body2.copyWith(
+                          color: AppColors.primary,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Icon(
+                      CupertinoIcons.doc_on_doc,
+                      size: 15,
+                      color: AppColors.gray400,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          SizedBox(height: 12),
+          // 기본 배점과 가산점을 갈라서 적는다 — 합만 보이면 대표가 얼마를
+          // 얹었는지 알 수 없어서 다시 매길 때 기준이 없다
+          Row(
+            children: [
+              Text(
+                '${log.totalPoints}점',
+                style: AppTextStyles.title3.copyWith(color: AppColors.primary),
+              ),
+              SizedBox(width: 8),
+              if (log.bonusPoints != 0)
+                Text(
+                  '기본 ${log.points} '
+                  '${log.bonusPoints > 0 ? '+' : '−'} '
+                  '${log.bonusPoints.abs()}',
+                  style: AppTextStyles.caption.copyWith(fontSize: 12),
+                ),
+            ],
+          ),
+          if (log.bonusReason case final reason? when reason.isNotEmpty) ...[
+            SizedBox(height: 6),
+            Text(
+              reason,
+              style: AppTextStyles.body2.copyWith(
+                color: AppColors.textSecondary,
+                height: 1.45,
+              ),
+            ),
+          ],
+          SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: AppButton(
+                  label: '닫기',
+                  onTap: () => Navigator.pop(context),
+                ),
+              ),
+              if (_canAwardEnv) ...[
+                SizedBox(width: 8),
+                Expanded(
+                  child: AppButton(
+                    label: log.awarded ? '다시 매기기' : '점수 매기기',
+                    filled: true,
+                    busy: _busy,
+                    onTap: _award,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 가산점과 사유를 받는다 — 취소하면 null
+///
+/// 프로젝트 점수 창(`_askAward`)과 같은 짜임이다. 다른 것은 **여기 값이
+/// 기본 배점 위에 얹힌다**는 것뿐이라, 창에 최종 점수를 미리 적어 준다.
+Future<(int, String)?> _askEnvAward(BuildContext context, EnvTaskLog log) {
+  final points = TextEditingController(text: '${log.bonusPoints}');
+  final reason = TextEditingController(text: log.bonusReason ?? '');
+  final pointsFocus = FocusNode();
+  final reasonFocus = FocusNode();
+
+  return showAppDialog<(int, String)>(
+    context,
+    (context) => Container(
+      width: dialogWidth(context, 320),
+      padding: EdgeInsets.fromLTRB(20, 20, 20, 16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('블로그 가산점', style: AppTextStyles.title3),
+          SizedBox(height: 4),
+          Text(
+            '기본 ${log.points}점 위에 얹어요. -100 ~ 100',
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.textTertiary,
+            ),
+          ),
+          SizedBox(height: 14),
+          _EnvAwardField(
+            controller: points,
+            focusNode: pointsFocus,
+            hint: '가산점',
+            number: true,
+          ),
+          SizedBox(height: 8),
+          _EnvAwardField(
+            controller: reason,
+            focusNode: reasonFocus,
+            hint: '사유 (필수)',
+          ),
+          SizedBox(height: 16),
+          Row(
+            children: [
+              Spacer(),
+              Pressable(
+                onTap: () => Navigator.pop(context),
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                child: Text(
+                  '취소',
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              SizedBox(width: 6),
+              Pressable(
+                onTap: () {
+                  final value = int.tryParse(points.text.trim());
+                  if (value == null || value < -100 || value > 100) {
+                    AppToast.show(context, '-100 부터 100 까지 적어주세요');
+                    pointsFocus.requestFocus();
+                    return;
+                  }
+                  final text = reason.text.trim();
+                  if (text.isEmpty) {
+                    AppToast.show(context, '점수 사유를 적어주세요');
+                    reasonFocus.requestFocus();
+                    return;
+                  }
+                  Navigator.pop(context, (value, text));
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '매기기',
+                    style: AppTextStyles.body2.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// 가산점 팝업 입력칸 — 프로젝트 점수 팝업(`_AwardField`)과 같은 모양이다
+class _EnvAwardField extends StatelessWidget {
+  _EnvAwardField({
+    required this.controller,
+    required this.hint,
+    this.focusNode,
+    this.number = false,
+  });
+
+  final TextEditingController controller;
+  final String hint;
+  final FocusNode? focusNode;
+  final bool number;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.gray50,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: TextField(
+        controller: controller,
+        focusNode: focusNode,
+        // 음수를 적어야 해서 부호가 있는 숫자판을 연다
+        keyboardType: number
+            ? TextInputType.numberWithOptions(signed: true)
+            : null,
+        style: AppTextStyles.body1,
+        cursorColor: AppColors.primary,
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: AppTextStyles.body1.copyWith(color: AppColors.gray400),
+          border: InputBorder.none,
+          isCollapsed: true,
+        ),
+      ),
+    );
+  }
+}

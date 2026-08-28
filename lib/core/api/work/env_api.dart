@@ -61,6 +61,11 @@ class EnvTaskLog {
     this.note,
     this.photoUrl,
     this.place,
+    this.link,
+    this.bonusPoints = 0,
+    this.bonusReason,
+    this.bonusById,
+    this.bonusAt,
   });
 
   factory EnvTaskLog.fromJson(Map<String, dynamic> json) => EnvTaskLog(
@@ -74,6 +79,13 @@ class EnvTaskLog {
     note: json['note'] as String?,
     photoUrl: json['photoUrl'] as String?,
     place: json['place'] as String?,
+    link: json['link'] as String?,
+    bonusPoints: json['bonusPoints'] as int? ?? 0,
+    bonusReason: json['bonusReason'] as String?,
+    bonusById: json['bonusById'] as String?,
+    bonusAt: json['bonusAt'] == null
+        ? null
+        : DateTime.parse(json['bonusAt'] as String).toLocal(),
   );
 
   final String id;
@@ -84,7 +96,7 @@ class EnvTaskLog {
   /// 수행 당시 항목 이름
   final String itemName;
 
-  /// 수행 당시 배점
+  /// 수행 당시 배점 — **가산점은 안 들어 있다** ([totalPoints] 를 쓸 것)
   final int points;
 
   final DateTime createdAt;
@@ -95,6 +107,30 @@ class EnvTaskLog {
 
   /// 어디에 했는지 — 사진과 짝이다 (현수막을 어디에 걸었나)
   final String? place;
+
+  /// 글 주소 — **블로그만 채워진다** (2026-08-28)
+  final String? link;
+
+  /// 대표가 얹은 가산점 — 기본 배점 **위에** 더한다
+  final int bonusPoints;
+
+  /// 왜 얹었나 (대표가 적는다)
+  final String? bonusReason;
+
+  final String? bonusById;
+  final DateTime? bonusAt;
+
+  /// 점수 원장에 실제로 쌓인 값 — **화면은 이걸 보여준다**
+  ///
+  /// 바닥을 0 으로 막는 것까지 서버와 같아야 한다. 안 맞추면 크게 깎았을 때
+  /// 원장은 0 인데 화면에는 음수가 뜬다.
+  int get totalPoints {
+    final total = points + bonusPoints;
+    return total < 0 ? 0 : total;
+  }
+
+  /// 대표가 손을 댄 기록인가
+  bool get awarded => bonusAt != null;
 }
 
 /// `/env-items` `/env-logs` — 환경정비
@@ -148,6 +184,7 @@ class EnvApi {
     String? note,
     String? photoUrl,
     String? place,
+    String? link,
   }) async {
     final data = await _client.post(
       '/env-logs',
@@ -156,7 +193,24 @@ class EnvApi {
         'note': ?note,
         'photoUrl': ?photoUrl,
         'place': ?place,
+        'link': ?link,
       },
+    );
+    return EnvTaskLog.fromJson(data!);
+  }
+
+  /// 가산점 얹기 — **MASTER 만, 블로그만** (2026-08-28)
+  ///
+  /// 배점을 10 → 3 으로 내린 대신 대표가 글을 보고 얹는다.
+  /// 다시 부르면 **갈아끼운다** (더해지지 않는다). 0 을 주면 걷는다.
+  static Future<EnvTaskLog> award(
+    String logId, {
+    required int points,
+    required String comment,
+  }) async {
+    final data = await _client.post(
+      '/env-logs/$logId/award',
+      body: {'points': points, 'comment': comment},
     );
     return EnvTaskLog.fromJson(data!);
   }
