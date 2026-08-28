@@ -203,6 +203,7 @@ class _ContributionSectionState extends State<ContributionSection>
         if (scope == null || event.branchId == scope)
           _Contribution(
             kind: null,
+            eventId: event.id,
             penalty: event.category,
             title: event.reason ?? event.category.label,
             points: event.points,
@@ -227,10 +228,52 @@ class _ContributionSectionState extends State<ContributionSection>
     if (granted == true && mounted) await _load();
   }
 
+  /// 이 사람이 되돌릴 수 있는가 — **MASTER 만이다**
+  ///
+  /// 깎은 것을 없던 일로 하는 자리라 프로젝트 점수 부여·사유서 승인과 같은
+  /// 종류다. `canGrant`(점장 이상)와 헷갈리면 안 된다 — 주는 것과 깎은 것을
+  /// 무르는 것은 다른 판단이다.
+  static bool get _canRevert => myRole == Role.master;
+
+  /// 깎인 점수 한 줄을 되돌린다 — 한 번 더 묻는다
+  Future<void> _revert(_Contribution item) async {
+    final id = item.eventId;
+    if (id == null) return;
+    final who = item.person == null ? '' : '${item.person}님의 ';
+    final ok = await showConfirmDialog(
+      context,
+      title: '점수를 되돌릴까요?',
+      message:
+          '$who${item.label} ${item.points}점이 없던 일이 돼요.\n'
+          '되돌리면 다시 깎을 수 없어요.',
+      confirmLabel: '되돌리기',
+    );
+    if (!ok || !mounted) return;
+    try {
+      await ScoreApi.revert(id);
+      if (!mounted) return;
+      // 목록에서 바로 빼고 조용히 다시 받는다 — 지운 줄이 남아 있으면
+      // 한 번 더 누르게 되고 그때는 404 다
+      setState(() {
+        _penalties = [
+          for (final event in _penalties)
+            if (event.id != id) event,
+        ];
+        _rebuild();
+      });
+      AppToast.show(context, '${item.points.abs()}점을 되돌렸어요');
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+  }
+
   void _openHistory() {
     showFullPage<void>(
       context,
-      (_) => _ContributionHistoryScreen(items: _items),
+      (_) => _ContributionHistoryScreen(
+        items: _items,
+        onRevert: _canRevert ? _revert : null,
+      ),
     );
   }
 
@@ -280,7 +323,10 @@ class _ContributionSectionState extends State<ContributionSection>
           else
             for (var i = 0; i < recent.length; i++) ...[
               if (i > 0) SizedBox(height: 12),
-              _ContributionCard(item: recent[i]),
+              _ContributionCard(
+                item: recent[i],
+                onRevert: _canRevert ? () => _revert(recent[i]) : null,
+              ),
             ],
         ],
       );
@@ -299,6 +345,7 @@ class _ContributionSectionState extends State<ContributionSection>
           items: _items.take(5).toList(),
           total: _items.length,
           onOpenAll: _openHistory,
+          onRevert: _canRevert ? _revert : null,
         ),
       ],
     );
@@ -339,10 +386,14 @@ class _Contribution {
     required this.title,
     required this.points,
     required this.date,
+    this.eventId,
     this.penalty,
     this.person,
     this.given = false,
   });
+
+  /// 점수 원장 줄 id — **깎인 것만 채워진다** (되돌릴 때 이 값을 쓴다)
+  final String? eventId;
 
   /// 어느 기여 항목인가 — **null 이면 깎인 것**이다 ([penalty] 를 본다)
   final ContribType? kind;

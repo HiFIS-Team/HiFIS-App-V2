@@ -348,6 +348,15 @@ class ScoreApi {
     ];
   }
 
+  /// 깎인 점수 되돌리기 — **MASTER 만, 음수 줄만** (2026-08-28)
+  ///
+  /// 상쇄로 `+20` 을 한 줄 넣는 게 아니라 **그 줄을 지운다.** 원장 합은 같지만
+  /// 랭킹 내역에 `지각 -10` 과 `지각 +10` 이 나란히 서면 무슨 일인지 알 수
+  /// 없다 (사유서 승인이 같은 이유로 그렇게 한다).
+  ///
+  /// 되돌렸다는 사실은 서버 활동 기록에 남는다.
+  static Future<void> revert(String eventId) => _client.delete('/scores/$eventId');
+
   /// 분류별 합계 — 직원은 **본인 것만** 볼 수 있다 (남의 것은 403)
   static Future<ScoreSummary> summary({
     required String employeeId,

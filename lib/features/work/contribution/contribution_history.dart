@@ -9,11 +9,15 @@ class _HistoryCard extends StatelessWidget {
     required this.items,
     required this.total,
     required this.onOpenAll,
+    this.onRevert,
   });
 
   final List<_Contribution> items;
   final int total;
   final VoidCallback onOpenAll;
+
+  /// 깎인 줄을 되돌린다 — null 이면 아이콘이 안 뜬다 (대표가 아니다)
+  final void Function(_Contribution item)? onRevert;
 
   @override
   Widget build(BuildContext context) {
@@ -56,7 +60,10 @@ class _HistoryCard extends StatelessWidget {
           else
             for (var i = 0; i < items.length; i++) ...[
               if (i > 0) Divider(height: 1, color: AppColors.divider),
-              _ContributionRow(item: items[i]),
+              _ContributionRow(
+                item: items[i],
+                onRevert: onRevert == null ? null : () => onRevert!(items[i]),
+              ),
             ],
         ],
       ),
@@ -68,9 +75,12 @@ class _HistoryCard extends StatelessWidget {
 ///
 /// 데스크톱은 아직 [_ContributionRow] 를 쓴다 (2단 화면이라 카드가 과하다).
 class _ContributionCard extends StatelessWidget {
-  _ContributionCard({required this.item});
+  _ContributionCard({required this.item, this.onRevert});
 
   final _Contribution item;
+
+  /// 깎인 점수를 되돌린다 — null 이면 아이콘이 안 뜬다 (대표가 아니다)
+  final VoidCallback? onRevert;
 
   @override
   Widget build(BuildContext context) {
@@ -130,6 +140,10 @@ class _ContributionCard extends StatelessWidget {
                   ),
                 ),
               ),
+              if (item.isPenalty && onRevert != null) ...[
+                SizedBox(width: 2),
+                _RevertButton(onTap: onRevert!),
+              ],
             ],
           ),
           SizedBox(height: 14),
@@ -149,10 +163,34 @@ class _ContributionCard extends StatelessWidget {
 }
 
 /// 기여 한 줄 — 항목 아이콘, 내용, 준 사람, 점수
+/// 깎인 줄 오른쪽 되돌리기 아이콘 — **대표에게만, 깎인 줄에만** (2026-08-28)
+///
+/// 줄 모양은 그대로 두고 아이콘만 뒤에 붙는다. 깎인 줄을 따로 생기게 만들면
+/// 목록이 두 종류로 갈려서 훑기가 어려워진다.
+class _RevertButton extends StatelessWidget {
+  _RevertButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Pressable(
+    onTap: onTap,
+    padding: EdgeInsets.all(6),
+    child: Icon(
+      CupertinoIcons.arrow_counterclockwise,
+      size: 15,
+      color: AppColors.textTertiary,
+    ),
+  );
+}
+
 class _ContributionRow extends StatelessWidget {
-  _ContributionRow({required this.item});
+  _ContributionRow({required this.item, this.onRevert});
 
   final _Contribution item;
+
+  /// 깎인 점수를 되돌린다 — null 이면 아이콘이 안 뜬다 (대표가 아니다)
+  final VoidCallback? onRevert;
 
   @override
   Widget build(BuildContext context) {
@@ -202,9 +240,14 @@ class _ContributionRow extends StatelessWidget {
             item.pointsLabel,
             style: AppTextStyles.body2.copyWith(
               fontWeight: FontWeight.w700,
-              color: AppColors.primary,
+              // 깎인 줄은 빨강 — 카드(`_ContributionCard`)와 같은 규칙이다
+              color: item.isPenalty ? AppColors.error : AppColors.primary,
             ),
           ),
+          if (item.isPenalty && onRevert != null) ...[
+            SizedBox(width: 2),
+            _RevertButton(onTap: onRevert!),
+          ],
         ],
       ),
     );
@@ -212,14 +255,39 @@ class _ContributionRow extends StatelessWidget {
 }
 
 /// 기여 내역 전체 화면 — 이번 달 내 기록
-class _ContributionHistoryScreen extends StatelessWidget {
-  _ContributionHistoryScreen({required this.items});
+class _ContributionHistoryScreen extends StatefulWidget {
+  _ContributionHistoryScreen({required this.items, this.onRevert});
 
   final List<_Contribution> items;
 
+  /// 깎인 줄을 되돌린다 — null 이면 아이콘이 안 뜬다 (대표가 아니다)
+  final void Function(_Contribution item)? onRevert;
+
+  @override
+  State<_ContributionHistoryScreen> createState() =>
+      _ContributionHistoryScreenState();
+}
+
+class _ContributionHistoryScreenState
+    extends State<_ContributionHistoryScreen> {
+  /// **넘겨받은 목록을 여기서 들고 있는다.** 되돌리면 이 화면에서도 줄이
+  /// 바로 빠져야 하는데, 뒤에 있는 탭이 다시 받아 오는 것을 여기서는 못 본다
+  /// (전체 화면으로 덮여 있어서 그 화면은 새로 안 그려진다).
+  late List<_Contribution> _items = widget.items;
+
+  void _revert(_Contribution item) {
+    widget.onRevert?.call(item);
+    setState(() {
+      _items = [
+        for (final row in _items)
+          if (row.eventId == null || row.eventId != item.eventId) row,
+      ];
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final mine = items;
+    final mine = _items;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -243,7 +311,12 @@ class _ContributionHistoryScreen extends StatelessWidget {
                 else
                   for (var i = 0; i < mine.length; i++) ...[
                     if (i > 0) Divider(height: 1, color: AppColors.divider),
-                    _ContributionRow(item: mine[i]),
+                    _ContributionRow(
+                      item: mine[i],
+                      onRevert: widget.onRevert == null
+                          ? null
+                          : () => _revert(mine[i]),
+                    ),
                   ],
               ],
             ),
