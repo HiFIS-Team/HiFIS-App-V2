@@ -8,6 +8,7 @@ import 'core/theme/theme_controller.dart';
 import 'core/theme/app_theme.dart';
 import 'core/util/app_trail.dart';
 import 'core/util/capture_guard.dart';
+import 'core/widgets/feedback/app_toast.dart';
 import 'core/util/platform.dart';
 import 'core/util/screen_refresh.dart';
 import 'core/widgets/feedback/app_loading.dart';
@@ -97,6 +98,14 @@ class _HiFISAppState extends State<HiFISApp> with WidgetsBindingObserver {
       builder: (context, child) => Stack(
         children: [
           child!,
+          // **토스트만 사는 층** — 화면들(Navigator) 위에 따로 깐다.
+          //
+          // 예전에는 화면과 같은 오버레이에 끼워 넣어서, 토스트가 뜨는
+          // 240ms 와 페이지가 밀려 나가는 전환이 겹치면 **뜨다 말고 끊겨**
+          // 보였다 (알림 전체 읽기를 누르고 바로 나갈 때 실제로 그랬다).
+          //
+          // **가림막보다는 아래다** — 앱 전환·녹화 때는 토스트도 같이 가려야 한다.
+          Positioned.fill(child: Overlay(key: AppToast.overlayKey)),
           if ((_obscured || CaptureGuard.recording.value) && !isDesktop)
             Positioned.fill(
               child: Container(

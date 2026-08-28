@@ -19,8 +19,21 @@ import '../../theme/app_shadows.dart';
 abstract final class AppToast {
   static OverlayEntry? _entry;
 
+  /// **토스트만 사는 층** — [main.dart] 가 Navigator 위에 하나 깔아 준다
+  ///
+  /// 예전에는 Navigator 의 오버레이에 끼워 넣었다. 그러면 토스트가 화면들과
+  /// **같은 층에서** 움직여서, 뜨는 240ms 와 페이지가 밀려 나가는 전환이
+  /// 겹치면 **뜨다 말고 끊겨 보였다** (알림 전체 읽기를 누르고 바로 나갈 때
+  /// 실제로 그랬다). 층을 갈라 두면 전환이 이 위젯을 건드리지 않는다.
+  ///
+  /// 로그아웃 때 Navigator 가 새로 만들어져도 이 층은 그대로다 —
+  /// 아래 [_clear] 가 막아 두던 사고도 애초에 안 난다.
+  static final overlayKey = GlobalKey<OverlayState>();
+
   static void show(BuildContext context, String message) {
-    final overlay = Overlay.maybeOf(context, rootOverlay: true);
+    // 전용 층이 아직 없으면(테스트 등) 예전처럼 화면 오버레이를 쓴다
+    final overlay =
+        overlayKey.currentState ?? Overlay.maybeOf(context, rootOverlay: true);
     if (overlay != null) _insert(overlay, message);
   }
 
@@ -103,47 +116,51 @@ class _ToastViewState extends State<_ToastView>
       top: isDesktop ? 28 : null,
       bottom: isDesktop ? null : 104,
       child: IgnorePointer(
-        // Material 바깥(Overlay)에서 텍스트에 노란 밑줄이 생기는 것을 막는다
-        child: Material(
-          type: MaterialType.transparency,
-          child: FadeTransition(
-            opacity: curved,
-            child: SlideTransition(
-              // 뜨는 자리 쪽에서 밀려 나온다 — 위에서 뜨는데 아래에서
-              // 올라오면 어디서 온 건지 안 읽힌다
-              position: Tween(
-                begin: Offset(0, isDesktop ? -0.4 : 0.4),
-                end: Offset.zero,
-              ).animate(curved),
-              child: Center(
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                  decoration: BoxDecoration(
-                    // 카드 톤과 맞춘 흰 캡슐 — 구분은 헤어라인과 그림자로
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppColors.gray100),
-                    boxShadow: AppShadows.popup,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        CupertinoIcons.checkmark_circle_fill,
-                        size: 16,
-                        color: AppColors.success,
-                      ),
-                      SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          widget.message,
-                          style: AppTextStyles.body2.copyWith(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.w600,
+        // 아래 화면과 따로 그린다 — 토스트가 240ms 동안 움직이는데 그때마다
+        // 뒤 목록까지 다시 칠하면 그 프레임이 흔들린다
+        child: RepaintBoundary(
+          // Material 바깥(Overlay)에서 텍스트에 노란 밑줄이 생기는 것을 막는다
+          child: Material(
+            type: MaterialType.transparency,
+            child: FadeTransition(
+              opacity: curved,
+              child: SlideTransition(
+                // 뜨는 자리 쪽에서 밀려 나온다 — 위에서 뜨는데 아래에서
+                // 올라오면 어디서 온 건지 안 읽힌다
+                position: Tween(
+                  begin: Offset(0, isDesktop ? -0.4 : 0.4),
+                  end: Offset.zero,
+                ).animate(curved),
+                child: Center(
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                    decoration: BoxDecoration(
+                      // 카드 톤과 맞춘 흰 캡슐 — 구분은 헤어라인과 그림자로
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.gray100),
+                      boxShadow: AppShadows.popup,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          CupertinoIcons.checkmark_circle_fill,
+                          size: 16,
+                          color: AppColors.success,
+                        ),
+                        SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            widget.message,
+                            style: AppTextStyles.body2.copyWith(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
