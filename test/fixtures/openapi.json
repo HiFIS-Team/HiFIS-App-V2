@@ -1,0 +1,3760 @@
+{
+ "_": "서버 OpenAPI 스냅샷 — 손으로 고치지 않는다. tool/refresh_openapi.sh 로 다시 받는다.",
+ "schemas": {
+  "AccessEvent": {
+   "properties": {},
+   "required": []
+  },
+  "AccessLogOut": {
+   "properties": {
+    "createdAt": {},
+    "email": {
+     "nullable": true
+    },
+    "employeeId": {
+     "nullable": true
+    },
+    "event": {},
+    "id": {},
+    "ip": {
+     "nullable": true
+    },
+    "userAgent": {
+     "nullable": true
+    }
+   },
+   "required": [
+    "id",
+    "event",
+    "createdAt"
+   ]
+  },
+  "AccessTokenResponse": {
+   "properties": {
+    "accessToken": {}
+   },
+   "required": [
+    "accessToken"
+   ]
+  },
+  "AccountCreate": {
+   "properties": {
+    "active": {},
+    "cat": {},
+    "loginId": {},
+    "memo": {
+     "nullable": true
+    },
+    "name": {},
+    "password": {},
+    "scope": {},
+    "url": {
+     "nullable": true
+    }
+   },
+   "required": [
+    "name",
+    "cat",
+    "scope",
+    "loginId",
+    "password"
+   ]
+  },
+  "AccountOut": {
+   "properties": {
+    "active": {},
+    "cat": {},
+    "id": {},
+    "loginId": {},
+    "memo": {
+     "nullable": true
+    },
+    "name": {},
+    "ownerId": {},
+    "scope": {},
+    "url": {
+     "nullable": true
+    }
+   },
+   "required": [
+    "id",
+    "name",
+    "cat",
+    "scope",
+    "loginId",
+    "ownerId",
+    "active"
+   ]
+  },
+  "AccountSecretOut": {
+   "properties": {
+    "password": {}
+   },
+   "required": [
+    "password"
+   ]
+  },
+  "AccountUpdate": {
+   "properties": {
+    "active": {
+     "nullable": true
+    },
+    "cat": {
+     "nullable": true
+    },
+    "loginId": {
+     "nullable": true
+    },
+    "memo": {
+     "nullable": true
+    },
+    "name": {
+     "nullable": true
+    },
+    "password": {
+     "nullable": true
+    },
+    "scope": {
+     "nullable": true
+    },
+    "url": {
+     "nullable": true
+    }
+   },
+   "required": []
+  },
+  "AccruedOut": {
+   "properties": {
+    "canAdjust": {},
+    "incentiveNew": {},
+    "incentiveRenewal": {},
+    "newSessions": {},
+    "payday": {},
+    "periodEnd": {},
+    "periodStart": {},
+    "renewalSessions": {},
+    "sessionSigns": {},
+    "total": {},
+    "yearMonth": {}
+   },
+   "required": [
+    "yearMonth",
+    "periodStart",
+    "periodEnd",
+    "payday",
+    "incentiveNew",
+    "incentiveRenewal",
+    "total",
+    "sessionSigns",
+    "newSessions",
+    "renewalSessions",
+    "canAdjust"
+   ]
+  },
+  "AnomalyKind": {
+   "properties": {},
+   "required": []
+  },
+  "AnomalyOut": {
+   "properties": {
+    "count": {},
+    "createdAt": {},
+    "detail": {},
+    "employeeId": {
+     "nullable": true
+    },
+    "id": {},
+    "ip": {
+     "nullable": true
+    },
+    "kind": {},
+    "resolvedAt": {
+     "nullable": true
+    },
+    "resolvedById": {
+     "nullable": true
+    },
+    "subject": {},
+    "userAgent": {
+     "nullable": true
+    }
+   },
+   "required": [
+    "id",
+    "kind",
+    "subject",
+    "detail",
+    "count",
+    "createdAt"
+   ]
+  },
+  "ApiMetricsOut": {
+   "properties": {
+    "avgMs": {},
+    "clientErrorRate": {},
+    "errorRate": {},
+    "maxMs": {},
+    "minutes": {},
+    "p50Ms": {},
+    "p95Ms": {},
+    "p99Ms": {},
+    "requests": {},
+    "rpm": {},
+    "slowest": {},
+    "timeline": {}
+   },
+   "required": [
+    "minutes",
+    "requests",
+    "rpm",
+    "errorRate",
+    "clientErrorRate",
+    "avgMs",
+    "p50Ms",
+    "p95Ms",
+    "p99Ms",
+    "maxMs",
+    "slowest",
+    "timeline"
+   ]
+  },
+  "ApprovalAction": {
+   "properties": {
+    "comment": {
+     "nullable": true
+    }
+   },
+   "required": []
+  },
+  "ApprovalComment": {
+   "properties": {
+    "authorId": {},
+    "body": {},
+    "createdAt": {}
+   },
+   "required": [
+    "authorId",
+    "body",
+    "createdAt"
+   ]
+  },
+  "ApprovalCreate": {
+   "properties": {
+    "amount": {
+     "nullable": true
+    },
+    "approverIds": {},
+    "content": {},
+    "endDate": {
+     "nullable": true
+    },
+    "kind": {},
+    "place": {
+     "nullable": true
+    },
+    "startDate": {
+     "nullable": true
+    },
+    "title": {}
+   },
+   "required": [
+    "kind",
+    "title",
+    "content",
+    "approverIds"
+   ]
+  },
+  "ApprovalOut": {
+   "properties": {
+    "amount": {
+     "nullable": true
+    },
+    "approverIds": {},
+    "comments": {},
+    "content": {},
+    "createdAt": {},
+    "currentApproverId": {
+     "nullable": true
+    },
+    "endDate": {
+     "nullable": true
+    },
+    "id": {},
+    "kind": {},
+    "place": {
+     "nullable": true
+    },
+    "requesterId": {},
+    "startDate": {
+     "nullable": true
+    },
+    "status": {},
+    "steps": {},
+    "title": {}
+   },
+   "required": [
+    "id",
+    "kind",
+    "title",
+    "content",
+    "requesterId",
+    "approverIds",
+    "steps",
+    "status",
+    "comments",
+    "createdAt"
+   ]
+  },
+  "ApprovalStatus": {
+   "properties": {},
+   "required": []
+  },
+  "ApprovalStep": {
+   "properties": {
+    "actedAt": {
+     "nullable": true
+    },
+    "approverId": {},
+    "comment": {
+     "nullable": true
+    },
+    "status": {}
+   },
+   "required": [
+    "approverId",
+    "status"
+   ]
+  },
+  "ApprovalStepStatus": {
+   "properties": {},
+   "required": []
+  },
+  "AttachmentOut": {
+   "properties": {
+    "ext": {},
+    "name": {},
+    "size": {},
+    "url": {}
+   },
+   "required": [
+    "url",
+    "name",
+    "ext",
+    "size"
+   ]
+  },
+  "AttendanceDayOut": {
+   "properties": {
+    "checkIn": {
+     "nullable": true
+    },
+    "checkOut": {
+     "nullable": true
+    },
+    "date": {},
+    "halfPeriod": {
+     "nullable": true
+    },
+    "leaveType": {
+     "nullable": true
+    },
+    "status": {},
+    "workMinutes": {
+     "nullable": true
+    }
+   },
+   "required": [
+    "date",
+    "status"
+   ]
+  },
+  "AttendanceOut": {
+   "properties": {
+    "checkIn": {
+     "nullable": true
+    },
+    "checkOut": {
+     "nullable": true
+    },
+    "date": {},
+    "employeeId": {},
+    "id": {},
+    "source": {},
+    "status": {
+     "nullable": true
+    },
+    "workMinutes": {
+     "nullable": true
+    }
+   },
+   "required": [
+    "id",
+    "employeeId",
+    "date",
+    "source"
+   ]
+  },
+  "AttendanceRosterDayOut": {
+   "properties": {
+    "date": {},
+    "groups": {}
+   },
+   "required": [
+    "date",
+    "groups"
+   ]
+  },
+  "AttendanceRosterGroupOut": {
+   "properties": {
+    "names": {},
+    "status": {}
+   },
+   "required": [
+    "status",
+    "names"
+   ]
+  },
+  "AttendanceScanRequest": {
+   "properties": {
+    "code": {
+     "nullable": true
+    }
+   },
+   "required": []
+  },
+  "AttendanceSource": {
+   "properties": {},
+   "required": []
+  },
+  "AttendanceStatus": {
+   "properties": {},
+   "required": []
+  },
+  "AuditLogOut": {
+   "properties": {
+    "action": {},
+    "createdAt": {},
+    "employeeId": {
+     "nullable": true
+    },
+    "id": {},
+    "ip": {
+     "nullable": true
+    },
+    "method": {},
+    "ok": {},
+    "path": {},
+    "payload": {
+     "nullable": true
+    },
+    "route": {},
+    "status": {},
+    "userAgent": {
+     "nullable": true
+    }
+   },
+   "required": [
+    "id",
+    "method",
+    "path",
+    "route",
+    "status",
+    "createdAt",
+    "action",
+    "ok"
+   ]
+  },
+  "Body_upload_attachment_chat_rooms__room_id__attachments_post": {
+   "properties": {
+    "file": {}
+   },
+   "required": [
+    "file"
+   ]
+  },
+  "Body_upload_document_documents_post": {
+   "properties": {
+    "desc": {
+     "nullable": true
+    },
+    "file": {},
+    "folderId": {
+     "nullable": true
+    },
+    "name": {
+     "nullable": true
+    },
+    "scope": {},
+    "space": {},
+    "tags": {
+     "nullable": true
+    }
+   },
+   "required": [
+    "file",
+    "scope",
+    "space"
+   ]
+  },
+  "Body_upload_env_photo_env_logs_photo_post": {
+   "properties": {
+    "file": {}
+   },
+   "required": [
+    "file"
+   ]
+  },
+  "Body_upload_my_avatar_employees_me_avatar_post": {
+   "properties": {
+    "file": {}
+   },
+   "required": [
+    "file"
+   ]
+  },
+  "BranchCreate": {
+   "properties": {
+    "name": {},
+    "type": {}
+   },
+   "required": [
+    "name"
+   ]
+  },
+  "BranchOut": {
+   "properties": {
+    "createdAt": {},
+    "id": {},
+    "name": {},
+    "type": {}
+   },
+   "required": [
+    "id",
+    "name",
+    "type",
+    "createdAt"
+   ]
+  },
+  "BranchUpdate": {
+   "properties": {
+    "name": {
+     "nullable": true
+    },
+    "type": {
+     "nullable": true
+    }
+   },
+   "required": []
+  },
+  "CaptureReport": {
+   "properties": {
+    "kind": {},
+    "platform": {},
+    "screen": {
+     "nullable": true
+    },
+    "seconds": {
+     "nullable": true
+    }
+   },
+   "required": [
+    "platform"
+   ]
+  },
+  "ChatAuditMessageOut": {
+   "properties": {
+    "attachments": {},
+    "body": {},
+    "createdAt": {},
+    "deletedAt": {
+     "nullable": true
+    },
+    "id": {},
+    "kind": {},
+    "replyToId": {
+     "nullable": true
+    },
+    "roomId": {},
+    "senderId": {}
+   },
+   "required": [
+    "id",
+    "roomId",
+    "senderId",
+    "body",
+    "kind",
+    "createdAt"
+   ]
+  },
+  "ChatAuditRoomOut": {
+   "properties": {
+    "createdAt": {},
+    "id": {},
+    "isGroup": {},
+    "lastMessageAt": {
+     "nullable": true
+    },
+    "leftMemberIds": {},
+    "memberIds": {},
+    "messageCount": {},
+    "name": {
+     "nullable": true
+    },
+    "ownerId": {}
+   },
+   "required": [
+    "id",
+    "isGroup",
+    "ownerId",
+    "createdAt"
+   ]
+  },
+  "ChatMemberAdd": {
+   "properties": {
+    "memberIds": {}
+   },
+   "required": []
+  },
+  "ChatMuteSet": {
+   "properties": {
+    "muted": {}
+   },
+   "required": [
+    "muted"
+   ]
+  },
+  "ChatRoomCreate": {
+   "properties": {
+    "isGroup": {},
+    "memberIds": {},
+    "name": {
+     "nullable": true
+    }
+   },
+   "required": []
+  },
+  "ChatRoomOut": {
+   "properties": {
+    "id": {},
+    "isGroup": {},
+    "lastMessage": {
+     "nullable": true
+    },
+    "memberIds": {},
+    "muted": {},
+    "name": {
+     "nullable": true
+    },
+    "ownerId": {},
+    "unreadCount": {},
+    "updatedAt": {}
+   },
+   "required": [
+    "id",
+    "isGroup",
+    "ownerId",
+    "updatedAt"
+   ]
+  },
+  "ChatRoomUpdate": {
+   "properties": {
+    "name": {
+     "nullable": true
+    }
+   },
+   "required": []
+  },
+  "CommentOut": {
+   "properties": {
+    "authorId": {},
+    "body": {},
+    "createdAt": {},
+    "id": {},
+    "targetId": {},
+    "targetType": {},
+    "updatedAt": {}
+   },
+   "required": [
+    "id",
+    "targetType",
+    "targetId",
+    "authorId",
+    "body",
+    "createdAt",
+    "updatedAt"
+   ]
+  },
+  "CommentTargetType": {
+   "properties": {},
+   "required": []
+  },
+  "CommentUpdate": {
+   "properties": {
+    "body": {}
+   },
+   "required": [
+    "body"
+   ]
+  },
+  "ComplaintStatus": {
+   "properties": {},
+   "required": []
+  },
+  "ComplaintStatusUpdate": {
+   "properties": {
+    "status": {}
+   },
+   "required": [
+    "status"
+   ]
+  },
+  "ConsentAgreement": {
+   "properties": {
+    "docType": {},
+    "docVersion": {}
+   },
+   "required": [
+    "docType",
+    "docVersion"
+   ]
+  },
+  "ContribType": {
+   "properties": {},
+   "required": []
+  },
+  "ContributionCreate": {
+   "properties": {
+    "employeeId": {},
+    "hours": {
+     "nullable": true
+    },
+    "reason": {},
+    "type": {}
+   },
+   "required": [
+    "employeeId",
+    "type",
+    "reason"
+   ]
+  },
+  "ContributionGrantOut": {
+   "properties": {
+    "createdAt": {},
+    "employeeId": {},
+    "grantedById": {},
+    "hours": {
+     "nullable": true
+    },
+    "id": {},
+    "points": {},
+    "reason": {},
+    "type": {}
+   },
+   "required": [
+    "id",
+    "employeeId",
+    "type",
+    "points",
+    "reason",
+    "grantedById",
+    "createdAt"
+   ]
+  },
+  "DashboardOut": {
+   "properties": {
+    "branchId": {
+     "nullable": true
+    },
+    "checkedInToday": {},
+    "headcount": {},
+    "leavesPending": {},
+    "period": {},
+    "sales": {},
+    "scores": {}
+   },
+   "required": [
+    "period"
+   ]
+  },
+  "DeductionLine": {
+   "properties": {
+    "amount": {},
+    "label": {}
+   },
+   "required": [
+    "label",
+    "amount"
+   ]
+  },
+  "DeductionMethod": {
+   "properties": {},
+   "required": []
+  },
+  "DeployReport": {
+   "properties": {
+    "message": {},
+    "ref": {},
+    "sha": {},
+    "status": {}
+   },
+   "required": []
+  },
+  "DeviceTokenIn": {
+   "properties": {
+    "platform": {},
+    "sandbox": {},
+    "token": {}
+   },
+   "required": [
+    "token"
+   ]
+  },
+  "DocumentHit": {
+   "properties": {
+    "ext": {},
+    "id": {},
+    "name": {}
+   },
+   "required": [
+    "id",
+    "name",
+    "ext"
+   ]
+  },
+  "DocumentOut": {
+   "properties": {
+    "createdAt": {},
+    "desc": {
+     "nullable": true
+    },
+    "ext": {},
+    "favoritedByMe": {},
+    "folderId": {
+     "nullable": true
+    },
+    "id": {},
+    "name": {},
+    "scope": {},
+    "sizeBytes": {},
+    "space": {},
+    "tags": {},
+    "updatedAt": {},
+    "uploaderId": {},
+    "url": {}
+   },
+   "required": [
+    "id",
+    "name",
+    "ext",
+    "sizeBytes",
+    "url",
+    "scope",
+    "space",
+    "tags",
+    "uploaderId",
+    "createdAt",
+    "updatedAt"
+   ]
+  },
+  "DocumentUpdate": {
+   "properties": {
+    "desc": {
+     "nullable": true
+    },
+    "folderId": {
+     "nullable": true
+    },
+    "name": {
+     "nullable": true
+    },
+    "tags": {
+     "nullable": true
+    }
+   },
+   "required": []
+  },
+  "EmployeeConsentCreate": {
+   "properties": {
+    "docType": {},
+    "docVersion": {}
+   },
+   "required": [
+    "docVersion"
+   ]
+  },
+  "EmployeeConsentOut": {
+   "properties": {
+    "agreedAt": {},
+    "docType": {},
+    "docVersion": {},
+    "employeeId": {},
+    "id": {}
+   },
+   "required": [
+    "id",
+    "employeeId",
+    "docType",
+    "docVersion",
+    "agreedAt"
+   ]
+  },
+  "EmployeeCreate": {
+   "properties": {
+    "avatarColor": {
+     "nullable": true
+    },
+    "branchId": {},
+    "email": {},
+    "name": {},
+    "password": {},
+    "phone": {
+     "nullable": true
+    },
+    "rank": {},
+    "role": {},
+    "team": {
+     "nullable": true
+    }
+   },
+   "required": [
+    "name",
+    "email",
+    "password",
+    "branchId",
+    "rank"
+   ]
+  },
+  "EmployeeMeUpdate": {
+   "properties": {
+    "avatarColor": {
+     "nullable": true
+    },
+    "avatarUrl": {
+     "nullable": true
+    },
+    "email": {
+     "nullable": true
+    },
+    "name": {
+     "nullable": true
+    },
+    "phone": {
+     "nullable": true
+    },
+    "statusMessage": {
+     "nullable": true
+    },
+    "workStatus": {
+     "nullable": true
+    }
+   },
+   "required": []
+  },
+  "EmployeeOut": {
+   "properties": {
+    "avatarColor": {},
+    "avatarUrl": {
+     "nullable": true
+    },
+    "branchId": {},
+    "email": {},
+    "empNo": {
+     "nullable": true
+    },
+    "employmentType": {},
+    "firstLoginAt": {
+     "nullable": true
+    },
+    "id": {},
+    "joinedAt": {},
+    "lastActiveAt": {
+     "nullable": true
+    },
+    "name": {},
+    "phone": {
+     "nullable": true
+    },
+    "rank": {},
+    "resignedAt": {
+     "nullable": true
+    },
+    "role": {},
+    "shiftEnd": {
+     "nullable": true
+    },
+    "shiftStart": {
+     "nullable": true
+    },
+    "status": {},
+    "statusMessage": {
+     "nullable": true
+    },
+    "suspendReason": {
+     "nullable": true
+    },
+    "suspendedAt": {
+     "nullable": true
+    },
+    "team": {
+     "nullable": true
+    },
+    "todayAttendanceStatus": {
+     "nullable": true
+    },
+    "workDays": {
+     "nullable": true
+    },
+    "workStatus": {}
+   },
+   "required": [
+    "id",
+    "name",
+    "email",
+    "branchId",
+    "rank",
+    "role",
+    "status",
+    "employmentType",
+    "avatarColor",
+    "workStatus",
+    "joinedAt"
+   ]
+  },
+  "EmployeeStatus": {
+   "properties": {},
+   "required": []
+  },
+  "EmployeeUpdate": {
+   "properties": {
+    "branchId": {
+     "nullable": true
+    },
+    "deductionMethod": {
+     "nullable": true
+    },
+    "employmentType": {
+     "nullable": true
+    },
+    "phone": {
+     "nullable": true
+    },
+    "rank": {
+     "nullable": true
+    },
+    "role": {
+     "nullable": true
+    },
+    "status": {
+     "nullable": true
+    },
+    "team": {
+     "nullable": true
+    }
+   },
+   "required": []
+  },
+  "EmploymentType": {
+   "properties": {},
+   "required": []
+  },
+  "EnvItemCreate": {
+   "properties": {
+    "branchId": {},
+    "editable": {},
+    "name": {},
+    "points": {},
+    "sortOrder": {}
+   },
+   "required": [
+    "branchId",
+    "name",
+    "points"
+   ]
+  },
+  "EnvItemOut": {
+   "properties": {
+    "branchId": {},
+    "editable": {},
+    "id": {},
+    "name": {},
+    "points": {},
+    "sortOrder": {}
+   },
+   "required": [
+    "id",
+    "branchId",
+    "name",
+    "points",
+    "editable",
+    "sortOrder"
+   ]
+  },
+  "EnvItemUpdate": {
+   "properties": {
+    "editable": {
+     "nullable": true
+    },
+    "name": {
+     "nullable": true
+    },
+    "points": {
+     "nullable": true
+    },
+    "sortOrder": {
+     "nullable": true
+    }
+   },
+   "required": []
+  },
+  "EnvLogCreate": {
+   "properties": {
+    "envItemId": {},
+    "note": {
+     "nullable": true
+    },
+    "photoUrl": {
+     "nullable": true
+    },
+    "place": {
+     "nullable": true
+    }
+   },
+   "required": [
+    "envItemId"
+   ]
+  },
+  "EnvLogPhotoOut": {
+   "properties": {
+    "url": {}
+   },
+   "required": [
+    "url"
+   ]
+  },
+  "EnvTaskLogOut": {
+   "properties": {
+    "branchId": {},
+    "createdAt": {},
+    "employeeId": {},
+    "envItemId": {},
+    "id": {},
+    "itemName": {},
+    "note": {
+     "nullable": true
+    },
+    "photoUrl": {
+     "nullable": true
+    },
+    "place": {
+     "nullable": true
+    },
+    "points": {}
+   },
+   "required": [
+    "id",
+    "employeeId",
+    "branchId",
+    "envItemId",
+    "itemName",
+    "points",
+    "createdAt"
+   ]
+  },
+  "EventCreate": {
+   "properties": {
+    "allDay": {},
+    "attendeeIds": {},
+    "category": {},
+    "color": {},
+    "endAt": {},
+    "memo": {
+     "nullable": true
+    },
+    "place": {
+     "nullable": true
+    },
+    "scope": {},
+    "startAt": {},
+    "title": {}
+   },
+   "required": [
+    "title",
+    "startAt",
+    "endAt",
+    "category",
+    "scope",
+    "color"
+   ]
+  },
+  "EventOut": {
+   "properties": {
+    "allDay": {},
+    "attendeeIds": {},
+    "category": {},
+    "color": {},
+    "createdAt": {},
+    "endAt": {},
+    "id": {},
+    "memo": {
+     "nullable": true
+    },
+    "ownerId": {},
+    "place": {
+     "nullable": true
+    },
+    "scope": {},
+    "startAt": {},
+    "status": {},
+    "title": {},
+    "updatedAt": {}
+   },
+   "required": [
+    "id",
+    "title",
+    "startAt",
+    "endAt",
+    "allDay",
+    "category",
+    "scope",
+    "color",
+    "attendeeIds",
+    "ownerId",
+    "status",
+    "createdAt",
+    "updatedAt"
+   ]
+  },
+  "EventStatus": {
+   "properties": {},
+   "required": []
+  },
+  "EventUpdate": {
+   "properties": {
+    "allDay": {
+     "nullable": true
+    },
+    "attendeeIds": {
+     "nullable": true
+    },
+    "category": {
+     "nullable": true
+    },
+    "color": {
+     "nullable": true
+    },
+    "endAt": {
+     "nullable": true
+    },
+    "memo": {
+     "nullable": true
+    },
+    "place": {
+     "nullable": true
+    },
+    "scope": {
+     "nullable": true
+    },
+    "startAt": {
+     "nullable": true
+    },
+    "title": {
+     "nullable": true
+    }
+   },
+   "required": []
+  },
+  "FolderCreate": {
+   "properties": {
+    "name": {},
+    "parentId": {
+     "nullable": true
+    },
+    "scope": {},
+    "space": {}
+   },
+   "required": [
+    "name",
+    "scope",
+    "space"
+   ]
+  },
+  "FolderOut": {
+   "properties": {
+    "createdAt": {},
+    "createdById": {},
+    "id": {},
+    "name": {},
+    "parentId": {
+     "nullable": true
+    },
+    "scope": {},
+    "space": {},
+    "updatedAt": {}
+   },
+   "required": [
+    "id",
+    "name",
+    "scope",
+    "space",
+    "createdById",
+    "createdAt",
+    "updatedAt"
+   ]
+  },
+  "FolderTreeCreate": {
+   "properties": {
+    "nodes": {},
+    "parentId": {
+     "nullable": true
+    },
+    "scope": {},
+    "space": {}
+   },
+   "required": [
+    "scope",
+    "space",
+    "nodes"
+   ]
+  },
+  "FolderTreeNode": {
+   "properties": {
+    "children": {},
+    "name": {}
+   },
+   "required": [
+    "name"
+   ]
+  },
+  "FolderTreeNodeOut": {
+   "properties": {
+    "children": {},
+    "id": {},
+    "name": {}
+   },
+   "required": [
+    "id",
+    "name"
+   ]
+  },
+  "FolderUpdate": {
+   "properties": {
+    "name": {
+     "nullable": true
+    },
+    "parentId": {
+     "nullable": true
+    }
+   },
+   "required": []
+  },
+  "GrafanaAlert": {
+   "properties": {
+    "message": {},
+    "status": {},
+    "title": {}
+   },
+   "required": []
+  },
+  "HTTPValidationError": {
+   "properties": {
+    "detail": {}
+   },
+   "required": []
+  },
+  "HalfPeriod": {
+   "properties": {},
+   "required": []
+  },
+  "HistoryOut": {
+   "properties": {
+    "branchName": {},
+    "high": {},
+    "highThreshold": {},
+    "low": {},
+    "lowThreshold": {},
+    "month": {}
+   },
+   "required": [
+    "branchName",
+    "month",
+    "highThreshold",
+    "lowThreshold",
+    "high",
+    "low"
+   ]
+  },
+  "HomeAttendanceOut": {
+   "properties": {
+    "checkIn": {
+     "nullable": true
+    },
+    "checkOut": {
+     "nullable": true
+    },
+    "halfPeriod": {
+     "nullable": true
+    },
+    "leaveType": {
+     "nullable": true
+    },
+    "status": {
+     "nullable": true
+    },
+    "workMinutes": {
+     "nullable": true
+    }
+   },
+   "required": []
+  },
+  "HomeSummaryOut": {
+   "properties": {
+    "incompleteProjects": {},
+    "monthScore": {},
+    "period": {},
+    "todayAttendance": {},
+    "unreadNotices": {}
+   },
+   "required": [
+    "period",
+    "todayAttendance",
+    "incompleteProjects",
+    "unreadNotices",
+    "monthScore"
+   ]
+  },
+  "HourlyBasis": {
+   "properties": {
+    "minutesPerDay": {},
+    "totalMinutes": {},
+    "wage": {},
+    "workDays": {}
+   },
+   "required": [
+    "wage",
+    "minutesPerDay",
+    "workDays",
+    "totalMinutes"
+   ]
+  },
+  "InboxItemOut": {
+   "properties": {
+    "createdAt": {},
+    "detail": {},
+    "employeeId": {},
+    "id": {},
+    "kind": {},
+    "title": {}
+   },
+   "required": [
+    "kind",
+    "id",
+    "employeeId",
+    "title",
+    "detail",
+    "createdAt"
+   ]
+  },
+  "InboxKind": {
+   "properties": {},
+   "required": []
+  },
+  "InboxStatus": {
+   "properties": {},
+   "required": []
+  },
+  "InviteKeyCreate": {
+   "properties": {
+    "branchId": {},
+    "employmentType": {},
+    "expiresAt": {
+     "nullable": true
+    },
+    "rank": {},
+    "role": {},
+    "team": {
+     "nullable": true
+    }
+   },
+   "required": [
+    "branchId",
+    "role",
+    "rank"
+   ]
+  },
+  "InviteKeyOut": {
+   "properties": {
+    "branchId": {},
+    "code": {},
+    "createdAt": {},
+    "employmentType": {},
+    "expiresAt": {},
+    "id": {},
+    "issuedById": {},
+    "rank": {},
+    "role": {},
+    "status": {},
+    "team": {
+     "nullable": true
+    }
+   },
+   "required": [
+    "id",
+    "code",
+    "branchId",
+    "role",
+    "rank",
+    "employmentType",
+    "status",
+    "issuedById",
+    "expiresAt",
+    "createdAt"
+   ]
+  },
+  "InviteStatus": {
+   "properties": {},
+   "required": []
+  },
+  "KindnessSurveyOut": {
+   "properties": {
+    "consent": {},
+    "id": {},
+    "improvement": {
+     "nullable": true
+    },
+    "improvementStatus": {},
+    "memberName": {},
+    "memberPhone": {},
+    "motivation": {},
+    "praiseComment": {},
+    "praisedEmployeeId": {},
+    "resolvedAt": {
+     "nullable": true
+    },
+    "resolvedById": {
+     "nullable": true
+    },
+    "submittedAt": {}
+   },
+   "required": [
+    "id",
+    "motivation",
+    "praisedEmployeeId",
+    "praiseComment",
+    "memberName",
+    "memberPhone",
+    "consent",
+    "submittedAt"
+   ]
+  },
+  "KindnessSurveyWebhook": {
+   "properties": {
+    "consent": {},
+    "improvement": {
+     "nullable": true
+    },
+    "memberName": {},
+    "memberPhone": {},
+    "motivation": {},
+    "praiseComment": {},
+    "praisedEmployeeId": {}
+   },
+   "required": [
+    "motivation",
+    "praisedEmployeeId",
+    "praiseComment",
+    "memberName",
+    "memberPhone",
+    "consent"
+   ]
+  },
+  "LeaveBalanceOut": {
+   "properties": {
+    "granted": {},
+    "remaining": {},
+    "used": {}
+   },
+   "required": [
+    "granted",
+    "used",
+    "remaining"
+   ]
+  },
+  "LeaveReject": {
+   "properties": {
+    "reason": {}
+   },
+   "required": [
+    "reason"
+   ]
+  },
+  "LeaveRequestCreate": {
+   "properties": {
+    "endDate": {},
+    "halfPeriod": {
+     "nullable": true
+    },
+    "reason": {
+     "nullable": true
+    },
+    "startDate": {},
+    "type": {}
+   },
+   "required": [
+    "type",
+    "startDate",
+    "endDate"
+   ]
+  },
+  "LeaveRequestOut": {
+   "properties": {
+    "days": {},
+    "employeeId": {},
+    "endDate": {},
+    "halfPeriod": {
+     "nullable": true
+    },
+    "id": {},
+    "reason": {
+     "nullable": true
+    },
+    "rejectReason": {
+     "nullable": true
+    },
+    "startDate": {},
+    "status": {},
+    "type": {}
+   },
+   "required": [
+    "id",
+    "employeeId",
+    "type",
+    "startDate",
+    "endDate",
+    "days",
+    "status"
+   ]
+  },
+  "LeaveStatus": {
+   "properties": {},
+   "required": []
+  },
+  "LeaveType": {
+   "properties": {},
+   "required": []
+  },
+  "LoginRequest": {
+   "properties": {
+    "email": {},
+    "password": {}
+   },
+   "required": [
+    "email",
+    "password"
+   ]
+  },
+  "MeetingCreate": {
+   "properties": {
+    "attendeeIds": {},
+    "blocks": {},
+    "meetingAt": {},
+    "projectId": {
+     "nullable": true
+    },
+    "scope": {},
+    "title": {}
+   },
+   "required": [
+    "title",
+    "scope",
+    "meetingAt"
+   ]
+  },
+  "MeetingOut": {
+   "properties": {
+    "attendeeIds": {},
+    "authorId": {},
+    "blocks": {},
+    "commentCount": {},
+    "createdAt": {},
+    "id": {},
+    "meetingAt": {},
+    "projectId": {
+     "nullable": true
+    },
+    "reactions": {},
+    "scope": {},
+    "title": {},
+    "updatedAt": {}
+   },
+   "required": [
+    "id",
+    "title",
+    "blocks",
+    "scope",
+    "attendeeIds",
+    "authorId",
+    "meetingAt",
+    "createdAt",
+    "updatedAt"
+   ]
+  },
+  "MeetingScope": {
+   "properties": {},
+   "required": []
+  },
+  "MeetingUpdate": {
+   "properties": {
+    "attendeeIds": {
+     "nullable": true
+    },
+    "blocks": {
+     "nullable": true
+    },
+    "meetingAt": {
+     "nullable": true
+    },
+    "projectId": {
+     "nullable": true
+    },
+    "scope": {
+     "nullable": true
+    },
+    "title": {
+     "nullable": true
+    }
+   },
+   "required": []
+  },
+  "MemberConsentCreate": {
+   "properties": {
+    "docType": {},
+    "docVersion": {},
+    "signatureBase64": {}
+   },
+   "required": [
+    "docVersion",
+    "signatureBase64"
+   ]
+  },
+  "MemberConsentOut": {
+   "properties": {
+    "agreedAt": {},
+    "collectedById": {},
+    "docType": {},
+    "docVersion": {},
+    "id": {},
+    "memberId": {},
+    "signatureUrl": {}
+   },
+   "required": [
+    "id",
+    "memberId",
+    "docType",
+    "docVersion",
+    "signatureUrl",
+    "collectedById",
+    "agreedAt"
+   ]
+  },
+  "MemberCreate": {
+   "properties": {
+    "branchId": {},
+    "memo": {
+     "nullable": true
+    },
+    "name": {},
+    "ownerTrainerId": {},
+    "phone": {},
+    "referrerMemberId": {
+     "nullable": true
+    },
+    "registration": {
+     "nullable": true
+    },
+    "visitPath": {
+     "nullable": true
+    }
+   },
+   "required": [
+    "name",
+    "phone",
+    "branchId",
+    "ownerTrainerId"
+   ]
+  },
+  "MemberCreateOut": {
+   "properties": {
+    "branchId": {},
+    "id": {},
+    "memo": {
+     "nullable": true
+    },
+    "name": {},
+    "ownerTrainerId": {},
+    "phone": {},
+    "referrerMemberId": {
+     "nullable": true
+    },
+    "registeredAt": {},
+    "registration": {
+     "nullable": true
+    },
+    "visitPath": {
+     "nullable": true
+    }
+   },
+   "required": [
+    "id",
+    "name",
+    "phone",
+    "branchId",
+    "ownerTrainerId",
+    "registeredAt"
+   ]
+  },
+  "MemberRegistrationInput": {
+   "properties": {
+    "pricePaid": {},
+    "purchasedAt": {
+     "nullable": true
+    },
+    "sessionUnitPrice": {},
+    "totalSessions": {},
+    "trainerId": {
+     "nullable": true
+    },
+    "type": {},
+    "usedSessions": {}
+   },
+   "required": [
+    "type",
+    "totalSessions",
+    "pricePaid",
+    "sessionUnitPrice"
+   ]
+  },
+  "MemberUpdate": {
+   "properties": {
+    "memo": {
+     "nullable": true
+    },
+    "name": {
+     "nullable": true
+    },
+    "ownerTrainerId": {
+     "nullable": true
+    },
+    "phone": {
+     "nullable": true
+    },
+    "referrerMemberId": {
+     "nullable": true
+    },
+    "visitPath": {
+     "nullable": true
+    }
+   },
+   "required": []
+  },
+  "MessageCreate": {
+   "properties": {
+    "attachments": {},
+    "body": {},
+    "replyToId": {
+     "nullable": true
+    }
+   },
+   "required": [
+    "body"
+   ]
+  },
+  "MessageKind": {
+   "properties": {},
+   "required": []
+  },
+  "MessageOut": {
+   "properties": {
+    "attachments": {},
+    "body": {},
+    "createdAt": {},
+    "id": {},
+    "kind": {},
+    "reactions": {},
+    "readCount": {},
+    "replyTo": {
+     "nullable": true
+    },
+    "roomId": {},
+    "senderId": {}
+   },
+   "required": [
+    "id",
+    "roomId",
+    "senderId",
+    "body",
+    "createdAt"
+   ]
+  },
+  "MessageRef": {
+   "properties": {
+    "body": {},
+    "deleted": {},
+    "id": {},
+    "senderId": {}
+   },
+   "required": [
+    "id",
+    "senderId"
+   ]
+  },
+  "MetricPointOut": {
+   "properties": {
+    "avgMs": {},
+    "count": {},
+    "errors": {},
+    "minute": {}
+   },
+   "required": [
+    "minute",
+    "count",
+    "avgMs",
+    "errors"
+   ]
+  },
+  "MyTaskCreate": {
+   "properties": {
+    "contents": {
+     "nullable": true
+    },
+    "items": {
+     "nullable": true
+    },
+    "weekdays": {
+     "nullable": true
+    }
+   },
+   "required": []
+  },
+  "MyTaskDayOut": {
+   "properties": {
+    "complete": {},
+    "date": {},
+    "done": {},
+    "tasks": {},
+    "total": {}
+   },
+   "required": [
+    "date",
+    "tasks",
+    "total",
+    "done",
+    "complete"
+   ]
+  },
+  "MyTaskExcuseCreate": {
+   "properties": {
+    "reason": {}
+   },
+   "required": [
+    "reason"
+   ]
+  },
+  "MyTaskItem": {
+   "properties": {
+    "content": {},
+    "weekdays": {
+     "nullable": true
+    }
+   },
+   "required": [
+    "content"
+   ]
+  },
+  "MyTaskMissOut": {
+   "properties": {
+    "contents": {
+     "nullable": true
+    },
+    "createdAt": {},
+    "date": {},
+    "decidedAt": {
+     "nullable": true
+    },
+    "decidedById": {
+     "nullable": true
+    },
+    "employeeId": {},
+    "employeeName": {
+     "nullable": true
+    },
+    "excuseReason": {
+     "nullable": true
+    },
+    "excuseStatus": {
+     "nullable": true
+    },
+    "id": {},
+    "rejectReason": {
+     "nullable": true
+    },
+    "taskCount": {}
+   },
+   "required": [
+    "id",
+    "employeeId",
+    "date",
+    "taskCount",
+    "createdAt"
+   ]
+  },
+  "MyTaskOut": {
+   "properties": {
+    "carriedFrom": {
+     "nullable": true
+    },
+    "checked": {},
+    "content": {},
+    "createdAt": {},
+    "employeeId": {},
+    "everChecked": {},
+    "id": {},
+    "pendingRequest": {
+     "nullable": true
+    },
+    "sort": {},
+    "weekdays": {}
+   },
+   "required": [
+    "id",
+    "employeeId",
+    "content",
+    "sort",
+    "createdAt"
+   ]
+  },
+  "MyTaskRequestCreate": {
+   "properties": {
+    "payload": {
+     "nullable": true
+    },
+    "reason": {},
+    "type": {}
+   },
+   "required": [
+    "type",
+    "reason"
+   ]
+  },
+  "MyTaskRequestOut": {
+   "properties": {
+    "createdAt": {},
+    "decidedAt": {
+     "nullable": true
+    },
+    "decidedById": {
+     "nullable": true
+    },
+    "id": {},
+    "myTaskId": {},
+    "payload": {
+     "nullable": true
+    },
+    "reason": {},
+    "rejectReason": {
+     "nullable": true
+    },
+    "requestedById": {},
+    "requesterName": {
+     "nullable": true
+    },
+    "status": {},
+    "taskContent": {
+     "nullable": true
+    },
+    "type": {}
+   },
+   "required": [
+    "id",
+    "myTaskId",
+    "type",
+    "reason",
+    "status",
+    "requestedById",
+    "createdAt"
+   ]
+  },
+  "MyTaskRequestType": {
+   "properties": {},
+   "required": []
+  },
+  "MyTaskRosterRow": {
+   "properties": {
+    "complete": {},
+    "done": {},
+    "employeeId": {},
+    "name": {},
+    "total": {}
+   },
+   "required": [
+    "employeeId",
+    "name",
+    "total",
+    "done",
+    "complete"
+   ]
+  },
+  "MyTaskUpdate": {
+   "properties": {
+    "content": {
+     "nullable": true
+    },
+    "weekdays": {
+     "nullable": true
+    }
+   },
+   "required": []
+  },
+  "NoticeCreate": {
+   "properties": {
+    "body": {},
+    "pinned": {},
+    "title": {}
+   },
+   "required": [
+    "title",
+    "body"
+   ]
+  },
+  "NoticeOut": {
+   "properties": {
+    "authorId": {},
+    "body": {},
+    "commentCount": {},
+    "createdAt": {},
+    "id": {},
+    "pinned": {},
+    "reactions": {},
+    "readByMe": {},
+    "readCount": {},
+    "title": {}
+   },
+   "required": [
+    "id",
+    "title",
+    "body",
+    "pinned",
+    "authorId",
+    "createdAt"
+   ]
+  },
+  "NoticeReaderItem": {
+   "properties": {
+    "avatarColor": {},
+    "avatarUrl": {
+     "nullable": true
+    },
+    "employeeId": {},
+    "name": {},
+    "readAt": {
+     "nullable": true
+    }
+   },
+   "required": [
+    "employeeId",
+    "name",
+    "avatarColor"
+   ]
+  },
+  "NoticeReadersOut": {
+   "properties": {
+    "people": {},
+    "readCount": {},
+    "total": {}
+   },
+   "required": [
+    "total",
+    "readCount",
+    "people"
+   ]
+  },
+  "NoticeUpdate": {
+   "properties": {
+    "body": {
+     "nullable": true
+    },
+    "pinned": {
+     "nullable": true
+    },
+    "title": {
+     "nullable": true
+    }
+   },
+   "required": []
+  },
+  "NotificationOut": {
+   "properties": {
+    "body": {
+     "nullable": true
+    },
+    "createdAt": {},
+    "employeeId": {},
+    "id": {},
+    "link": {
+     "nullable": true
+    },
+    "read": {},
+    "title": {},
+    "type": {}
+   },
+   "required": [
+    "id",
+    "employeeId",
+    "type",
+    "title",
+    "read",
+    "createdAt"
+   ]
+  },
+  "PasswordChange": {
+   "properties": {
+    "currentPassword": {},
+    "newPassword": {}
+   },
+   "required": [
+    "currentPassword",
+    "newPassword"
+   ]
+  },
+  "PasswordResetConfirmReq": {
+   "properties": {
+    "password": {},
+    "resetToken": {}
+   },
+   "required": [
+    "resetToken",
+    "password"
+   ]
+  },
+  "PasswordResetRequestReq": {
+   "properties": {
+    "contact": {},
+    "method": {}
+   },
+   "required": [
+    "method",
+    "contact"
+   ]
+  },
+  "PasswordResetVerifyReq": {
+   "properties": {
+    "code": {},
+    "contact": {}
+   },
+   "required": [
+    "contact",
+    "code"
+   ]
+  },
+  "PasswordResetVerifyResp": {
+   "properties": {
+    "resetToken": {}
+   },
+   "required": [
+    "resetToken"
+   ]
+  },
+  "PaydayWindowOut": {
+   "properties": {
+    "isOpen": {},
+    "payday": {},
+    "yearMonth": {}
+   },
+   "required": [
+    "yearMonth",
+    "payday",
+    "isOpen"
+   ]
+  },
+  "PayslipBasis": {
+   "properties": {
+    "hourly": {
+     "nullable": true
+    },
+    "newSales": {},
+    "renewalSales": {},
+    "sessionSigns": {}
+   },
+   "required": [
+    "newSales",
+    "renewalSales",
+    "sessionSigns"
+   ]
+  },
+  "PayslipGenerateRequest": {
+   "properties": {
+    "branchId": {},
+    "yearMonth": {}
+   },
+   "required": [
+    "branchId",
+    "yearMonth"
+   ]
+  },
+  "PayslipOut": {
+   "properties": {
+    "baseSalary": {},
+    "basis": {},
+    "decidedAt": {
+     "nullable": true
+    },
+    "decidedById": {
+     "nullable": true
+    },
+    "deductionMethod": {},
+    "deductions": {},
+    "employeeId": {},
+    "gross": {},
+    "id": {},
+    "incentiveNew": {},
+    "incentiveNewAuto": {
+     "nullable": true
+    },
+    "incentiveRenewal": {},
+    "incentiveRenewalAuto": {
+     "nullable": true
+    },
+    "net": {},
+    "note": {
+     "nullable": true
+    },
+    "otherAllowances": {},
+    "paidAt": {
+     "nullable": true
+    },
+    "payday": {},
+    "rank": {},
+    "rejectReason": {
+     "nullable": true
+    },
+    "status": {},
+    "submittedAt": {
+     "nullable": true
+    },
+    "totalDeduction": {},
+    "yearMonth": {}
+   },
+   "required": [
+    "id",
+    "employeeId",
+    "yearMonth",
+    "rank",
+    "baseSalary",
+    "incentiveNew",
+    "incentiveRenewal",
+    "otherAllowances",
+    "gross",
+    "deductionMethod",
+    "deductions",
+    "totalDeduction",
+    "net",
+    "basis",
+    "status",
+    "payday"
+   ]
+  },
+  "PayslipReject": {
+   "properties": {
+    "reason": {}
+   },
+   "required": [
+    "reason"
+   ]
+  },
+  "PayslipStatus": {
+   "properties": {},
+   "required": []
+  },
+  "PayslipSubmit": {
+   "properties": {
+    "incentiveNew": {
+     "nullable": true
+    },
+    "incentiveRenewal": {
+     "nullable": true
+    },
+    "note": {
+     "nullable": true
+    },
+    "yearMonth": {}
+   },
+   "required": [
+    "yearMonth"
+   ]
+  },
+  "PeerAggregateItem": {
+   "properties": {
+    "byCategory": {},
+    "name": {},
+    "reviewCount": {},
+    "revieweeId": {},
+    "total": {}
+   },
+   "required": [
+    "revieweeId",
+    "name",
+    "reviewCount",
+    "total",
+    "byCategory"
+   ]
+  },
+  "PeerReviewCreate": {
+   "properties": {
+    "period": {},
+    "reasons": {},
+    "revieweeId": {},
+    "scores": {}
+   },
+   "required": [
+    "revieweeId",
+    "period",
+    "scores",
+    "reasons"
+   ]
+  },
+  "PeerReviewOut": {
+   "properties": {
+    "id": {},
+    "isSelf": {},
+    "period": {},
+    "reasons": {},
+    "revieweeId": {},
+    "reviewerId": {},
+    "scores": {},
+    "submittedAt": {},
+    "total": {}
+   },
+   "required": [
+    "id",
+    "reviewerId",
+    "revieweeId",
+    "isSelf",
+    "period",
+    "scores",
+    "reasons",
+    "total",
+    "submittedAt"
+   ]
+  },
+  "PeerScores": {
+   "properties": {
+    "attitude": {},
+    "collaboration": {},
+    "competency": {},
+    "contribution": {},
+    "leadership": {}
+   },
+   "required": [
+    "competency",
+    "collaboration",
+    "contribution",
+    "attitude",
+    "leadership"
+   ]
+  },
+  "PersonHit": {
+   "properties": {
+    "avatarColor": {},
+    "branchId": {},
+    "email": {},
+    "id": {},
+    "name": {},
+    "team": {
+     "nullable": true
+    }
+   },
+   "required": [
+    "id",
+    "name",
+    "email",
+    "avatarColor",
+    "branchId"
+   ]
+  },
+  "ProjectActivityKind": {
+   "properties": {},
+   "required": []
+  },
+  "ProjectActivityOut": {
+   "properties": {
+    "actorId": {
+     "nullable": true
+    },
+    "body": {
+     "nullable": true
+    },
+    "createdAt": {},
+    "id": {},
+    "kind": {},
+    "projectId": {},
+    "updatedAt": {}
+   },
+   "required": [
+    "id",
+    "projectId",
+    "kind",
+    "createdAt",
+    "updatedAt"
+   ]
+  },
+  "ProjectAwardCreate": {
+   "properties": {
+    "comment": {},
+    "employeeId": {
+     "nullable": true
+    },
+    "points": {}
+   },
+   "required": [
+    "comment"
+   ]
+  },
+  "ProjectAwardOut": {
+   "properties": {
+    "comment": {
+     "nullable": true
+    },
+    "createdAt": {},
+    "createdById": {
+     "nullable": true
+    },
+    "employeeId": {},
+    "id": {},
+    "points": {},
+    "projectId": {}
+   },
+   "required": [
+    "id",
+    "projectId",
+    "employeeId",
+    "points",
+    "createdAt"
+   ]
+  },
+  "ProjectCreate": {
+   "properties": {
+    "assigneeIds": {},
+    "color": {
+     "nullable": true
+    },
+    "due": {},
+    "ownerId": {
+     "nullable": true
+    },
+    "progress": {},
+    "purpose": {},
+    "startAt": {
+     "nullable": true
+    },
+    "steps": {},
+    "title": {},
+    "todos": {}
+   },
+   "required": [
+    "title",
+    "due"
+   ]
+  },
+  "ProjectEditPayload": {
+   "properties": {
+    "color": {
+     "nullable": true
+    },
+    "purpose": {
+     "nullable": true
+    },
+    "title": {
+     "nullable": true
+    }
+   },
+   "required": []
+  },
+  "ProjectMembersPayload": {
+   "properties": {
+    "addIds": {}
+   },
+   "required": [
+    "addIds"
+   ]
+  },
+  "ProjectOut": {
+   "properties": {
+    "assigneeIds": {},
+    "color": {
+     "nullable": true
+    },
+    "commentCount": {},
+    "completedAt": {
+     "nullable": true
+    },
+    "createdAt": {},
+    "createdById": {},
+    "doneCount": {},
+    "due": {},
+    "extensionReason": {
+     "nullable": true
+    },
+    "id": {},
+    "ownerId": {},
+    "progress": {},
+    "purpose": {},
+    "reactions": {},
+    "startAt": {
+     "nullable": true
+    },
+    "status": {},
+    "steps": {},
+    "title": {},
+    "todoCount": {}
+   },
+   "required": [
+    "id",
+    "title",
+    "purpose",
+    "steps",
+    "due",
+    "progress",
+    "assigneeIds",
+    "ownerId",
+    "status",
+    "createdById",
+    "createdAt"
+   ]
+  },
+  "ProjectRequestCreate": {
+   "properties": {
+    "members": {
+     "nullable": true
+    },
+    "newDue": {
+     "nullable": true
+    },
+    "payload": {
+     "nullable": true
+    },
+    "reason": {},
+    "type": {}
+   },
+   "required": [
+    "type",
+    "reason"
+   ]
+  },
+  "ProjectRequestOut": {
+   "properties": {
+    "createdAt": {},
+    "decidedAt": {
+     "nullable": true
+    },
+    "decidedById": {
+     "nullable": true
+    },
+    "id": {},
+    "members": {
+     "nullable": true
+    },
+    "newDue": {
+     "nullable": true
+    },
+    "payload": {
+     "nullable": true
+    },
+    "projectId": {},
+    "reason": {},
+    "rejectReason": {
+     "nullable": true
+    },
+    "requestedById": {},
+    "status": {},
+    "type": {}
+   },
+   "required": [
+    "id",
+    "projectId",
+    "type",
+    "reason",
+    "status",
+    "requestedById",
+    "createdAt"
+   ]
+  },
+  "ProjectRequestReject": {
+   "properties": {
+    "reason": {}
+   },
+   "required": [
+    "reason"
+   ]
+  },
+  "ProjectRequestStatus": {
+   "properties": {},
+   "required": []
+  },
+  "ProjectRequestType": {
+   "properties": {},
+   "required": []
+  },
+  "ProjectStatus": {
+   "properties": {},
+   "required": []
+  },
+  "ProjectTodoCreate": {
+   "properties": {
+    "assigneeId": {
+     "nullable": true
+    },
+    "content": {},
+    "sort": {}
+   },
+   "required": [
+    "content"
+   ]
+  },
+  "ProjectTodoOut": {
+   "properties": {
+    "assigneeId": {
+     "nullable": true
+    },
+    "content": {},
+    "createdAt": {},
+    "createdById": {},
+    "done": {},
+    "id": {},
+    "projectId": {},
+    "sort": {}
+   },
+   "required": [
+    "id",
+    "projectId",
+    "content",
+    "done",
+    "sort",
+    "createdById",
+    "createdAt"
+   ]
+  },
+  "ProjectTodoUpdate": {
+   "properties": {
+    "assigneeId": {
+     "nullable": true
+    },
+    "content": {
+     "nullable": true
+    },
+    "done": {
+     "nullable": true
+    },
+    "sort": {
+     "nullable": true
+    }
+   },
+   "required": []
+  },
+  "ProjectUpdate": {
+   "properties": {
+    "assigneeIds": {
+     "nullable": true
+    },
+    "color": {
+     "nullable": true
+    },
+    "due": {
+     "nullable": true
+    },
+    "extensionReason": {
+     "nullable": true
+    },
+    "ownerId": {
+     "nullable": true
+    },
+    "progress": {
+     "nullable": true
+    },
+    "purpose": {
+     "nullable": true
+    },
+    "startAt": {
+     "nullable": true
+    },
+    "steps": {
+     "nullable": true
+    },
+    "title": {
+     "nullable": true
+    }
+   },
+   "required": []
+  },
+  "PtSurveyOut": {
+   "properties": {
+    "answeredAt": {
+     "nullable": true
+    },
+    "createdAt": {},
+    "id": {},
+    "memberId": {},
+    "memberName": {
+     "nullable": true
+    },
+    "registrationId": {},
+    "renew": {
+     "nullable": true
+    },
+    "request": {
+     "nullable": true
+    },
+    "satisfaction": {
+     "nullable": true
+    },
+    "sentAt": {
+     "nullable": true
+    },
+    "sessionNo": {},
+    "trainerId": {},
+    "trainerName": {
+     "nullable": true
+    },
+    "url": {}
+   },
+   "required": [
+    "id",
+    "registrationId",
+    "memberId",
+    "trainerId",
+    "sessionNo",
+    "createdAt"
+   ]
+  },
+  "PtSurveyPageOut": {
+   "properties": {
+    "answered": {},
+    "branchName": {},
+    "memberName": {},
+    "sessionNo": {},
+    "totalSessions": {},
+    "trainerAvatarColor": {},
+    "trainerName": {}
+   },
+   "required": [
+    "memberName",
+    "trainerName",
+    "trainerAvatarColor",
+    "branchName",
+    "sessionNo",
+    "totalSessions",
+    "answered"
+   ]
+  },
+  "PtSurveySubmit": {
+   "properties": {
+    "renew": {},
+    "request": {
+     "nullable": true
+    },
+    "satisfaction": {}
+   },
+   "required": [
+    "satisfaction",
+    "renew"
+   ]
+  },
+  "PushKeys": {
+   "properties": {
+    "auth": {},
+    "p256Dh": {}
+   },
+   "required": [
+    "p256Dh",
+    "auth"
+   ]
+  },
+  "PushSubscribeIn": {
+   "properties": {
+    "endpoint": {},
+    "keys": {}
+   },
+   "required": [
+    "endpoint",
+    "keys"
+   ]
+  },
+  "Rank": {
+   "properties": {},
+   "required": []
+  },
+  "RankOvertakeOut": {
+   "properties": {
+    "createdAt": {},
+    "gap": {},
+    "id": {},
+    "metric": {},
+    "moverBranchId": {
+     "nullable": true
+    },
+    "moverId": {},
+    "moverName": {},
+    "passedId": {},
+    "passedName": {},
+    "period": {},
+    "rank": {}
+   },
+   "required": [
+    "id",
+    "period",
+    "metric",
+    "moverId",
+    "moverName",
+    "passedId",
+    "passedName",
+    "gap",
+    "rank",
+    "createdAt"
+   ]
+  },
+  "RankPolicyCreate": {
+   "properties": {
+    "baseSalary": {},
+    "branchId": {
+     "nullable": true
+    },
+    "effectiveFrom": {},
+    "newRate": {},
+    "rank": {},
+    "renewalRate": {}
+   },
+   "required": [
+    "rank",
+    "baseSalary",
+    "newRate",
+    "renewalRate",
+    "effectiveFrom"
+   ]
+  },
+  "RankPolicyOut": {
+   "properties": {
+    "baseSalary": {},
+    "branchId": {
+     "nullable": true
+    },
+    "effectiveFrom": {},
+    "id": {},
+    "newRate": {},
+    "rank": {},
+    "renewalRate": {}
+   },
+   "required": [
+    "id",
+    "rank",
+    "baseSalary",
+    "newRate",
+    "renewalRate",
+    "effectiveFrom"
+   ]
+  },
+  "RankingBoardItem": {
+   "properties": {
+    "blogScore": {},
+    "branchId": {},
+    "care": {},
+    "careScore": {},
+    "contribScore": {},
+    "employeeId": {},
+    "instaScore": {},
+    "kindness": {},
+    "lastRank": {},
+    "ledger": {},
+    "lessonScore": {},
+    "lessons": {},
+    "name": {},
+    "newSignups": {},
+    "otptScore": {},
+    "overall": {},
+    "projectDone": {},
+    "projectScore": {},
+    "projectTotal": {},
+    "reSignups": {},
+    "revenue": {},
+    "reviews": {},
+    "salesScore": {}
+   },
+   "required": [
+    "employeeId",
+    "name",
+    "branchId"
+   ]
+  },
+  "RankingItem": {
+   "properties": {
+    "employeeId": {},
+    "name": {},
+    "points": {},
+    "rank": {}
+   },
+   "required": [
+    "rank",
+    "employeeId",
+    "name",
+    "points"
+   ]
+  },
+  "RankingKind": {
+   "properties": {},
+   "required": []
+  },
+  "ReactionAgg": {
+   "properties": {
+    "emoji": {},
+    "employeeIds": {}
+   },
+   "required": [
+    "emoji"
+   ]
+  },
+  "ReactionTargetType": {
+   "properties": {},
+   "required": []
+  },
+  "ReactionToggle": {
+   "properties": {
+    "emoji": {},
+    "targetId": {},
+    "targetType": {}
+   },
+   "required": [
+    "targetType",
+    "targetId",
+    "emoji"
+   ]
+  },
+  "RefreshRequest": {
+   "properties": {
+    "refreshToken": {}
+   },
+   "required": [
+    "refreshToken"
+   ]
+  },
+  "RegistrationCreate": {
+   "properties": {
+    "memberId": {},
+    "pricePaid": {},
+    "purchasedAt": {
+     "nullable": true
+    },
+    "sessionUnitPrice": {},
+    "totalSessions": {},
+    "trainerId": {},
+    "type": {},
+    "usedSessions": {}
+   },
+   "required": [
+    "memberId",
+    "trainerId",
+    "type",
+    "totalSessions",
+    "pricePaid",
+    "sessionUnitPrice"
+   ]
+  },
+  "RegistrationOut": {
+   "properties": {
+    "id": {},
+    "memberId": {},
+    "pricePaid": {},
+    "purchasedAt": {},
+    "sessionUnitPrice": {},
+    "status": {},
+    "totalSessions": {},
+    "trainerId": {},
+    "type": {},
+    "usedSessions": {}
+   },
+   "required": [
+    "id",
+    "memberId",
+    "trainerId",
+    "type",
+    "totalSessions",
+    "usedSessions",
+    "pricePaid",
+    "sessionUnitPrice",
+    "status",
+    "purchasedAt"
+   ]
+  },
+  "RegistrationStatus": {
+   "properties": {},
+   "required": []
+  },
+  "RegistrationType": {
+   "properties": {},
+   "required": []
+  },
+  "RenewIntent": {
+   "properties": {},
+   "required": []
+  },
+  "ResolvedOut": {
+   "properties": {
+    "id": {},
+    "resolvedAt": {},
+    "text": {}
+   },
+   "required": [
+    "id",
+    "text",
+    "resolvedAt"
+   ]
+  },
+  "Role": {
+   "properties": {},
+   "required": []
+  },
+  "SaleItem": {
+   "properties": {
+    "amount": {},
+    "memberName": {},
+    "pkg": {}
+   },
+   "required": [
+    "memberName",
+    "pkg",
+    "amount"
+   ]
+  },
+  "SalesSummary": {
+   "properties": {
+    "count": {},
+    "new": {},
+    "renewal": {},
+    "total": {}
+   },
+   "required": []
+  },
+  "ScanTerminalCreate": {
+   "properties": {
+    "branchId": {},
+    "name": {}
+   },
+   "required": [
+    "branchId",
+    "name"
+   ]
+  },
+  "ScanTerminalCreated": {
+   "properties": {
+    "branchId": {},
+    "createdAt": {},
+    "heartbeatAt": {
+     "nullable": true
+    },
+    "id": {},
+    "issuedById": {},
+    "lastUsedAt": {
+     "nullable": true
+    },
+    "name": {},
+    "revokedAt": {
+     "nullable": true
+    },
+    "scannerAt": {
+     "nullable": true
+    },
+    "scannerPort": {
+     "nullable": true
+    },
+    "startedAt": {
+     "nullable": true
+    },
+    "token": {}
+   },
+   "required": [
+    "id",
+    "branchId",
+    "name",
+    "issuedById",
+    "createdAt",
+    "token"
+   ]
+  },
+  "ScanTerminalHeartbeat": {
+   "properties": {
+    "scannerPort": {
+     "nullable": true
+    }
+   },
+   "required": []
+  },
+  "ScanTerminalOut": {
+   "properties": {
+    "branchId": {},
+    "createdAt": {},
+    "heartbeatAt": {
+     "nullable": true
+    },
+    "id": {},
+    "issuedById": {},
+    "lastUsedAt": {
+     "nullable": true
+    },
+    "name": {},
+    "revokedAt": {
+     "nullable": true
+    },
+    "scannerAt": {
+     "nullable": true
+    },
+    "scannerPort": {
+     "nullable": true
+    },
+    "startedAt": {
+     "nullable": true
+    }
+   },
+   "required": [
+    "id",
+    "branchId",
+    "name",
+    "issuedById",
+    "createdAt"
+   ]
+  },
+  "ScheduleSet": {
+   "properties": {
+    "shiftEnd": {},
+    "shiftStart": {},
+    "workDays": {}
+   },
+   "required": [
+    "shiftStart",
+    "shiftEnd",
+    "workDays"
+   ]
+  },
+  "ScoreCategory": {
+   "properties": {},
+   "required": []
+  },
+  "ScoreCreate": {
+   "properties": {
+    "category": {},
+    "employeeId": {},
+    "period": {
+     "nullable": true
+    },
+    "points": {},
+    "reason": {
+     "nullable": true
+    }
+   },
+   "required": [
+    "employeeId",
+    "points"
+   ]
+  },
+  "ScoreEventOut": {
+   "properties": {
+    "branchId": {},
+    "category": {},
+    "createdAt": {},
+    "createdById": {
+     "nullable": true
+    },
+    "employeeId": {},
+    "id": {},
+    "period": {},
+    "points": {},
+    "reason": {
+     "nullable": true
+    },
+    "sourceRefId": {
+     "nullable": true
+    }
+   },
+   "required": [
+    "id",
+    "employeeId",
+    "branchId",
+    "category",
+    "points",
+    "period",
+    "createdAt"
+   ]
+  },
+  "SearchResults": {
+   "properties": {
+    "documents": {},
+    "meetings": {},
+    "notices": {},
+    "people": {},
+    "projects": {}
+   },
+   "required": []
+  },
+  "SessionSignCreate": {
+   "properties": {
+    "performedByTrainerId": {
+     "nullable": true
+    },
+    "registrationId": {},
+    "signatureBase64": {}
+   },
+   "required": [
+    "registrationId",
+    "signatureBase64"
+   ]
+  },
+  "SessionSignOut": {
+   "properties": {
+    "id": {},
+    "memberId": {},
+    "memberName": {
+     "nullable": true
+    },
+    "performedByTrainerId": {},
+    "registrationId": {},
+    "registrationType": {
+     "nullable": true
+    },
+    "sessionNo": {},
+    "signatureUrl": {},
+    "signedAt": {},
+    "totalSessions": {
+     "nullable": true
+    }
+   },
+   "required": [
+    "id",
+    "registrationId",
+    "memberId",
+    "performedByTrainerId",
+    "sessionNo",
+    "signatureUrl",
+    "signedAt"
+   ]
+  },
+  "SessionSignResult": {
+   "properties": {
+    "registration": {},
+    "sign": {}
+   },
+   "required": [
+    "sign",
+    "registration"
+   ]
+  },
+  "SignupRequest": {
+   "properties": {
+    "consents": {},
+    "email": {},
+    "inviteKey": {},
+    "name": {},
+    "password": {},
+    "phone": {}
+   },
+   "required": [
+    "name",
+    "email",
+    "password",
+    "phone",
+    "inviteKey"
+   ]
+  },
+  "SignupResponse": {
+   "properties": {
+    "result": {}
+   },
+   "required": [
+    "result"
+   ]
+  },
+  "SlowRouteOut": {
+   "properties": {
+    "avgMs": {},
+    "count": {},
+    "errors": {},
+    "maxMs": {},
+    "method": {},
+    "p95Ms": {},
+    "route": {}
+   },
+   "required": [
+    "method",
+    "route",
+    "count",
+    "avgMs",
+    "p95Ms",
+    "maxMs",
+    "errors"
+   ]
+  },
+  "SshLoginReport": {
+   "properties": {
+    "event": {},
+    "ip": {},
+    "user": {}
+   },
+   "required": [
+    "user",
+    "ip"
+   ]
+  },
+  "SupplyOrderCreate": {
+   "properties": {
+    "branchId": {},
+    "itemName": {},
+    "price": {}
+   },
+   "required": [
+    "branchId",
+    "itemName",
+    "price"
+   ]
+  },
+  "SupplyOrderOut": {
+   "properties": {
+    "branchId": {},
+    "createdAt": {},
+    "id": {},
+    "itemName": {},
+    "orderedById": {},
+    "price": {}
+   },
+   "required": [
+    "id",
+    "branchId",
+    "itemName",
+    "price",
+    "orderedById",
+    "createdAt"
+   ]
+  },
+  "SurveyBranchOut": {
+   "properties": {
+    "branchName": {},
+    "staff": {}
+   },
+   "required": [
+    "branchName",
+    "staff"
+   ]
+  },
+  "SurveyLinkOut": {
+   "properties": {
+    "branchName": {},
+    "url": {}
+   },
+   "required": [
+    "branchName",
+    "url"
+   ]
+  },
+  "SurveyStaffOut": {
+   "properties": {
+    "avatarColor": {},
+    "id": {},
+    "name": {},
+    "rank": {}
+   },
+   "required": [
+    "id",
+    "name",
+    "rank",
+    "avatarColor"
+   ]
+  },
+  "SurveySubmit": {
+   "properties": {
+    "consent": {},
+    "improvement": {
+     "nullable": true
+    },
+    "memberName": {},
+    "memberPhone": {},
+    "motivation": {},
+    "praiseComment": {},
+    "praisedEmployeeId": {}
+   },
+   "required": [
+    "motivation",
+    "praisedEmployeeId",
+    "praiseComment",
+    "memberName",
+    "memberPhone",
+    "consent"
+   ]
+  },
+  "TitleHit": {
+   "properties": {
+    "id": {},
+    "title": {}
+   },
+   "required": [
+    "id",
+    "title"
+   ]
+  },
+  "TodoCreate": {
+   "properties": {
+    "assigneeId": {},
+    "dueAt": {},
+    "title": {}
+   },
+   "required": [
+    "title",
+    "dueAt",
+    "assigneeId"
+   ]
+  },
+  "TodoOut": {
+   "properties": {
+    "assignedById": {},
+    "assigneeId": {},
+    "createdAt": {},
+    "done": {},
+    "dueAt": {},
+    "id": {},
+    "title": {}
+   },
+   "required": [
+    "id",
+    "title",
+    "dueAt",
+    "assigneeId",
+    "assignedById",
+    "done",
+    "createdAt"
+   ]
+  },
+  "TodoUpdate": {
+   "properties": {
+    "done": {
+     "nullable": true
+    },
+    "dueAt": {
+     "nullable": true
+    },
+    "title": {
+     "nullable": true
+    }
+   },
+   "required": []
+  },
+  "ToggleResult": {
+   "properties": {
+    "added": {},
+    "reactions": {}
+   },
+   "required": [
+    "added"
+   ]
+  },
+  "TokenResponse": {
+   "properties": {
+    "accessToken": {},
+    "employee": {},
+    "refreshToken": {}
+   },
+   "required": [
+    "accessToken",
+    "refreshToken",
+    "employee"
+   ]
+  },
+  "TrailBatch": {
+   "properties": {
+    "items": {}
+   },
+   "required": [
+    "items"
+   ]
+  },
+  "TrailItem": {
+   "properties": {
+    "at": {},
+    "kind": {},
+    "screen": {},
+    "target": {
+     "nullable": true
+    },
+    "targetId": {
+     "nullable": true
+    }
+   },
+   "required": [
+    "screen",
+    "at"
+   ]
+  },
+  "TrailOut": {
+   "properties": {
+    "at": {},
+    "employeeId": {
+     "nullable": true
+    },
+    "employeeName": {
+     "nullable": true
+    },
+    "id": {},
+    "ip": {
+     "nullable": true
+    },
+    "kind": {},
+    "screen": {},
+    "target": {
+     "nullable": true
+    },
+    "targetId": {
+     "nullable": true
+    }
+   },
+   "required": [
+    "id",
+    "employeeId",
+    "kind",
+    "screen",
+    "target",
+    "targetId",
+    "at",
+    "ip"
+   ]
+  },
+  "TvOut": {
+   "properties": {
+    "branchName": {},
+    "resolved": {}
+   },
+   "required": [
+    "branchName",
+    "resolved"
+   ]
+  },
+  "ValidationError": {
+   "properties": {
+    "ctx": {},
+    "input": {},
+    "loc": {},
+    "msg": {},
+    "type": {}
+   },
+   "required": [
+    "loc",
+    "msg",
+    "type"
+   ]
+  },
+  "VapidPublicKeyOut": {
+   "properties": {
+    "publicKey": {}
+   },
+   "required": [
+    "publicKey"
+   ]
+  },
+  "VisitPath": {
+   "properties": {},
+   "required": []
+  },
+  "WorkStatus": {
+   "properties": {},
+   "required": []
+  },
+  "app__api__public__history__MemberOut": {
+   "properties": {
+    "days": {},
+    "lastVisit": {},
+    "name": {},
+    "phone": {},
+    "rank": {},
+    "status": {}
+   },
+   "required": [
+    "rank",
+    "name",
+    "phone",
+    "days",
+    "lastVisit",
+    "status"
+   ]
+  },
+  "app__schemas__board__approval__CommentCreate": {
+   "properties": {
+    "body": {}
+   },
+   "required": [
+    "body"
+   ]
+  },
+  "app__schemas__board__comment__CommentCreate": {
+   "properties": {
+    "body": {},
+    "targetId": {},
+    "targetType": {}
+   },
+   "required": [
+    "targetType",
+    "targetId",
+    "body"
+   ]
+  },
+  "app__schemas__members__member__MemberOut": {
+   "properties": {
+    "branchId": {},
+    "id": {},
+    "memo": {
+     "nullable": true
+    },
+    "name": {},
+    "ownerTrainerId": {},
+    "phone": {},
+    "referrerMemberId": {
+     "nullable": true
+    },
+    "registeredAt": {},
+    "visitPath": {
+     "nullable": true
+    }
+   },
+   "required": [
+    "id",
+    "name",
+    "phone",
+    "branchId",
+    "ownerTrainerId",
+    "registeredAt"
+   ]
+  },
+  "app__schemas__platform__dashboard__ScoreSummary": {
+   "properties": {
+    "byCategory": {},
+    "total": {}
+   },
+   "required": []
+  },
+  "app__schemas__scoring__score__ScoreSummary": {
+   "properties": {
+    "byCategory": {},
+    "employeeId": {},
+    "period": {
+     "nullable": true
+    },
+    "total": {}
+   },
+   "required": [
+    "employeeId",
+    "total",
+    "byCategory"
+   ]
+  }
+ },
+ "version": "0.22.0"
+}
