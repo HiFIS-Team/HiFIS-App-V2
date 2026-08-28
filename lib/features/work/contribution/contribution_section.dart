@@ -56,6 +56,9 @@ class _ContributionSectionState extends State<ContributionSection>
   List<ContributionGrant> _given = const [];
   List<ScoreEvent> _events = const [];
 
+  /// 깎인 점수 — 지각·업무 누락처럼 **볼 자리가 없던 것들** (2026-08-28)
+  List<ScoreEvent> _penalties = const [];
+
   @override
   void initState() {
     super.initState();
@@ -74,7 +77,7 @@ class _ContributionSectionState extends State<ContributionSection>
     if (mounted) setState(_rebuild);
   }
 
-  void _rebuild() => _items = _merge(_received, _given, _events);
+  void _rebuild() => _items = _merge(_received, _given, _events, _penalties);
 
   /// 받는 쪽이 아니라 **주는 쪽만** 보는 사람인가 — 대표·관리자
   ///
@@ -111,14 +114,29 @@ class _ContributionSectionState extends State<ContributionSection>
         category: ScoreCategory.contrib,
         period: period,
       );
+      // 깎인 점수 — **어디에도 안 보이던 것들이다** (2026-08-28 대표 요청).
+      //
+      // 지각(`LATE`)·업무 누락(`TASK_MISS`)은 랭킹 어느 탭에도 안 서고
+      // 종합 점수만 조용히 깎았다. 여기 `+` 옆에 같이 세운다.
+      //
+      // **카테고리로 안 부른다** — 그러면 요청이 종류만큼 늘고, 프로젝트
+      // 평가나 운영자 감점처럼 음수가 될 수 있는 나머지를 빠뜨린다.
+      // 서버가 부호로 잘라 준다 (`negativeOnly`).
+      final penaltyRequest = ScoreApi.events(
+        employeeId: _givenOnly ? null : me.id,
+        period: period,
+        negativeOnly: true,
+      );
       final given = await givenRequest;
       final received = await receivedRequest;
       final events = await eventRequest;
+      final penalties = await penaltyRequest;
       if (!mounted) return;
       setState(() {
         _received = received;
         _given = given;
         _events = events;
+        _penalties = penalties;
         _rebuild();
         endLoad();
       });
@@ -141,6 +159,7 @@ class _ContributionSectionState extends State<ContributionSection>
     List<ContributionGrant> received,
     List<ContributionGrant> given,
     List<ScoreEvent> events,
+    List<ScoreEvent> penalties,
   ) {
     // **남의 것이 섞여 올 때만 거른다.** 그 밖에는 원장이 이미 `employeeId=나` 라
     // 여기서 지점을 또 걸면 내가 다른 지점을 보는 동안 **내 자동 점수가 통째로
@@ -174,6 +193,20 @@ class _ContributionSectionState extends State<ContributionSection>
             points: event.points,
             date: event.createdAt,
             // 내 것에는 이름을 안 붙인다 — 내 화면에서 내 이름을 부를 이유가 없다
+            person: event.employeeId == me
+                ? null
+                : StaffDirectory.instance.byId(event.employeeId)?.name,
+          ),
+      // 깎인 것 — `kind` 가 없다. 항목 네 칸(`_KindGrid`)에는 안 서고
+      // 내역 목록에만 선다 (기여 항목이 아니라 그 반대다)
+      for (final event in penalties)
+        if (scope == null || event.branchId == scope)
+          _Contribution(
+            kind: null,
+            penalty: event.category,
+            title: event.reason ?? event.category.label,
+            points: event.points,
+            date: event.createdAt,
             person: event.employeeId == me
                 ? null
                 : StaffDirectory.instance.byId(event.employeeId)?.name,
@@ -306,11 +339,16 @@ class _Contribution {
     required this.title,
     required this.points,
     required this.date,
+    this.penalty,
     this.person,
     this.given = false,
   });
 
-  final ContribType kind;
+  /// 어느 기여 항목인가 — **null 이면 깎인 것**이다 ([penalty] 를 본다)
+  final ContribType? kind;
+
+  /// 무엇 때문에 깎였나 — 지각·업무 누락 등 ([kind] 가 null 일 때만 채워진다)
+  final ScoreCategory? penalty;
 
   /// 무엇으로 받았는지 (자동 항목은 집계 근거가 들어간다)
   final String title;
@@ -325,6 +363,25 @@ class _Contribution {
 
   /// 내가 준 것인가 — 점장은 준 것과 받은 것을 한 목록에서 본다
   final bool given;
+
+  /// 깎인 것인가 — 화면은 이걸로 색과 부호를 가른다
+  bool get isPenalty => kind == null;
+
+  /// 카드에 그릴 아이콘 — 깎인 것은 종류마다 다르게 둔다
+  IconData get icon => switch ((kind, penalty)) {
+    (final ContribType type?, _) => type.icon,
+    (_, ScoreCategory.late) => CupertinoIcons.alarm_fill,
+    (_, ScoreCategory.taskMiss) => CupertinoIcons.xmark_circle_fill,
+    _ => CupertinoIcons.minus_circle_fill,
+  };
+
+  /// 깎인 것은 **전부 빨강**이다 — 종류를 색으로 또 가르면 목록이 알록달록해진다
+  Color get color => kind?.color ?? AppColors.error;
+
+  String get label => kind?.label ?? '${penalty?.label ?? '점수'} 차감';
+
+  /// `+3` · `-20` — 부호를 붙여 준다
+  String get pointsLabel => points < 0 ? '$points' : '+$points';
 
   /// 카드 한 줄의 상대 표시 — 조사로 방향을 가른다
   String? get personLabel => person == null

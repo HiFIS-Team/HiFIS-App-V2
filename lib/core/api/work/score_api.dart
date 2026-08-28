@@ -329,6 +329,7 @@ class ScoreApi {
     String? employeeId,
     ScoreCategory? category,
     String? period,
+    bool negativeOnly = false,
   }) async {
     final rows = await _client.getList(
       '/scores',
@@ -336,6 +337,9 @@ class ScoreApi {
         'employeeId': ?employeeId,
         'category': ?category?.wire,
         'period': ?period,
+        // 깎인 것만 — 카테고리를 안 걸고 다 받으면 환경정비·수업까지 통째로
+        // 온다 (대표는 전 직원치라 수천 줄이다)
+        if (negativeOnly) 'negativeOnly': 'true',
       },
     );
     return [

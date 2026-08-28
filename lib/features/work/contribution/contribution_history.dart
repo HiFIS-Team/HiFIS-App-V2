@@ -87,10 +87,10 @@ class _ContributionCard extends StatelessWidget {
                 height: 40,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: item.kind.color.withValues(alpha: 0.12),
+                  color: item.color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(13),
                 ),
-                child: Icon(item.kind.icon, size: 18, color: item.kind.color),
+                child: Icon(item.icon, size: 18, color: item.color),
               ),
               SizedBox(width: 12),
               Expanded(
@@ -98,7 +98,7 @@ class _ContributionCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      item.kind.label,
+                      item.label,
                       style: AppTextStyles.body1.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
@@ -118,14 +118,14 @@ class _ContributionCard extends StatelessWidget {
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                 decoration: BoxDecoration(
-                  color: item.kind.color.withValues(alpha: 0.12),
+                  color: item.color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(100),
                 ),
                 child: Text(
-                  '+${item.points}',
+                  item.pointsLabel,
                   style: AppTextStyles.caption.copyWith(
                     fontSize: 12,
-                    color: item.kind.color,
+                    color: item.color,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -165,10 +165,10 @@ class _ContributionRow extends StatelessWidget {
             height: 34,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: item.kind.color.withValues(alpha: 0.12),
+              color: item.color.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(11),
             ),
-            child: Icon(item.kind.icon, size: 15, color: item.kind.color),
+            child: Icon(item.icon, size: 15, color: item.color),
           ),
           SizedBox(width: 12),
           Expanded(
@@ -187,8 +187,8 @@ class _ContributionRow extends StatelessWidget {
                 Text(
                   // 부여 항목은 상대가 근거다 — 조사로 준 것·받은 것을 가른다
                   item.personLabel == null
-                      ? '${item.kind.label} · ${_dayLabel(item.date)}'
-                      : '${item.kind.label} · ${item.personLabel} · '
+                      ? '${item.label} · ${_dayLabel(item.date)}'
+                      : '${item.label} · ${item.personLabel} · '
                             '${_dayLabel(item.date)}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -199,7 +199,7 @@ class _ContributionRow extends StatelessWidget {
           ),
           SizedBox(width: 10),
           Text(
-            '+${item.points}',
+            item.pointsLabel,
             style: AppTextStyles.body2.copyWith(
               fontWeight: FontWeight.w700,
               color: AppColors.primary,
