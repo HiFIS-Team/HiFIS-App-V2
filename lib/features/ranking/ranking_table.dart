@@ -29,12 +29,19 @@ class _RankList extends StatelessWidget {
   /// 지금 내역이 열려 있는 사람 (그 줄을 눌린 상태로 둔다)
   final String? picked;
 
+  /// 색 면이 깔리는 줄인가 — 내 줄이거나 지금 내역을 연 줄
+  bool _filled(_Entry entry) => entry.ranker.isMe || picked == entry.ranker.id;
+
   @override
   Widget build(BuildContext context) {
     if (entries.isEmpty) return SizedBox.shrink();
 
     return Container(
-      padding: EdgeInsets.fromLTRB(12, isDesktop ? 16 : 6, 12, 6),
+      // **좌우 여백을 카드가 아니라 줄이 갖는다.** 카드가 갖고 있으면 색 면이
+      // 깔린 줄 둘레에 흰 띠가 남아서 잘못 칠한 것처럼 보였다 (2026-08-28 지적).
+      // 줄이 끝에서 끝까지 차고, 모서리는 카드가 깎아 준다.
+      clipBehavior: Clip.antiAlias,
+      padding: EdgeInsets.symmetric(vertical: isDesktop ? 10 : 0),
       decoration: AppDecorations.card(radius: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -42,15 +49,20 @@ class _RankList extends StatelessWidget {
           // 폰은 1위부터라 `1위부터` 라고 적을 것이 없다 — 머리말을 뺀다
           if (isDesktop) ...[
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10),
+              padding: EdgeInsets.symmetric(horizontal: 22),
               child: Text('$startsAt위부터', style: AppTextStyles.label),
             ),
             SizedBox(height: 6),
           ],
           for (var i = 0; i < entries.length; i++) ...[
-            if (!isDesktop && i > 0)
+            // 색 면이 깔린 줄 **위아래로는 선을 안 긋는다** — 면과 면 사이
+            // 띄운 자리에 선이 떠 있으면 잘못 그은 것처럼 보인다
+            if (!isDesktop &&
+                i > 0 &&
+                !_filled(entries[i]) &&
+                !_filled(entries[i - 1]))
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: 10),
+                padding: EdgeInsets.symmetric(horizontal: 22),
                 child: Container(height: 1, color: AppColors.divider),
               ),
             _RankRow(
@@ -95,7 +107,9 @@ class _RankRow extends StatelessWidget {
   Widget _row(bool mine) {
     return Container(
       height: 56,
-      padding: EdgeInsets.symmetric(horizontal: 10),
+      // **모서리도 여백도 없다.** 색 면이 카드 안쪽 끝까지 차야 둘레에 흰 띠가
+      // 안 남는다 — 모서리는 카드(`clipBehavior`)가 깎아 준다.
+      padding: EdgeInsets.symmetric(horizontal: 22),
       decoration: BoxDecoration(
         // 내역을 연 줄은 회색 면으로 어디를 눌렀는지 남긴다
         // (내 줄의 파란 면이 우선이다 — 내 자리를 잃으면 안 된다)
@@ -104,17 +118,11 @@ class _RankRow extends StatelessWidget {
             : picked
             ? AppColors.gray50
             : Colors.transparent,
-        borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
         children: [
-          SizedBox(
-            width: 26,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: _RankMark(rank: entry.rank, mine: mine),
-            ),
-          ),
+          _RankMark(rank: entry.rank, mine: mine),
+          SizedBox(width: 4),
           Avatar(name: entry.ranker.name, size: isDesktop ? 32 : 36),
           SizedBox(width: 12),
           Expanded(
@@ -186,8 +194,9 @@ class _RankRow extends StatelessWidget {
 /// 없다. 줄 모양은 4위 아래와 **똑같이** 두고 숫자만 다르게 한다 — 위 셋을
 /// 다른 물건으로 만들면 목록이 한 줄로 안 훑힌다.
 ///
-/// 22 는 슬롯(26)보다 작다. 꽉 채우면 옆 아바타에 붙는데, 그 사이를
-/// 벌리려고 여백을 더하면 **4위 아래 줄까지 같이 밀린다.**
+/// **4위 아래도 같은 22 칸을 쓴다.** 예전에는 글자를 그대로 뒀는데, 메달은
+/// 칸 가운데에 숫자가 있고 글자는 왼쪽에서 시작해서 **1~3위와 4위 아래가
+/// 서로 어긋나 보였다** (2026-08-28 지적).
 class _RankMark extends StatelessWidget {
   _RankMark({required this.rank, required this.mine});
 
@@ -196,22 +205,32 @@ class _RankMark extends StatelessWidget {
   /// 내 줄인가 — 4위 아래는 파란 글자로 자기 자리를 알아본다
   final bool mine;
 
+  /// 메달 지름 — **숫자만 있는 줄도 같은 칸**이라 자리가 안 어긋난다
+  static const _size = 22.0;
+
   @override
   Widget build(BuildContext context) {
     if (rank > 3) {
-      return Text(
-        '$rank',
-        style: AppTextStyles.body2.copyWith(
-          fontWeight: FontWeight.w700,
-          color: mine ? AppColors.primary : AppColors.gray500,
+      // 예전에는 글자를 그대로 뒀는데, 메달은 22 칸 **가운데**에 숫자가 있고
+      // 이쪽은 글자가 **왼쪽에서** 시작해서 4위 아래가 왼쪽으로 밀려 보였다
+      return SizedBox(
+        width: _size,
+        child: Center(
+          child: Text(
+            '$rank',
+            style: AppTextStyles.body2.copyWith(
+              fontWeight: FontWeight.w700,
+              color: mine ? AppColors.primary : AppColors.gray500,
+            ),
+          ),
         ),
       );
     }
 
     final (light, dark) = _medal(rank);
     return Container(
-      width: 22,
-      height: 22,
+      width: _size,
+      height: _size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         shape: BoxShape.circle,

@@ -101,14 +101,14 @@ class _RankingSkeleton extends StatelessWidget {
   /// 순위표 — 줄 높이 56 은 [_RankRow] 와 같은 값이다
   /// (PC 는 4위부터, 폰은 1위부터다)
   Widget _list() => Container(
-    padding: EdgeInsets.fromLTRB(12, isDesktop ? 16 : 6, 12, 6),
+    padding: EdgeInsets.symmetric(vertical: isDesktop ? 10 : 0),
     decoration: AppDecorations.card(radius: 20),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (isDesktop) ...[
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 10),
+            padding: EdgeInsets.symmetric(horizontal: 22),
             child: Skeleton(width: 62, height: 13),
           ),
           SizedBox(height: 6),
@@ -117,10 +117,15 @@ class _RankingSkeleton extends StatelessWidget {
           SizedBox(
             height: 56,
             child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10),
+              padding: EdgeInsets.symmetric(horizontal: 22),
               child: Row(
                 children: [
-                  SizedBox(width: 26, child: Skeleton(width: 12, height: 13)),
+                  // 등수 칸 — 진짜 줄과 같은 22 (`_RankMark._size`) + 여백 4
+                  SizedBox(
+                    width: 22,
+                    child: Center(child: Skeleton(width: 12, height: 13)),
+                  ),
+                  SizedBox(width: 4),
                   SkeletonCircle(size: isDesktop ? 32 : 36),
                   SizedBox(width: 12),
                   // 줄마다 이름 길이를 달리해서 진짜 목록처럼 보이게 한다
