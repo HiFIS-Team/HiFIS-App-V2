@@ -35,6 +35,9 @@ class _NoticeViewState extends State<_NoticeView> {
   bool get _editing => widget.editing;
   bool _help = false;
 
+  /// 확인 현황을 폈나 — **접힌 것이 기본**이다
+  bool _readOpen = false;
+
   @override
   void initState() {
     super.initState();
@@ -284,17 +287,31 @@ class _NoticeViewState extends State<_NoticeView> {
                 ],
               ),
               if (_help) ...[SizedBox(height: 10), MarkdownHelpPanel()],
-            ] else
+            ] else ...[
               Row(
                 children: [
                   Avatar(name: notice.author, size: 24),
                   SizedBox(width: 8),
-                  Text(
-                    '${notice.author} ${staffOf(notice.author).role} · ${_date(notice.date)}',
-                    style: AppTextStyles.caption,
+                  Expanded(
+                    child: Text(
+                      '${notice.author} ${staffOf(notice.author).role} · ${_date(notice.date)}',
+                      style: AppTextStyles.caption,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  // 확인 현황은 **여기 접어 둔다** — 눌러야 아래로 편다
+                  _ReadPeek(
+                    notice: notice,
+                    open: _readOpen,
+                    onTap: () => setState(() => _readOpen = !_readOpen),
                   ),
                 ],
               ),
+              if (_readOpen) ...[
+                SizedBox(height: 12),
+                _ReadCard(notice: notice),
+              ],
+            ],
             SizedBox(height: 14),
             Container(height: 1, color: AppColors.gray100),
             SizedBox(height: 14),
@@ -316,8 +333,6 @@ class _NoticeViewState extends State<_NoticeView> {
                 )
               else
                 MarkdownView(source: notice.body, onCheckbox: _toggleCheckbox),
-              SizedBox(height: 24),
-              _ReadCard(notice: notice),
             ],
           ],
         ),
@@ -349,7 +364,65 @@ class _NoticeViewState extends State<_NoticeView> {
   }
 }
 
-/// 읽음 현황 — 누가 확인했고 누가 안 봤는지
+/// 확인 현황을 **머리말 오른쪽에 접어 둔 것** — 누르면 아래로 편다
+///
+/// 예전에는 본문 아래에 카드로 늘 서 있었다. 스물세 명이면 이름 알약과
+/// 아바타가 화면 한 판을 먹어서 **본문보다 눈에 먼저 들어왔다.**
+/// 누가 봤는지는 궁금할 때만 여는 값이라 얼굴 셋과 `12/23` 만 남긴다.
+class _ReadPeek extends StatelessWidget {
+  _ReadPeek({required this.notice, required this.open, required this.onTap});
+
+  final _Notice notice;
+  final bool open;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<NoticeReaders>(
+      future: _readersOf(notice),
+      initialData: notice.id == null ? null : _readersData[notice.id],
+      builder: (context, snapshot) {
+        final data = snapshot.data;
+        final read = [
+          for (final person in data?.people ?? const <NoticeReader>[])
+            if (person.read) person,
+        ];
+        // 아직 안 받았으면 목록에 있던 인원수로 버틴다 (칸이 비지 않게)
+        final count = data?.readCount ?? notice.readCount;
+
+        return Pressable(
+          onTap: onTap,
+          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (read.isNotEmpty) ...[
+                _AvatarStack(people: read, size: 20, stride: 13, max: 3),
+                SizedBox(width: 7),
+              ],
+              Text(
+                data == null ? '$count' : '$count/${data.total}',
+                style: AppTextStyles.caption.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              Icon(
+                open
+                    ? Icons.keyboard_arrow_up_rounded
+                    : Icons.keyboard_arrow_down_rounded,
+                size: 16,
+                color: AppColors.textTertiary,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// 펴 놓은 확인 현황 — 누가 확인했고 누가 안 봤는지
 class _ReadCard extends StatelessWidget {
   _ReadCard({required this.notice});
 
@@ -412,53 +485,14 @@ class _ReadCard extends StatelessWidget {
                 ratio: total == 0 ? 0 : readCount / total,
                 color: allRead ? AppColors.success : null,
               ),
-              // 확인한 사람은 **이름까지** 보여준다 — 누가 봤는지가 알고 싶은 값이다
+              // 아바타를 **겹쳐 한 줄**로 — 스물이 넘어도 카드 높이가 그대로다
               if (read.isNotEmpty) ...[
-                SizedBox(height: 18),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    for (final person in read) _ReaderChip(name: person.name),
-                  ],
-                ),
+                SizedBox(height: 16),
+                _StackRow(label: '확인', people: read),
               ],
-              // 안 본 사람은 **아바타만** 촘촘히 — 스물이 넘어도 카드가 안 길어진다
               if (unread.isNotEmpty) ...[
-                SizedBox(height: 18),
-                Row(
-                  children: [
-                    Text(
-                      '아직 안 봤어요',
-                      style: AppTextStyles.caption.copyWith(fontSize: 12),
-                    ),
-                    SizedBox(width: 6),
-                    Text(
-                      '${unread.length}',
-                      style: AppTextStyles.caption.copyWith(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textTertiary,
-                      ),
-                    ),
-                  ],
-                ),
                 SizedBox(height: 10),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    for (final person in unread)
-                      // 이름이 없으면 누구인지 모르니 길게 눌러 확인한다
-                      Tooltip(
-                        message: person.name,
-                        child: Opacity(
-                          opacity: 0.45,
-                          child: Avatar(name: person.name, size: 30),
-                        ),
-                      ),
-                  ],
-                ),
+                _StackRow(label: '미확인', people: unread, faded: true),
               ],
             ],
           );
@@ -499,32 +533,122 @@ Future<NoticeReaders> _readersOf(_Notice notice) {
 }
 
 /// 확인한 사람 알약 — 안 본 사람은 아바타만 그리므로 여기 안 온다
-class _ReaderChip extends StatelessWidget {
-  _ReaderChip({required this.name});
+/// 라벨 한 마디 + 겹친 아바타 한 줄
+class _StackRow extends StatelessWidget {
+  _StackRow({required this.label, required this.people, this.faded = false});
 
-  final String name;
+  final String label;
+  final List<NoticeReader> people;
+
+  /// 안 본 사람은 흐리게 — 라벨을 안 읽어도 색으로 갈린다
+  final bool faded;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.fromLTRB(4, 4, 10, 4),
-      decoration: BoxDecoration(
-        color: AppColors.gray50,
-        borderRadius: BorderRadius.circular(100),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Avatar(name: name, size: 22),
-          SizedBox(width: 6),
-          Text(
-            name == me ? '나' : name,
+    return Row(
+      children: [
+        SizedBox(
+          width: 44,
+          child: Text(
+            label,
             style: AppTextStyles.caption.copyWith(
               fontSize: 12,
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w600,
+              color: AppColors.textTertiary,
             ),
           ),
+        ),
+        Expanded(
+          child: _AvatarStack(people: people, faded: faded),
+        ),
+      ],
+    );
+  }
+}
+
+/// 아바타를 **겹쳐 한 줄에** 세운다 — 넘치는 만큼은 `+N` 으로 접는다
+///
+/// 예전에는 확인한 사람을 이름 알약으로, 안 본 사람을 아바타로 `Wrap` 했다.
+/// 스물세 명이면 그 두 덩이가 화면 한 판을 먹어서 **카드가 본문보다 길었다.**
+/// 이름은 길게 눌러 확인한다.
+class _AvatarStack extends StatelessWidget {
+  _AvatarStack({
+    required this.people,
+    this.faded = false,
+    this.size = 30,
+    this.stride = 20,
+    this.max,
+  });
+
+  final List<NoticeReader> people;
+  final bool faded;
+  final double size;
+
+  /// 다음 아바타가 서는 자리 — 지름보다 작아야 겹친다
+  final double stride;
+
+  /// 폭에 맞추지 않고 **이만큼만** 세운다 (머리말 미리보기).
+  /// 이때는 `+N` 을 안 붙인다 — 옆에 `12/23` 이 이미 서 있다
+  final int? max;
+
+  @override
+  Widget build(BuildContext context) {
+    if (max case final cap?) return _row(cap, more: false);
+    // 들어가는 만큼만 세운다. 접을 것이 있으면 마지막 자리를 `+N` 에 내준다
+    return LayoutBuilder(
+      builder: (context, box) =>
+          _row(((box.maxWidth - size) / stride).floor() + 1),
+    );
+  }
+
+  Widget _row(int fit, {bool more = true}) {
+    final cap = fit.clamp(1, people.length);
+    final shown = people
+        .take(more && cap < people.length ? cap - 1 : cap)
+        .toList();
+    final rest = people.length - shown.length;
+
+    return SizedBox(
+      height: size,
+      // 미리보기는 겹친 만큼만 차지한다 (Row 안이라 폭을 알려 줘야 한다)
+      width: max == null ? null : (shown.length - 1) * stride + size,
+      child: Stack(
+        children: [
+          // 거꾸로 돌려서 **왼쪽 것이 위에** 오게 한다
+          for (var i = shown.length - 1; i >= 0; i--)
+            Positioned(
+              left: i * stride,
+              child: Tooltip(
+                message: shown[i].name == me ? '나' : shown[i].name,
+                child: Opacity(
+                  opacity: faded ? 0.4 : 1,
+                  child: Container(
+                    // 흰 테를 둘러야 겹친 아바타끼리 갈린다
+                    padding: EdgeInsets.all(1.5),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Avatar(name: shown[i].name, size: size - 3),
+                  ),
+                ),
+              ),
+            ),
+          if (rest > 0)
+            Positioned(
+              left: shown.length * stride + 8,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: Text(
+                  '+$rest',
+                  style: AppTextStyles.caption.copyWith(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textTertiary,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
