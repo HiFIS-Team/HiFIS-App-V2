@@ -201,27 +201,36 @@ class _RankingScreenState extends State<RankingScreen>
   ///
   /// 뒤로는 제한이 없다. 기록이 없는 달은 원래 있던 '집계된 실적이 없어요'
   /// 빈 화면이 그대로 뜬다.
-  Widget _monthNav() => Row(
+  /// [compact] 는 **폰의 제목 줄 오른쪽**에 붙는 모양이다 (2026-08-28).
+  /// 스크롤 안에 한 줄을 따로 두면 목록바 위가 비어 보였다.
+  Widget _monthNav({bool compact = false}) => Row(
+    mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
     mainAxisAlignment: MainAxisAlignment.center,
     children: [
-      _arrow(CupertinoIcons.chevron_left, () => _moveMonth(-1)),
-      SizedBox(width: 14),
-      Text(_month, style: AppTextStyles.title3),
-      SizedBox(width: 14),
+      _arrow(CupertinoIcons.chevron_left, () => _moveMonth(-1), compact),
+      SizedBox(width: compact ? 6 : 14),
+      Text(
+        _month,
+        style: compact
+            ? AppTextStyles.body1.copyWith(fontWeight: FontWeight.w700)
+            : AppTextStyles.title3,
+      ),
+      SizedBox(width: compact ? 6 : 14),
       // 다음 달은 아직 안 왔으니 늘 비어 있다 — 눌리지 않게 흐려 둔다
       _arrow(
         CupertinoIcons.chevron_right,
         _isThisMonth ? null : () => _moveMonth(1),
+        compact,
       ),
     ],
   );
 
   /// [onTap] 이 null 이면 흐린 채로 안 눌린다 (자리는 그대로 둔다 — 감추면
   /// 이번 달일 때만 줄이 한 칸 좁아져서 화면이 흔들린다)
-  Widget _arrow(IconData icon, VoidCallback? onTap) {
+  Widget _arrow(IconData icon, VoidCallback? onTap, [bool compact = false]) {
     final box = Container(
-      width: 30,
-      height: 30,
+      width: compact ? 26 : 30,
+      height: compact ? 26 : 30,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: AppColors.gray50,
@@ -229,7 +238,7 @@ class _RankingScreenState extends State<RankingScreen>
       ),
       child: Icon(
         icon,
-        size: 13,
+        size: compact ? 12 : 13,
         color: onTap == null ? AppColors.gray300 : AppColors.textSecondary,
       ),
     );
@@ -301,14 +310,16 @@ class _RankingScreenState extends State<RankingScreen>
               .map((e) => e.ranker)
               .firstOrNull;
 
-    final top = entries.take(3).toList();
-    final rest = entries.skip(3).toList();
-    final podium = _Podium(
-      top: top,
-      metric: _metric,
-      big: !isDesktop,
-      onPick: _canPick ? _pick : null,
-    );
+    // **폰은 시상대를 안 세운다** (2026-08-28 대표 요청).
+    //
+    // 왕관·메달 받침대가 화면 위쪽을 통째로 먹는 데다, 1~3위와 4위 아래가
+    // 완전히 다른 물건으로 보여서 **한 줄로 훑히지가 않았다.** 이제 1위부터
+    // 같은 줄에 서고 **등수 숫자만** 메달이다 ([_RankMark]).
+    //
+    // PC 는 그대로다 — 거기는 시상대가 카드 하나라 자리를 안 먹고,
+    // 내 순위 카드와 나란히 서는 짜임이다.
+    final top = isDesktop ? entries.take(3).toList() : const <_Entry>[];
+    final rest = isDesktop ? entries.skip(3).toList() : entries;
 
     // 대표·관리자는 실적이 없어 '내 순위'가 늘 비어 있다.
     // 그 자리에 누가 누구를 앞질렀는지를 대신 놓는다.
@@ -329,26 +340,32 @@ class _RankingScreenState extends State<RankingScreen>
 
     return [
       // 데스크톱은 폭이 남아 내 순위와 시상대를 나란히 놓는다.
-      // 폰은 시상대를 먼저 크게 세우고 내 순위를 그 아래에 둔다.
-      if (myCard == null)
-        podium
-      else if (isDesktop)
-        IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(child: myCard),
-              SizedBox(width: 16),
-              Expanded(flex: 2, child: podium),
-            ],
+      if (isDesktop) ...[
+        if (myCard == null)
+          _Podium(top: top, metric: _metric, onPick: _canPick ? _pick : null)
+        else
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: myCard),
+                SizedBox(width: 16),
+                Expanded(
+                  flex: 2,
+                  child: _Podium(
+                    top: top,
+                    metric: _metric,
+                    onPick: _canPick ? _pick : null,
+                  ),
+                ),
+              ],
+            ),
           ),
-        )
-      else ...[
-        podium,
         SizedBox(height: 16),
+      ] else if (myCard != null) ...[
         myCard,
+        SizedBox(height: 12),
       ],
-      SizedBox(height: isDesktop ? 16 : 12),
       // 종합에서 사람을 고르면 PC 는 순위표 옆에 점수 내역을 편다.
       // 폰은 시트로 뜨므로 목록 폭이 안 바뀐다.
       if (picked != null && isDesktop)
@@ -389,13 +406,13 @@ class _RankingScreenState extends State<RankingScreen>
         title: '랭킹',
         // 왼쪽 위 글래스 필터 — 스크롤과 따로 떠 있는 자리다
         leading: _jobFilter(),
+        // 달 이동은 제목과 **같은 줄 오른쪽 끝**이다 (2026-08-28 대표 요청)
+        trailing: _monthNav(compact: true),
         filter: _PhoneTabs(
           selected: _tab,
           onSelect: (i) => setState(() => _tab = i),
         ),
         children: [
-          _monthNav(),
-          SizedBox(height: 14),
           PaneTransition(
             step: _tab,
             child: showSkeleton

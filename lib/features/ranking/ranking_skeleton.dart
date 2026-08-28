@@ -15,62 +15,36 @@ class _RankingSkeleton extends StatelessWidget {
 
   /// 시상대 한 칸 — 아바타 · 이름 · 값 · 받침대
   ///
-  /// 크기는 [_Step] 에서 그대로 가져왔다 (폰은 크게, PC 는 카드 안이라 작게).
-  Widget _step({
-    required double avatar,
-    required double pedestal,
-    required bool big,
-  }) => Column(
+  /// 크기는 [_Step] 에서 그대로 가져왔다. **PC 값만 있다** — 폰에는
+  /// 시상대가 없다 (2026-08-28).
+  Widget _step({required double avatar, required double pedestal}) => Column(
     children: [
-      // 1위 왕관 자리 — 진짜 시상대도 늘 비워 둬서 세 칸 아래가 안 어긋난다
-      if (big) SizedBox(height: 24),
       SkeletonCircle(size: avatar),
-      SizedBox(height: big ? 10 : 8),
-      Skeleton(width: big ? 50 : 44, height: 13),
+      SizedBox(height: 8),
+      Skeleton(width: 44, height: 13),
       SizedBox(height: 6),
-      Skeleton(width: big ? 38 : 34, height: 11),
-      SizedBox(height: big ? 12 : 10),
+      Skeleton(width: 34, height: 11),
+      SizedBox(height: 10),
       Padding(
-        padding: EdgeInsets.symmetric(horizontal: big ? 3 : 4),
+        padding: EdgeInsets.symmetric(horizontal: 4),
         child: SizedBox(
           width: double.infinity,
-          child: Skeleton(height: pedestal, radius: big ? 16 : 12),
+          child: Skeleton(height: pedestal, radius: 12),
         ),
       ),
     ],
   );
 
   /// 2위 · 1위 · 3위 순서 — 1위가 가운데다
-  Widget _podium(bool big) {
+  Widget _podium() {
     final steps = Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Expanded(
-          child: _step(
-            avatar: big ? 56 : 42,
-            pedestal: big ? 78 : 56,
-            big: big,
-          ),
-        ),
-        Expanded(
-          child: _step(
-            avatar: big ? 72 : 52,
-            pedestal: big ? 104 : 74,
-            big: big,
-          ),
-        ),
-        Expanded(
-          child: _step(
-            avatar: big ? 56 : 42,
-            pedestal: big ? 64 : 44,
-            big: big,
-          ),
-        ),
+        Expanded(child: _step(avatar: 42, pedestal: 56)),
+        Expanded(child: _step(avatar: 52, pedestal: 74)),
+        Expanded(child: _step(avatar: 42, pedestal: 44)),
       ],
     );
-
-    // 폰은 카드 없이 배경 위에 그대로 세운다 ([_Podium] 과 같다)
-    if (big) return steps;
 
     return Container(
       padding: EdgeInsets.fromLTRB(20, 18, 20, 0),
@@ -124,7 +98,8 @@ class _RankingSkeleton extends StatelessWidget {
     ),
   );
 
-  /// 4위부터의 순위표 — 줄 높이 56 은 [_RankRow] 와 같은 값이다
+  /// 순위표 — 줄 높이 56 은 [_RankRow] 와 같은 값이다
+  /// (PC 는 4위부터, 폰은 1위부터다)
   Widget _list() => Container(
     padding: EdgeInsets.fromLTRB(12, isDesktop ? 16 : 6, 12, 6),
     decoration: AppDecorations.card(radius: 20),
@@ -169,7 +144,8 @@ class _RankingSkeleton extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // PC 는 폭이 남아 내 순위와 시상대를 나란히, 폰은 시상대를 크게
+        // PC 는 폭이 남아 내 순위와 시상대를 나란히 놓는다.
+        // **폰에는 시상대가 없다** (2026-08-28) — 1위부터 순위표에 선다
         if (isDesktop)
           IntrinsicHeight(
             child: Row(
@@ -177,15 +153,12 @@ class _RankingSkeleton extends StatelessWidget {
               children: [
                 Expanded(child: _myRank()),
                 SizedBox(width: 16),
-                Expanded(flex: 2, child: _podium(false)),
+                Expanded(flex: 2, child: _podium()),
               ],
             ),
           )
-        else ...[
-          _podium(true),
-          SizedBox(height: 16),
+        else
           _myRank(),
-        ],
         SizedBox(height: isDesktop ? 16 : 12),
         _list(),
       ],

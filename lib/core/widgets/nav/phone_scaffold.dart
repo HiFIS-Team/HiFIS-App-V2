@@ -43,6 +43,7 @@ class PhoneListScaffold extends StatefulWidget {
     this.filter,
     this.onCreate,
     this.leading,
+    this.trailing,
   });
 
   final String title;
@@ -62,6 +63,10 @@ class PhoneListScaffold extends StatefulWidget {
   /// 좌측 상단에 놓을 다른 버튼 (필터 등) — [onCreate] 와 같은 자리다.
   /// 만들기 버튼이 없는 화면에서 쓴다 (랭킹 지점 필터).
   final Widget? leading;
+
+  /// 타이틀과 **같은 줄 오른쪽 끝**에 붙는 것 (랭킹의 달 이동 줄).
+  /// 스크롤 안에 따로 한 줄을 두는 것보다 자리를 덜 먹는다.
+  final Widget? trailing;
 
   @override
   State<PhoneListScaffold> createState() => _PhoneListScaffoldState();
@@ -104,6 +109,7 @@ class _PhoneListScaffoldState extends State<PhoneListScaffold> {
           ),
         ] else
           Spacer(),
+        ?widget.trailing,
       ],
     );
   }

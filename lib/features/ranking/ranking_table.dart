@@ -4,7 +4,10 @@ part of 'ranking_screen.dart';
 // 순위표
 // ---------------------------------------------------------------------------
 
-/// 4위부터의 순위표 — 내 줄은 파란 면으로 눈에 띄게 둔다
+/// 순위표 — 내 줄은 파란 면으로 눈에 띄게 둔다
+///
+/// **폰은 1위부터, PC 는 4위부터다** (2026-08-28). PC 는 위 셋이 시상대에
+/// 서 있어서 여기서 빠지고, 폰은 시상대가 없어서 전원이 여기 선다.
 class _RankList extends StatelessWidget {
   _RankList({
     required this.entries,
@@ -36,7 +39,7 @@ class _RankList extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 폰은 시상대 바로 아래라 이어지는 흐름이 보여서 머리말을 뺀다
+          // 폰은 1위부터라 `1위부터` 라고 적을 것이 없다 — 머리말을 뺀다
           if (isDesktop) ...[
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 10),
@@ -107,12 +110,9 @@ class _RankRow extends StatelessWidget {
         children: [
           SizedBox(
             width: 26,
-            child: Text(
-              '${entry.rank}',
-              style: AppTextStyles.body2.copyWith(
-                fontWeight: FontWeight.w700,
-                color: mine ? AppColors.primary : AppColors.gray500,
-              ),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: _RankMark(rank: entry.rank, mine: mine),
             ),
           ),
           Avatar(name: entry.ranker.name, size: isDesktop ? 32 : 36),
@@ -175,6 +175,69 @@ class _RankRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 등수 표시 — **1~3위만 메달이다**
+///
+/// 폰에서 시상대를 걷어내면서(2026-08-28) 금·은·동이 갈 자리가 여기밖에
+/// 없다. 줄 모양은 4위 아래와 **똑같이** 두고 숫자만 다르게 한다 — 위 셋을
+/// 다른 물건으로 만들면 목록이 한 줄로 안 훑힌다.
+///
+/// 22 는 슬롯(26)보다 작다. 꽉 채우면 옆 아바타에 붙는데, 그 사이를
+/// 벌리려고 여백을 더하면 **4위 아래 줄까지 같이 밀린다.**
+class _RankMark extends StatelessWidget {
+  _RankMark({required this.rank, required this.mine});
+
+  final int rank;
+
+  /// 내 줄인가 — 4위 아래는 파란 글자로 자기 자리를 알아본다
+  final bool mine;
+
+  @override
+  Widget build(BuildContext context) {
+    if (rank > 3) {
+      return Text(
+        '$rank',
+        style: AppTextStyles.body2.copyWith(
+          fontWeight: FontWeight.w700,
+          color: mine ? AppColors.primary : AppColors.gray500,
+        ),
+      );
+    }
+
+    final (light, dark) = _medal(rank);
+    return Container(
+      width: 22,
+      height: 22,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [light, dark],
+        ),
+        // 메달만 그림자를 진다 — 흰 면 위에서 동그라미가 떠 보인다
+        boxShadow: [
+          BoxShadow(
+            color: dark.withValues(alpha: 0.35),
+            blurRadius: 6,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Text(
+        '$rank',
+        style: TextStyle(
+          fontFamily: AppTextStyles.fontFamily,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+          height: 1,
+          color: Colors.white,
+        ),
       ),
     );
   }
