@@ -398,35 +398,62 @@ class _ProjectComposerState extends State<_ProjectComposer> {
           ],
         ),
         SizedBox(height: 16),
-        Text('참여 멤버', style: AppTextStyles.label),
+        // 할 일 줄과 같은 모양으로 개수를 붙인다 — 열여섯 개가 깔려 있으면
+        // 몇 명 골랐는지 세는 것이 일이다
+        Row(
+          children: [
+            Text('참여 멤버', style: AppTextStyles.label),
+            SizedBox(width: 6),
+            Text(
+              '${_members.length}',
+              style: AppTextStyles.label.copyWith(
+                color: AppColors.textTertiary,
+              ),
+            ),
+          ],
+        ),
         SizedBox(height: 8),
-        ScrollBox(
-          maxHeight: kChipBoxHeight,
-          child: Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (final staff in staffList)
-                _MemberChip(
-                  staff: staff,
-                  joined: _members.contains(staff.name),
-                  // 직원·점장은 자기를 못 뺀다 — 자기 일을 자기가 올리는 자리다.
-                  //
-                  // **대표·관리자는 뺄 수 있다** (2026-08-20). 만들면서 기본으로
-                  // 들어가는 것은 같지만(`_members`), 남에게 통째로 맡기는
-                  // 프로젝트가 원래 주력 흐름이라 여기까지 막으면 그걸 못 만든다.
-                  // 자기를 빼면 담당 자리도 같이 비어서(`_toggleMember`)
-                  // 저장 전에 누구에게 맡길지 반드시 고르게 된다.
-                  //
-                  // 결재 모드에서는 인원 추가 결재가 따로 있어서 잠근다
-                  onTap: (staff.name == me && myRole.doesFieldWork)
-                      ? null
-                      : (_needsApproval
-                            ? _lockedNote
-                            : () => _toggleMember(staff.name)),
-                ),
-            ],
-          ),
+        // **한 줄에 셋씩 카드로 세운다** (2026-08-28 대표 결정).
+        //
+        // 예전에는 이름이 붙은 알약을 폭 되는 대로 흘려 놓았는데, 알약마다
+        // 이름 길이가 달라서 줄이 들쭉날쭉하고 **글자가 그냥 널린 것처럼**
+        // 보였다. 셋으로 칸을 고정하면 세로 줄이 맞는다.
+        //
+        // 폭을 [LayoutBuilder] 로 재서 나눈다 — 고정값으로 박으면 폰 폭이
+        // 다를 때(SE·Max) 마지막 칸이 넘치거나 남는다.
+        LayoutBuilder(
+          builder: (context, box) {
+            const gap = 8.0;
+            final width = (box.maxWidth - gap * 2) / 3;
+            return Wrap(
+              spacing: gap,
+              runSpacing: gap,
+              children: [
+                // 명단 차례 그대로 — 누를 때마다 순서가 바뀌면 자리를 못 외운다
+                for (final staff in staffList)
+                  SizedBox(
+                    width: width,
+                    child: _MemberCard(
+                      staff: staff,
+                      joined: _members.contains(staff.name),
+                      // 직원·점장은 자기를 못 뺀다 — 자기 일을 자기가 올리는 자리다.
+                      //
+                      // **대표·관리자는 뺄 수 있다** (2026-08-20). 남에게 통째로
+                      // 맡기는 프로젝트가 원래 주력 흐름이라 여기까지 막으면
+                      // 그걸 못 만든다. 자기를 빼면 담당 자리도 같이 비어서
+                      // (`_toggleMember`) 저장 전에 누구에게 맡길지 고르게 된다.
+                      //
+                      // 결재 모드에서는 인원 추가 결재가 따로 있어서 잠근다
+                      onTap: (staff.name == me && myRole.doesFieldWork)
+                          ? null
+                          : (_needsApproval
+                                ? _lockedNote
+                                : () => _toggleMember(staff.name)),
+                    ),
+                  ),
+              ],
+            );
+          },
         ),
         SizedBox(height: 18),
         Row(
@@ -570,6 +597,7 @@ class _ProjectComposerState extends State<_ProjectComposer> {
     if (widget.phone) {
       return PhoneDetailScaffold(
         title: _pageTitle,
+        background: AppColors.surface,
         // 삭제는 여기 하나뿐이다 — 상세 화면에는 안 둔다 (2026-08-19)
         actions: [
           if (_canDelete) GlassIconButton(symbol: 'trash', onPressed: _delete),
@@ -588,12 +616,9 @@ class _ProjectComposerState extends State<_ProjectComposer> {
             GlassBottomButton.inset(context),
           ),
           children: [
-            // 입력칸(gray50)이 회색 배경에 묻히지 않게 흰 카드 위에 올린다
-            Container(
-              padding: EdgeInsets.fromLTRB(20, 20, 20, 22),
-              decoration: AppDecorations.card(),
-              child: _form(context, dday),
-            ),
+            // 배경이 흰색이라 카드 없이 그대로 앉는다 — 예전에는 폼 전체를
+            // 흰 카드에 넣었는데 화면이 모달처럼 보였다 (2026-08-28)
+            _form(context, dday),
           ],
         ),
       );
@@ -710,12 +735,22 @@ class _Field extends StatelessWidget {
   }
 }
 
-/// 참여 멤버 고르는 알약 (생성 폼)
-class _MemberChip extends StatelessWidget {
-  _MemberChip({required this.staff, required this.joined, this.onTap});
+/// 참여 멤버 한 칸 — 아바타 위, 이름 아래 (생성 폼)
+///
+/// **알약이 아니라 카드다** (2026-08-28). 알약은 이름 길이만큼 폭이 달라서
+/// 줄이 들쭉날쭉했다 — 칸을 고정하면 세로 줄이 맞고 훑기가 쉽다.
+///
+/// 고른 것은 **테두리로** 가른다. 배경만으로는 `primaryLight`(옅은 파랑)와
+/// `gray50`(옅은 회색)이 둘 다 옅어서 훑어서 안 잡힌다. 파랑을 꽉 채우지
+/// 않는 이유는 안에 **색이 저마다 다른 아바타**가 있어서다 — 배경을 진하게
+/// 하면 그 색들과 부딪힌다.
+class _MemberCard extends StatelessWidget {
+  _MemberCard({required this.staff, required this.joined, this.onTap});
 
   final Staff staff;
   final bool joined;
+
+  /// null 이면 못 뺀다 (본인) — 모양은 그대로 두고 안 눌리게만 한다
   final VoidCallback? onTap;
 
   @override
@@ -723,18 +758,25 @@ class _MemberChip extends StatelessWidget {
     return Pressable(
       onTap: onTap ?? () {},
       child: Container(
-        padding: EdgeInsets.fromLTRB(4, 4, 10, 4),
+        padding: EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
           color: joined ? AppColors.primaryLight : AppColors.gray50,
-          borderRadius: BorderRadius.circular(100),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: joined ? AppColors.primary : Colors.transparent,
+            width: 1.5,
+          ),
         ),
-        child: Row(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Avatar(name: staff.name, size: 22),
-            SizedBox(width: 6),
+            Avatar(name: staff.name, size: 34),
+            SizedBox(height: 7),
             Text(
               staff.name == me ? '나' : staff.name,
+              maxLines: 1,
+              // 이름이 길면 칸을 넘치는 대신 줄인다 — 칸 폭이 고정이라 밀 수 없다
+              overflow: TextOverflow.ellipsis,
               style: AppTextStyles.caption.copyWith(
                 fontSize: 12,
                 color: joined ? AppColors.primary : AppColors.textSecondary,

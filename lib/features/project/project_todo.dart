@@ -153,17 +153,26 @@ class _TodoRowState extends State<_TodoRow> {
 
 /// 담당자 알약 — 누르면 참여자 중에서 고른다
 class _AssigneeChip extends StatelessWidget {
-  _AssigneeChip({required this.name, required this.onTap});
+  _AssigneeChip({required this.name, required this.onTap, this.filled = false});
 
   final String? name;
 
   /// null 이면 못 고친다 (완료된 프로젝트) — 모양은 그대로 두고 안 눌리게만 한다
   final VoidCallback? onTap;
 
+  /// 회색 면을 깔지 — **혼자 서는 자리에서만 켠다.**
+  ///
+  /// 할 일 목록에서는 줄 끝에 붙는 것이라 면이 없어야 조용하다. 반면
+  /// 할 일 **추가 줄**에서는 왼쪽에 혼자 서는데, 면이 없으면 눌러야 하는
+  /// 것인지가 안 보인다 — 오른쪽의 파란 `추가` 와 나란히 놓이면 더 그렇다.
+  final bool filled;
+
   @override
   Widget build(BuildContext context) {
     final assigned = name != null;
-    final padding = EdgeInsets.fromLTRB(assigned ? 3 : 8, 3, 8, 3);
+    final padding = filled
+        ? EdgeInsets.fromLTRB(assigned ? 4 : 12, 4, 12, 4)
+        : EdgeInsets.fromLTRB(assigned ? 3 : 8, 3, 8, 3);
     final chip = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -180,9 +189,20 @@ class _AssigneeChip extends StatelessWidget {
     );
 
     final tap = onTap;
-    if (tap == null) return Padding(padding: padding, child: chip);
+    if (!filled) {
+      if (tap == null) return Padding(padding: padding, child: chip);
+      return Pressable(onTap: tap, padding: padding, child: chip);
+    }
 
-    return Pressable(onTap: tap, padding: padding, child: chip);
+    final box = Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        color: AppColors.gray50,
+        borderRadius: BorderRadius.circular(100),
+      ),
+      child: chip,
+    );
+    return tap == null ? box : Pressable(onTap: tap, child: box);
   }
 }
 
@@ -247,88 +267,125 @@ class _TodoComposerState extends State<_TodoComposer> {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    // **두 줄로 나눈다** (2026-08-28 대표 지적).
+    //
+    // 예전에는 한 줄에 넷이 들어갔다 — `[할 일] [개수] [담당자] [+]`.
+    // 폰 폭 375 에서 좌우 여백을 빼면 335 인데, 뒤의 셋이 185 를 가져가서
+    // **정작 적는 칸에 150 밖에 안 남았다.** 게다가 개수 칸은 라벨도 힌트도
+    // `1` 뿐이라 그게 무엇인지 알 방법이 없었다.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
-          child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-            decoration: BoxDecoration(
-              color: AppColors.gray50,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: TextField(
-              controller: _controller,
-              focusNode: _focus,
-              style: AppTextStyles.body2,
-              cursorColor: AppColors.primary,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => _submit(),
-              decoration: InputDecoration(
-                hintText: '할 일을 적고 엔터',
-                hintStyle: AppTextStyles.body2.copyWith(
-                  color: AppColors.gray400,
-                ),
-                border: InputBorder.none,
-                isCollapsed: true,
-              ),
-            ),
-          ),
-        ),
-        SizedBox(width: 6),
-        // 개수 — 비워 두면 1개다. 평소에는 눈에 안 띄게 좁게 둔다
+        // 1줄 — 적는 칸이 폭을 다 쓴다
         Container(
-          width: 38,
-          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 11),
+          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 11),
           decoration: BoxDecoration(
             color: AppColors.gray50,
             borderRadius: BorderRadius.circular(12),
           ),
           child: TextField(
-            controller: _count,
-            textAlign: TextAlign.center,
-            keyboardType: TextInputType.number,
-            // 두 자리까지 — 같은 할 일을 100개 붙일 일은 없다
-            maxLength: 2,
+            controller: _controller,
+            focusNode: _focus,
             style: AppTextStyles.body2,
             cursorColor: AppColors.primary,
             textInputAction: TextInputAction.done,
             onSubmitted: (_) => _submit(),
             decoration: InputDecoration(
-              hintText: '1',
+              hintText: '할 일을 적어주세요',
               hintStyle: AppTextStyles.body2.copyWith(color: AppColors.gray400),
               border: InputBorder.none,
               isCollapsed: true,
-              counterText: '', // 글자 수 표시가 줄 아래로 삐져나온다
             ),
           ),
         ),
-        SizedBox(width: 4),
-        _AssigneeChip(
-          name: _assignee,
-          onTap: () async {
-            final picked = await _pickMember(
-              context,
-              names: widget.members,
-              current: _assignee,
-            );
-            if (picked == null) return;
-            setState(() => _assignee = picked.isEmpty ? null : picked);
-            _focus.requestFocus();
-          },
-        ),
-        SizedBox(width: 4),
-        Pressable(
-          onTap: _submit,
-          child: Container(
-            width: 38,
-            height: 38,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(12),
+        SizedBox(height: 8),
+        // 2줄 — 누구에게 · 몇 개 · 추가
+        Row(
+          children: [
+            _AssigneeChip(
+              name: _assignee,
+              filled: true,
+              onTap: () async {
+                final picked = await _pickMember(
+                  context,
+                  names: widget.members,
+                  current: _assignee,
+                );
+                if (picked == null) return;
+                setState(() => _assignee = picked.isEmpty ? null : picked);
+                _focus.requestFocus();
+              },
             ),
-            child: Icon(Icons.add_rounded, size: 20, color: Colors.white),
-          ),
+            Spacer(),
+            // 같은 할 일을 여러 개 만든다 (`청소 1` `청소 2` …).
+            // **`개` 를 붙여야 무엇을 세는 칸인지 보인다** — 예전에는 회색 `1`
+            // 하나만 떠 있어서 눌러 보기 전에는 뜻을 알 수 없었다
+            Container(
+              width: 40,
+              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 9),
+              decoration: BoxDecoration(
+                color: AppColors.gray50,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: TextField(
+                controller: _count,
+                textAlign: TextAlign.center,
+                keyboardType: TextInputType.number,
+                // 두 자리까지 — 같은 할 일을 100개 붙일 일은 없다
+                maxLength: 2,
+                style: AppTextStyles.body2,
+                cursorColor: AppColors.primary,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _submit(),
+                decoration: InputDecoration(
+                  hintText: '1',
+                  hintStyle: AppTextStyles.body2.copyWith(
+                    color: AppColors.gray400,
+                  ),
+                  border: InputBorder.none,
+                  isCollapsed: true,
+                  counterText: '', // 글자 수 표시가 줄 아래로 삐져나온다
+                ),
+              ),
+            ),
+            SizedBox(width: 5),
+            Text(
+              '개',
+              style: AppTextStyles.caption.copyWith(
+                fontSize: 12,
+                color: AppColors.textTertiary,
+              ),
+            ),
+            SizedBox(width: 10),
+            // **글자를 넣는다.** `+` 만 있으면 무엇이 더해지는지가 안 보인다
+            Pressable(
+              onTap: _submit,
+              child: Container(
+                height: 36,
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.add_rounded, size: 16, color: Colors.white),
+                    SizedBox(width: 3),
+                    Text(
+                      '추가',
+                      style: AppTextStyles.caption.copyWith(
+                        fontSize: 13,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );

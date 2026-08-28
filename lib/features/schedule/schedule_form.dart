@@ -468,6 +468,7 @@ class _EventDialogState extends State<_EventDialog> {
       final side = _sideActions();
       return PhoneDetailScaffold(
         title: _heading,
+        background: AppColors.surface,
         // 남의 일정을 열어 본 것이면 저장할 게 없어 버튼을 안 낸다
         bottomBar: _locked
             ? null
@@ -491,18 +492,10 @@ class _EventDialogState extends State<_EventDialog> {
               Text('만든 사람만 고칠 수 있어요', style: AppTextStyles.caption),
               SizedBox(height: 12),
             ],
-            // 입력칸(gray50)이 회색 배경에 묻히지 않게 흰 카드 위에 올린다
-            Container(
-              padding: EdgeInsets.fromLTRB(20, 20, 20, 22),
-              decoration: AppDecorations.card(),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _body(),
-                  if (side != null) ...[SizedBox(height: 6), side],
-                ],
-              ),
-            ),
+            // 배경이 흰색이라 카드 없이 그대로 앉는다 — 예전에는 폼 전체를
+            // 흰 카드에 넣었는데 화면이 모달처럼 보였다 (2026-08-28)
+            _body(),
+            if (side != null) ...[SizedBox(height: 6), side],
           ],
         ),
       );

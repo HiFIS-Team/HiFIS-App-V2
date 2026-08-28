@@ -208,10 +208,22 @@ class PhoneDetailScaffold extends StatefulWidget {
     this.actions = const [],
     this.leadingActions = const [],
     this.bottomBar,
+    this.background,
   });
 
   final String title;
   final Widget child;
+
+  /// 화면 배경 — 안 주면 회색([AppColors.background])이다.
+  ///
+  /// **폼 화면은 흰색([AppColors.surface])으로 준다.** 입력칸이 `gray50` 인데
+  /// 라이트에서 그 색이 회색 배경과 **완전히 같다**(둘 다 `#F2F4F6`) — 그래서
+  /// 회색 배경 위에 그냥 놓으면 칸이 안 보인다.
+  ///
+  /// 예전에는 폼 전체를 **흰 카드 한 장**에 넣어서 피했는데, 그러면 화면
+  /// 하나가 좌우로 떠 있는 판이 되어 **모달처럼 보였다** (2026-08-28 대표 지적).
+  /// 배경을 바꾸면 카드가 필요 없어지고 폼이 화면에 그대로 앉는다.
+  final Color? background;
 
   /// 우측 상단 글래스 버튼들 (편집·삭제 등)
   final List<Widget> actions;
@@ -251,7 +263,12 @@ class _PhoneDetailScaffoldState extends State<PhoneDetailScaffold> {
 
   @override
   Widget build(BuildContext context) {
+    // 블러는 **배경과 같은 색**이어야 한다 — 다르면 헤더 자리에 색이 다른
+    // 띠가 생긴다
+    final background = widget.background ?? AppColors.background;
+
     return Scaffold(
+      backgroundColor: background,
       body: Stack(
         children: [
           SafeArea(
@@ -262,7 +279,7 @@ class _PhoneDetailScaffoldState extends State<PhoneDetailScaffold> {
             ),
           ),
           // 스크롤 시 상단 프로그레시브 블러 — 콘텐츠가 헤더 뒤로 흐려진다
-          TopFrost(collapse: _collapse, color: AppColors.background),
+          TopFrost(collapse: _collapse, color: background),
           // 상단 중앙 고정 타이틀 (터치는 아래 본문으로 통과)
           IgnorePointer(
             child: SafeArea(

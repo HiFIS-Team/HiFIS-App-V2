@@ -288,6 +288,7 @@ class _ComposerState extends State<_Composer> {
     if (!isDesktop) {
       return PhoneDetailScaffold(
         title: '결재 올리기',
+        background: AppColors.surface,
         bottomBar: GlassBottomButton(
           label: '올리기',
           // 제목을 적어야 채워진 상태가 되고, 안 적었을 때는 _submit 이 안내한다
@@ -302,12 +303,9 @@ class _ComposerState extends State<_Composer> {
             GlassBottomButton.inset(context),
           ),
           children: [
-            // 입력칸(gray50)이 회색 배경에 묻히지 않게 흰 카드 위에 올린다
-            Container(
-              padding: EdgeInsets.fromLTRB(20, 20, 20, 22),
-              decoration: AppDecorations.card(),
-              child: _form(),
-            ),
+            // 배경이 흰색이라 카드 없이 그대로 앉는다 — 예전에는 폼 전체를
+            // 흰 카드에 넣었는데 화면이 모달처럼 보였다 (2026-08-28)
+            _form(),
           ],
         ),
       );
