@@ -355,9 +355,18 @@ class _MyTaskSectionState extends State<MyTaskSection>
             ),
           ),
           const SizedBox(height: 12),
+          // 진행 막대 — `3/5` 만으로는 얼마나 남았는지가 눈에 안 들어온다
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: ProgressBar(
+              ratio: day.total == 0 ? 0 : day.done / day.total,
+              height: 6,
+            ),
+          ),
+          const SizedBox(height: 18),
           // 요일 줄 — 눌러서 그날 목록을 본다
           _DayTabs(selected: _viewDay, onSelect: _pickDay),
-          const SizedBox(height: 12),
+          const SizedBox(height: 6),
           if (day.tasks.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 24),
@@ -374,11 +383,11 @@ class _MyTaskSectionState extends State<MyTaskSection>
               // 것을 앞에, 밀려 온 것을 뒤에 담아 주므로 첫 줄에서만 걸린다
               if (day.tasks[i].carriedFrom != null &&
                   (i == 0 || day.tasks[i - 1].carriedFrom == null)) ...[
-                if (i > 0) const SizedBox(height: 14),
+                if (i > 0) const SizedBox(height: 12),
                 const _CarriedDivider(),
-                const SizedBox(height: 10),
+                const SizedBox(height: 4),
               ] else if (i > 0)
-                const SizedBox(height: 8),
+                const _RowDivider(),
               _TaskRow(
                 task: day.tasks[i],
                 // **오늘이 아니면 못 체크한다.** 서버는 체크를 늘 오늘로 찍어서
@@ -523,39 +532,47 @@ class _DayTabs extends StatelessWidget {
     final today = DateTime.now().weekday;
     return Row(
       children: [
-        for (var day = 1; day <= 7; day++) ...[
-          if (day > 1) const SizedBox(width: 5),
+        for (var day = 1; day <= 7; day++)
           Expanded(
             child: Pressable(
               onTap: () => onSelect(day),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 140),
-                height: 36,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: day == selected ? AppColors.primary : AppColors.gray50,
-                  borderRadius: BorderRadius.circular(11),
-                ),
-                child: Text(
-                  _MyTaskSectionState._dayNames[day - 1],
-                  style: AppTextStyles.body2.copyWith(
-                    // 오늘은 안 골랐어도 도드라진다 — 돌아올 자리를 잃지 않게
-                    fontWeight: day == selected || day == today
-                        ? FontWeight.w700
-                        : FontWeight.w500,
-                    color: day == selected
-                        ? Colors.white
-                        : day == today
-                        ? AppColors.primary
-                        : day == 7
-                        ? AppColors.error
-                        : AppColors.textSecondary,
+              child: SizedBox(
+                height: 40,
+                child: Center(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 140),
+                    width: 32,
+                    height: 32,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      // 안 고른 날은 **면이 없다.** 일곱 칸을 다 칠하면
+                      // 머리말 아래가 통째로 블록이 되어 목록보다 무거웠다
+                      color: day == selected
+                          ? AppColors.primary
+                          : Colors.transparent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      _MyTaskSectionState._dayNames[day - 1],
+                      style: AppTextStyles.body2.copyWith(
+                        // 오늘은 안 골랐어도 도드라진다 — 돌아올 자리를 잃지 않게
+                        fontWeight: day == selected || day == today
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        color: day == selected
+                            ? Colors.white
+                            : day == today
+                            ? AppColors.primary
+                            : day == 7
+                            ? AppColors.error
+                            : AppColors.textSecondary,
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ],
       ],
     );
   }
@@ -596,20 +613,25 @@ class _DoneBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final complete = day.complete;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: complete
-            ? AppColors.primary.withValues(alpha: 0.1)
-            : AppColors.gray100,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(
-        complete ? '완료' : '${day.done}/${day.total}',
-        style: AppTextStyles.caption.copyWith(
-          color: complete ? AppColors.primary : AppColors.textSecondary,
-          fontWeight: FontWeight.w700,
-        ),
+    final strong = AppTextStyles.caption.copyWith(
+      color: AppColors.primary,
+      fontWeight: FontWeight.w700,
+    );
+    if (complete) return Text('완료', style: strong);
+    // 알약을 걷었다 — 바로 아래 진행 막대가 같은 말을 하고 있어서
+    // 회색 면까지 두면 머리말이 두 겹으로 무겁다
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(text: '${day.done}', style: strong),
+          TextSpan(
+            text: '/${day.total}',
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.textTertiary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -642,15 +664,14 @@ class _TaskRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final checked = task.checked;
     final pending = task.pendingRequest;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        // **다 한 줄은 도드라지지 않는다.** 파란 면으로 띄우면 눈이 거기
-        // 멈추는데, 봐야 하는 건 아직 안 한 줄이다. 줄이 그어진 채로
-        // 조용히 물러난다.
-        color: AppColors.gray50,
-        borderRadius: BorderRadius.circular(14),
-      ),
+    return Padding(
+      // **면을 안 깐다.** 회색 박스를 줄마다 두면 다섯 개짜리 목록이 회색
+      // 덩어리 다섯으로 읽힌다. 줄 사이는 [_RowDivider] 가 가른다.
+      //
+      // **다 한 줄도 도드라지지 않는다.** 파란 면으로 띄우면 눈이 거기
+      // 멈추는데, 봐야 하는 건 아직 안 한 줄이다. 줄이 그어진 채로
+      // 조용히 물러난다.
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
       child: Row(
         children: [
           // 결재를 기다리는 줄·다 한 줄은 **누름 효과도 안 준다** — 눌리는
@@ -705,6 +726,17 @@ class _TaskRow extends StatelessWidget {
   }
 }
 
+/// 할 일 줄 사이의 얇은 선 — 회색 면을 대신한다
+class _RowDivider extends StatelessWidget {
+  const _RowDivider();
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 4),
+    child: Container(height: 1, color: AppColors.gray100),
+  );
+}
+
 /// 왼쪽 동그라미 — 체크되면 채워진다
 class _CheckMark extends StatelessWidget {
   const _CheckMark({required this.checked});
@@ -748,12 +780,25 @@ class _MyTaskSkeleton extends StatelessWidget {
           children: [
             Skeleton(width: 64, height: 13),
             const Spacer(),
-            Skeleton(width: 38, height: 22, radius: 10),
+            Skeleton(width: 26, height: 13),
           ],
         ),
         const SizedBox(height: 12),
+        Skeleton(height: 6, radius: 3),
+        const SizedBox(height: 18),
+        // 요일 줄 자리 — 안 그리면 목록이 40 만큼 위에서 시작했다 내려온다
+        SizedBox(
+          height: 40,
+          child: Row(
+            children: [
+              for (var i = 0; i < 7; i++)
+                Expanded(child: Center(child: SkeletonCircle(size: 30))),
+            ],
+          ),
+        ),
+        const SizedBox(height: 6),
         // 줄 간격을 실제 목록과 맞춘다 — 안 맞추면 뼈대에서 목록으로 바뀔 때 밀린다
-        SkeletonRows(rows: 4, avatar: 22, gap: 20, trailing: 40),
+        SkeletonRows(rows: 4, avatar: 22, gap: 18, trailing: 40),
       ],
     ),
   );

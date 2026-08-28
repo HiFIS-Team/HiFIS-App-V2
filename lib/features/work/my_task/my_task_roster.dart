@@ -315,6 +315,17 @@ class _PersonTaskCardBody extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
+          // 직원 화면과 같은 머리말이라 진행 막대도 같이 둔다
+          if (day != null) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: ProgressBar(
+                ratio: day!.total == 0 ? 0 : day!.done / day!.total,
+                height: 6,
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
           if (tasks.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 24),
@@ -327,7 +338,7 @@ class _PersonTaskCardBody extends StatelessWidget {
             )
           else
             for (var i = 0; i < tasks.length; i++) ...[
-              if (i > 0) const SizedBox(height: 8),
+              if (i > 0) const _RowDivider(),
               _ReadOnlyRow(task: tasks[i]),
             ],
         ],
@@ -345,12 +356,8 @@ class _ReadOnlyRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final checked = task.checked;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.gray50,
-        borderRadius: BorderRadius.circular(14),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
       child: Row(
         children: [
           _CheckMark(checked: checked),
