@@ -50,6 +50,10 @@ dependencies:
   image: ^4.5.4
   # 사진 크게 보기에서 사진첩에 저장 (폰만 — PC 는 file_picker 로 파일 저장)
   gal: ^2.3.3
+  # 운동일지 영상 재생 — 앱 안에서 못 튼다.
+  # video_player 는 윈도우를 지원하지 않고 media_kit 은 네이티브 의존이 무겁다.
+  # 서명된 주소를 시스템 재생기로 넘기면 여섯 플랫폼이 전부 같은 길로 간다.
+  url_launcher: ^6.3.1
 dev_dependencies:
   flutter_test:
     sdk: flutter

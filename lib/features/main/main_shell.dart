@@ -25,6 +25,7 @@ import '../attendance/attendance_screen.dart';
 import '../documents/document_screen.dart';
 import '../home/home_screen.dart';
 import '../meeting/meeting_screen.dart';
+import '../member/member_screen.dart';
 import '../messages/chat_store.dart';
 import '../messages/desktop_chat_screen.dart';
 import '../messages/message_screen.dart';
@@ -154,15 +155,15 @@ class _MainShellState extends State<MainShell> {
       // 슬라이드인 화면이 열려 있으면 덮고 있어서 먼저 닫는다
       _paneNavKey.currentState?.popUntil((r) => r.isFirst);
       _paneIndex.value = switch (target) {
-        NotificationTarget.project => 2,
-        NotificationTarget.attendance => 8,
-        NotificationTarget.salary => 9,
-        NotificationTarget.notice => 10,
-        NotificationTarget.ranking => 11,
-        NotificationTarget.approval => 6,
-        NotificationTarget.schedule => 3,
-        NotificationTarget.meeting => 4,
-        NotificationTarget.staff => 7,
+        NotificationTarget.project => 3,
+        NotificationTarget.attendance => 9,
+        NotificationTarget.salary => 10,
+        NotificationTarget.notice => 11,
+        NotificationTarget.ranking => 12,
+        NotificationTarget.approval => 7,
+        NotificationTarget.schedule => 4,
+        NotificationTarget.meeting => 5,
+        NotificationTarget.staff => 8,
         // 위에서 이미 처리했다
         NotificationTarget.chat => _paneIndex.value,
       };
@@ -263,6 +264,7 @@ class _MainShellState extends State<MainShell> {
   static const _desktopNames = [
     '홈',
     '업무',
+    '회원',
     '프로젝트',
     '일정',
     '회의록',
@@ -322,6 +324,7 @@ class _MainShellState extends State<MainShell> {
       onOpenAttendance: () => _go(NotificationTarget.attendance),
     ),
     WorkScreen(),
+    MemberScreen(),
     ProjectScreen(),
     ScheduleScreen(),
     MeetingScreen(),

@@ -38,6 +38,7 @@ import '../notice/notice_screen.dart';
 import '../notifications/notification_screen.dart';
 import '../project/project_screen.dart';
 import '../schedule/schedule_screen.dart';
+import '../member/member_screen.dart';
 import '../../core/widgets/feedback/skeleton.dart';
 part 'home_inbox.dart';
 part 'home_staff.dart';
@@ -166,11 +167,14 @@ class _HomeScreenState extends State<HomeScreen>
   void _open(Widget screen) =>
       Navigator.push(context, CupertinoPageRoute(builder: (_) => screen));
 
-  /// 폰 홈 왼쪽 위 바로가기 — 일정 · 전자결재
+  /// 폰 홈 왼쪽 위 바로가기 — 일정 · 전자결재 · 회원 관리
   ///
-  /// **폰에는 이 둘의 탭이 없다** (`MainShell._go` 가 갈 데가 없어 그냥 돌아온다).
+  /// **폰에는 이 셋의 탭이 없다** (`MainShell._go` 가 갈 데가 없어 그냥 돌아온다).
   /// 데스크톱은 사이드바에 메뉴가 있어서 안 그린다.
   /// 셸 헤더 버튼이 오른쪽 위를 쓰고 있어 왼쪽이 비어 있다.
+  ///
+  /// **회원 관리는 권한으로 안 가린다** — 보이는 범위가 갈릴 뿐이다.
+  /// 대표·관리자는 전 회원을, 점장·직원은 본인 담당만 받는다.
   Widget _shortcuts() => SafeArea(
     bottom: false,
     child: Align(
@@ -187,6 +191,11 @@ class _HomeScreenState extends State<HomeScreen>
             GlassIconButton(
               symbol: 'checkmark.seal',
               onPressed: () => _open(ApprovalScreen()),
+            ),
+            SizedBox(width: 10),
+            GlassIconButton(
+              symbol: 'person.2',
+              onPressed: () => _open(MemberScreen()),
             ),
           ],
         ),

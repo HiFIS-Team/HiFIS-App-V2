@@ -118,6 +118,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// 이전 대화를 받아오는 중 — 스크롤 한 번에 여러 번 부르지 않게 잠근다
   bool _loadingOlder = false;
 
+  /// 바닥(=최신 메시지)에 한 번 섬 뒤에만 true
+  ///
+  /// 목록은 오래된 것이 위라 아무것도 안 하면 **맨 위(가장 오래된 메시지)**에 선다.
+  /// 그 사이에 `_onScroll` 이 돌면 위쪽 끝이라고 판단해 이전 대화를 더 붙이고,
+  /// 그 위치를 그대로 유지해버려서 **알림을 누르면 예날 대화에 서 있었다**.
+  /// 자리를 잡기 전까지는 더 불러오지도, 따라가지도 않는다.
+  bool _settled = false;
+
   /// 파일을 올리는 중 — 두 번 눌러 두 번 보내지 않게 잠근다
   bool _uploading = false;
 
@@ -150,6 +158,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// **버튼을 두지 않는다** — 화면에 없던 요소를 새로 만들지 않고, 카톡·인스타처럼
   /// 위로 당기면 알아서 이어 붙는다.
   void _onScroll() {
+    if (!_settled) return;
     if (_loadingOlder || !_store.hasMore(_roomId)) return;
     if (!_scrollController.hasClients) return;
     if (_scrollController.position.pixels > 80) return;
@@ -186,12 +195,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
     // 들어가자마자 바닥이어야 한다 — 위에서 스르륵 내려오면 어수선하다
     _scrollToBottom(animate: false);
+    // 바닥에 섬을 확인한 뒤에야 위로 더 불러오기를 푸다
+    WidgetsBinding.instance.addPostFrameCallback((_) => _settled = true);
   }
 
   /// 새 메시지가 들어오면 아래에 붙어 있던 화면은 따라 내려간다
   void _onStore() {
     if (!mounted) return;
+    // 아직 자리를 안 잡았으면 무조건 바닥이다 — 첫 목록이 들어올 때 화면은
+    // offset 0(맨 위)이라 그대로 두면 예날 대화에 멈춰 버린다
     final atBottom =
+        !_settled ||
         !_scrollController.hasClients ||
         _scrollController.position.pixels >=
             _scrollController.position.maxScrollExtent - 80;
@@ -330,6 +344,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// 다음 프레임 콜백을 이미 걸어 뒀는지 — 한 프레임에 하나만 건다
   bool _pinQueued = false;
 
+  /// 붙잡는 동안 본 목록 길이 — 사진이 뛰어 길어졌는지 보려고 기억해 둔다 (-1 이면 안 재다)
+  double _pinExtent = -1;
+
+  /// 이 시각을 넘기면 더 늘어나도 놓아준다 — 사진이 줄줄이 들어오는 방에서
+  /// 영영 못 놓는 일이 없게 한다
+  DateTime _pinDeadline = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// 늘어난 뒤에도 붙잡을 수 있는 최대 시간
+  static const _pinMax = Duration(seconds: 8);
+
   /// **타이머가 아니라 프레임마다** 따라간다
   ///
   /// 50ms 타이머로 하면 초당 20번만 따라가서, 키보드처럼 60번 움직이는 것을
@@ -337,6 +361,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   void _pinToBottom({required Duration after, Duration hold = _pinFor}) {
     final now = DateTime.now();
     final until = now.add(after + hold);
+    if (_pinUntil == null) {
+      _pinExtent = -1;
+      _pinDeadline = now.add(after + _pinMax);
+    }
     // 이미 따라가는 중이면 마감만 늦춘다 (연달아 부르면 더 오래 붙어 있는다)
     if (_pinUntil == null || until.isAfter(_pinUntil!)) _pinUntil = until;
     final from = now.add(after);
@@ -349,25 +377,33 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _pinQueued = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _pinQueued = false;
-      final until = _pinUntil;
-      if (until == null) return;
+      if (_pinUntil == null) return;
       if (!mounted || !_scrollController.hasClients) {
-        _pinUntil = null;
+        _releasePin();
         return;
       }
       final position = _scrollController.position;
       // 손으로 스크롤을 잡았으면 놓아 준다
       if (position.userScrollDirection != ScrollDirection.idle) {
-        _pinUntil = null;
+        _releasePin();
         return;
       }
       final now = DateTime.now();
-      if (now.isAfter(_pinFrom) &&
-          (position.pixels - position.maxScrollExtent).abs() > 0.5) {
-        _scrollController.jumpTo(position.maxScrollExtent);
+      final extent = position.maxScrollExtent;
+      // 늦게 뜬 사진 때문에 목록이 길어졌으면 그만큼 더 붙잡는다 — 안 하면
+      // 1.5초 안에 사진이 안 뜨는 느린 망에서 화면이 중간에 선다
+      if (_pinExtent >= 0 &&
+          extent > _pinExtent + 0.5 &&
+          now.isBefore(_pinDeadline)) {
+        final extended = now.add(_pinFor);
+        if (extended.isAfter(_pinUntil!)) _pinUntil = extended;
       }
-      if (now.isAfter(until)) {
-        _pinUntil = null;
+      _pinExtent = extent;
+      if (now.isAfter(_pinFrom) && (position.pixels - extent).abs() > 0.5) {
+        _scrollController.jumpTo(extent);
+      }
+      if (now.isAfter(_pinUntil!) || now.isAfter(_pinDeadline)) {
+        _releasePin();
         return;
       }
       _queuePin();
@@ -375,6 +411,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     // 화면이 그대로면 프레임이 안 도니까 직접 부른다 —
     // 사진이 늦게 떠서 목록이 길어지는 것을 기다리는 자리다
     WidgetsBinding.instance.scheduleFrame();
+  }
+
+  void _releasePin() {
+    _pinUntil = null;
+    _pinExtent = -1;
   }
 
   Future<void> _openDetail() async {

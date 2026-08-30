@@ -34,6 +34,8 @@ const _icons = <String, IconData>{
   'line.3.horizontal.decrease.circle.fill': Icons.filter_alt_rounded,
   'message': Icons.chat_bubble_outline_rounded,
   'person': Icons.person_outline_rounded,
+  // 회원 관리 — 데스크톱 사이드바의 '회원'과 같은 아이콘이다
+  'person.2': Icons.people_alt_rounded,
   // 프로젝트 상세 헤더의 인원 추가 — 본문 `+` 동그라미와 같은 아이콘이다
   'person.badge.plus': Icons.person_add_alt_rounded,
   'plus': Icons.add_rounded,

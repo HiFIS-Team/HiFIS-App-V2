@@ -62,12 +62,21 @@ abstract final class PhotoCache {
     final key = keyOf(url);
     final done = ready(url);
     if (done != null) return Future.value(done);
-    return _busy[key] ??= _download(url).whenComplete(() => _busy.remove(key));
+    // **[whenComplete] 에 화살표 몸통을 쓰면 안 된다.** `_busy.remove(key)` 가
+    // 지금 기다리는 바로 그 Future 를 돌려주는데, [Future.whenComplete] 는
+    // 콜백이 Future 를 돌려주면 그게 끝날 때까지 기다린다 — 자기 자신을
+    // 기다리게 돼서 **영원히 안 끝난다** (사진 칸이 계속 도는 채로 남았다).
+    return _busy[key] ??= _download(url).whenComplete(() {
+      _busy.remove(key);
+    });
   }
 
   static Future<File?> _download(String url) async {
     try {
       final bytes = await ApiClient.instance.getBytes(url);
+      // 빈 몸으로 200 이 오면 0바이트 파일이 남아 **영원히 회색 칸**이 된다 —
+      // [ready] 가 그 파일을 계속 돌려줘서 다시 받을 기회가 없다
+      if (bytes.isEmpty) return null;
       final file = _fileOf(url);
       // 받다 말고 끊겼을 때 반쪽짜리 파일이 남지 않게 다 받고 한 번에 쓴다
       await file.writeAsBytes(bytes, flush: true);

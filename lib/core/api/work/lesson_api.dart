@@ -76,6 +76,8 @@ class Member {
     this.referrerMemberId,
     this.visitPath,
     this.memo,
+    this.goals = const [],
+    this.trainingToken,
   });
 
   factory Member.fromJson(Map<String, dynamic> json) => Member(
@@ -88,6 +90,8 @@ class Member {
     referrerMemberId: json['referrerMemberId'] as String?,
     visitPath: VisitPath.parse(json['visitPath'] as String?),
     memo: json['memo'] as String?,
+    goals: (json['goals'] as List?)?.cast<String>() ?? const [],
+    trainingToken: json['trainingToken'] as String?,
   );
 
   final String id;
@@ -106,6 +110,12 @@ class Member {
 
   final DateTime registeredAt;
   final String? memo;
+
+  /// 운동을 하는 이유 — 회원이 말한 것을 번호 매겨 적어 둔다
+  final List<String> goals;
+
+  /// 회원에게 보내는 수업 주소의 마지막 칸 — `hifis.app/training/{token}`
+  final String? trainingToken;
 }
 
 /// 등록권 한 건 (서버 `RegistrationOut`)
@@ -280,6 +290,34 @@ class MemberApi {
     return [
       for (final row in rows)
         Member.fromJson((row as Map).cast<String, dynamic>()),
+    ];
+  }
+
+  /// 회원 한 명 — 상세 화면이 목록에 실린 값 대신 최신 값을 받는다
+  ///
+  /// 남의 지점 회원은 **404** 다 (서버가 있다는 사실도 숨긴다).
+  static Future<Member> detail(String id) async {
+    final data = await ApiClient.instance.get('/members/$id');
+    return Member.fromJson(data);
+  }
+
+  /// 운동을 하는 이유 — **통째로 덮어쓴다** (빈 줄은 서버가 걸러 낸다)
+  static Future<Member> updateGoals(String id, List<String> goals) async {
+    final data = await ApiClient.instance.patch(
+      '/members/$id',
+      body: {'goals': goals},
+    );
+    return Member.fromJson(data!);
+  }
+
+  /// 이 회원이 지금까지 끊은 등록권 전부 — 신규부터 재등록까지
+  static Future<List<Registration>> registrations(String memberId) async {
+    final rows = await ApiClient.instance.getList(
+      '/members/$memberId/registrations',
+    );
+    return [
+      for (final row in rows)
+        Registration.fromJson((row as Map).cast<String, dynamic>()),
     ];
   }
 

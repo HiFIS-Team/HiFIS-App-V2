@@ -49,6 +49,7 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
       '업무',
       [
         (Icons.work_rounded, '업무'),
+        (Icons.people_alt_rounded, '회원'),
         (Icons.folder_rounded, '프로젝트'),
         (Icons.calendar_today_rounded, '일정'),
         (Icons.insert_drive_file_rounded, '회의록'),

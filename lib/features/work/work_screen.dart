@@ -1029,19 +1029,20 @@ class _PhotoLogCardState extends State<_PhotoLogCard> {
               borderRadius: BorderRadius.circular(12),
             ),
             child: _file != null
-                ? Image.file(_file!, fit: BoxFit.cover)
+                // 깨진 파일이면 아무것도 안 그려져 빈 회색 칸으로 보인다 — 못 읽었다고 말한다
+                ? Image.file(
+                    _file!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => _photoFallback(),
+                  )
+                : _failed
+                ? _photoFallback()
                 : Center(
-                    child: _failed
-                        ? Icon(
-                            CupertinoIcons.photo,
-                            size: 22,
-                            color: AppColors.gray400,
-                          )
-                        : SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
                   ),
           ),
           if (place != null && place.isNotEmpty) ...[
@@ -1062,6 +1063,17 @@ class _PhotoLogCardState extends State<_PhotoLogCard> {
       ),
     );
   }
+
+  Widget _photoFallback() => Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(CupertinoIcons.photo, size: 22, color: AppColors.gray400),
+        SizedBox(height: 6),
+        Text('사진을 불러오지 못했어요', style: AppTextStyles.caption),
+      ],
+    ),
+  );
 }
 
 /// 위치 입력 길이 — 기록에 그대로 남는 값이라 서버 컬럼(100)과 맞춘다

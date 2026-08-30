@@ -38,6 +38,15 @@ part 'lesson_register.dart';
 part 'lesson_pick.dart';
 part 'lesson_sign.dart';
 
+/// 회원 등록 화면을 연다 — **회원 관리 화면도 같은 것을 쓴다**
+///
+/// 등록 화면은 이 파일의 part 라 밖에서 이름을 못 부른다. 화면을 하나 더
+/// 만들면 신규·재등록·소개·방문 경로 규칙이 두 벌이 되므로 통로만 연다.
+///
+/// 돌아온 값이 true 면 회원이 하나 늘었다는 뜻이다 — 부른 쪽이 목록을 다시 받는다.
+Future<bool?> showMemberRegister(BuildContext context) =>
+    showFullPage<bool>(context, (_) => _RegisterScreen());
+
 /// 수업 개수 탭 콘텐츠
 ///
 /// 수업은 회원의 싸인을 받아야 인정된다.
