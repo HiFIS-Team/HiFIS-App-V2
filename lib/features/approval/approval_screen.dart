@@ -16,13 +16,15 @@ import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
 import '../../core/widgets/display/avatar.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
+import '../../core/api/notice/comment_api.dart';
+import '../../core/widgets/editor/post_comment_sheet.dart';
 import '../../core/widgets/feedback/app_toast.dart';
+import '../../core/widgets/feedback/reject_reason_dialog.dart';
 import '../../core/widgets/feedback/empty_card.dart';
 import '../../core/widgets/feedback/failed_card.dart';
 import '../../core/widgets/feedback/empty_state.dart';
 import '../../core/widgets/glass/glass_bottom_button.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
-import '../../core/widgets/glass/glass_input_bar.dart';
 import '../../core/widgets/input/decide_buttons.dart';
 import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/input/pressable.dart';
@@ -36,7 +38,6 @@ part 'approval_detail.dart';
 part 'approval_phone.dart';
 part 'approval_comments.dart';
 part 'approval_composer.dart';
-part 'approval_decide.dart';
 part 'approval_fields.dart';
 part 'approval_data.dart';
 
@@ -157,36 +158,31 @@ class _ApprovalScreenState extends State<ApprovalScreen>
     }
   }
 
-  /// 승인·반려 모두 의견을 남겨야 처리된다
+  /// **승인은 바로 처리하고 반려만 사유를 받는다**
+  ///
+  /// 홈 결재함([home_inbox.dart])과 같은 흐름이다 — 거기는 처음부터 이랬는데
+  /// 이 화면만 승인에도 의견을 요구했다 (2026-08-31 대표가 짚었다).
+  /// 승인은 "됐다" 는 뜻이라 더 적을 말이 없고, 반려는 왜 안 되는지를
+  /// 신청한 사람이 알아야 한다.
+  ///
+  /// 반려 창도 급여·월차·일정·컴플레인과 **같은 공용 창**([askRejectReason])을
+  /// 쓴다. 예전에는 이 화면만 제 창을 따로 갖고 있었다.
   Future<void> _decide(_Doc doc, {required bool approve}) async {
     if (!doc.myTurn) return;
-    final comment = await _showDecisionDialog(
-      context,
-      doc: doc,
-      approve: approve,
-    );
-    if (comment == null || !mounted) return;
+    String? reason;
+    if (!approve) {
+      // 홈 결재함의 결재 항목과 같은 예시 문장이다
+      reason = await askRejectReason(context, hint: '예) 금액 근거를 더 적어주세요');
+      if (reason == null || !mounted) return;
+    }
 
     try {
       final saved = approve
-          ? await ApprovalApi.approve(doc.id, comment: comment)
-          : await ApprovalApi.reject(doc.id, comment: comment);
+          ? await ApprovalApi.approve(doc.id)
+          : await ApprovalApi.reject(doc.id, comment: reason);
       if (!mounted) return;
       setState(() => _replace(_fromServer(saved)));
       AppToast.show(context, approve ? '승인했어요' : '반려했어요');
-    } catch (error) {
-      if (mounted) AppToast.show(context, messageOf(error));
-    }
-  }
-
-  /// 댓글 — 처리 전에 되묻는 자리다 (승인·반려 의견과 다르다)
-  ///
-  /// 서버가 문서를 통째로 돌려줘서 그대로 갈아끼운다.
-  Future<void> _comment(_Doc doc, String body) async {
-    try {
-      final saved = await ApprovalApi.comment(doc.id, body: body);
-      if (!mounted) return;
-      setState(() => _replace(_fromServer(saved)));
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
     }
@@ -233,7 +229,6 @@ class _ApprovalScreenState extends State<ApprovalScreen>
           onApprove: (d) => _decide(d, approve: true),
           onReject: (d) => _decide(d, approve: false),
           onWithdraw: _withdraw,
-          onComment: _comment,
         ),
       ),
     );
@@ -296,7 +291,6 @@ class _ApprovalScreenState extends State<ApprovalScreen>
                     onApprove: () => _decide(selected, approve: true),
                     onReject: () => _decide(selected, approve: false),
                     onWithdraw: () => _withdraw(selected),
-                    onComment: (body) => _comment(selected, body),
                   ),
           ),
         ],

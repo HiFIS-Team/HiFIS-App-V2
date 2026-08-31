@@ -174,6 +174,10 @@ class Approval {
   /// 지금 결재할 차례인 사람 — 끝났으면 null
   final String? currentApproverId;
 
+  /// 옛 결재 댓글 — **새 앱은 안 읽는다** (2026-08-31)
+  ///
+  /// 결재 댓글이 공용 `/comments` 로 옮겨 갔다. 서버는 이 칸을 옛 빌드용으로
+  /// 그대로 두고 새 댓글은 안 쌓는다. 새로 붙은 것은 늘 비어 있다.
   final List<ApprovalComment> comments;
   final DateTime createdAt;
 
@@ -279,15 +283,6 @@ class ApprovalApi {
   static Future<Approval> withdraw(String id) async {
     final data = await _client.post('/approvals/$id/withdraw');
     notifyApprovalChanged();
-    return Approval.fromJson(data!);
-  }
-
-  /// 댓글 달기 — 결재 당사자끼리 주고받는다
-  static Future<Approval> comment(String id, {required String body}) async {
-    final data = await _client.post(
-      '/approvals/$id/comments',
-      body: {'body': body},
-    );
     return Approval.fromJson(data!);
   }
 }

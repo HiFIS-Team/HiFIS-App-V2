@@ -9,16 +9,12 @@ class _DocDetail extends StatelessWidget {
     required this.onApprove,
     required this.onReject,
     required this.onWithdraw,
-    required this.onComment,
   });
 
   final _Doc doc;
   final VoidCallback onApprove;
   final VoidCallback onReject;
   final VoidCallback onWithdraw;
-
-  /// 댓글 달기 — 서버에 올리고 오는 동안 기다린다
-  final Future<void> Function(String) onComment;
 
   @override
   Widget build(BuildContext context) {
@@ -244,14 +240,8 @@ class _DocDetail extends StatelessWidget {
         ],
         SizedBox(height: 16),
         // 처리 뒤에도 오간 말은 남는다 — 그래서 결과 카드 아래다.
-        // 폰은 프로젝트와 같이 시트로 빼고 여기엔 눌러서 여는 줄만 둔다
-        if (phone)
-          _CommentTeaser(
-            doc: doc,
-            onTap: () => _showComments(context, doc, onComment: onComment),
-          )
-        else
-          _CommentCard(doc: doc, onComment: onComment),
+        // 누르면 공지·회의록·프로젝트와 **같은 댓글 시트**가 올라온다
+        _ApprovalComments(doc: doc),
       ],
     );
   }

@@ -7,7 +7,10 @@ import '../client/api_client.dart';
 enum CommentTarget {
   notice('NOTICE'),
   meeting('MEETING'),
-  project('PROJECT');
+  project('PROJECT'),
+  // 전자결재 (2026-08-31) — 예전에는 결재 행의 JSONB 에 따로 쌓였다.
+  // 줄마다 id 가 없어 고치고 지울 수가 없어서 결재만 댓글 창이 달랐다
+  approval('APPROVAL');
 
   const CommentTarget(this.wire);
 

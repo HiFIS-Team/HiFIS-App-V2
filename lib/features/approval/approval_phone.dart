@@ -90,7 +90,6 @@ class _DocDetailScreen extends StatefulWidget {
     required this.onApprove,
     required this.onReject,
     required this.onWithdraw,
-    required this.onComment,
   });
 
   /// 열 때의 문서 — id 를 얻고, 목록에서 못 찾을 때의 대비책으로도 쓴다
@@ -99,7 +98,6 @@ class _DocDetailScreen extends StatefulWidget {
   final Future<void> Function(_Doc) onApprove;
   final Future<void> Function(_Doc) onReject;
   final Future<void> Function(_Doc) onWithdraw;
-  final Future<void> Function(_Doc, String) onComment;
 
   @override
   State<_DocDetailScreen> createState() => _DocDetailScreenState();
@@ -127,7 +125,6 @@ class _DocDetailScreenState extends State<_DocDetailScreen> {
       onApprove: () => _run(widget.onApprove),
       onReject: () => _run(widget.onReject),
       onWithdraw: () => _run(widget.onWithdraw),
-      onComment: (body) => _run((doc) => widget.onComment(doc, body)),
     ),
   );
 }

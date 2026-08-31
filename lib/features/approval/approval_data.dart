@@ -109,7 +109,6 @@ class _Doc {
     required this.state,
     required this.approverIds,
     required this.steps,
-    required this.comments,
     this.currentApproverId,
     this.startDate,
     this.endDate,
@@ -140,7 +139,6 @@ class _Doc {
   final String? currentApproverId;
 
   /// 당사자끼리 주고받은 말 — 오래된 것부터다 (서버가 뒤에 붙인다)
-  final List<ApprovalComment> comments;
 
   String get writer => _nameOf(writerId);
 
@@ -204,7 +202,6 @@ _Doc _fromServer(Approval row) => _Doc(
   state: _State.of(row.status),
   approverIds: row.approverIds,
   steps: row.steps,
-  comments: row.comments,
   currentApproverId: row.currentApproverId,
   startDate: row.startDate,
   endDate: row.endDate,
