@@ -95,6 +95,9 @@ class MyTaskRequest {
 
   /// 고치겠다는 요일 — 안 실려 있으면 매일 (요일이 생기기 전 결재)
   List<int> get newWeekdays => parseWeekdays(payload?['weekdays']);
+
+  /// 고치겠다는 입력 칸 — 안 실려 있으면 없음 (칸이 생기기 전 결재)
+  List<MyTaskField> get newFields => parseFields(payload?['fields']);
 }
 
 /// 매일 — 요일을 안 고르면 이 값이다 (서버 `EVERY_DAY` 와 같다)
@@ -122,6 +125,44 @@ String weekdayLabel(List<int> days) {
   return [for (final d in days) names[d - 1]].join('·');
 }
 
+/// 체크할 때 받을 칸 하나 (서버 `MyTaskField`)
+///
+/// **선택이다.** 칸을 안 붙이면 예전처럼 누르기만 하면 되고, 붙이면
+/// **다 채워야 체크가 된다** (2026-08-31 요청 — 주간 신규·재등록 수처럼
+/// 체크와 함께 받아야 하는 값이 있다).
+class MyTaskField {
+  MyTaskField({required this.name, this.number = true});
+
+  factory MyTaskField.fromJson(Map<String, dynamic> json) => MyTaskField(
+    name: json['name'] as String? ?? '',
+    number: (json['kind'] as String? ?? 'NUMBER') == 'NUMBER',
+  );
+
+  final String name;
+
+  /// 숫자만 받는가 — 아니면 아무 글이나
+  final bool number;
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'kind': number ? 'NUMBER' : 'TEXT',
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      other is MyTaskField && other.name == name && other.number == number;
+
+  @override
+  int get hashCode => Object.hash(name, number);
+}
+
+/// 서버가 준 칸 목록 — 없으면 빈 목록
+List<MyTaskField> parseFields(Object? raw) => [
+  if (raw is List)
+    for (final f in raw)
+      if (f is Map) MyTaskField.fromJson(f.cast<String, dynamic>()),
+];
+
 /// 내 업무 한 줄 (서버 `MyTaskOut`)
 ///
 /// 공통 업무(환경정비 칩)와 달리 **하루에 한 번만** 체크한다.
@@ -131,6 +172,8 @@ class MyTask {
     required this.employeeId,
     required this.content,
     required this.weekdays,
+    required this.fields,
+    required this.values,
     required this.sort,
     required this.checked,
     required this.everChecked,
@@ -144,6 +187,8 @@ class MyTask {
     employeeId: json['employeeId'] as String,
     content: json['content'] as String,
     weekdays: parseWeekdays(json['weekdays']),
+    fields: parseFields(json['fields']),
+    values: (json['values'] as Map?)?.cast<String, dynamic>() ?? const {},
     sort: json['sort'] as int? ?? 0,
     checked: json['checked'] as bool? ?? false,
     everChecked: json['everChecked'] as bool? ?? false,
@@ -167,6 +212,20 @@ class MyTask {
   /// 금요일에만 하는 대청소가 월~목에도 서서 안 누른 나흘이 누락으로 잡히던
   /// 자리다 (2026-08-20). 기존 업무는 전부 매일이다.
   final List<int> weekdays;
+
+  /// 체크할 때 받을 칸 — 비어 있으면 누르기만 하면 된다
+  final List<MyTaskField> fields;
+
+  /// **그날 적어 넣은 값** — 체크 전에는 비어 있다 (`{"신규": 3}`)
+  final Map<String, dynamic> values;
+
+  /// 값이 붙은 줄에 뒤따라 붙는 한 마디 — `신규 3 · 재등록 5`
+  ///
+  /// 칸 차례대로 적는다. 화면마다 따로 만들면 순서가 갈린다
+  String get valueLabel => [
+    for (final f in fields)
+      if (values[f.name] != null) '${f.name} ${values[f.name]}',
+  ].join(' · ');
 
   final int sort;
 
@@ -369,12 +428,23 @@ class MyTaskApi {
   /// [plan] 은 **업무 이름 → 걸리는 요일**이다. 요일을 하나씩 훑으며 담는
   /// 화면이 그대로 넘겨준다 — 같은 이름이 여러 요일에 걸리면 서버가 요일을
   /// 합쳐서 **한 줄로** 만든다 (두 줄이면 어느 쪽을 체크했는지 알 수 없다).
-  static Future<List<MyTask>> create(Map<String, List<int>> plan) async {
+  /// [fields] 는 **업무 이름 → 그 업무가 체크할 때 받을 칸**이다 (선택).
+  /// 안 넘긴 업무는 예전처럼 누르기만 하면 된다.
+  static Future<List<MyTask>> create(
+    Map<String, List<int>> plan, {
+    Map<String, List<MyTaskField>> fields = const {},
+  }) async {
     final rows = await _client.postList(
       '/my-tasks',
       body: {
         'items': [
-          for (final e in plan.entries) {'content': e.key, 'weekdays': e.value},
+          for (final e in plan.entries)
+            {
+              'content': e.key,
+              'weekdays': e.value,
+              if (fields[e.key]?.isNotEmpty ?? false)
+                'fields': [for (final f in fields[e.key]!) f.toJson()],
+            },
         ],
       },
     );
@@ -387,8 +457,14 @@ class MyTaskApi {
   /// 오늘 했다고 표시 (멱등)
   ///
   /// **되돌릴 수 없다.** 해제하는 길이 없어서, 누르기 전에 한 번 묻는다.
-  static Future<void> check(String id) =>
-      _client.post('/my-tasks/$id/check').then((_) {});
+  /// 칸이 붙은 업무는 [values] 를 같이 보낸다 — 하나라도 비면 서버가 400.
+  /// 글자로 보내고 숫자 칸은 서버가 바꿔 담는다
+  static Future<void> check(String id, {Map<String, String>? values}) => _client
+      .post(
+        '/my-tasks/$id/check',
+        body: {'values': values ?? const <String, String>{}},
+      )
+      .then((_) {});
 
   /// 수정 — **한 번도 체크한 적 없을 때만** (그 밖에는 400 `TASK_LOCKED`)
   ///
@@ -397,10 +473,16 @@ class MyTaskApi {
     String id, {
     String? content,
     List<int>? weekdays,
+    List<MyTaskField>? fields,
   }) async {
     final data = await _client.patch(
       '/my-tasks/$id',
-      body: {'content': ?content, 'weekdays': ?weekdays},
+      body: {
+        'content': ?content,
+        'weekdays': ?weekdays,
+        // **빈 배열도 뜻이 있다** (칸을 없애는 것) — null 일 때만 안 보낸다
+        if (fields != null) 'fields': [for (final f in fields) f.toJson()],
+      },
     );
     return MyTask.fromJson(data!);
   }
@@ -418,6 +500,7 @@ class MyTaskApi {
     required String reason,
     String? content,
     List<int>? weekdays,
+    List<MyTaskField>? fields,
   }) async {
     final data = await _client.post(
       '/my-tasks/$id/requests',
@@ -425,7 +508,11 @@ class MyTaskApi {
         'type': type.wire,
         'reason': reason,
         if (type == MyTaskRequestType.edit)
-          'payload': {'content': ?content, 'weekdays': ?weekdays},
+          'payload': {
+            'content': ?content,
+            'weekdays': ?weekdays,
+            if (fields != null) 'fields': [for (final f in fields) f.toJson()],
+          },
       },
     );
     notifyApprovalChanged();

@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import '../../../core/data/data_signal.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/api/client/api_exception.dart';
 import '../../../core/api/work/my_task_api.dart';
@@ -55,15 +56,16 @@ Future<bool> addMyTasks(BuildContext context) async {
   // 폰은 오른쪽에서 밀려 들어오고, 데스크톱은 가운데 모달이다
   // (프로젝트 만들기·내역 전체보기와 같은 `showFullPage`)
   // 업무 이름 → 걸리는 요일. 요일을 하나씩 훑으며 채운 결과다
-  final plan = await showFullPage<Map<String, List<int>>>(
+  final made = await showFullPage<_AddResult>(
     context,
     (_) => const _AddTaskScreen(),
   );
-  if (plan == null || plan.isEmpty || !context.mounted) return false;
+  final plan = made?.plan ?? const <String, List<int>>{};
+  if (plan.isEmpty || !context.mounted) return false;
   try {
     // 여러 줄을 **한 번에** 보낸다 — 줄마다 부르면 중간에 끊겼을 때
     // 반만 들어간 채로 화면이 닫힌다
-    await MyTaskApi.create(plan);
+    await MyTaskApi.create(plan, fields: made!.fields);
     if (context.mounted) {
       AppToast.show(
         context,
@@ -201,6 +203,18 @@ class _MyTaskSectionState extends State<MyTaskSection>
   /// 없으므로 잘못 누르면 되돌릴 방법이 없다.
   Future<void> _check(MyTask task) async {
     if (task.checked || _busy.contains(task.id)) return;
+
+    // 입력 칸이 붙은 업무는 **값을 받는 창이 확인 창을 대신한다** — 되돌릴 수
+    // 없다는 말도 거기 같이 적혀서 두 번 묻지 않는다 (2026-08-31 요청)
+    if (task.fields.isNotEmpty) {
+      final values = await showAppDialog<Map<String, String>>(
+        context,
+        (_) => _ValueCard(task: task),
+      );
+      if (values == null || !mounted) return;
+      return _send(task, values: values);
+    }
+
     final ok = await showConfirmDialog(
       context,
       icon: Icons.check_circle_rounded,
@@ -214,9 +228,14 @@ class _MyTaskSectionState extends State<MyTaskSection>
       confirmLabel: '완료',
     );
     if (!ok || !mounted) return;
+    return _send(task);
+  }
+
+  /// 실제로 보내는 자리 — 값이 있든 없든 여기 하나를 지난다
+  Future<void> _send(MyTask task, {Map<String, String>? values}) async {
     setState(() => _busy.add(task.id));
     try {
-      await MyTaskApi.check(task.id);
+      await MyTaskApi.check(task.id, values: values);
       await _load();
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
@@ -250,6 +269,7 @@ class _MyTaskSectionState extends State<MyTaskSection>
         task.id,
         content: result.content,
         weekdays: result.weekdays,
+        fields: result.fields,
       );
       await _load();
       if (mounted) AppToast.show(context, '업무를 고쳤어요');
@@ -291,6 +311,7 @@ class _MyTaskSectionState extends State<MyTaskSection>
         reason: result.reason,
         content: result.content,
         weekdays: result.weekdays,
+        fields: result.fields,
       );
       await _load();
       if (mounted) AppToast.show(context, '${type.label} 결재를 올렸어요');
@@ -704,6 +725,18 @@ class _TaskRow extends StatelessWidget {
                     decorationThickness: 1.6,
                   ),
                 ),
+                // 적어 넣은 값 — `신규 3 · 재등록 5` (2026-08-31).
+                // 체크한 뒤에만 채워지므로 아직 안 한 줄에는 안 붙는다
+                if (task.valueLabel.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    task.valueLabel,
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
                 if (pending != null) ...[
                   const SizedBox(height: 3),
                   Text(

@@ -2020,6 +2020,12 @@
     "errors"
    ]
   },
+  "MyTaskCheckCreate": {
+   "properties": {
+    "values": {}
+   },
+   "required": []
+  },
   "MyTaskCreate": {
    "properties": {
     "contents": {
@@ -2058,9 +2064,25 @@
     "reason"
    ]
   },
+  "MyTaskField": {
+   "properties": {
+    "kind": {},
+    "name": {}
+   },
+   "required": [
+    "name"
+   ]
+  },
+  "MyTaskFieldKind": {
+   "properties": {},
+   "required": []
+  },
   "MyTaskItem": {
    "properties": {
     "content": {},
+    "fields": {
+     "nullable": true
+    },
     "weekdays": {
      "nullable": true
     }
@@ -2116,11 +2138,13 @@
     "createdAt": {},
     "employeeId": {},
     "everChecked": {},
+    "fields": {},
     "id": {},
     "pendingRequest": {
      "nullable": true
     },
     "sort": {},
+    "values": {},
     "weekdays": {}
    },
    "required": [
@@ -2205,6 +2229,9 @@
   "MyTaskUpdate": {
    "properties": {
     "content": {
+     "nullable": true
+    },
+    "fields": {
      "nullable": true
     },
     "weekdays": {

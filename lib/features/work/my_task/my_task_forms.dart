@@ -51,6 +51,12 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
   /// 업무 이름 → 걸리는 요일. **화면 전체가 이 하나를 채운다**
   final _plan = <String, Set<int>>{};
 
+  /// 업무 이름 → 체크할 때 받을 칸 (2026-08-31). 안 붙이면 없는 것이다
+  ///
+  /// 요일을 훑는 동안 같은 업무가 여러 번 나오지만 **칸은 업무에 하나**다 —
+  /// 서버도 이름으로 한 줄로 합친다
+  final _fields = <String, List<MyTaskField>>{};
+
   int get _day => _stepDays[_step];
   bool get _last => _step == _stepDays.length - 1;
 
@@ -102,7 +108,10 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
       if (days == null) return;
       if (!days.remove(_day)) days.add(_day);
       // 어느 요일에도 안 걸리면 목록에서 뺀다 — 영영 안 뜨는 업무가 된다
-      if (days.isEmpty) _plan.remove(content);
+      if (days.isEmpty) {
+        _plan.remove(content);
+        _fields.remove(content);
+      }
     });
   }
 
@@ -131,8 +140,28 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
   void _submit() {
     _flush();
     if (_plan.isEmpty) return;
-    Navigator.pop(context, {
-      for (final e in _plan.entries) e.key: e.value.toList()..sort(),
+    Navigator.pop(
+      context,
+      _AddResult({
+        for (final e in _plan.entries) e.key: e.value.toList()..sort(),
+      }, _fields),
+    );
+  }
+
+  /// 담아 둔 줄에 입력 칸을 붙이거나 뗀다 — 줄을 누르면 열린다
+  Future<void> _editFields(String content) async {
+    final made = await showAppDialog<List<MyTaskField>>(
+      context,
+      (_) =>
+          _FieldsCard(content: content, fields: _fields[content] ?? const []),
+    );
+    if (made == null || !mounted) return;
+    setState(() {
+      if (made.isEmpty) {
+        _fields.remove(content);
+      } else {
+        _fields[content] = made;
+      }
     });
   }
 
@@ -268,7 +297,12 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
           ),
           for (var i = 0; i < _todays.length; i++) ...[
             if (i > 0) const SizedBox(height: 8),
-            _StagedRow(text: _todays[i], onRemove: () => _toggle(_todays[i])),
+            _StagedRow(
+              text: _todays[i],
+              fields: _fields[_todays[i]] ?? const [],
+              onTap: () => _editFields(_todays[i]),
+              onRemove: () => _toggle(_todays[i]),
+            ),
           ],
         ],
         // **앞 요일에 담은 것** — 체크하면 이 요일에도 걸린다.
@@ -360,11 +394,21 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
   }
 }
 
-/// 아직 안 만든 줄 — 오른쪽 X 로 뺀다
+/// 아직 안 만든 줄 — **누르면 입력 칸**, 오른쪽 X 로 뺀다
 class _StagedRow extends StatelessWidget {
-  const _StagedRow({required this.text, required this.onRemove});
+  const _StagedRow({
+    required this.text,
+    required this.fields,
+    required this.onTap,
+    required this.onRemove,
+  });
 
   final String text;
+
+  /// 이 업무에 붙은 입력 칸 — 있으면 이름 아래에 한 마디로 적는다
+  final List<MyTaskField> fields;
+
+  final VoidCallback onTap;
   final VoidCallback onRemove;
 
   @override
@@ -380,9 +424,32 @@ class _StagedRow extends StatelessWidget {
         Icon(CupertinoIcons.circle, size: 22, color: AppColors.gray300),
         const SizedBox(width: 12),
         Expanded(
-          child: Text(
-            text,
-            style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w500),
+          child: Pressable(
+            onTap: onTap,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  text,
+                  style: AppTextStyles.body2.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                // 칸을 안 붙였으면 붙이는 길이 있다고 알려 준다 — 줄을 눌러야
+                // 열리는데 아무 표시가 없으면 있는 줄을 모른다
+                Text(
+                  fields.isEmpty
+                      ? '눌러서 입력 칸 추가'
+                      : [for (final f in fields) f.name].join(' · '),
+                  style: AppTextStyles.caption.copyWith(
+                    fontSize: 11,
+                    color: fields.isEmpty
+                        ? AppColors.textTertiary
+                        : AppColors.primary,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
         Pressable(
@@ -452,9 +519,303 @@ class _PickRow extends StatelessWidget {
   );
 }
 
+/// 추가 화면이 돌려주는 값 — 업무별 요일과 입력 칸
+class _AddResult {
+  const _AddResult(this.plan, this.fields);
+
+  /// 업무 이름 → 걸리는 요일
+  final Map<String, List<int>> plan;
+
+  /// 업무 이름 → 체크할 때 받을 칸 (안 붙인 업무는 없다)
+  final Map<String, List<MyTaskField>> fields;
+}
+
+/// 업무 하나의 입력 칸을 손보는 창 — 추가 화면에서 줄을 누르면 열린다
+class _FieldsCard extends StatefulWidget {
+  const _FieldsCard({required this.content, required this.fields});
+
+  final String content;
+  final List<MyTaskField> fields;
+
+  @override
+  State<_FieldsCard> createState() => _FieldsCardState();
+}
+
+class _FieldsCardState extends State<_FieldsCard> {
+  late var _fields = [...widget.fields];
+
+  @override
+  Widget build(BuildContext context) => _FormCard(
+    title: widget.content,
+    hint: '칸을 붙이면 체크할 때 값을 물어봐요.',
+    confirmLabel: '저장',
+    enabled: true,
+    onConfirm: () => Navigator.pop(context, _fields),
+    body: [
+      _Label('입력 칸'),
+      _FieldsEditor(
+        fields: _fields,
+        onChanged: (next) => setState(() => _fields = next),
+      ),
+    ],
+  );
+}
+
+/// 업무 하나에 붙일 수 있는 입력 칸 수 — 서버 `MAX_FIELDS` 와 같은 값
+const _maxFields = 5;
+
+/// 칸 이름 길이 — 서버 `MyTaskField.name` 이 20자다
+const _fieldNameMax = 20;
+
+/// **체크할 때 받을 칸을 정하는 자리** (2026-08-31 요청)
+///
+/// 주간 신규·재등록 수처럼 체크와 함께 받아야 하는 값이 있다. 칸을 붙이면
+/// 그 업무는 **값을 다 채워야 체크가 된다.**
+///
+/// 추가 화면과 수정 폼이 같이 쓴다 — 두 자리에서 모양이 갈리면 안 된다.
+class _FieldsEditor extends StatelessWidget {
+  const _FieldsEditor({required this.fields, required this.onChanged});
+
+  final List<MyTaskField> fields;
+  final ValueChanged<List<MyTaskField>> onChanged;
+
+  void _add(BuildContext context) async {
+    final made = await showAppDialog<MyTaskField>(
+      context,
+      (_) => const _FieldNameCard(),
+    );
+    if (made == null) return;
+    // 같은 이름을 두 번 두지 않는다 — 값이 이름을 키로 담아서 겹치면 덮인다
+    if (fields.any((f) => f.name == made.name)) return;
+    onChanged([...fields, made]);
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      for (var i = 0; i < fields.length; i++) ...[
+        if (i > 0) const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.fromLTRB(14, 10, 9, 10),
+          decoration: BoxDecoration(
+            color: AppColors.gray50,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Expanded(child: Text(fields[i].name, style: AppTextStyles.body2)),
+              Text(
+                fields[i].number ? '숫자' : '글',
+                style: AppTextStyles.caption.copyWith(fontSize: 11),
+              ),
+              const SizedBox(width: 6),
+              Pressable(
+                onTap: () => onChanged([...fields]..removeAt(i)),
+                child: Padding(
+                  padding: const EdgeInsets.all(5),
+                  child: Icon(
+                    CupertinoIcons.xmark,
+                    size: 13,
+                    color: AppColors.textTertiary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+      if (fields.length < _maxFields) ...[
+        if (fields.isNotEmpty) const SizedBox(height: 8),
+        Pressable(
+          onTap: () => _add(context),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 11),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.gray100),
+            ),
+            child: Text(
+              fields.isEmpty ? '입력 칸 추가' : '칸 하나 더',
+              style: AppTextStyles.body2.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ],
+    ],
+  );
+}
+
+/// 칸 하나 만들기 — 이름과 종류
+class _FieldNameCard extends StatefulWidget {
+  const _FieldNameCard();
+
+  @override
+  State<_FieldNameCard> createState() => _FieldNameCardState();
+}
+
+class _FieldNameCardState extends State<_FieldNameCard> {
+  final _name = TextEditingController();
+  bool _number = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _name.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final text = _name.text.trim();
+    if (text.isEmpty) return;
+    Navigator.pop(context, MyTaskField(name: text, number: _number));
+  }
+
+  @override
+  Widget build(BuildContext context) => _FormCard(
+    title: '입력 칸',
+    hint: '체크할 때 이 값을 물어봐요.',
+    confirmLabel: '추가',
+    enabled: _name.text.trim().isNotEmpty,
+    onConfirm: _submit,
+    body: [
+      _Label('칸 이름'),
+      _Field(
+        controller: _name,
+        autofocus: true,
+        hintText: '예) 신규',
+        maxLength: _fieldNameMax,
+        onSubmitted: (_) => _submit(),
+      ),
+      const SizedBox(height: 14),
+      _Label('받을 값'),
+      Row(
+        children: [
+          for (final number in [true, false]) ...[
+            if (!number) const SizedBox(width: 8),
+            Expanded(
+              child: Pressable(
+                onTap: () => setState(() => _number = number),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: _number == number
+                        ? AppColors.primary
+                        : AppColors.gray50,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    number ? '숫자' : '글',
+                    style: AppTextStyles.body2.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: _number == number
+                          ? Colors.white
+                          : AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    ],
+  );
+}
+
+/// **체크하면서 값을 적는 창** (2026-08-31 요청)
+///
+/// 칸이 붙은 업무는 이 창이 대신 뜬다 — 확인 창(`showConfirmDialog`)과
+/// 두 번 묻지 않으려고 되돌릴 수 없다는 말도 여기 같이 적는다.
+class _ValueCard extends StatefulWidget {
+  const _ValueCard({required this.task});
+
+  final MyTask task;
+
+  @override
+  State<_ValueCard> createState() => _ValueCardState();
+}
+
+class _ValueCardState extends State<_ValueCard> {
+  late final _inputs = {
+    for (final f in widget.task.fields) f.name: TextEditingController(),
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    for (final c in _inputs.values) {
+      c.addListener(() => setState(() {}));
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final c in _inputs.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  /// 하나라도 비면 못 넘긴다 — 값을 받으려고 만든 칸이다
+  bool get _ready => _inputs.values.every((c) => c.text.trim().isNotEmpty);
+
+  void _submit() {
+    if (!_ready) return;
+    Navigator.pop(context, {
+      for (final e in _inputs.entries) e.key: e.value.text.trim(),
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fields = widget.task.fields;
+    return _FormCard(
+      title: widget.task.content,
+      // 처음 체크할 때만 결재 이야기를 한다 — 확인 창과 같은 규칙이다
+      hint: widget.task.everChecked
+          ? '한 번 체크하면 되돌릴 수 없어요.'
+          : '한 번 체크하면 되돌릴 수 없어요.\n그 뒤로는 고치거나 지울 때 대표님 승인이 필요해요.',
+      confirmLabel: '완료',
+      enabled: _ready,
+      onConfirm: _submit,
+      body: [
+        for (var i = 0; i < fields.length; i++) ...[
+          if (i > 0) const SizedBox(height: 14),
+          _Label(fields[i].name),
+          _Field(
+            controller: _inputs[fields[i].name]!,
+            autofocus: i == 0,
+            number: fields[i].number,
+            hintText: fields[i].number ? '숫자' : '내용',
+            maxLength: fields[i].number ? 9 : _contentMax,
+            onSubmitted: (_) => _submit(),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 /// 수정·삭제 폼이 돌려주는 값
 class _RequestResult {
-  const _RequestResult({this.reason = '', this.content, this.weekdays});
+  const _RequestResult({
+    this.reason = '',
+    this.content,
+    this.weekdays,
+    this.fields,
+  });
 
   /// 결재 사유 — **바로 고치는 길에서는 빈 문자열**이다 (안 묻는다)
   final String reason;
@@ -464,6 +825,9 @@ class _RequestResult {
 
   /// 고치겠다는 요일 — 삭제면 null. **내용과 따로 고칠 수 있다**
   final List<int>? weekdays;
+
+  /// 고치겠다는 입력 칸 — 삭제면 null. **빈 목록은 칸을 없앤다는 뜻**이다
+  final List<MyTaskField>? fields;
 }
 
 /// 누락 사유서 폼 (2026-08-21)
@@ -589,12 +953,25 @@ class _RequestCardState extends State<_RequestCard> {
   /// 지금 걸린 요일에서 시작한다 — 안 건드리면 그대로 간다
   late final _days = <int>{...widget.task.weekdays};
 
+  /// 지금 붙은 입력 칸에서 시작한다 (2026-08-31)
+  late var _fields = [...widget.task.fields];
+
   bool get _isEdit => widget.type == MyTaskRequestType.edit;
 
   /// 요일을 바꿨나 — 차례를 맞춰 견준다 (서버도 정렬해서 준다)
   bool get _daysChanged {
     final now = _days.toList()..sort();
     return now.join(',') != widget.task.weekdays.join(',');
+  }
+
+  /// 입력 칸을 바꿨나
+  bool get _fieldsChanged {
+    final was = widget.task.fields;
+    if (_fields.length != was.length) return true;
+    for (var i = 0; i < _fields.length; i++) {
+      if (_fields[i] != was[i]) return true;
+    }
+    return false;
   }
 
   @override
@@ -618,7 +995,7 @@ class _RequestCardState extends State<_RequestCard> {
     if (next.isEmpty) return false;
     // 안 바꿨으면 올릴 이유가 없다 — 대표가 무엇을 승인하는지 알 수 없다.
     // **내용·요일 중 하나만 바꿔도 된다** (2026-08-20)
-    return next != widget.task.content || _daysChanged;
+    return next != widget.task.content || _daysChanged || _fieldsChanged;
   }
 
   void _submit() {
@@ -631,6 +1008,7 @@ class _RequestCardState extends State<_RequestCard> {
         reason: _reason.text.trim(),
         content: _isEdit ? _content.text.trim() : null,
         weekdays: _isEdit ? (days.isEmpty ? everyWeekday : days) : null,
+        fields: _isEdit ? _fields : null,
       ),
     );
   }
@@ -657,6 +1035,12 @@ class _RequestCardState extends State<_RequestCard> {
           selected: _days,
           onChanged: () => setState(() {}),
           note: '고른 요일에만 목록에 떠요',
+        ),
+        const SizedBox(height: 14),
+        _Label('입력 칸'),
+        _FieldsEditor(
+          fields: _fields,
+          onChanged: (next) => setState(() => _fields = next),
         ),
       ] else
         Container(
@@ -772,6 +1156,7 @@ class _Field extends StatelessWidget {
     this.onSubmitted,
     this.focusNode,
     this.bare = false,
+    this.number = false,
   });
 
   final TextEditingController controller;
@@ -783,6 +1168,9 @@ class _Field extends StatelessWidget {
 
   /// 회색 면 없이 글자만 — 바깥에서 이미 칸을 그렸을 때
   final bool bare;
+
+  /// 숫자만 받는가 — 숫자 자판이 뜨고 다른 글자는 안 들어간다
+  final bool number;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -800,6 +1188,8 @@ class _Field extends StatelessWidget {
       focusNode: focusNode,
       autofocus: autofocus,
       maxLength: maxLength,
+      keyboardType: number ? TextInputType.number : null,
+      inputFormatters: number ? [FilteringTextInputFormatter.digitsOnly] : null,
       style: AppTextStyles.body1,
       cursorColor: AppColors.primary,
       onSubmitted: onSubmitted,
