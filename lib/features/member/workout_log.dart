@@ -6,6 +6,7 @@ import '../../core/api/work/lesson_api.dart';
 import '../../core/api/work/workout_api.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
+import '../../core/theme/app_shadows.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
@@ -50,6 +51,7 @@ class WorkoutLogScreen extends StatefulWidget {
     required this.editable,
     this.log,
     this.nextSessionNo,
+    this.onExit,
   });
 
   final Member member;
@@ -64,6 +66,9 @@ class WorkoutLogScreen extends StatefulWidget {
   /// 새 PT 일지가 몇 회차가 될지 — **보여 주기만** 한다.
   /// 실제 번호는 저장할 때 서버가 매긴다(두 대에서 동시에 눌러도 안 겹치게).
   final int? nextSessionNo;
+
+  /// 팝업이 아니라 화면 한 칸에 박아 쓸 때 — 닫기·저장·삭제가 이걸 대신 부른다
+  final void Function(bool changed)? onExit;
 
   @override
   State<WorkoutLogScreen> createState() => _WorkoutLogScreenState();
@@ -128,6 +133,15 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
 
   void _onEdit() {
     if (mounted) setState(() {});
+  }
+
+  void _exit(bool changed) {
+    final exit = widget.onExit;
+    if (exit == null) {
+      Navigator.pop(context, changed);
+    } else {
+      exit(changed);
+    }
   }
 
   bool get _isPt => widget.kind == WorkoutKind.pt;
@@ -257,7 +271,7 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
         );
       }
       if (!mounted) return;
-      Navigator.pop(context, true);
+      _exit(true);
     } catch (error) {
       if (!mounted) return;
       setState(() => _busy = false);
@@ -281,7 +295,7 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
     try {
       await WorkoutApi.remove(old.id);
       if (!mounted) return;
-      Navigator.pop(context, true);
+      _exit(true);
     } catch (error) {
       if (!mounted) return;
       setState(() => _busy = false);
@@ -525,43 +539,47 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
     backgroundColor: AppColors.surface,
     body: Column(
       children: [
+        // 뒤로 가는 자리는 **안 흐른다** — 다 적고 맨 위까지 올려야 나갈 수
+        // 있으면 안 된다. 글 위에 띄우면 적는 걸 가리니 칸을 따로 뒀다.
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 28, 14),
+          child: Row(
+            children: [
+              _BackButton(onTap: () => _exit(false)),
+              const SizedBox(width: 12),
+              Text(
+                '${widget.member.name} 회원님',
+                style: AppTextStyles.body2.copyWith(
+                  color: AppColors.textTertiary,
+                ),
+              ),
+            ],
+          ),
+        ),
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(28, 26, 28, 12),
-            children: [
-              Row(
-                children: [
-                  Text(
-                    '${widget.member.name} 회원님',
-                    style: AppTextStyles.body2.copyWith(
-                      color: AppColors.textTertiary,
-                    ),
-                  ),
-                  const Spacer(),
-                  if (widget.editable && widget.log != null)
-                    AppButton(
-                      label: '삭제',
-                      shrinkWrap: true,
-                      textColor: AppColors.error,
-                      onTap: _delete,
-                    ),
-                  const SizedBox(width: 8),
-                  AppButton(
-                    label: '닫기',
-                    shrinkWrap: true,
-                    onTap: () => Navigator.pop(context, false),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              ..._body(),
-            ],
+            padding: const EdgeInsets.fromLTRB(28, 0, 28, 12),
+            children: _body(),
           ),
         ),
         if (widget.editable)
           Padding(
             padding: const EdgeInsets.fromLTRB(28, 0, 28, 20),
-            child: _saveButton(),
+            child: widget.log == null
+                ? _saveButton()
+                : Row(
+                    children: [
+                      Expanded(
+                        child: AppButton(
+                          label: '삭제',
+                          textColor: AppColors.error,
+                          onTap: _delete,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(child: _saveButton()),
+                    ],
+                  ),
           ),
       ],
     ),
@@ -569,6 +587,47 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
 }
 
 // ── 표 ──────────────────────────────────────────────────────────
+
+/// 상세 자리에서 회원 화면으로 되돌아가는 화살표 — 팝업이 아니라 한 칸 뒤다
+class _BackButton extends StatefulWidget {
+  const _BackButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  State<_BackButton> createState() => _BackButtonState();
+}
+
+class _BackButtonState extends State<_BackButton> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) => MouseRegion(
+    cursor: SystemMouseCursors.click,
+    onEnter: (_) => setState(() => _hover = true),
+    onExit: (_) => setState(() => _hover = false),
+    child: Pressable(
+      onTap: widget.onTap,
+      child: Container(
+        width: 36,
+        height: 36,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          // 흰 면 위의 흰 원이라 테두리와 그림자로 떠 보이게 한다
+          color: _hover ? AppColors.gray50 : Colors.white,
+          shape: BoxShape.circle,
+          border: Border.all(color: AppColors.gray100),
+          boxShadow: AppShadows.card,
+        ),
+        child: Icon(
+          Icons.arrow_back_rounded,
+          size: 19,
+          color: AppColors.textSecondary,
+        ),
+      ),
+    ),
+  );
+}
 
 /// 칸 너비 — 한 줄에 다 넣으면 무게 칸이 `60kg 1…` 로 잘린다.
 /// 웨이트는 **두 줄**로 나눠 적는다 (부위·운동명 / 무게·세트).

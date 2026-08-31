@@ -34,9 +34,6 @@ class DesktopSidebar extends StatefulWidget {
 class _DesktopSidebarState extends State<DesktopSidebar> {
   bool _hovered = false;
 
-  /// 커서가 올라가 있는 항목 (인스타그램처럼 호버한 칸에만 배경색을 입힌다)
-  int? _hoverIndex;
-
   /// (섹션 제목, 메뉴 목록) — 제목이 null이면 캡션 없이 그린다.
   /// 아이콘은 장식이 적은 심플한 라운드 세트로 통일한다.
   ///
@@ -243,7 +240,6 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
   }
 
   Widget _item(int index, (IconData, String) item) => _row(
-    index: index,
     icon: item.$1,
     label: item.$2,
     selected: index == widget.selectedIndex,
@@ -251,9 +247,7 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
   );
 
   /// 맨 아래 로그아웃 — 화면 이동이 아니라서 선택 표시가 없다.
-  /// 호버 구분용 자리만 -1로 잡아 둔다 (메뉴 인덱스와 안 겹치게)
   Widget _logoutItem() => _row(
-    index: -1,
     icon: Icons.logout_rounded,
     label: '로그아웃',
     selected: false,
@@ -275,22 +269,58 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
   );
 
   Widget _row({
-    required int index,
     required IconData icon,
     required String label,
     required bool selected,
     required VoidCallback onTap,
-  }) {
-    final hovered = index == _hoverIndex;
+  }) => _SidebarRow(
+    icon: icon,
+    label: label,
+    selected: selected,
+    expanded: _hovered,
+    onTap: onTap,
+  );
+}
+
+/// 메뉴 한 칸 — **호버 상태를 자기가 들고 있다.**
+///
+/// 예전에는 사이드바 State 가 `_hoverIndex` 를 들고 `setState` 를 했다. 그러면
+/// 커서가 칸 하나를 지날 때마다 사이드바 전체(메뉴 열다섯 칸 + 캡션 + 로고)가
+/// 다시 빌드돼서, 레일 위로 마우스를 훑으면 눈에 띄게 굼떴다. 배경색이 바뀌는
+/// 건 커서가 올라간 그 칸뿐이라 리빌드도 그 칸에서 끝내야 한다.
+class _SidebarRow extends StatefulWidget {
+  const _SidebarRow({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.expanded,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+
+  /// 사이드바가 펼쳐졌는지 — 제목을 보일지 정한다
+  final bool expanded;
+  final VoidCallback onTap;
+
+  @override
+  State<_SidebarRow> createState() => _SidebarRowState();
+}
+
+class _SidebarRowState extends State<_SidebarRow> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       child: MouseRegion(
-        onEnter: (_) => setState(() => _hoverIndex = index),
-        onExit: (_) => setState(() {
-          if (_hoverIndex == index) _hoverIndex = null;
-        }),
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
         child: Pressable(
-          onTap: onTap,
+          onTap: widget.onTap,
           // 호버 배경은 애니메이션 없이 즉시 — 페이드가 있으면 커서를
           // 빠르게 지나갈 때 이전 항목의 배경이 잔상처럼 깜빡인다
           child: Container(
@@ -300,7 +330,7 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
             padding: EdgeInsets.symmetric(horizontal: 13),
             // 인스타그램처럼 배경색은 호버한 칸에만 — 선택 표시는 색·굵기로만
             decoration: BoxDecoration(
-              color: hovered ? AppColors.primaryLight : Colors.transparent,
+              color: _hovered ? AppColors.primaryLight : Colors.transparent,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
@@ -308,27 +338,31 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
                 SizedBox(
                   width: 20,
                   child: Icon(
-                    icon,
+                    widget.icon,
                     size: 20,
-                    color: selected ? AppColors.primary : AppColors.gray500,
+                    color: widget.selected
+                        ? AppColors.primary
+                        : AppColors.gray500,
                   ),
                 ),
                 Expanded(
                   child: ClipRect(
-                    child: _fade(
-                      Padding(
+                    child: AnimatedOpacity(
+                      duration: Duration(milliseconds: 150),
+                      opacity: widget.expanded ? 1 : 0,
+                      child: Padding(
                         padding: EdgeInsets.only(left: 10),
                         child: Text(
-                          label,
+                          widget.label,
                           maxLines: 1,
                           softWrap: false,
                           overflow: TextOverflow.clip,
                           style: AppTextStyles.label.copyWith(
                             fontSize: 15,
-                            fontWeight: selected
+                            fontWeight: widget.selected
                                 ? FontWeight.w700
                                 : FontWeight.w500,
-                            color: selected
+                            color: widget.selected
                                 ? AppColors.primary
                                 : AppColors.gray600,
                           ),

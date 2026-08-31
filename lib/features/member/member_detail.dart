@@ -184,7 +184,22 @@ class _MemberDetailScreenState extends State<MemberDetailScreen>
 
   // ── 일지 ─────────────────────────────────────────────────────
 
+  /// 데스크톱에서 상세 자리에 대신 띄운 일지 — 없으면 회원 상세다.
+  /// 목록·상세로 이미 두 칸이라 일지까지 옆에 붙이면 칸이 다 좁아진다.
+  _LogView? _view;
+
+  Future<void> _closeView(bool changed) async {
+    setState(() => _view = null);
+    if (changed) await _reload();
+  }
+
   Future<void> _open(WorkoutLog log) async {
+    if (isDesktop) {
+      setState(
+        () => _view = _LogView(kind: log.kind, editable: _canWrite, log: log),
+      );
+      return;
+    }
     final changed = await showWorkoutLog(
       context,
       member: widget.member,
@@ -196,24 +211,38 @@ class _MemberDetailScreenState extends State<MemberDetailScreen>
   }
 
   Future<void> _addPt() async {
+    // **받은 싸인과 쓴 일지 중 큰 쪽 다음**이다 — 서버가 매기는 번호와 같다.
+    // 일지 번호만 보면 일지가 생기기 전부터 있던 회원이 1 회차부터 다시
+    // 세어져서, 써도 싸인이 안 열린다 (2026-08-31 고침)
+    final last = _pt.lastOrNull?.sessionNo ?? 0;
+    final next = (_signed > last ? _signed : last) + 1;
+    if (isDesktop) {
+      setState(
+        () => _view = _LogView(
+          kind: WorkoutKind.pt,
+          editable: true,
+          nextSessionNo: next,
+        ),
+      );
+      return;
+    }
     final changed = await showWorkoutLog(
       context,
       member: widget.member,
       kind: WorkoutKind.pt,
       editable: true,
-      // **받은 싸인과 쓴 일지 중 큰 쪽 다음**이다 — 서버가 매기는 번호와 같다.
-      // 일지 번호만 보면 일지가 생기기 전부터 있던 회원이 1 회차부터 다시
-      // 세어져서, 써도 싸인이 안 열린다 (2026-08-31 고침)
-      nextSessionNo:
-          (_signed > (_pt.lastOrNull?.sessionNo ?? 0)
-              ? _signed
-              : (_pt.lastOrNull?.sessionNo ?? 0)) +
-          1,
+      nextSessionNo: next,
     );
     if (changed == true) await _reload();
   }
 
   Future<void> _addPersonal() async {
+    if (isDesktop) {
+      setState(
+        () => _view = const _LogView(kind: WorkoutKind.personal, editable: true),
+      );
+      return;
+    }
     final changed = await showWorkoutLog(
       context,
       member: widget.member,
@@ -400,6 +429,17 @@ class _MemberDetailScreenState extends State<MemberDetailScreen>
         ),
       );
     }
+    if (_view case final view?) {
+      return WorkoutLogScreen(
+        key: ValueKey(view.log?.id ?? 'new-${view.kind.name}'),
+        member: widget.member,
+        kind: view.kind,
+        editable: view.editable,
+        log: view.log,
+        nextSessionNo: view.nextSessionNo,
+        onExit: _closeView,
+      );
+    }
     return Scaffold(
       backgroundColor: AppColors.background,
       body: ListView(
@@ -417,6 +457,21 @@ class _MemberDetailScreenState extends State<MemberDetailScreen>
       ),
     );
   }
+}
+
+/// 상세 자리에 띄울 일지 한 장 — `log` 가 없으면 새로 쓰는 것이다
+class _LogView {
+  const _LogView({
+    required this.kind,
+    required this.editable,
+    this.log,
+    this.nextSessionNo,
+  });
+
+  final WorkoutKind kind;
+  final bool editable;
+  final WorkoutLog? log;
+  final int? nextSessionNo;
 }
 
 /// 이유 한 줄 — 앞에 번호, 뒤에 지우기
