@@ -187,6 +187,7 @@ class _WithdrawCard extends StatelessWidget {
   Future<void> _withdraw(BuildContext context) async {
     final ok = await showConfirmDialog(
       context,
+      icon: Icons.warning_amber_rounded,
       title: '정말 탈퇴할까요?',
       message: '되돌릴 수 없어요. 계정이 비활성화되고 이름·연락처가 지워져요.',
       confirmLabel: '탈퇴하기',

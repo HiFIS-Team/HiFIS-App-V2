@@ -242,6 +242,7 @@ class _ContributionSectionState extends State<ContributionSection>
     final who = item.person == null ? '' : '${item.person}님의 ';
     final ok = await showConfirmDialog(
       context,
+      icon: Icons.restore_rounded,
       title: '점수를 되돌릴까요?',
       message:
           '$who${item.label} ${item.points}점이 없던 일이 돼요.\n'

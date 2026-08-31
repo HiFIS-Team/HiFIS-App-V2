@@ -382,6 +382,7 @@ class _InviteKeyScreenState extends State<_InviteKeyScreen>
   Future<void> _delete(InviteKey key) async {
     final ok = await showConfirmDialog(
       context,
+      icon: Icons.delete_outline_rounded,
       title: '${key.code} 를 지울까요?',
       message: '아직 가입 안 한 사람이 이 키를 갖고 있으면 못 쓰게 돼요.',
       confirmLabel: '지우기',

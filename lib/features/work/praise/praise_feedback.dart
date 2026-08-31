@@ -101,6 +101,7 @@ class _FeedbackDetailCardState extends State<_FeedbackDetailCard> {
 
     final ok = await showConfirmDialog(
       context,
+      icon: Icons.delete_outline_rounded,
       title: '이 컴플레인을 지울까요?',
       message: '지운 글은 되돌릴 수 없어요.\n같은 회원이 남긴 칭찬은 그대로 남아요.',
       confirmLabel: '지우기',

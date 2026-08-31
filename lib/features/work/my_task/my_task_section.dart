@@ -203,6 +203,7 @@ class _MyTaskSectionState extends State<MyTaskSection>
     if (task.checked || _busy.contains(task.id)) return;
     final ok = await showConfirmDialog(
       context,
+      icon: Icons.check_circle_rounded,
       title: '완료하시겠어요?',
       // 결재를 받게 된다는 말은 **처음 체크할 때만** 한다 (2026-08-20 요청).
       // 이미 한 번 한 업무는 그때부터 줄곧 결재를 타고 있어서, 매일 다시
@@ -261,6 +262,7 @@ class _MyTaskSectionState extends State<MyTaskSection>
   Future<void> _removeNow(MyTask task) async {
     final ok = await showConfirmDialog(
       context,
+      icon: Icons.delete_outline_rounded,
       title: '업무를 지울까요?',
       message: '${task.content}\n아직 한 번도 안 한 업무라 바로 지워져요.',
       confirmLabel: '삭제',

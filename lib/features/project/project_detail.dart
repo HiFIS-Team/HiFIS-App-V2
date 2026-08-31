@@ -511,6 +511,7 @@ class _ProjectDetail extends StatelessWidget {
   Future<void> _complete(BuildContext context) async {
     final yes = await showConfirmDialog(
       context,
+      icon: Icons.check_circle_rounded,
       title: '프로젝트를 완료할까요?',
       message: '완료 후 되돌릴 수 없습니다.',
       confirmLabel: '완료',
@@ -552,6 +553,7 @@ class _ProjectDetail extends StatelessWidget {
     if (projectId == null) return false;
     final yes = await showConfirmDialog(
       context,
+      icon: Icons.delete_outline_rounded,
       title: '프로젝트를 삭제할까요?',
       message: '삭제 후 되돌릴 수 없습니다.',
       confirmLabel: '삭제하기',

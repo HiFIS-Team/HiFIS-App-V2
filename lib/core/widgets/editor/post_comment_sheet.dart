@@ -199,6 +199,7 @@ class _CommentSheetState extends State<_CommentSheet> {
   Future<void> _remove(PostComment comment) async {
     final yes = await showConfirmDialog(
       context,
+      icon: Icons.delete_outline_rounded,
       title: '댓글을 지울까요?',
       confirmLabel: '삭제',
       destructive: true,

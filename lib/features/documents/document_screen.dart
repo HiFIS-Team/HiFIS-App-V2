@@ -539,6 +539,7 @@ class _DocumentScreenState extends State<DocumentScreen>
         item.isFolder && item.children!.any((child) => child.isFolder);
     final ok = await showConfirmDialog(
       context,
+      icon: Icons.delete_outline_rounded,
       title: item.isFolder
           ? "'${item.name}' 폴더를 지울까요?"
           : "'${item.name}' 을 지울까요?",

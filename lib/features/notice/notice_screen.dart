@@ -193,6 +193,7 @@ class _NoticeScreenState extends State<NoticeScreen>
     // 전 직원이 보는 글이라 한 번 더 묻는다 — 문서함 폴더와 같은 기준이다
     final ok = await showConfirmDialog(
       context,
+      icon: Icons.delete_outline_rounded,
       title: '이 공지를 지울까요?',
       message: '지우면 되돌릴 수 없어요.',
       confirmLabel: '삭제',

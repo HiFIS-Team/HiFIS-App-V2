@@ -269,6 +269,7 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
     if (old == null || _busy) return;
     final yes = await showConfirmDialog(
       context,
+      icon: Icons.delete_outline_rounded,
       title: '이 일지를 지울까요?',
       message: '적어 둔 운동과 올린 자료가 함께 사라져요.',
       confirmLabel: '삭제',

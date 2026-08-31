@@ -63,6 +63,7 @@ class _AttendanceQrAdminState extends State<AttendanceQrAdmin>
   Future<void> _register() async {
     final ok = await showConfirmDialog(
       context,
+      icon: Icons.wifi_rounded,
       title: '지금 이 인터넷을 등록할까요?',
       message:
           '지금 이 폰이 쓰는 인터넷이 ${_qr?.branchName ?? '이 지점'} 것으로 등록돼요.\n'
@@ -84,6 +85,7 @@ class _AttendanceQrAdminState extends State<AttendanceQrAdmin>
   Future<void> _forget(String ip) async {
     final ok = await showConfirmDialog(
       context,
+      icon: Icons.delete_outline_rounded,
       title: '이 인터넷을 지울까요?',
       message: '$ip 에서는 QR 이 안 찍히게 돼요.',
       confirmLabel: '지우기',

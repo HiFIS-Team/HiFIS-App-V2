@@ -10,6 +10,7 @@ import 'auth_session.dart';
 Future<void> confirmLogout(BuildContext context) async {
   final ok = await showConfirmDialog(
     context,
+    icon: Icons.logout_rounded,
     title: '로그아웃할까요?',
     message: '다음에 들어올 때 다시 로그인해야 해요.',
     confirmLabel: '로그아웃',

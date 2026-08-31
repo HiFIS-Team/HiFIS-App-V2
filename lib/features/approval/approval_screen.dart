@@ -196,6 +196,7 @@ class _ApprovalScreenState extends State<ApprovalScreen>
   Future<void> _withdraw(_Doc doc) async {
     final ok = await showConfirmDialog(
       context,
+      icon: Icons.undo_rounded,
       title: '결재를 회수할까요?',
       message: '올린 문서를 물립니다. 다시 올리려면 새로 작성해야 해요.',
       confirmLabel: '회수',
