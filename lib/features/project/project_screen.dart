@@ -640,10 +640,22 @@ class ProjectBrief {
   /// 목록 앞의 세로 막대에 쓰는 프로젝트 색
   Color get color => _project.color;
 
-  /// '나' / '나 외 3명'
-  String get members => _project.members.length <= 1
-      ? '나'
-      : '나 외 ${_project.members.length - 1}명';
+  /// '나' / '나 외 3명' — **내가 담당이 아니면 그 사람 이름**으로 센다
+  ///
+  /// 예전에는 담당이 누구든 늘 `나 외 N명` 이었다. 대표·관리자는 홈에
+  /// **전사 프로젝트**가 서서 대부분 자기가 안 낀 것인데도 낀 것처럼 보였다
+  /// (2026-08-31 대표가 짚었다). 담당이 아무도 없는 프로젝트도 `나` 로 떴다.
+  ///
+  /// 세는 것은 [_Project.members] (이름을 못 찾은 사람은 빠져 있다), 내가
+  /// 꼈는지는 [_Project.memberIds] 로 본다 — 이름은 겹칠 수 있다.
+  String get members {
+    final names = _project.members;
+    if (names.isEmpty) return '담당자 없음';
+    final me = currentUser?.id;
+    final mine = me != null && _project.memberIds.contains(me);
+    final head = mine ? '나' : names.first;
+    return names.length <= 1 ? head : '$head 외 ${names.length - 1}명';
+  }
 
   /// 'D-3' · 'D-DAY' · '누락 2일' · '완료'
   String get dday {
