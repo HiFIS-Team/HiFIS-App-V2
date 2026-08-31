@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import '../../core/data/data_signal.dart';
 import 'package:flutter/material.dart';
@@ -129,16 +131,54 @@ class _SalaryScreenState extends State<SalaryScreen>
     }
   }
 
+  /// 처리하는 중 — 두 번 눌러 두 번 보내지 않게 잠근다
+  bool _deciding = false;
+
+  /// 결재 한 건 처리 — **화면을 먼저 바꾸고** 목록은 뒤에서 맞춘다
+  ///
+  /// 예전에는 목록을 다 받은 뒤에야 버튼이 갈렸다. 처리 요청 하나에
+  /// **결재함 두 번 + 그 사람 명세서 한 번**이 더 붙어서, 승인을 눌러도
+  /// '지급 처리'로 바뀌기까지 한참 걸렸다 (2026-08-31 대표가 짚었다).
+  ///
+  /// 서버가 **바뀐 명세서를 그대로 돌려주므로** 그걸 그 자리에 끼우면 된다 —
+  /// 문서함 이동·즐겨찾기 별과 같은 방식이다. 실패하면 아무것도 안 바뀐다.
   Future<void> _decide(Future<Payslip> Function() action, String done) async {
+    if (_deciding) return;
+    _deciding = true;
     try {
-      await action();
+      final updated = await action();
       if (!mounted) return;
+      setState(() {
+        _deciding = false;
+        _applyDecision(updated);
+      });
       AppToast.show(context, done);
-      await _load();
-      if (mounted) setState(() {});
+      // 목록·명세서는 뒤에서 맞춘다 — 버튼은 이미 갈려 있다
+      unawaited(_load());
     } catch (error) {
+      _deciding = false;
       if (mounted) AppToast.show(context, messageOf(error));
     }
+  }
+
+  /// 처리한 건을 결재함에 반영한다
+  ///
+  /// 남는 것은 **대기와 지급 대기**뿐이다 — 반려·지급 완료는 빠진다
+  /// ([_load] 가 세우는 것과 같은 규칙이라 뒤에서 맞춰도 안 어긋난다).
+  void _applyDecision(Payslip updated) {
+    final at = _inbox.indexWhere((p) => p.id == updated.id);
+    if (at < 0) return;
+    final next = [..._inbox];
+    if (updated.status == PayslipStatus.submitted ||
+        updated.status == PayslipStatus.approved) {
+      next[at] = updated;
+    } else {
+      next.removeAt(at);
+      if (_inboxIndex >= next.length) {
+        _inboxIndex = next.isEmpty ? 0 : next.length - 1;
+      }
+    }
+    _inbox = next;
   }
 
   Future<void> _approveTarget(Payslip payslip) =>
