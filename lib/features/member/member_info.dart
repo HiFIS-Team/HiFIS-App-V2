@@ -19,9 +19,9 @@ import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/feedback/empty_card.dart';
 import '../../core/widgets/feedback/skeleton.dart';
+import '../../core/widgets/glass/glass_bottom_button.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/nav/phone_scaffold.dart';
-import '../../core/widgets/input/app_button.dart';
 import '../../core/widgets/input/mode_switch.dart';
 import 'member_edit.dart';
 
@@ -364,12 +364,39 @@ class _MemberInfoDetailState extends State<_MemberInfoDetail> {
       },
       child: PhoneDetailScaffold(
         title: '${_member.name} 회원님',
+        // 고치기·지우기는 **하단 고정 글래스**다 — 스크롤 안에 두면 아래까지
+        // 내려야 보이고, 애플에서 버튼이 리퀴드 글래스가 아니라 평평해진다
+        bottomBar: _canEdit
+            ? BottomActionBar(
+                children: [
+                  BottomActionButton(
+                    id: 'member-delete',
+                    label: '삭제',
+                    // 되돌릴 수 없는 자리라 빨간 글래스다
+                    tint: AppColors.error,
+                    shrinkWrap: true,
+                    onPressed: _delete,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: BottomActionButton(
+                      id: 'member-edit',
+                      label: '정보 수정',
+                      onPressed: _edit,
+                    ),
+                  ),
+                ],
+              )
+            : null,
         child: ListView(
           padding: EdgeInsets.fromLTRB(
             20,
             PhoneDetailScaffold.topPadding,
             20,
-            bottomBarInset(context),
+            // 하단 고정 버튼에 마지막 카드가 가리지 않게
+            _canEdit
+                ? GlassBottomButton.inset(context)
+                : bottomBarInset(context),
           ),
           children: [
             // ── 누구인가 ──
@@ -433,31 +460,6 @@ class _MemberInfoDetailState extends State<_MemberInfoDetail> {
                 ],
               ),
             ),
-            // ── 고치기·지우기 ──
-            if (_canEdit) ...[
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: AppButton(
-                      label: '삭제',
-                      color: AppColors.error.withValues(alpha: 0.1),
-                      textColor: AppColors.error,
-                      onTap: _delete,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    flex: 2,
-                    child: AppButton(
-                      label: '정보 수정',
-                      filled: true,
-                      onTap: _edit,
-                    ),
-                  ),
-                ],
-              ),
-            ],
           ],
         ),
       ),

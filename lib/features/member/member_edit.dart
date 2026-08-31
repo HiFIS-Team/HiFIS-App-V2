@@ -168,25 +168,6 @@ class _MemberEditScreenState extends State<_MemberEditScreen> {
                 const SizedBox(height: 16),
                 const _Label('메모'),
                 _Field(controller: _memo, hint: '상담에서 들은 것', lines: 3),
-                const SizedBox(height: 28),
-                Center(
-                  child: Pressable(
-                    onTap: _delete,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      child: Text(
-                        '회원 삭제',
-                        style: AppTextStyles.body2.copyWith(
-                          color: AppColors.error,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
@@ -215,6 +196,15 @@ class _MemberEditScreenState extends State<_MemberEditScreen> {
             alignment: Alignment.bottomCenter,
             child: BottomActionBar(
               children: [
+                // 되돌릴 수 없는 자리라 빨간 글래스다
+                BottomActionButton(
+                  id: 'delete-member',
+                  label: '삭제',
+                  tint: AppColors.error,
+                  shrinkWrap: true,
+                  onPressed: _delete,
+                ),
+                const SizedBox(width: 8),
                 Expanded(
                   child: BottomActionButton(
                     id: 'save-member',

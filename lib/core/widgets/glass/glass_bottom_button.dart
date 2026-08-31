@@ -27,6 +27,7 @@ class BottomActionButton extends StatelessWidget {
     this.filled = true,
     this.tinted = true,
     this.shrinkWrap = false,
+    this.tint,
   });
 
   /// 테마가 바뀔 때 네이티브 버튼을 새로 만들기 위한 식별자
@@ -47,6 +48,15 @@ class BottomActionButton extends StatelessWidget {
   /// true면 글자 폭만큼만 차지한다 (취소 버튼처럼 옆에 붙일 때)
   final bool shrinkWrap;
 
+  /// 포인트 컬러 대신 쓸 색 — **되돌릴 수 없는 동작의 빨간 버튼**에만 준다
+  ///
+  /// 안 주면 [AppColors.primary] 다. 세 갈래(애플 글래스·안드 단색·PC
+  /// [AppButton])가 **같은 색으로 그려져야** 플랫폼마다 다른 버튼이 안 된다.
+  final Color? tint;
+
+  /// 색을 안 주면 포인트 컬러
+  Color get _tint => tint ?? AppColors.primary;
+
   /// 탭바와 같은 높이
   static const double height = 56;
 
@@ -58,7 +68,11 @@ class BottomActionButton extends StatelessWidget {
         onTap: onPressed,
         filled: filled,
         // 조건이 아직 안 갖춰진 상태 — 눌리는 자리라는 건 보이게 둔다
-        color: !filled && tinted ? AppColors.gray200 : null,
+        color: !filled && tinted
+            ? AppColors.gray200
+            : filled && tint != null
+            ? tint
+            : null,
         textColor: !filled && tinted ? AppColors.gray700 : null,
         shrinkWrap: shrinkWrap,
       );
@@ -69,7 +83,7 @@ class BottomActionButton extends StatelessWidget {
         key: ValueKey('$id-${AppColors.isDark}'),
         label: label,
         style: filled ? CNButtonStyle.prominentGlass : CNButtonStyle.glass,
-        tint: tinted ? AppColors.primary : null,
+        tint: tinted ? _tint : null,
         height: height,
         shrinkWrap: shrinkWrap,
         onPressed: onPressed,
@@ -84,7 +98,7 @@ class BottomActionButton extends StatelessWidget {
     final Color foreground;
     final Color border;
     if (filled) {
-      background = AppColors.primary;
+      background = _tint;
       foreground = Colors.white;
       border = Colors.transparent;
     } else if (tinted) {
