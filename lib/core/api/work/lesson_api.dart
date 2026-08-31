@@ -302,6 +302,37 @@ class MemberApi {
     return Member.fromJson(data);
   }
 
+  /// 회원 정보 수정 — **담당 트레이너 본인 · MASTER · ADMIN** (그 밖은 403)
+  ///
+  /// 안 넘긴 칸은 서버가 지금 값을 그대로 둔다. 담당 트레이너 변경은
+  /// 여기서 안 다룬다 (매출 귀속이 바뀌는 일이라 인사 쪽 화면 몫이다).
+  static Future<Member> update(
+    String id, {
+    String? name,
+    String? phone,
+    VisitPath? visitPath,
+    String? memo,
+  }) async {
+    final data = await ApiClient.instance.patch(
+      '/members/$id',
+      body: {
+        'name': ?name,
+        'phone': ?phone,
+        'visitPath': ?visitPath?.wire,
+        // **빈 글자도 뜻이 있다** (메모를 지우는 것) — null 일 때만 안 보낸다
+        'memo': ?memo,
+      },
+    );
+    return Member.fromJson(data!);
+  }
+
+  /// 회원 삭제 — **되돌릴 수 없다.** 부르기 전에 반드시 한 번 묻는다
+  ///
+  /// 등록권·세션 싸인·운동일지·동의와 거기서 쌓인 **매출·수업 점수까지**
+  /// 같이 걷힌다. 안 그러면 지워도 랭킹에 결제액이 남아 중복이 안 풀린다.
+  static Future<void> remove(String id) =>
+      ApiClient.instance.delete('/members/$id');
+
   /// 운동을 하는 이유 — **통째로 덮어쓴다** (빈 줄은 서버가 걸러 낸다)
   static Future<Member> updateGoals(String id, List<String> goals) async {
     final data = await ApiClient.instance.patch(
