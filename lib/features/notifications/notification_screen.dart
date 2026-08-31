@@ -294,6 +294,9 @@ enum NotificationTarget {
   meeting,
   staff,
 
+  /// 업무 탭 — 점수·칭찬·컴플레인 알림이 여기로 온다 (2026-08-31)
+  work,
+
   /// 사내톡 — 어느 방인지는 [requestedRoomId] 가 따로 들고 간다 (2026-08-19)
   chat,
 }
@@ -364,6 +367,10 @@ NotificationTarget? _targetOf(String? link) {
     'chat' => NotificationTarget.chat,
     // 조직도는 데스크톱에만 있다 — 폰에서는 읽음 처리만 된다
     'staff' => NotificationTarget.staff,
+    // 점수·칭찬·컴플레인 — 업무 탭 안이라 탭까지만 옮긴다.
+    // **예전부터 서버가 `/work` 를 보내고 있었는데 여기 자리가 없어서**
+    // 가산점·점수 되돌림 알림이 눌러도 안 움직였다 (2026-08-31)
+    'work' => NotificationTarget.work,
     _ => null,
   };
 }

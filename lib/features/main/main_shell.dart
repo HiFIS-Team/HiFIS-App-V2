@@ -156,6 +156,7 @@ class _MainShellState extends State<MainShell> {
       _paneNavKey.currentState?.popUntil((r) => r.isFirst);
       _paneIndex.value = switch (target) {
         NotificationTarget.project => 3,
+        NotificationTarget.work => 1,
         NotificationTarget.attendance => 9,
         NotificationTarget.salary => 10,
         NotificationTarget.notice => 11,
@@ -181,6 +182,7 @@ class _MainShellState extends State<MainShell> {
       setState(
         () => _androidTab = switch (target) {
           NotificationTarget.project => 2,
+          NotificationTarget.work => 1,
           NotificationTarget.attendance => 4,
           NotificationTarget.salary => 5,
           NotificationTarget.notice => 6,
@@ -200,6 +202,9 @@ class _MainShellState extends State<MainShell> {
         case NotificationTarget.project:
           _subMenu = false;
           _mainIndex = 2;
+        case NotificationTarget.work:
+          _subMenu = false;
+          _mainIndex = 1;
         case NotificationTarget.attendance:
           _subMenu = true;
           _subIndex = 1;
