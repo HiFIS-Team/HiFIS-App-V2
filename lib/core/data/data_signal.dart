@@ -54,3 +54,15 @@ void notifyAttendanceChanged() => attendanceChanged.value++;
 final approvalChanged = ValueNotifier<int>(0);
 
 void notifyApprovalChanged() => approvalChanged.value++;
+
+/// 세션 싸인이 방금 찍혔다
+///
+/// 싸인 한 건이 **PT 커미션**(급여)과 **수업왕 점수**를 같이 올린다. 그런데
+/// 급여 화면은 다른 탭이라 [ScreenRefresh] 의 1분 간격에 걸려서, 찍고 바로
+/// 넘어가면 **옛 금액이 그대로 떠 있었다** (2026-08-31 대표 요청).
+///
+/// 급여의 PT 커미션은 미리 저장해 둔 값이 아니라 `GET /payslips/me/accrued`
+/// 가 **부를 때마다 그 주기 싸인을 다시 세는** 값이라, 다시 받기만 하면 맞는다.
+final sessionSignChanged = ValueNotifier<int>(0);
+
+void notifySessionSignChanged() => sessionSignChanged.value++;

@@ -1,4 +1,5 @@
 import '../client/api_client.dart';
+import '../../data/data_signal.dart';
 
 export '../client/period.dart' show periodKey;
 
@@ -459,6 +460,9 @@ class SessionSignApi {
         'performedByTrainerId': ?performedByTrainerId,
       },
     );
+    // 급여 화면의 PT 커미션이 이 신호를 듣고 바로 다시 받는다.
+    // **화면이 아니라 여기서 쏜다** — 부르는 자리가 늘어도 안 빠뜨린다
+    notifySessionSignChanged();
     return SessionSignResult.fromJson(data!);
   }
 }

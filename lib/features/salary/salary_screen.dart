@@ -69,7 +69,11 @@ class _SalaryScreenState extends State<SalaryScreen>
 
   /// 급여 결재함·내 명세서 상태가 바뀐다
   @override
-  List<ValueNotifier<int>> get watchSignals => [approvalChanged];
+  List<ValueNotifier<int>> get watchSignals => [
+    approvalChanged,
+    // 싸인을 찍으면 PT 커미션이 바로 오른다
+    sessionSignChanged,
+  ];
 
   @override
   void initState() {
