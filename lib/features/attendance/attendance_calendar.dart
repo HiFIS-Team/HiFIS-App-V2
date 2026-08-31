@@ -313,13 +313,11 @@ class _DayCellState extends State<_DayCell> {
                 Spacer(),
                 if (leave != null)
                   _tag(
-                    // 갈래마다 제 이름으로 — 병가·기타가 `반차` 로 뜨면 안 된다
-                    switch (leave.kind) {
-                      _LeaveKind.full => '월차',
-                      _LeaveKind.half => '반차',
-                      _LeaveKind.sick => '병가',
-                      _LeaveKind.etc => '휴가',
-                    },
+                    // 갈래마다 제 이름으로 — 병가·기타가 `반차` 로 뜨면 안 된다.
+                    // **신청 화면의 칩과 같은 글자를 쓴다** — 여기에 따로 적어
+                    // 두면 갈래가 늘 때마다 두 곳을 고쳐야 한다 (실제로
+                    // 휴가가 생기면서 `기타` 가 '휴가' 로 떠 있었다)
+                    leave.kind.label,
                     AppColors.primary,
                     faded: leave.status == _LeaveStatus.pending,
                   )

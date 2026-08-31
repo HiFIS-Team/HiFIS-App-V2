@@ -654,6 +654,10 @@ class _LeaveComposerState extends State<_LeaveComposer> {
     if (widget.phone) {
       return PhoneDetailScaffold(
         title: '월차 및 휴가 신청',
+        // 배경을 흰색으로 두고 감싸던 카드를 뺀다 — 회색 위에 흰 카드가
+        // 얹혀 있으면 페이지가 아니라 **모달처럼 보인다** (2026-08-31).
+        // 프로젝트·일정·결재 폼이 먼저 같은 이유로 이렇게 갔다.
+        background: AppColors.surface,
         bottomBar: GlassBottomButton(
           label: '신청하기',
           active: _ready,
@@ -666,14 +670,7 @@ class _LeaveComposerState extends State<_LeaveComposer> {
             20,
             GlassBottomButton.inset(context),
           ),
-          children: [
-            // 입력칸(gray50)이 회색 배경에 묻히지 않게 흰 카드 위에 올린다
-            Container(
-              padding: EdgeInsets.fromLTRB(20, 20, 20, 22),
-              decoration: AppDecorations.card(),
-              child: _form(),
-            ),
-          ],
+          children: [_form()],
         ),
       );
     }

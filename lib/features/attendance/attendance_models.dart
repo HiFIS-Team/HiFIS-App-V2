@@ -121,8 +121,9 @@ class _Day {
 /// 화면 어디도 그걸로 갈리지 않아서, 고르게 하면 물어보기만 하고 안 쓰는 값이
 /// 된다. 서버는 칸을 남겨 두고 선택으로 받는다 — 다시 나누기로 하면 앱만 고친다.
 enum _LeaveKind {
-  full('종일', 1.0, LeaveType.annual, null),
+  full('월차', 1.0, LeaveType.annual, null),
   half('반차', 0.5, LeaveType.half, null),
+  vacation('휴가', 1.0, LeaveType.vacation, null),
   sick('병가', 0, LeaveType.sick, null),
   etc('기타', 0, LeaveType.etc, null);
 
@@ -148,6 +149,7 @@ enum _LeaveKind {
   /// [period] 는 안 본다 — 예전에 오전·오후로 낸 신청도 그냥 `반차`로 읽는다
   static _LeaveKind of(LeaveType type, HalfPeriod? period) => switch (type) {
     LeaveType.half => _LeaveKind.half,
+    LeaveType.vacation => _LeaveKind.vacation,
     LeaveType.sick => _LeaveKind.sick,
     // 외근은 앱에서 신청할 수 없지만 서버에 값이 있다 — 받으면 기타로 읽는다
     LeaveType.field || LeaveType.etc => _LeaveKind.etc,

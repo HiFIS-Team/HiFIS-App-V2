@@ -12,8 +12,11 @@ export '../../data/attendance_status.dart';
 /// 앱 화면은 '월차'만 다루지만 서버는 병가·외근까지 한 테이블에 담는다.
 /// 오전/오후 반차 구분은 서버에 없다 (backend-gap.md 15번).
 enum LeaveType {
-  annual('ANNUAL', '연차'),
+  annual('ANNUAL', '월차'),
   half('HALF', '반차'),
+
+  /// 휴가 (2026-08-31) — **월차와 같은 지갑**이다. 쓴 날수가 그대로 쌓인다
+  vacation('VACATION', '휴가'),
   sick('SICK', '병가'),
   field('FIELD', '외근'),
   etc('ETC', '기타');
