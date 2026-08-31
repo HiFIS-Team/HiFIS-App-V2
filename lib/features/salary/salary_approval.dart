@@ -31,152 +31,145 @@ bool get _canDecide => myRole.canApprove;
 /// MANAGER 는 본인도 급여를 신청해서 예전 화면 그대로다 (근태와 같은 기준).
 bool get _isPayBoss => myRole.boss;
 
-/// 급여 결재 카드 — '급여 신청서 작성' 자리를 대신한다
+/// 그 탭이 비었을 때 할 말
+String _boxEmptyText(PayslipStatus status) => switch (status) {
+  PayslipStatus.draft => '아직 안 낸 사람이 없어요',
+  PayslipStatus.submitted => '들어온 급여 신청이 없어요',
+  PayslipStatus.rejected => '반려한 급여가 없어요',
+  _ => '지급을 기다리는 급여가 없어요',
+};
+
+/// 그 상태를 가리키는 색 — 금액 배지에 입힌다
+Color _boxColor(PayslipStatus status) => switch (status) {
+  PayslipStatus.draft => AppColors.gray400,
+  PayslipStatus.submitted => AppColors.primary,
+  PayslipStatus.rejected => AppColors.error,
+  _ => AppColors.success,
+};
+
+/// 한 탭의 사람 목록 — **사람마다 카드 하나**
 ///
-/// **금액은 여기 안 적는다.** 화면 전체(8월 급여·최근 6개월·지급)가 이미
-/// 이 사람 것을 그리고 있어서, 카드에 또 적으면 같은 값이 두 벌이 된다.
-/// 여기서는 **누구 것을 보고 있는지**와 **처리 버튼**만 맡는다.
-///
-/// 여러 건이 밀려 있으면 오른쪽 끝 `1/2` 로 넘긴다 — 넘기면 화면 전체가
-/// 그 사람 것으로 바뀐다.
-class _PayrollDecideCard extends StatelessWidget {
-  _PayrollDecideCard({
-    required this.inbox,
-    required this.index,
-    required this.onMove,
-    required this.onApprove,
-    required this.onReject,
-    required this.onPay,
+/// 조직도·동료 평가·내 업무 명단과 같은 틀이다 (2026-08-31 요청). 같은 사람을
+/// 보는 자리인데 화면마다 줄 모양이 다르면 안 된다 — PC 는 공용 [PersonCard],
+/// 폰은 그 카드와 같은 결의 줄이다.
+class _PayrollBoxList extends StatelessWidget {
+  _PayrollBoxList({
+    required this.payslips,
+    required this.status,
+    required this.onOpen,
   });
 
-  final List<Payslip> inbox;
-  final int index;
+  final List<Payslip> payslips;
 
-  /// -1 이면 앞 건, 1 이면 뒷 건
-  final ValueChanged<int> onMove;
+  /// 이 탭이 담는 상태 — 빈 문구와 배지 색이 여기서 나온다
+  final PayslipStatus status;
 
-  final ValueChanged<Payslip> onApprove;
-  final ValueChanged<Payslip> onReject;
-  final ValueChanged<Payslip> onPay;
-
-  /// 신청이 있을 때의 높이 — 다 처리하고 나면 카드가 쪼그라들어
-  /// 옆 지급 카드와 어긋난다 (월차 결재에서 겪은 것과 같다)
-  static const _emptyHeight = 150.0;
+  final ValueChanged<Payslip> onOpen;
 
   @override
   Widget build(BuildContext context) {
-    final target = inbox.isEmpty
-        ? null
-        : inbox[index.clamp(0, inbox.length - 1)];
-
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(20),
-      decoration: AppDecorations.card(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    if (payslips.isEmpty) {
+      return EmptyCard(icon: CupertinoIcons.tray, text: _boxEmptyText(status));
+    }
+    // PC 는 폭이 남아서 두 칸으로 세운다 (내 업무 명단과 같은 규칙)
+    final columns = isDesktop ? 2 : 1;
+    final cards = [
+      for (final payslip in payslips)
+        _PayrollPersonCard(
+          payslip: payslip,
+          color: _boxColor(status),
+          onTap: () => onOpen(payslip),
+        ),
+    ];
+    if (columns == 1) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('급여 결재', style: AppTextStyles.label),
-          SizedBox(height: 16),
-          if (target == null)
-            SizedBox(
-              height: _emptyHeight,
-              child: Center(
-                child: EmptyCard(
-                  icon: CupertinoIcons.tray,
-                  text: '들어온 급여 신청이 없어요',
-                  framed: false,
-                ),
-              ),
-            )
-          else ...[
-            _PayrollDecideRow(
-              payslip: target,
-              index: index.clamp(0, inbox.length - 1),
-              total: inbox.length,
-              onMove: onMove,
-            ),
-            // 데스크톱은 옆 지급 카드와 높이를 맞추느라 남는 자리가 생긴다
-            if (isDesktop) Spacer() else SizedBox(height: 18),
-            if (isDesktop) SizedBox(height: 18),
-            // 서버가 처리를 MASTER 에게만 연다 — 눌러도 403 날 버튼은 안 보여준다
-            if (_canDecide)
-              if (target.status == PayslipStatus.approved)
-                // 승인은 끝났고 실제 입금만 남은 건
-                _PayButton(onTap: () => onPay(target))
-              else
-                DecideButtons(
-                  fill: true,
-                  onApprove: () => onApprove(target),
-                  onReject: () => onReject(target),
-                ),
+          for (var i = 0; i < cards.length; i++) ...[
+            if (i > 0) SizedBox(height: 12),
+            cards[i],
           ],
         ],
-      ),
+      );
+    }
+    return Column(
+      children: [
+        for (var row = 0; row * columns < cards.length; row++) ...[
+          if (row > 0) SizedBox(height: 12),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var col = 0; col < columns; col++) ...[
+                  if (col > 0) SizedBox(width: 12),
+                  Expanded(
+                    child: switch (row * columns + col) {
+                      final i when i < cards.length => cards[i],
+                      // 마지막 줄이 덜 찼으면 빈 자리로 둔다
+                      _ => SizedBox.shrink(),
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
 
-/// 지급 처리 버튼 — 승인된 건에만 뜬다
-class _PayButton extends StatelessWidget {
-  _PayButton({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => Pressable(
-    onTap: onTap,
-    child: Container(
-      height: 44,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        '지급 처리',
-        style: AppTextStyles.body2.copyWith(
-          fontWeight: FontWeight.w700,
-          color: Colors.white,
-        ),
-      ),
-    ),
-  );
-}
-
-/// 결재 대기 한 건 — 누구 것을 보고 있는지
-class _PayrollDecideRow extends StatelessWidget {
-  _PayrollDecideRow({
+/// 사람 한 명 — 아바타 · 이름 · 직급, 오른쪽에 실수령액
+class _PayrollPersonCard extends StatelessWidget {
+  _PayrollPersonCard({
     required this.payslip,
-    required this.index,
-    required this.total,
-    required this.onMove,
+    required this.color,
+    required this.onTap,
   });
 
   final Payslip payslip;
-  final int index;
-  final int total;
+  final Color color;
+  final VoidCallback onTap;
 
-  final ValueChanged<int> onMove;
+  Employee? get _person => StaffDirectory.instance.byId(payslip.employeeId);
+  String get _name => _person?.name ?? '알 수 없음';
 
-  String get _name =>
-      StaffDirectory.instance.byId(payslip.employeeId)?.name ?? '알 수 없음';
-
-  String get _month => '${int.parse(payslip.yearMonth.substring(5))}월 급여';
-
-  /// 지금 어느 단계인가 — 승인 대기냐, 입금만 남았냐
-  String get _stage =>
-      payslip.status == PayslipStatus.approved ? '승인 완료 · 지급 대기' : '승인 대기';
+  /// 이름 아래 한 줄 — 직급과 어느 달 것인지
+  String get _subtitle {
+    final rank = _person?.rank.label ?? '';
+    final month = '${_monthOf(payslip)}월 급여';
+    return rank.isEmpty ? month : '$rank · $month';
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+    final badge = _AmountBadge(
+      amount: payslip.net,
+      color: color,
+      // 본인이 고쳐서 낸 건은 열기 전에 표가 나야 한다
+      adjusted: payslip.adjusted,
+    );
+
+    if (isDesktop) {
+      return PersonCard(
+        name: _name,
+        subtitle: _subtitle,
+        color: _person?.color,
+        avatarUrl: _person?.avatarImageUrl,
+        trailing: badge,
+        onTap: onTap,
+      );
+    }
+
+    return Pressable(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.fromLTRB(20, 18, 20, 18),
+        decoration: AppDecorations.card(),
+        child: Row(
           children: [
-            Avatar(name: _name, size: 34),
-            SizedBox(width: 10),
+            Avatar(name: _name, size: 40, imageUrl: _person?.avatarImageUrl),
+            SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -185,13 +178,13 @@ class _PayrollDecideRow extends StatelessWidget {
                     _name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.body2.copyWith(
-                      fontWeight: FontWeight.w600,
+                    style: AppTextStyles.body1.copyWith(
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   SizedBox(height: 2),
                   Text(
-                    '$_month · $_stage',
+                    _subtitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: AppTextStyles.caption.copyWith(fontSize: 12),
@@ -199,49 +192,259 @@ class _PayrollDecideRow extends StatelessWidget {
                 ],
               ),
             ),
-            // 한 건뿐이면 셈이 필요 없다
-            if (total > 1) ...[
-              SizedBox(width: 8),
-              _arrow(CupertinoIcons.chevron_left, () => onMove(-1)),
-              Text(
-                '${index + 1}/$total',
-                style: AppTextStyles.caption.copyWith(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              _arrow(CupertinoIcons.chevron_right, () => onMove(1)),
-            ],
+            SizedBox(width: 8),
+            badge,
           ],
         ),
-        if (payslip.adjusted) ...[
-          SizedBox(height: 10),
-          _AdjustedNotice(payslip: payslip),
-        ],
-        if ((payslip.note ?? '').isNotEmpty) ...[
-          SizedBox(height: 10),
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppColors.gray50,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text('특이사항 · ${payslip.note}', style: AppTextStyles.caption),
+      ),
+    );
+  }
+}
+
+/// 오른쪽 금액 배지 — 내 업무 명단의 `3/5` 배지와 같은 모양
+class _AmountBadge extends StatelessWidget {
+  _AmountBadge({
+    required this.amount,
+    required this.color,
+    this.adjusted = false,
+  });
+
+  final int amount;
+  final Color color;
+
+  /// 본인이 커미션을 고쳐서 낸 건인가
+  final bool adjusted;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.end,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          _won(amount),
+          style: AppTextStyles.caption.copyWith(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: color,
           ),
-        ],
+        ),
+      ),
+      if (adjusted) ...[
+        SizedBox(height: 4),
+        Text(
+          '금액 수정',
+          style: AppTextStyles.caption.copyWith(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: AppColors.warning,
+          ),
+        ),
+      ],
+    ],
+  );
+}
+
+int _monthOf(Payslip payslip) => int.parse(payslip.yearMonth.substring(5));
+
+/// 신청 한 건을 열어 보는 화면 — **그 사람 급여 화면 그대로**
+///
+/// 목록에서 이름을 누르면 밀려 들어온다. 요약·추이·지급 카드는 본인이
+/// 보는 것과 **같은 위젯**이다 (두 화면이 갈리면 안 된다 — 2026-08-31 요청).
+/// 처리 버튼은 화면 아래에 붙는다 — iOS 는 네이티브 리퀴드 글래스다.
+///
+/// 명세서는 전역 [_payslips] 에 담긴다. 이 화면이 떠 있는 동안은 그 사람
+/// 것이고, 닫으면 부른 쪽이 다시 채운다.
+class _PayslipReview extends StatefulWidget {
+  _PayslipReview({required this.payslip});
+
+  final Payslip payslip;
+
+  @override
+  State<_PayslipReview> createState() => _PayslipReviewState();
+}
+
+class _PayslipReviewState extends State<_PayslipReview> {
+  /// 지금 보고 있는 명세서 — 처리하면 서버가 돌려준 것으로 갈린다
+  late Payslip _payslip = widget.payslip;
+
+  bool _ready = false;
+
+  /// 처리하는 중 — 두 번 눌러 두 번 보내지 않게 잠근다
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      await _loadPayslips(
+        employeeId: _payslip.employeeId,
+        month: _payslip.yearMonth,
+      );
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+    if (mounted) setState(() => _ready = true);
+  }
+
+  String get _name =>
+      StaffDirectory.instance.byId(_payslip.employeeId)?.name ?? '알 수 없음';
+
+  /// 처리 한 번 — **화면을 바로 바꾸고** 목록은 닫을 때 맞춘다
+  Future<void> _run(Future<Payslip> Function() action, String done) async {
+    if (_busy) return;
+    _busy = true;
+    try {
+      final updated = await action();
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _payslip = updated;
+        for (final row in _payslips) {
+          if (row.source?.id == updated.id) row.source = updated;
+        }
+      });
+      AppToast.show(context, done);
+      // 승인은 '지급 처리' 가 남아서 화면에 머문다. 지급·반려는 끝이라 닫는다
+      if (updated.status != PayslipStatus.approved) Navigator.pop(context);
+    } catch (error) {
+      _busy = false;
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+  }
+
+  void _approve() => _run(() => PayrollApi.approve(_payslip.id), '승인했어요');
+
+  Future<void> _reject() async {
+    final reason = await askRejectReason(context, hint: '예) 추가 근무 시간이 기록과 달라요');
+    if (reason == null || !mounted) return;
+    await _run(() => PayrollApi.reject(_payslip.id, reason), '반려했어요');
+  }
+
+  void _pay() => _run(() => PayrollApi.pay(_payslip.id), '지급 처리했어요');
+
+  /// 아래에 붙는 처리 버튼 — 서버가 MASTER 에게만 열어 준다
+  Widget? _actions() {
+    if (!_canDecide) return null;
+    if (_payslip.status == PayslipStatus.approved) {
+      return GlassBottomButton(label: '지급 처리', onPressed: _pay);
+    }
+    return BottomActionBar(
+      children: [
+        Expanded(
+          child: BottomActionButton(
+            id: 'pay-reject',
+            label: '반려',
+            filled: false,
+            tinted: false,
+            onPressed: _reject,
+          ),
+        ),
+        SizedBox(width: 10),
+        Expanded(
+          child: BottomActionButton(
+            id: 'pay-approve',
+            label: '승인',
+            onPressed: _approve,
+          ),
+        ),
       ],
     );
   }
 
-  Widget _arrow(IconData icon, VoidCallback onTap) => Pressable(
-    onTap: onTap,
-    child: Padding(
-      padding: EdgeInsets.all(5),
-      child: Icon(icon, size: 12, color: AppColors.textTertiary),
-    ),
-  );
+  /// 본인 화면과 같은 카드들 — 위젯을 새로 만들지 않는다
+  List<Widget> _cards() {
+    final current = _payslips.isEmpty ? null : _payslips.first;
+    if (current == null) return const [];
+    return [
+      _SummaryCard(payslip: current),
+      if (_payslip.adjusted) ...[
+        SizedBox(height: 12),
+        _AdjustedNotice(payslip: _payslip),
+      ],
+      if ((_payslip.note ?? '').isNotEmpty) ...[
+        SizedBox(height: 12),
+        Container(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: AppDecorations.card(),
+          child: Text(
+            '특이사항 · ${_payslip.note}',
+            style: AppTextStyles.caption.copyWith(height: 1.5),
+          ),
+        ),
+      ],
+      SizedBox(height: 12),
+      _TrendCard(),
+      SizedBox(height: 12),
+      _PayCard(payslip: current),
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final title = '$_name · ${_monthOf(_payslip)}월 급여';
+    final cards = _ready ? _cards() : const <Widget>[];
+    final actions = _actions();
+
+    if (!isDesktop) {
+      return PhoneDetailScaffold(
+        title: title,
+        bottomBar: actions,
+        child: ListView(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            PhoneDetailScaffold.topPadding,
+            20,
+            actions == null ? 32 : GlassBottomButton.inset(context),
+          ),
+          children: _ready
+              ? cards
+              : [SizedBox(height: 120, child: Center(child: DelayedSpinner()))],
+        ),
+      );
+    }
+
+    return Container(
+      width: dialogWidth(context, 620),
+      padding: EdgeInsets.fromLTRB(24, 22, 24, 18),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(title, style: AppTextStyles.title3),
+          SizedBox(height: 14),
+          Flexible(
+            child: ListView(
+              shrinkWrap: true,
+              children: _ready
+                  ? cards
+                  : [
+                      SizedBox(
+                        height: 120,
+                        child: Center(child: DelayedSpinner()),
+                      ),
+                    ],
+            ),
+          ),
+          if (actions != null) ...[SizedBox(height: 16), actions],
+        ],
+      ),
+    );
+  }
 }
 
 /// 결재함 한 덩어리 — 대기 · 지급 대기 · 처리 내역

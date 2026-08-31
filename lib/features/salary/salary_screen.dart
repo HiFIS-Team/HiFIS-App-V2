@@ -8,6 +8,7 @@ import '../../core/util/skeleton_delay.dart';
 
 import '../../core/api/client/api_exception.dart';
 import '../../core/api/staff/payroll_api.dart';
+import '../../core/data/employee.dart';
 import '../../core/data/staff.dart';
 import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
@@ -16,8 +17,10 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
 import '../../core/widgets/display/avatar.dart';
+import '../../core/widgets/display/person_card.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/widgets/feedback/app_toast.dart';
+import '../../core/widgets/feedback/delayed_spinner.dart';
 import '../../core/widgets/feedback/empty_card.dart';
 import '../../core/widgets/feedback/reject_reason_dialog.dart';
 import '../../core/widgets/feedback/skeleton.dart';
@@ -56,14 +59,37 @@ class _SalaryScreenState extends State<SalaryScreen>
   /// **MASTER·ADMIN 에게는 이 탭이 없다** — 화면 전체가 이미 결재 화면이다.
   int _tab = 0;
 
-  /// 결재를 기다리는 것 + 지급을 기다리는 것 (MASTER·ADMIN 화면이 이걸 따라간다)
-  List<Payslip> _inbox = const [];
+  /// 대표·관리자 결재함 — **할 일 기준으로 넷으로 가른다** (2026-08-31 요청)
+  ///
+  /// | 탭 | 담기는 것 | 여기서 하는 일 |
+  /// |---|---|---|
+  /// | 미제출 | `DRAFT` | 아직 안 낸 사람 — 볼 뿐이다 |
+  /// | 승인 | `SUBMITTED` | **승인·반려** |
+  /// | 반려 | `REJECTED` | 되돌려보낸 것 — 다시 낼 때까지 여기 있다 |
+  /// | 지급 | `APPROVED` | **지급 처리** |
+  ///
+  /// **지급까지 끝난 것(`PAID`)은 어느 탭에도 안 선다** — 할 일이 없다.
+  ///
+  /// 줄을 섞지 않는 것이 이 구조의 뜻이다. 예전에는 한 줄에 이어 붙여 놓고
+  /// `1/5` 로 넘겼는데, 승인하면 그 건이 지급 줄 끝으로 옮겨 가면서
+  /// **보던 자리에 다른 사람이 들어왔다.**
+  static const _boxLabels = ['미제출', '승인', '반려', '지급'];
+  static const _boxStatuses = [
+    PayslipStatus.draft,
+    PayslipStatus.submitted,
+    PayslipStatus.rejected,
+    PayslipStatus.approved,
+  ];
 
-  /// 지금 보고 있는 신청 순번
-  int _inboxIndex = 0;
+  /// 탭별 목록 — 위 차례와 같다
+  List<List<Payslip>> _boxes = const [[], [], [], []];
 
-  Payslip? get _target =>
-      _inbox.isEmpty ? null : _inbox[_inboxIndex.clamp(0, _inbox.length - 1)];
+  int _boxTab = 1;
+
+  List<Payslip> get _box => _boxes[_boxTab];
+
+  /// 들어온 것이 하나도 없나 — 그러면 대표·관리자도 본인 화면을 본다
+  bool get _boxEmpty => _boxes.every((rows) => rows.isEmpty);
 
   /// 탭에 다시 들어오거나 앱이 다시 앞으로 나왔을 때 조용히 다시 받는다
   @override
@@ -89,22 +115,28 @@ class _SalaryScreenState extends State<SalaryScreen>
         // 결재 대기(제출됨)가 먼저, 그다음 지급 대기(승인됨).
         // 대표·관리자는 자기 급여를 낼 일이 없어서 화면 전체가 이 사람들 것이다.
         // 두 함은 서로 상관없어서 한 번에 던진다 (하나씩 기다리면 왕복이 두 배)
-        final boxes = await Future.wait([
-          PayrollApi.box('inbox'),
-          PayrollApi.box('decided'),
-        ]);
-        final waiting = boxes[0];
-        final handled = boxes[1];
-        _inbox = [
-          ...waiting,
-          for (final p in handled)
-            if (p.status == PayslipStatus.approved) p,
-        ];
-        if (_inboxIndex >= _inbox.length) _inboxIndex = 0;
-        await _loadPayslips(
-          employeeId: _target?.employeeId,
-          month: _target?.yearMonth,
+        // 미제출까지 세워야 해서 상태를 안 가리고 한 번에 받는다.
+        // 오래된 달은 자른다 — 안 자르면 해가 갈수록 목록이 는다
+        final now = DateTime.now();
+        final rows = await PayrollApi.all(
+          from: yearMonthKey(DateTime(now.year, now.month - _monthsToLoad)),
         );
+        _boxes = [
+          for (final status in _boxStatuses)
+            [
+              for (final p in rows)
+                if (p.status == status) p,
+            ],
+        ];
+        // 보던 줄이 비면 뭐라도 있는 줄로 옮겨 준다 — 빈 칸을 보고 있을
+        // 이유가 없다. 아무 데도 없으면 그대로 두고 아래에서 본인 화면으로 간다
+        if (_box.isEmpty) {
+          final found = _boxes.indexWhere((rows) => rows.isNotEmpty);
+          if (found >= 0) _boxTab = found;
+        }
+        // 들어온 것이 하나도 없을 때만 본인 것을 받는다 — 목록만 그릴 때는
+        // 안 쓰는 값이라 그때 받으면 왕복만 는다
+        if (_boxEmpty) await _loadPayslips();
       } else {
         await _loadPayslips();
       }
@@ -114,84 +146,57 @@ class _SalaryScreenState extends State<SalaryScreen>
     if (mounted) setState(endLoad);
   }
 
-  /// 신청을 하나 넘긴다 — 화면 전체가 그 사람 것으로 바뀐다
-  Future<void> _moveInbox(int step) async {
-    if (_inbox.length < 2) return;
-    var next = (_inboxIndex + step) % _inbox.length;
-    if (next < 0) next += _inbox.length;
-    setState(() => _inboxIndex = next);
-    try {
-      await _loadPayslips(
-        employeeId: _target?.employeeId,
-        month: _target?.yearMonth,
-      );
-      if (mounted) setState(() {});
-    } catch (error) {
-      if (mounted) AppToast.show(context, messageOf(error));
-    }
-  }
-
-  /// 처리하는 중 — 두 번 눌러 두 번 보내지 않게 잠근다
-  bool _deciding = false;
-
-  /// 결재 한 건 처리 — **화면을 먼저 바꾸고** 목록은 뒤에서 맞춘다
+  /// 신청 한 건을 열어 본다 — **그 사람 급여 화면이 통째로 뜬다**
   ///
-  /// 예전에는 목록을 다 받은 뒤에야 버튼이 갈렸다. 처리 요청 하나에
-  /// **결재함 두 번 + 그 사람 명세서 한 번**이 더 붙어서, 승인을 눌러도
-  /// '지급 처리'로 바뀌기까지 한참 걸렸다 (2026-08-31 대표가 짚었다).
+  /// 처리하고 나오면 목록을 다시 받는다.
+  Future<void> _openReview(Payslip payslip) async {
+    await showFullPage<void>(context, (_) => _PayslipReview(payslip: payslip));
+    if (!mounted) return;
+    // 검토 화면이 전역 명세서 목록을 그 사람 것으로 채워 뒀다 — 되돌린다.
+    // 처리했든 그냥 봤든 다시 받는다 (안 했으면 같은 값이 온다)
+    await _load();
+    if (mounted) setState(() {});
+  }
+
+  /// 대표·관리자 화면 — **줄 두 개와 이름 목록**
   ///
-  /// 서버가 **바뀐 명세서를 그대로 돌려주므로** 그걸 그 자리에 끼우면 된다 —
-  /// 문서함 이동·즐겨찾기 별과 같은 방식이다. 실패하면 아무것도 안 바뀐다.
-  Future<void> _decide(Future<Payslip> Function() action, String done) async {
-    if (_deciding) return;
-    _deciding = true;
-    try {
-      final updated = await action();
-      if (!mounted) return;
-      setState(() {
-        _deciding = false;
-        _applyDecision(updated);
-      });
-      AppToast.show(context, done);
-      // 목록·명세서는 뒤에서 맞춘다 — 버튼은 이미 갈려 있다
-      unawaited(_load());
-    } catch (error) {
-      _deciding = false;
-      if (mounted) AppToast.show(context, messageOf(error));
+  /// 승인 대기와 지급 대기를 탭으로 가른다. 이름을 누르면 그 사람 급여
+  /// 화면이 밀려 들어오고, 처리 버튼은 그 화면 아래에 붙는다
+  /// (2026-08-31 대표 요청 — 예전에는 한 카드 안에서 `1/5` 로 넘겼다).
+  Widget _boxScreen() {
+    final tabs = SegmentedTabs(
+      labels: _boxLabels,
+      selected: _boxTab,
+      onSelect: (i) => setState(() => _boxTab = i),
+    );
+    final list = PaneTransition(
+      step: _boxTab,
+      child: _PayrollBoxList(
+        payslips: _box,
+        status: _boxStatuses[_boxTab],
+        onOpen: _openReview,
+      ),
+    );
+
+    if (!isDesktop) {
+      return PhoneListScaffold(title: '급여', filter: tabs, children: [list]);
     }
+    return Scaffold(
+      body: SafeArea(
+        bottom: false,
+        child: ListView(
+          padding: EdgeInsets.fromLTRB(24, 64, 24, 32),
+          children: [
+            DesktopHeader(title: '급여', subtitle: '들어온 급여 신청을 결재해요'),
+            SizedBox(height: 22),
+            tabs,
+            SizedBox(height: 16),
+            list,
+          ],
+        ),
+      ),
+    );
   }
-
-  /// 처리한 건을 결재함에 반영한다
-  ///
-  /// 남는 것은 **대기와 지급 대기**뿐이다 — 반려·지급 완료는 빠진다
-  /// ([_load] 가 세우는 것과 같은 규칙이라 뒤에서 맞춰도 안 어긋난다).
-  void _applyDecision(Payslip updated) {
-    final at = _inbox.indexWhere((p) => p.id == updated.id);
-    if (at < 0) return;
-    final next = [..._inbox];
-    if (updated.status == PayslipStatus.submitted ||
-        updated.status == PayslipStatus.approved) {
-      next[at] = updated;
-    } else {
-      next.removeAt(at);
-      if (_inboxIndex >= next.length) {
-        _inboxIndex = next.isEmpty ? 0 : next.length - 1;
-      }
-    }
-    _inbox = next;
-  }
-
-  Future<void> _approveTarget(Payslip payslip) =>
-      _decide(() => PayrollApi.approve(payslip.id), '승인했어요');
-
-  Future<void> _rejectTarget(Payslip payslip) async {
-    final reason = await askRejectReason(context, hint: '예) 추가 근무 시간이 기록과 달라요');
-    if (reason == null || !mounted) return;
-    await _decide(() => PayrollApi.reject(payslip.id, reason), '반려했어요');
-  }
-
-  Future<void> _payTarget(Payslip payslip) =>
-      _decide(() => PayrollApi.pay(payslip.id), '지급 처리했어요');
 
   void _openHistory(BuildContext context) {
     showFullPage<void>(context, (_) => _HistoryScreen());
@@ -240,6 +245,10 @@ class _SalaryScreenState extends State<SalaryScreen>
 
   @override
   Widget build(BuildContext context) {
+    // 대표·관리자에게 들어온 신청이 있으면 **줄부터 세운다.** 그때는 본인
+    // 명세서를 안 받으므로 아래 뼈대 조건(`_payslips.isEmpty`)에 걸리면 안 된다
+    if (_isPayBoss && !_boxEmpty && !showSkeleton) return _boxScreen();
+
     if (showSkeleton || _payslips.isEmpty) {
       if (!isDesktop) return _SalarySkeleton();
       return SkeletonDesktopPage(
@@ -306,23 +315,15 @@ class _SalaryScreenState extends State<SalaryScreen>
     final content = [
       _SummaryCard(payslip: current),
       SizedBox(height: 12),
-      // 대표·관리자는 자기 신청서를 낼 일이 없어서 이 자리를 결재함으로 쓴다
-      if (_isPayBoss)
-        _PayrollDecideCard(
-          inbox: _inbox,
-          index: _inboxIndex,
-          onMove: _moveInbox,
-          onApprove: _approveTarget,
-          onReject: _rejectTarget,
-          onPay: _payTarget,
-        )
-      else
+      // 여기까지 왔으면 들어온 신청이 없다 — 대표·관리자에게도 본인 화면이다
+      if (!_isPayBoss) ...[
         _StatusNotice(
           payslip: current,
           onSubmit: () => _submit(current),
           onCancel: () => _cancel(current),
         ),
-      SizedBox(height: 12),
+        SizedBox(height: 12),
+      ],
       _TrendCard(),
       SizedBox(height: 12),
       _PayCard(payslip: current),
@@ -395,22 +396,15 @@ class _SalaryScreenState extends State<SalaryScreen>
                 children: [
                   Expanded(child: _PayCard(payslip: current)),
                   SizedBox(width: 16),
-                  Expanded(
-                    child: _isPayBoss
-                        ? _PayrollDecideCard(
-                            inbox: _inbox,
-                            index: _inboxIndex,
-                            onMove: _moveInbox,
-                            onApprove: _approveTarget,
-                            onReject: _rejectTarget,
-                            onPay: _payTarget,
-                          )
-                        : _StatusNotice(
-                            payslip: current,
-                            onSubmit: () => _submit(current),
-                            onCancel: () => _cancel(current),
-                          ),
-                  ),
+                  // 여기까지 왔으면 들어온 신청이 없다 (있으면 목록 화면이다)
+                  if (!_isPayBoss)
+                    Expanded(
+                      child: _StatusNotice(
+                        payslip: current,
+                        onSubmit: () => _submit(current),
+                        onCancel: () => _cancel(current),
+                      ),
+                    ),
                 ],
               ),
             ),

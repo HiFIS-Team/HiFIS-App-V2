@@ -399,6 +399,22 @@ class PayrollApi {
   // ---------------------------------------------------------------------
 
   /// 결재함 — [box] 는 `inbox`(대기 중) · `decided`(처리한 것)
+  /// 결재함 전부 — **상태를 안 가린다** (미제출까지 온다)
+  ///
+  /// `box` 는 대기(SUBMITTED)와 처리됨(APPROVED·PAID·REJECTED)만 갈라 주는데,
+  /// 대표 화면이 **미제출(DRAFT)** 도 줄로 세우게 되면서 그 둘로는 모자란다.
+  /// [from] 으로 오래된 달을 잘라 낸다 — 안 자르면 해가 갈수록 목록이 는다.
+  static Future<List<Payslip>> all({String? from, String? branchId}) async {
+    final rows = await _client.getList(
+      '/payslips',
+      query: {'from': ?from, 'branchId': ?branchId},
+    );
+    return [
+      for (final row in rows)
+        Payslip.fromJson((row as Map).cast<String, dynamic>()),
+    ];
+  }
+
   static Future<List<Payslip>> box(
     String box, {
     String? yearMonth,
