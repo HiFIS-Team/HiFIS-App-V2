@@ -34,12 +34,17 @@ const _icons = <String, IconData>{
   'line.3.horizontal.decrease.circle.fill': Icons.filter_alt_rounded,
   'message': Icons.chat_bubble_outline_rounded,
   'person': Icons.person_outline_rounded,
+  // 사람 필터가 걸려 있을 때 (`PickFilterButton`) — 채운 아이콘으로 알린다
+  'person.fill': Icons.person_rounded,
   // 회원 관리 — 데스크톱 사이드바의 '회원'과 같은 아이콘이다
   'person.2': Icons.people_alt_rounded,
   // 프로젝트 상세 헤더의 인원 추가 — 본문 `+` 동그라미와 같은 아이콘이다
   'person.badge.plus': Icons.person_add_alt_rounded,
   'plus': Icons.add_rounded,
   'square.and.pencil': Icons.edit_rounded,
+  // 환경정비 항목 필터 (`PickFilterButton`) — 걸리면 채운다
+  'tag': Icons.label_outline_rounded,
+  'tag.fill': Icons.label_rounded,
   'trash': Icons.delete_outline_rounded,
   'xmark': Icons.close_rounded,
   // 하단 탭바

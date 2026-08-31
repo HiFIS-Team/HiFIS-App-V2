@@ -59,7 +59,11 @@ class PickFilterButton extends StatefulWidget {
   /// 메뉴 줄에 붙는 아이콘 — 애플이 아닐 때 쓴다
   final IconData icon;
 
-  /// 같은 아이콘의 SF 심볼 이름 — 아이폰 네이티브 메뉴가 쓴다
+  /// 같은 아이콘의 SF 심볼 이름 — **버튼과 네이티브 메뉴가 같이 쓴다**
+  ///
+  /// 버튼은 걸려 있으면 `.fill` 을 붙인 것으로 바꾼다 (`person` →
+  /// `person.fill`). 새 값을 쓸 때는 **둘 다** [sfSymbols] 매핑표에 넣는다 —
+  /// 안 넣으면 안드로이드·윈도우에서 빈 원이 된다.
   final String symbol;
 
   @override
@@ -77,9 +81,12 @@ class _PickFilterButtonState extends State<PickFilterButton> {
 
   /// 걸려 있으면 채운 아이콘 — 버튼이 아이콘 하나라 고른 것의 **이름**은
   /// 메뉴를 열어야 보인다. 최소한 "지금 걸려 있다"는 건 알 수 있게 한다.
-  String get _symbol => widget.selected == null
-      ? 'line.3.horizontal.decrease'
-      : 'line.3.horizontal.decrease.circle.fill';
+  ///
+  /// **거르는 대상을 그린다** (사람이면 사람, 항목이면 태그). 예전에는 둘 다
+  /// 필터 아이콘이었는데, 환경정비에서 두 버튼이 나란히 서면서 어느 쪽이
+  /// 무엇인지 구분이 안 됐다 (2026-08-31).
+  String get _symbol =>
+      widget.selected == null ? widget.symbol : '${widget.symbol}.fill';
 
   Future<void> _openMenu() async {
     if (_open) return;
