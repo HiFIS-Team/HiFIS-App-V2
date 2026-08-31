@@ -80,7 +80,18 @@ class _PeerReviewSectionState extends State<PeerReviewSection>
   /// 폰 목록 필터 — 남은 게 용건이라 '평가 전'부터 연다
   _Filter _filter = _Filter.pending;
 
-  String get _period => periodKey(DateTime.now());
+  /// 지금 평가를 쓸 수 있나 — **서버가 정한다**
+  ///
+  /// 평가는 매월 **말일과 다음 달 1일** 이틀만 열린다 (2026-08-31 대표 결정).
+  /// 못 받았을 때는 닫힌 것으로 두고 시작한다 — 열어 뒀다가 다 쓰고 나서
+  /// 제출에서 400 이 나면 그게 더 나쁘다.
+  PeerWindow _window = PeerWindow.closed;
+
+  /// 보고 있는 달 — 열려 있으면 지금 창, 닫혀 있으면 마지막 창이다.
+  ///
+  /// **오늘 날짜로 세지 않는다.** 9월 1일에 쓰는 평가는 9월이 아니라 **8월**
+  /// 것이고, 9월 15일에 읽는 것도 8월 것이다. 서버가 알려 준다.
+  String get _period => _window.period ?? periodKey(DateTime.now());
 
   /// 평가를 쓰는 사람인가 — 대표·관리자는 현황만 본다
   bool get _canReview => currentUser?.role.doesFieldWork ?? false;
@@ -101,9 +112,12 @@ class _PeerReviewSectionState extends State<PeerReviewSection>
   Future<void> _load() async {
     final me = currentUser;
     try {
-      final reviews = await PeerReviewApi.list(period: _period);
+      // 창을 먼저 받아야 어느 달을 볼지 정해진다 — 목록이 그 값에 매달린다
+      final window = await PeerReviewApi.window();
+      final reviews = await PeerReviewApi.list(period: window.period);
       if (!mounted) return;
       setState(() {
+        _window = window;
         _targets = _targetsOf(me);
         _all = reviews;
         // 대표·관리자는 남이 쓴 평가까지 오므로 내가 쓴 것만 남긴다
@@ -124,9 +138,13 @@ class _PeerReviewSectionState extends State<PeerReviewSection>
     }
   }
 
-  /// 평가 대상 — 같은 지점에서 **현장 업무를 하는 사람**(직원·점장), 본인이 맨 앞
+  /// 평가 대상 — 같은 지점에서 **현장 업무를 하는 재직자**(직원·점장), 본인이 맨 앞
   ///
   /// 대표·관리자는 운영 전담이라 평가하지도, 평가받지도 않는다.
+  ///
+  /// **서버 `review_targets` 와 같은 규칙이어야 한다.** 갈리면 화면이 세는 수와
+  /// 감점을 매기는 수가 달라진다 — 퇴사자를 안 걸렀을 때 실제로 그랬다.
+  /// 모달은 서버 값으로 '남은 2명' 이라는데 화면에는 3줄이 서 있었다.
   static List<Employee> _targetsOf(Employee? me) {
     if (me == null || !me.role.doesFieldWork) return const [];
     return [
@@ -134,10 +152,21 @@ class _PeerReviewSectionState extends State<PeerReviewSection>
       for (final employee in StaffDirectory.instance.employees)
         if (employee.branchId == me.branchId &&
             employee.id != me.id &&
-            employee.role.doesFieldWork)
+            employee.role.doesFieldWork &&
+            // 나간 사람은 평가하지 않는다 — 서버도 안 센다
+            employee.status == EmployeeStatus.active)
           employee,
     ];
   }
+
+  /// 이 사람을 눌러서 열 수 있나 — null 이면 안 눌린다
+  ///
+  /// 창이 닫혀 있어도 **이미 낸 것은 읽을 수 있다.** 못 여는 것은 아직 안 낸
+  /// 사람뿐이다 — 지난달에 뭐라고 썼는지는 언제든 볼 수 있어야 한다.
+  VoidCallback? _tapOf(Employee person) =>
+      _window.isOpen || _mine.containsKey(person.id)
+      ? () => _openForm(person)
+      : null;
 
   /// 평가 작성 — 폰은 밀려 들어오고 PC는 모달로 뜬다
   ///
@@ -185,6 +214,7 @@ class _PeerReviewSectionState extends State<PeerReviewSection>
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (!_window.isOpen) ...[_ClosedNotice(), SizedBox(height: 14)],
           _FilterTabs(
             selected: _filter,
             onSelect: (filter) => setState(() => _filter = filter),
@@ -206,7 +236,7 @@ class _PeerReviewSectionState extends State<PeerReviewSection>
                 person: shown[i],
                 isSelf: shown[i].id == currentUser?.id,
                 review: _mine[shown[i].id],
-                onTap: () => _openForm(shown[i]),
+                onTap: _tapOf(shown[i]),
               ),
             ],
         ],
@@ -218,6 +248,7 @@ class _PeerReviewSectionState extends State<PeerReviewSection>
       // 사람이 적으면 통째로 가운데로 밀린다 — 조직도에서 겪었다)
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (!_window.isOpen) ...[_ClosedNotice(), SizedBox(height: 14)],
         _ReviewProgress(done: done.length, total: _targets.length),
         SizedBox(height: 16),
         // 흰 카드로 감싸지 않는다 — 조직도처럼 머리말 선으로만 가른다
@@ -251,11 +282,37 @@ class _PeerReviewSectionState extends State<PeerReviewSection>
                   person: person,
                   isSelf: person.id == currentUser?.id,
                   done: _mine.containsKey(person.id),
-                  onTap: () => _openForm(person),
+                  onTap: _tapOf(person),
                 ),
             ],
           ),
       ],
     );
   }
+}
+
+/// 평가 창이 닫혔을 때의 안내 한 줄
+///
+/// **명단은 그대로 두고 이 줄만 더한다** (2026-08-31 결정). 탭을 통째로
+/// 감추면 한 달에 이틀만 생겼다 사라져서 자리를 못 외운다. 지난달에 낸 것은
+/// 눌러서 그대로 읽힌다 — 못 여는 것은 아직 안 낸 사람뿐이다.
+///
+/// 모양은 급여 신청서·세션 등록의 각주와 같다 (info_circle 13 · gray400).
+class _ClosedNotice extends StatelessWidget {
+  _ClosedNotice();
+
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Icon(CupertinoIcons.info_circle, size: 13, color: AppColors.gray400),
+      SizedBox(width: 5),
+      Expanded(
+        child: Text(
+          '동료평가는 매월 말일과 다음 달 1일에만 열려요',
+          style: AppTextStyles.caption.copyWith(fontSize: 12, height: 1.5),
+        ),
+      ),
+    ],
+  );
 }

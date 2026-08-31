@@ -2587,6 +2587,19 @@
     "leadership"
    ]
   },
+  "PeerWindowOut": {
+   "properties": {
+    "isOpen": {},
+    "period": {
+     "nullable": true
+    },
+    "remaining": {},
+    "total": {}
+   },
+   "required": [
+    "isOpen"
+   ]
+  },
   "PersonHit": {
    "properties": {
     "avatarColor": {},

@@ -93,6 +93,54 @@ class PeerReview {
   final DateTime submittedAt;
 }
 
+/// 지금 동료평가를 쓸 수 있나 (서버 `PeerWindowOut`)
+///
+/// **평가는 매월 말일과 다음달 1일 이틀만 열린다** (2026-08-31 대표 결정).
+/// 그 이틀이 아니면 서버가 제출을 안 받는다 — 화면도 같이 잠근다.
+///
+/// **날짜를 앱이 세지 않는다.** 대상 명단 규칙(같은 지점 현장 인원)이 양쪽에
+/// 있으면 언젠가 갈리는데, 갈리면 화면에는 다 냈다고 나오고 서버는 안 냈다고
+/// 20점을 깎는다.
+class PeerWindow {
+  PeerWindow({
+    required this.isOpen,
+    required this.period,
+    required this.total,
+    required this.remaining,
+  });
+
+  factory PeerWindow.fromJson(Map<String, dynamic> json) => PeerWindow(
+    isOpen: json['isOpen'] as bool? ?? false,
+    period: json['period'] as String?,
+    total: json['total'] as int? ?? 0,
+    remaining: json['remaining'] as int? ?? 0,
+  );
+
+  /// 닫혀 있을 때의 값 — 못 받았을 때도 이걸 쓴다 (열어 주면 제출에서 400)
+  static final closed = PeerWindow(
+    isOpen: false,
+    period: null,
+    total: 0,
+    remaining: 0,
+  );
+
+  final bool isOpen;
+
+  /// 이 창이 평가하는 달 (`2026-08`) — 닫혀 있으면 null
+  ///
+  /// **말일과 1일이 같은 값을 준다.** 9월 1일에 쓰는 평가는 8월 것이다.
+  final String? period;
+
+  /// 내가 평가해야 할 사람 수 — 대표·관리자는 0
+  final int total;
+
+  /// 그중 아직 안 낸 수 — 0 이면 다 낸 것이다
+  final int remaining;
+
+  /// 재촉할 자리인가 — 열려 있는데 남은 것이 있다
+  bool get needsNudge => isOpen && remaining > 0;
+}
+
 /// `/peer-reviews` — 동료 평가
 class PeerReviewApi {
   PeerReviewApi._();
@@ -116,6 +164,14 @@ class PeerReviewApi {
       for (final row in rows)
         PeerReview.fromJson((row as Map).cast<String, dynamic>()),
     ];
+  }
+
+  /// 지금 평가를 쓸 수 있는지 + 내가 몇 명 남았는지
+  ///
+  /// 못 받으면 **닫힌 것으로 본다** — 열어 뒀다가 제출에서 400 이 나면
+  /// 다 쓰고 나서 튕기는 셈이라 그게 더 나쁘다.
+  static Future<PeerWindow> window() async {
+    return PeerWindow.fromJson(await _client.get('/peer-reviews/window'));
   }
 
   /// 평가 제출 — 다섯 항목의 별점과 사유가 모두 있어야 한다

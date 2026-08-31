@@ -34,6 +34,7 @@ import '../notice/notice_screen.dart';
 import '../notifications/notification_screen.dart';
 import '../profile/profile_screen.dart';
 import '../project/project_screen.dart';
+import '../work/peer_review/peer_review_modal.dart';
 import '../ranking/ranking_screen.dart';
 import '../salary/salary_screen.dart';
 import '../schedule/schedule_screen.dart';
@@ -61,15 +62,21 @@ class _MainShellState extends State<MainShell> {
     super.initState();
     requestedScreen.addListener(_onRequestedScreen);
     PushGuard.tappedLink.addListener(_onPushTap);
-    // 앱을 열 때 마감 임박 프로젝트를 한 장 짚어 준다.
+    // 앱을 열 때 짚어 줄 것을 한 장 띄운다 — 동료평가 재촉 · 마감 임박 프로젝트.
     //
     // **여기서만 부른다** — `AppLifecycleState.resumed` 에 걸면 다른 창을 잠깐
     // 보고 돌아올 때마다 요청이 나간다 (홈에서 실제로 겪었다, macos.md 3번).
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    //
+    // **둘을 겹쳐 띄우지 않는다.** 동료평가 창(말일·1일)에 마감이 겹치면 X 를
+    // 두 번 눌러야 한다. 동료평가가 먼저인 이유는 **창이 이틀뿐이고 안 내면
+    // 20점이 깎이기** 때문이다 — 마감 모달은 다음에 켤 때 그대로 뜬다.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       // 꺼져 있던 앱을 푸시로 켜면 셸이 뜨기 **전에** 링크가 도착해 있다
       _onPushTap();
-      showProjectDueModal(context);
+      final nudged = await showPeerReviewModal(context);
+      if (!mounted || nudged) return;
+      await showProjectDueModal(context);
     });
   }
 

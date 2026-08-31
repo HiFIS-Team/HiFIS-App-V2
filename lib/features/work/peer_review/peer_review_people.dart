@@ -115,7 +115,9 @@ class _PersonCard extends StatelessWidget {
   /// 이미 낸 평가 — 없으면 아직 안 한 사람이다
   final PeerReview? review;
 
-  final VoidCallback onTap;
+  /// null 이면 **안 눌린다** — 평가 창이 닫혔고 아직 안 낸 사람이다.
+  /// 공용 [PersonCard] 와 같은 규칙이라 손가락 커서도 안 뜬다.
+  final VoidCallback? onTap;
 
   /// 준 별점의 평균 (5개 항목)
   double get _average {
@@ -128,82 +130,81 @@ class _PersonCard extends StatelessWidget {
     final done = review != null;
     final color = done ? AppColors.success : AppColors.primary;
 
-    return Pressable(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.fromLTRB(20, 18, 20, 18),
-        decoration: AppDecorations.card(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Avatar(name: person.name, size: 40),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              person.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppTextStyles.body1.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
+    final card = Container(
+      padding: EdgeInsets.fromLTRB(20, 18, 20, 18),
+      decoration: AppDecorations.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Avatar(name: person.name, size: 40),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            person.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.body1.copyWith(
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                          if (isSelf) ...[
-                            SizedBox(width: 6),
-                            _Chip(text: '나', color: AppColors.primary),
-                          ],
+                        ),
+                        if (isSelf) ...[
+                          SizedBox(width: 6),
+                          _Chip(text: '나', color: AppColors.primary),
                         ],
-                      ),
-                      SizedBox(height: 2),
-                      Text(
-                        isSelf ? '본인 평가' : person.rank.label,
-                        style: AppTextStyles.caption.copyWith(fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(width: 8),
-                _StatusBadge(done: done),
-              ],
-            ),
-            SizedBox(height: 14),
-            Row(
-              children: [
-                for (var i = 1; i <= peerStarCount; i++) ...[
-                  if (i > 1) SizedBox(width: 3),
-                  Icon(
-                    done && i <= _average.round()
-                        ? CupertinoIcons.star_fill
-                        : CupertinoIcons.star,
-                    size: 15,
-                    color: done ? color : AppColors.gray300,
-                  ),
-                ],
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    done ? _average.toStringAsFixed(1) : '아직 평가하지 않았어요',
-                    style: AppTextStyles.caption.copyWith(
-                      fontSize: 12,
-                      fontWeight: done ? FontWeight.w700 : FontWeight.w400,
-                      color: done ? color : AppColors.textTertiary,
+                      ],
                     ),
-                  ),
+                    SizedBox(height: 2),
+                    Text(
+                      isSelf ? '본인 평가' : person.rank.label,
+                      style: AppTextStyles.caption.copyWith(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(width: 8),
+              _StatusBadge(done: done),
+            ],
+          ),
+          SizedBox(height: 14),
+          Row(
+            children: [
+              for (var i = 1; i <= peerStarCount; i++) ...[
+                if (i > 1) SizedBox(width: 3),
+                Icon(
+                  done && i <= _average.round()
+                      ? CupertinoIcons.star_fill
+                      : CupertinoIcons.star,
+                  size: 15,
+                  color: done ? color : AppColors.gray300,
                 ),
               ],
-            ),
-          ],
-        ),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  done ? _average.toStringAsFixed(1) : '아직 평가하지 않았어요',
+                  style: AppTextStyles.caption.copyWith(
+                    fontSize: 12,
+                    fontWeight: done ? FontWeight.w700 : FontWeight.w400,
+                    color: done ? color : AppColors.textTertiary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
+    // 공용 [PersonCard] 와 같은 규칙 — onTap 이 null 이면 안 감싼다
+    return onTap == null ? card : Pressable(onTap: onTap!, child: card);
   }
 }
 
@@ -265,7 +266,10 @@ class _PersonTile extends StatelessWidget {
 
   final Employee person;
   final bool isSelf;
-  final VoidCallback onTap;
+
+  /// null 이면 **안 눌린다** — 평가 창이 닫혔고 아직 안 낸 사람이다.
+  /// 공용 [PersonCard] 와 같은 규칙이라 손가락 커서도 안 뜬다.
+  final VoidCallback? onTap;
   final bool done;
 
   @override

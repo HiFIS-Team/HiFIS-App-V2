@@ -60,6 +60,25 @@ const _writeInMaxLength = 80;
 ///
 /// 5개 평가 항목을 밑줄 탭으로 전환하며 항목별 점수와 상세를 보여준다.
 /// 환경정비는 서버 데이터로 돌고, 나머지 항목은 아직 목업이다.
+/// 업무 화면의 **동료 평가** 탭 번호 — `_items` 순서와 같아야 한다
+///
+/// 밖에서 이 탭을 열려고 번호를 손으로 적으면, 항목이 하나 늘 때 조용히
+/// 딴 탭이 열린다. 이름을 붙여 한 자리에 둔다.
+const workPeerReviewTab = 1;
+
+/// 업무 화면을 **어느 탭으로** 열지 — 넣고 나서 화면을 요청한다
+///
+/// ```dart
+/// requestedWorkTab.value = workPeerReviewTab;
+/// requestedScreen.value = NotificationTarget.work;
+/// ```
+///
+/// 동료평가 재촉 모달이 쓴다. 그냥 업무 화면만 요청하면 첫 탭(환경정비)이
+/// 열려서 한 번 더 찾아야 한다.
+///
+/// **화면이 아직 안 만들어져 있어도 된다** — 뜰 때 `initState` 가 집어 간다.
+final requestedWorkTab = ValueNotifier<int?>(null);
+
 class WorkScreen extends StatefulWidget {
   WorkScreen({super.key});
 
@@ -159,6 +178,10 @@ class _WorkScreenState extends State<WorkScreen>
   void initState() {
     super.initState();
     branchScope.addListener(_onBranchScope);
+    requestedWorkTab.addListener(_onRequestedTab);
+    // 셸보다 늦게 만들어졌으면 요청이 이미 들어와 있다. 여기서는 setState 를
+    // 못 부르므로(빌드 전이다) 값만 바로 넣는다
+    if (_pickTab() case final tab?) _tab = tab;
     _loadEnv();
     // 첫 화면이 환경정비라 여기서 한 번 맞춘다
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -169,9 +192,29 @@ class _WorkScreenState extends State<WorkScreen>
   @override
   void dispose() {
     branchScope.removeListener(_onBranchScope);
+    requestedWorkTab.removeListener(_onRequestedTab);
     // 안 비우면 다른 탭에서도 이 버튼이 남는다
     headerAction.value = null;
     super.dispose();
+  }
+
+  /// 들어온 탭 요청을 꺼내 온다 — **꺼내면서 비운다** (한 번만 듣는다)
+  int? _pickTab() {
+    final tab = requestedWorkTab.value;
+    if (tab == null) return null;
+    requestedWorkTab.value = null;
+    return tab >= 0 && tab < _items.length ? tab : null;
+  }
+
+  /// 밖에서 '이 탭으로 열어 달라' 고 했다 (동료평가 재촉 모달)
+  void _onRequestedTab() {
+    // **mounted 를 먼저 본다** — `_pickTab` 이 꺼내면서 비우므로, 못 쓸 때
+    // 부르면 요청이 그냥 사라진다
+    if (!mounted) return;
+    if (_pickTab() case final tab?) {
+      setState(() => _tab = tab);
+      _syncHeaderAction();
+    }
   }
 
   /// 헤더에서 지점을 바꿨다 — 이 화면이 들고 있는 것만 다시 받는다.

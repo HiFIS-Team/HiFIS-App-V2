@@ -1,0 +1,21 @@
+import asyncio
+from datetime import date, datetime, timedelta, timezone
+from app.core.periods import KST
+from app.services.peer_reviews import is_last_day, period_of_window, open_period
+
+print("── 창 판정 ──")
+for d in ["2026-08-29", "2026-08-30", "2026-08-31", "2026-09-01", "2026-09-02",
+          "2026-09-29", "2026-09-30", "2026-10-01", "2026-02-28", "2026-02-29",
+          "2026-12-31", "2027-01-01"]:
+    day = date.fromisoformat(d)
+    print(f"  {d} ({day:%a})  말일={is_last_day(day)!s:5}  기간={period_of_window(day)}")
+
+print("\n── 지금 (KST) ──")
+now = datetime.now(timezone.utc).astimezone(KST)
+print(f"  {now:%Y-%m-%d %H:%M %Z}  →  열린 기간 = {open_period()}")
+
+print("\n── 2월 윤년 경계 ──")
+# 2028 은 윤년
+for d in ["2028-02-28", "2028-02-29", "2028-03-01"]:
+    day = date.fromisoformat(d)
+    print(f"  {d}  기간={period_of_window(day)}")
