@@ -126,6 +126,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// 자리를 잡기 전까지는 더 불러오지도, 따라가지도 않는다.
   bool _settled = false;
 
+  /// 바닥에 앉히기 전에는 목록을 **감춘다**
+  ///
+  /// 어디가 바닥인지는 한 번 그려 봐야 안다 (사진 높이가 그때 정해진다).
+  /// 그래서 그린 다음 프레임에 옮기는데, **그 한 프레임이 눈에 띈다** —
+  /// 글만 있는 방은 마지막 줄이 입력바에 가렸다가 올라오고, 사진이 있는 방은
+  /// 맨 위가 보였다가 아래로 내려간다 (2026-08-31 대표가 짚었다).
+  ///
+  /// 감추는 것은 목록뿐이다 — 헤더·입력바는 [Stack] 의 다른 자식이라 그대로 있다.
+  bool _placed = false;
+
   /// 파일을 올리는 중 — 두 번 눌러 두 번 보내지 않게 잠근다
   bool _uploading = false;
 
@@ -196,7 +206,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     // 들어가자마자 바닥이어야 한다 — 위에서 스르륵 내려오면 어수선하다
     _scrollToBottom(animate: false);
     // 바닥에 섬을 확인한 뒤에야 위로 더 불러오기를 푸다
-    WidgetsBinding.instance.addPostFrameCallback((_) => _settled = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _settled = true;
+      // 안전망 — 빈 방이거나 못 받아왔으면 위에서 안 켜진다
+      if (!_placed && mounted) setState(() => _placed = true);
+    });
   }
 
   /// 새 메시지가 들어오면 아래에 붙어 있던 화면은 따라 내려간다
@@ -210,7 +224,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         _scrollController.position.pixels >=
             _scrollController.position.maxScrollExtent - 80;
     setState(() {});
-    if (atBottom) _scrollToBottom();
+    // 첫 목록이 들어올 때는 **옮긴다** — 스르륵 내리면 맨 위에서 아래로
+    // 미끄러지는 게 그대로 보인다. 그 뒤에 오는 새 글만 스르륵 내려간다
+    if (atBottom) _scrollToBottom(animate: _settled);
     // 열어 둔 방에 새 글이 오면 바로 읽은 것으로 친다
     if (_room?.unreadCount case final unread? when unread > 0) {
       _store.markRead(_roomId);
@@ -310,7 +326,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// **사용자가 스크롤을 잡으면 즉시 그만둔다** — 위로 올려 보는 것을 붙잡으면 안 된다.
   void _scrollToBottom({bool animate = true}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scrollController.hasClients) return;
+      if (!mounted || !_scrollController.hasClients) return;
       final bottom = _scrollController.position.maxScrollExtent;
       if (animate) {
         _scrollController.animateTo(
@@ -321,6 +337,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       } else {
         _scrollController.jumpTo(bottom);
       }
+      // 자리를 잡았으니 이제 보여준다 — 빈 목록에는 안 켠다 (아직 받는 중이라
+      // 켜 두면 '오늘' 한 줄만 떴다가 대화가 채워지는 게 보인다)
+      if (!_placed && _messages.isNotEmpty) setState(() => _placed = true);
       _pinToBottom(
         after: animate ? Duration(milliseconds: 260) : Duration.zero,
       );
@@ -737,60 +756,65 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         children: [
           SafeArea(
             bottom: false,
-            child: ListView(
-              controller: _scrollController,
-              // 하단 여백은 입력바 높이(52+10)에 딱 맞게 — 고정 120이면
-              // 홈 인디케이터가 없는 데스크톱에서 마지막 말풍선과 너무 벌어진다
-              padding: EdgeInsets.fromLTRB(
-                20,
-                70,
-                20,
-                MediaQuery.paddingOf(context).bottom + 72,
+            // 바닥에 앉기 전에는 안 그린다 ([_placed]) — 자리를 잡는 한 프레임이
+            // 눈에 띈다. `Opacity(0)` 은 **자리는 재고 그리지만 않는다**
+            child: Opacity(
+              opacity: _placed ? 1 : 0,
+              child: ListView(
+                controller: _scrollController,
+                // 하단 여백은 입력바 높이(52+10)에 딱 맞게 — 고정 120이면
+                // 홈 인디케이터가 없는 데스크톱에서 마지막 말풍선과 너무 벌어진다
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  70,
+                  20,
+                  MediaQuery.paddingOf(context).bottom + 72,
+                ),
+                children: [
+                  Center(child: Text('오늘', style: AppTextStyles.caption)),
+                  SizedBox(height: 16),
+                  for (var index = 0; index < _messages.length; index++)
+                    _messageRow(
+                      _messages[index],
+                      desktop,
+                      index == 0 ||
+                          !_sameMessageMinute(
+                            _messages[index - 1],
+                            _messages[index],
+                          ),
+                      index == _messages.length - 1 ||
+                          !_sameMessageMinute(
+                            _messages[index],
+                            _messages[index + 1],
+                          ),
+                    ),
+                  if (_readLabel case final label?)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Padding(
+                        padding: EdgeInsets.only(right: 4),
+                        child: Text(
+                          label,
+                          style: AppTextStyles.caption.copyWith(fontSize: 12),
+                        ),
+                      ),
+                    ),
+                  if (_typingLabel case final label?)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: EdgeInsets.only(left: 4, top: 4),
+                        child: Text(
+                          label,
+                          style: AppTextStyles.caption.copyWith(
+                            fontSize: 12,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
-              children: [
-                Center(child: Text('오늘', style: AppTextStyles.caption)),
-                SizedBox(height: 16),
-                for (var index = 0; index < _messages.length; index++)
-                  _messageRow(
-                    _messages[index],
-                    desktop,
-                    index == 0 ||
-                        !_sameMessageMinute(
-                          _messages[index - 1],
-                          _messages[index],
-                        ),
-                    index == _messages.length - 1 ||
-                        !_sameMessageMinute(
-                          _messages[index],
-                          _messages[index + 1],
-                        ),
-                  ),
-                if (_readLabel case final label?)
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Padding(
-                      padding: EdgeInsets.only(right: 4),
-                      child: Text(
-                        label,
-                        style: AppTextStyles.caption.copyWith(fontSize: 12),
-                      ),
-                    ),
-                  ),
-                if (_typingLabel case final label?)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Padding(
-                      padding: EdgeInsets.only(left: 4, top: 4),
-                      child: Text(
-                        label,
-                        style: AppTextStyles.caption.copyWith(
-                          fontSize: 12,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
             ),
           ),
           // 상단 고정 프로스트 — 대화가 헤더 뒤로 흐려진다
