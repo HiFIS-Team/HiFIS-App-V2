@@ -34,6 +34,7 @@ import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/input/see_all_button.dart';
 import '../../core/widgets/nav/pick_filter_button.dart';
 import '../../core/widgets/nav/desktop_header.dart';
+import '../member/member_info.dart';
 import 'contribution/contribution_section.dart';
 import 'lesson/lesson_section.dart';
 import 'my_task/my_task_section.dart';
@@ -112,16 +113,44 @@ class _WorkScreenState extends State<WorkScreen>
   /// 헤더 `+` 로 업무를 추가하면 오른다 — [MyTaskSection] 이 다시 받는다
   int _myTaskReload = 0;
 
-  /// 화면 왼쪽 끝의 `+` 를 켜고 끈다
+  /// 화면 왼쪽 끝 버튼을 켜고 끈다 — 탭마다 다른 것이 선다
   ///
-  /// **환경정비 탭에 있는 내내 둔다.** 공통 업무 / 내 업무 칸을 옮길 때마다
-  /// 켰다 껐다 하면 버튼이 생겼다 없어져서 그게 곧 깜빡임이다.
+  /// | 탭 | 버튼 |
+  /// |---|---|
+  /// | 환경정비 | `+` 내 업무 추가 (직접 수행하는 사람만) |
+  /// | 수업 개수 | 사람 — **회원 목록** (2026-08-31 대표 요청) |
+  ///
+  /// **환경정비의 `+` 는 그 탭에 있는 내내 둔다.** 공통 업무 / 내 업무 칸을
+  /// 옮길 때마다 켰다 껐다 하면 버튼이 생겼다 없어져서 그게 곧 깜빡임이다.
   /// 공통 업무를 보다가 눌러도 되게, 만들고 나면 내 업무 칸으로 옮겨 준다.
-  void _syncHeaderAction() => _setHeaderAction(
-    _canDoEnv && _envTab != 2 && _items[_tab].checklist
-        ? HeaderAction(symbol: 'plus', onPressed: _addMyTask)
-        : null,
-  );
+  void _syncHeaderAction() {
+    final item = _items[_tab];
+    if (item.checklist) {
+      _setHeaderAction(
+        _canDoEnv && _envTab != 2
+            ? HeaderAction(symbol: 'plus', onPressed: _addMyTask)
+            : null,
+      );
+      return;
+    }
+    // **권한을 안 가린다.** 목록을 보는 것뿐이고, 누가 무엇을 보는지는
+    // 회원 화면이 스스로 가른다 (담당자는 본인 것, 대표·관리자는 전체).
+    // 폰에서 대표가 회원 목록에 닿는 길이 여기 하나다
+    _setHeaderAction(
+      item.members
+          ? HeaderAction(symbol: 'person', onPressed: _openMembers)
+          : null,
+    );
+  }
+
+  /// 회원 정보를 연다 — 헤더 왼쪽 끝 사람 버튼 (2026-08-31 대표 요청)
+  ///
+  /// **운동일지 화면이 아니다.** 저기(`운동 일지` 버튼)는 회원을 고르면 일지가
+  /// 열리는 수업 흐름이고, 여기는 활성·만료로 갈라 보고 인적 사항을 고치거나
+  /// 지우는 자리다.
+  void _openMembers() {
+    showFullPage<void>(context, (_) => MemberInfoScreen());
+  }
 
   /// **한 프레임 뒤에** 바꾼다
   ///
@@ -418,7 +447,7 @@ class _WorkScreenState extends State<WorkScreen>
     _WorkItem(label: '환경정비', checklist: true),
     _WorkItem(label: '동료 평가'),
     _WorkItem(label: '회원 친절도'),
-    _WorkItem(label: '수업 개수'),
+    _WorkItem(label: '수업 개수', members: true),
     _WorkItem(label: '센터 기여도'),
   ];
 
