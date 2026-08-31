@@ -18,7 +18,6 @@ import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/feedback/empty_card.dart';
 import '../../core/widgets/feedback/skeleton.dart';
-import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/glass/glass_search_bar.dart';
 import '../../core/widgets/input/app_button.dart';
 import '../../core/widgets/input/mode_switch.dart';
@@ -238,10 +237,9 @@ class _MemberScreenState extends State<MemberScreen>
     if (!isDesktop) {
       return PhoneDetailScaffold(
         title: '회원 관리',
-        actions: [
-          if (_canRegister)
-            GlassIconButton(symbol: 'person.badge.plus', onPressed: _register),
-        ],
+        // **머리말에 회원 추가를 안 둔다** (2026-08-31 대표 요청) — 이 화면은
+        // 업무 탭 '수업 개수' 의 `운동 일지` 로 들어오는데, 바로 옆에 `회원
+        // 등록` 버튼이 이미 서 있어서 같은 일이 두 자리에 있었다.
         bottomBar: search,
         child: ListView(
           padding: EdgeInsets.fromLTRB(
