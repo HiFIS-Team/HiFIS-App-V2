@@ -20,6 +20,7 @@ import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/feedback/empty_card.dart';
 import '../../core/widgets/feedback/skeleton.dart';
 import '../../core/widgets/glass/glass_bottom_button.dart';
+import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/nav/phone_scaffold.dart';
 import '../../core/widgets/input/mode_switch.dart';
@@ -310,10 +311,6 @@ class _MemberInfoDetailState extends State<_MemberInfoDetail> {
   Future<void> _edit() async {
     final result = await showMemberEdit(context, _member);
     if (!mounted || result == null) return;
-    if (result == MemberEditResult.deleted) {
-      Navigator.pop(context, true);
-      return;
-    }
     try {
       final fresh = await MemberApi.detail(_member.id);
       if (!mounted) return;
@@ -364,29 +361,20 @@ class _MemberInfoDetailState extends State<_MemberInfoDetail> {
       },
       child: PhoneDetailScaffold(
         title: '${_member.name} 회원님',
-        // 고치기·지우기는 **하단 고정 글래스**다 — 스크롤 안에 두면 아래까지
-        // 내려야 보이고, 애플에서 버튼이 리퀴드 글래스가 아니라 평평해진다
+        // 지우기는 **우측 상단 휴지통** — 운동일지·공지·회의록과 같은 자리다.
+        // 아래에 빨간 버튼으로 두면 '정보 수정' 옆에서 눈에 먼저 들어온다
+        actions: [
+          if (_canEdit)
+            GlassIconButton(
+              symbol: 'trash',
+              stableId: 'member-info-delete',
+              onPressed: _delete,
+            ),
+        ],
+        // 고치기는 **하단 고정 글래스** — 스크롤 안에 두면 아래까지 내려야
+        // 보이고, 애플에서 버튼이 리퀴드 글래스가 아니라 평평해진다
         bottomBar: _canEdit
-            ? BottomActionBar(
-                children: [
-                  BottomActionButton(
-                    id: 'member-delete',
-                    label: '삭제',
-                    // 되돌릴 수 없는 자리라 빨간 글래스다
-                    tint: AppColors.error,
-                    shrinkWrap: true,
-                    onPressed: _delete,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: BottomActionButton(
-                      id: 'member-edit',
-                      label: '정보 수정',
-                      onPressed: _edit,
-                    ),
-                  ),
-                ],
-              )
+            ? GlassBottomButton(label: '정보 수정', onPressed: _edit)
             : null,
         child: ListView(
           padding: EdgeInsets.fromLTRB(

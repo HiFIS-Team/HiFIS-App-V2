@@ -21,7 +21,6 @@ import '../../core/widgets/feedback/empty_card.dart';
 import '../../core/widgets/feedback/skeleton.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/nav/phone_scaffold.dart';
-import 'member_edit.dart';
 import 'workout_log.dart';
 
 /// 회원 한 명 — 인적 사항 · 운동을 하는 이유 · PT 일지 · 개인 운동
@@ -33,16 +32,9 @@ import 'workout_log.dart';
 /// 회차에 뭐를 했나" 를 한 번에 훑어야 한다. 탭으로 나누면 한 번 훑어 내리면
 /// 될 것을 세 번 눌러야 아는 것으로 바꿄다.
 class MemberDetailScreen extends StatefulWidget {
-  const MemberDetailScreen({super.key, required this.member, this.onDeleted});
+  const MemberDetailScreen({super.key, required this.member});
 
   final Member member;
-
-  /// 회원이 지워졌다 — **데스크톱만 준다.**
-  ///
-  /// 폰은 밀려 들어온 화면이라 그냥 닫으면 목록으로 나가는데, 데스크톱은
-  /// 오른쪽 칸에 **박혀 있어서** `Navigator.pop` 을 부르면 회원 관리 화면이
-  /// 통째로 닫힌다. 그래서 부모가 고른 줄을 비우고 목록을 다시 받는다.
-  final VoidCallback? onDeleted;
 
   @override
   State<MemberDetailScreen> createState() => _MemberDetailScreenState();
@@ -50,12 +42,6 @@ class MemberDetailScreen extends StatefulWidget {
 
 class _MemberDetailScreenState extends State<MemberDetailScreen>
     with SkeletonDelay<MemberDetailScreen> {
-  /// 화면이 그리는 회원 — **수정하면 갈아끼운다.**
-  ///
-  /// `widget.member` 를 그대로 쓰면 이름을 고쳐도 목록이 넘겨준 옛 값이라
-  /// 이 화면만 안 바뀐다 (목록은 뒤에서 다시 받는다).
-  late Member _member = widget.member;
-
   List<WorkoutLog> _pt = const [];
   List<WorkoutLog> _personal = const [];
 
@@ -101,14 +87,14 @@ class _MemberDetailScreenState extends State<MemberDetailScreen>
   /// 다른 트레이너의 회원은 **보기만 한다.** 서버도 같은 줄로 막는다
   /// (`NOT_MY_MEMBER`) — 여기서 감추는 건 헛걸음을 줄이려는 것뿐이다.
   bool get _canWrite =>
-      myRole.boss || currentUser?.id == _member.ownerTrainerId;
+      myRole.boss || currentUser?.id == widget.member.ownerTrainerId;
 
   Future<void> _load() async {
     try {
       // 등록권도 같이 받는다 — **다음 회차 번호가 여기서 나온다**.
       // 일지가 한 장도 없는 옛 회원은 이미 받은 싸인 수가 곧 진도다
-      final request = MemberApi.registrations(_member.id);
-      final logs = await WorkoutApi.list(_member.id);
+      final request = MemberApi.registrations(widget.member.id);
+      final logs = await WorkoutApi.list(widget.member.id);
       final registrations = await request;
       if (!mounted) return;
       setState(() {
@@ -144,7 +130,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen>
 
   Future<void> _reload() async {
     try {
-      final logs = await WorkoutApi.list(_member.id);
+      final logs = await WorkoutApi.list(widget.member.id);
       if (mounted) setState(() => _split(logs));
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
@@ -182,7 +168,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen>
     if (_savingGoals) return;
     setState(() => _savingGoals = true);
     try {
-      final saved = await MemberApi.updateGoals(_member.id, _goalTexts);
+      final saved = await MemberApi.updateGoals(widget.member.id, _goalTexts);
       if (!mounted) return;
       setState(() {
         _savedGoals = List.of(saved.goals);
@@ -216,7 +202,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen>
     }
     final changed = await showWorkoutLog(
       context,
-      member: _member,
+      member: widget.member,
       kind: log.kind,
       editable: _canWrite,
       log: log,
@@ -242,7 +228,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen>
     }
     final changed = await showWorkoutLog(
       context,
-      member: _member,
+      member: widget.member,
       kind: WorkoutKind.pt,
       editable: true,
       nextSessionNo: next,
@@ -253,45 +239,17 @@ class _MemberDetailScreenState extends State<MemberDetailScreen>
   Future<void> _addPersonal() async {
     if (isDesktop) {
       setState(
-        () =>
-            _view = const _LogView(kind: WorkoutKind.personal, editable: true),
+        () => _view = const _LogView(kind: WorkoutKind.personal, editable: true),
       );
       return;
     }
     final changed = await showWorkoutLog(
       context,
-      member: _member,
+      member: widget.member,
       kind: WorkoutKind.personal,
       editable: true,
     );
     if (changed == true) await _reload();
-  }
-
-  // ── 회원 정보 고치기·지우기 ─────────────────────
-
-  /// 회원 정보를 고치거나 지운다 — **담당 트레이너 본인과 대표·관리자만**
-  ///
-  /// 지우면 이 화면을 닫는다. 목록은 뒤에서 다시 받으므로 나가면 사라져 있다.
-  Future<void> _edit() async {
-    final result = await showMemberEdit(context, _member);
-    if (!mounted || result == null) return;
-    if (result == MemberEditResult.deleted) {
-      if (widget.onDeleted case final onDeleted?) {
-        onDeleted();
-      } else {
-        Navigator.pop(context, true);
-      }
-      return;
-    }
-    // 고친 값을 바로 그린다 — 목록이 넘겨준 옛 값이 이름표에 남으면 안 된다
-    try {
-      final fresh = await MemberApi.detail(_member.id);
-      if (!mounted) return;
-      setState(() => _member = fresh);
-      AppToast.show(context, '고쳤어요');
-    } catch (error) {
-      if (mounted) AppToast.show(context, messageOf(error));
-    }
   }
 
   // ── 회원에게 보내는 주소 ───────────────────────
@@ -302,7 +260,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen>
 
   /// 회원이 로그인 없이 자기 수업을 보는 주소
   String? get _trainingLink {
-    final token = _member.trainingToken;
+    final token = widget.member.trainingToken;
     return token == null ? null : 'https://hifis.app/training/$token';
   }
 
@@ -316,7 +274,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen>
   // ── 화면 ─────────────────────────────────
 
   List<Widget> _sections() => [
-    _ProfileCard(member: _member, onEdit: _canWrite ? _edit : null),
+    _ProfileCard(member: widget.member),
     if (_trainingLink case final link?) ...[
       const SizedBox(height: 12),
       _LinkCard(link: link, onCopy: _copyLink),
@@ -459,7 +417,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen>
   Widget build(BuildContext context) {
     if (!isDesktop) {
       return PhoneDetailScaffold(
-        title: '${_member.name} 회원님',
+        title: '${widget.member.name} 회원님',
         child: ListView(
           padding: EdgeInsets.fromLTRB(
             20,
@@ -474,7 +432,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen>
     if (_view case final view?) {
       return WorkoutLogScreen(
         key: ValueKey(view.log?.id ?? 'new-${view.kind.name}'),
-        member: _member,
+        member: widget.member,
         kind: view.kind,
         editable: view.editable,
         log: view.log,
@@ -489,7 +447,10 @@ class _MemberDetailScreenState extends State<MemberDetailScreen>
         children: [
           Padding(
             padding: const EdgeInsets.only(left: 4, bottom: 18),
-            child: Text('${_member.name} 회원님', style: AppTextStyles.title3),
+            child: Text(
+              '${widget.member.name} 회원님',
+              style: AppTextStyles.title3,
+            ),
           ),
           ..._sections(),
         ],
@@ -697,12 +658,9 @@ class _AddButton extends StatelessWidget {
 
 /// 인적 사항 — 이름·전화 아래에 담당·지점·방문 경로를 칸으로 세운다
 class _ProfileCard extends StatelessWidget {
-  const _ProfileCard({required this.member, this.onEdit});
+  const _ProfileCard({required this.member});
 
   final Member member;
-
-  /// 고칠 수 있는 사람에게만 준다 — 없으면 `수정` 이 안 뜬다
-  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -740,25 +698,6 @@ class _ProfileCard extends StatelessWidget {
                   ],
                 ),
               ),
-              // 이름 오른쪽 끝의 작은 글자 — '운동을 하는 이유' 의 `저장` 과
-              // 같은 결이다. 아이콘을 두면 카드에 없던 요소가 는다
-              if (onEdit case final onEdit?)
-                Pressable(
-                  onTap: onEdit,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 4,
-                    ),
-                    child: Text(
-                      '수정',
-                      style: AppTextStyles.caption.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
             ],
           ),
           const SizedBox(height: 18),

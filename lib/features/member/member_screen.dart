@@ -319,12 +319,6 @@ class _MemberScreenState extends State<MemberScreen>
                     // 회원을 바꾸면 상세를 새로 그린다 (일지·스크롤 초기화)
                     key: ValueKey(selected.source.id),
                     member: selected.source,
-                    // 오른쪽 칸에 박혀 있어서 스스로 닫을 수 없다 —
-                    // 고른 줄을 비우고 목록을 다시 받는다
-                    onDeleted: () {
-                      setState(() => _selected = null);
-                      _load();
-                    },
                   ),
           ),
         ],

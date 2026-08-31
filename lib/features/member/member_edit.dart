@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/api/client/api_exception.dart';
@@ -16,9 +15,6 @@ import '../../core/widgets/input/pressable.dart';
 enum MemberEditResult {
   /// 고쳤다 — 상세를 다시 받는다
   saved,
-
-  /// 지웠다 — 상세를 닫고 목록으로 나간다
-  deleted,
 }
 
 /// 회원 정보 고치기 — **담당 트레이너 본인과 대표·관리자만** 연다
@@ -28,6 +24,9 @@ enum MemberEditResult {
 ///
 /// **담당 트레이너는 여기서 안 바꾼다** — 매출 귀속이 따라 움직이는 값이라
 /// 인사 쪽에서 다룰 일이다. 서버도 관리자에게만 열어 두었다.
+///
+/// **지우는 자리도 아니다.** 삭제는 회원 정보 상세의 휴지통 하나뿐이다 —
+/// 고치러 들어와서 지우는 버튼이 같이 서 있으면 잘못 누른다.
 Future<MemberEditResult?> showMemberEdit(BuildContext context, Member member) =>
     showFullPage<MemberEditResult>(
       context,
@@ -107,32 +106,6 @@ class _MemberEditScreenState extends State<_MemberEditScreen> {
     }
   }
 
-  Future<void> _delete() async {
-    if (_busy) return;
-    final ok = await showConfirmDialog(
-      context,
-      title: '${widget.member.name} 회원님을 삭제할까요?',
-      // 무엇이 같이 사라지는지 말해 준다 — 되돌릴 수 없는 자리다
-      message: '등록권 · 세션 싸인 · 운동일지가 함께 지워지고 되돌릴 수 없어요',
-      confirmLabel: '삭제',
-      destructive: true,
-      icon: CupertinoIcons.trash,
-      iconColor: AppColors.error,
-    );
-    if (!ok || !mounted) return;
-
-    setState(() => _busy = true);
-    try {
-      await MemberApi.remove(widget.member.id);
-      if (!mounted) return;
-      Navigator.pop(context, MemberEditResult.deleted);
-    } catch (error) {
-      if (!mounted) return;
-      setState(() => _busy = false);
-      AppToast.show(context, messageOf(error));
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -196,15 +169,6 @@ class _MemberEditScreenState extends State<_MemberEditScreen> {
             alignment: Alignment.bottomCenter,
             child: BottomActionBar(
               children: [
-                // 되돌릴 수 없는 자리라 빨간 글래스다
-                BottomActionButton(
-                  id: 'delete-member',
-                  label: '삭제',
-                  tint: AppColors.error,
-                  shrinkWrap: true,
-                  onPressed: _delete,
-                ),
-                const SizedBox(width: 8),
                 Expanded(
                   child: BottomActionButton(
                     id: 'save-member',
