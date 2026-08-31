@@ -53,6 +53,17 @@ abstract final class PhotoCache {
     final file = _fileOf(url);
     if (_have.contains(key)) return file;
     if (!file.existsSync()) return null;
+    // **0바이트면 없는 셈 친다.** 빈 몸으로 200 이 오면 안 남기게 막아 뒀지만
+    // (`_download`), 그 전에 이미 남은 기기가 있다. 그대로 두면 여기서 계속
+    // 돌려줘서 **영영 못 읽는 사진**이 된다 — 지우고 다시 받게 한다
+    try {
+      if (file.lengthSync() == 0) {
+        file.deleteSync();
+        return null;
+      }
+    } catch (_) {
+      return null;
+    }
     _have.add(key);
     return file;
   }
