@@ -237,13 +237,18 @@ class _Attachments extends StatelessWidget {
     children: [
       Icon(CupertinoIcons.doc, size: 15, color: tint),
       SizedBox(width: 6),
-      ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: 200),
-        child: Text(
-          _nameOf(url),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: AppTextStyles.body2.copyWith(color: tint),
+      // **[Flexible] 이 있어야 한다.** 사진이 안 떴을 때 이 줄이 사진 자리
+      // ([_width] = 220) 안에 들어가는데, 아이콘 15 + 틈 6 + 글자 200 이라
+      // 딱 1px 이 넘쳤다 (노란 빗금이 떴다). 남은 폭까지만 쓰게 한다
+      Flexible(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: 200),
+          child: Text(
+            _nameOf(url),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.body2.copyWith(color: tint),
+          ),
         ),
       ),
     ],

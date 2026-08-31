@@ -10,6 +10,7 @@ import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
 import '../../core/data/staff_directory.dart';
 import '../../core/util/photo.dart';
+import '../../core/util/photo_cache.dart';
 
 /// 사내톡 상태 한 곳
 ///
@@ -252,10 +253,13 @@ class ChatStore extends ChangeNotifier {
   /// 무한정 쌓이지 않게 이만큼만 들고 있는다 (넘으면 오래된 것부터 버린다)
   static const _localCopyKeep = 40;
 
-  String? localCopyOf(String url) => _localCopies[url];
+  /// **파일 이름으로 찾는다** — 주소를 그대로 키로 쓰면 안 된다.
+  /// 서버가 내려줄 때마다 서명(`?exp&sig`)을 새로 붙여서, 올릴 때 받은 주소와
+  /// 보낸 뒤 돌려받은 주소가 글자로는 다르다. 이름은 uuid 라 겹치지 않는다
+  String? localCopyOf(String url) => _localCopies[PhotoCache.keyOf(url)];
 
   void _rememberLocal(String url, String path) {
-    _localCopies[url] = path;
+    _localCopies[PhotoCache.keyOf(url)] = path;
     while (_localCopies.length > _localCopyKeep) {
       _localCopies.remove(_localCopies.keys.first);
     }
