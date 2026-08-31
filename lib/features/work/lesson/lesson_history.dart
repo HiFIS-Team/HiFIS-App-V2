@@ -315,9 +315,9 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
                 alignment: Alignment.topRight,
                 child: Padding(
                   padding: EdgeInsets.only(top: 8, right: 16),
-                  child: PeopleFilterButton(
+                  child: PickFilterButton(
                     stableId: 'lesson-trainer',
-                    people: _trainers,
+                    options: _trainers,
                     selected: _trainerId,
                     onSelect: (id) => setState(() => _trainerId = id),
                   ),

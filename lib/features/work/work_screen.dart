@@ -32,7 +32,7 @@ import '../../core/widgets/input/app_button.dart';
 import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/input/see_all_button.dart';
-import '../../core/widgets/nav/people_filter_button.dart';
+import '../../core/widgets/nav/pick_filter_button.dart';
 import '../../core/widgets/nav/desktop_header.dart';
 import 'contribution/contribution_section.dart';
 import 'lesson/lesson_section.dart';
@@ -324,6 +324,8 @@ class _WorkScreenState extends State<WorkScreen>
       (_) => _HistoryScreen(
         myLogs: _myLogs,
         allLogs: List.of(_logs),
+        // 항목 필터 메뉴를 이걸로 세운다 — 대표·관리자와 '전 지점' 은 비어 있다
+        items: _envItems,
         // 날짜를 옮기면 그 화면이 직접 다시 받는다 — 어느 지점인지 넘겨준다
         branchId: _branch,
         initialAll: all,

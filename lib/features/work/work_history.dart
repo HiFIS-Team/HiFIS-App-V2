@@ -120,6 +120,7 @@ class _HistoryScreen extends StatefulWidget {
     required this.myLogs,
     required this.allLogs,
     required this.branchId,
+    this.items = const [],
     this.initialAll = false,
     this.tabs = true,
   });
@@ -130,6 +131,12 @@ class _HistoryScreen extends StatefulWidget {
 
   /// 날짜를 옮길 때 다시 받을 지점 (null 이면 전 지점)
   final String? branchId;
+
+  /// 이 지점의 환경정비 항목 — **항목 필터 메뉴를 이걸로 세운다**
+  ///
+  /// 비어 있을 수 있다. 업무 화면이 대표·관리자와 '전 지점' 에는 항목을
+  /// 안 받는다 (겹쳐 오거나 안 쓰므로). 그때는 그날 기록에서 뽑아 세운다.
+  final List<EnvItem> items;
 
   /// 어느 쪽으로 열지 (데스크톱은 누른 카드에 맞춰 연다)
   final bool initialAll;
@@ -171,14 +178,43 @@ class _HistoryScreenState extends State<_HistoryScreen>
   /// 서버에 다시 묻지 않고 **받아 둔 그날 기록에서 거른다.**
   String? _personId;
 
+  /// 오른쪽 위 필터로 고른 환경정비 항목 — null 이면 전체
+  ///
+  /// 사람 필터와 **따로 돈다** — 둘 다 걸면 '유찬빈의 현수막' 만 남는다.
+  /// 사람 필터와 달리 **내 내역에서도 보인다** (내가 뭘 몇 번 했는지를
+  /// 보는 자리라 나 혼자여도 뜻이 있다).
+  String? _itemId;
+
   bool get _canSeeOthers => myRole != Role.member;
+
+  /// 고를 수 있는 항목 — **지점 항목을 다 세운다** (사람 필터와 규칙이 다르다)
+  ///
+  /// 사람은 그날 이름이 있는 사람만 세우는데, 항목은 그러면 안 된다.
+  /// 그날 기록이 없는 항목도 골라야 날짜를 넘겨 가며 "현수막을 며칠에
+  /// 했지" 를 찾을 수 있다. 그날 것만 세우면 고르는 순간 그 항목이 메뉴에서
+  /// 사라져서 필터를 풀 수도 없다.
+  ///
+  /// 지점 항목을 못 받았으면([_HistoryScreen.items] 가 비었으면) 그날
+  /// 기록에서 이름순으로 뽑는다.
+  List<FilterOption> get _itemOptions {
+    if (widget.items.isNotEmpty) {
+      // 서버가 하루 일하는 흐름대로 세워 준다 — 앱이 다시 안 세운다
+      return [for (final item in widget.items) (id: item.id, name: item.name)];
+    }
+    final names = <String, String>{};
+    for (final log in [..._allLogs, ..._myLogs]) {
+      names[log.envItemId] ??= log.itemName;
+    }
+    return [for (final e in names.entries) (id: e.key, name: e.value)]
+      ..sort((a, b) => a.name.compareTo(b.name));
+  }
 
   /// 고를 수 있는 사람 — 이름순
   ///
   /// 명단 전체가 아니라 **그날 기록에 이름이 있는 사람만** 세운다
   /// (세션 기록과 같은 규칙). 스무 명 메뉴에서 오늘 일한 셋을 찾게 하면
   /// 고르는 일이 더 번거롭다.
-  List<FilterPerson> get _people {
+  List<FilterOption> get _people {
     final names = <String, String>{};
     for (final log in _allLogs) {
       names[log.employeeId] ??= _logAuthor(log);
@@ -190,17 +226,20 @@ class _HistoryScreenState extends State<_HistoryScreen>
   /// 공백·대소문자를 지우고 맞춘다 ('화장실 청소' 로 쳐도 찾히게)
   ///
   /// 사람 필터는 **전체 내역에서만** 건다 — 내 내역은 어차피 나뿐이다.
+  /// 항목 필터는 양쪽 다 건다.
   List<EnvTaskLog> _filter(List<EnvTaskLog> rows) {
     final person = _all ? _personId : null;
+    final item = _itemId;
     final key = _WorkScreenState._envKey(_search.text.trim());
-    if (key.isEmpty && person == null) return rows;
+    if (key.isEmpty && person == null && item == null) return rows;
     return [
       for (final log in rows)
         if (person == null || log.employeeId == person)
-          if (key.isEmpty ||
-              _WorkScreenState._envKey(log.itemName).contains(key) ||
-              _WorkScreenState._envKey(_logAuthor(log)).contains(key))
-            log,
+          if (item == null || log.envItemId == item)
+            if (key.isEmpty ||
+                _WorkScreenState._envKey(log.itemName).contains(key) ||
+                _WorkScreenState._envKey(_logAuthor(log)).contains(key))
+              log,
     ];
   }
 
@@ -414,25 +453,45 @@ class _HistoryScreenState extends State<_HistoryScreen>
               ),
             ),
           ),
-          // 우측 상단 사람 필터 — **전체 내역을 볼 때만.** 뒤로가기와 마주 보는
-          // 자리다. 아래 검색바(블러)와는 Stack 의 다른 자식이라 네이티브
-          // 버튼이 묻히지 않는다 (같은 Row 에 두면 탭이 안 먹는다)
-          if (_canSeeOthers && _all)
-            SafeArea(
-              bottom: false,
-              child: Align(
-                alignment: Alignment.topRight,
-                child: Padding(
-                  padding: EdgeInsets.only(top: 8, right: 16),
-                  child: PeopleFilterButton(
-                    stableId: 'env-person',
-                    people: _people,
-                    selected: _personId,
-                    onSelect: (id) => setState(() => _personId = id),
-                  ),
+          // 우측 상단 필터 둘 — **항목**은 늘, **사람**은 전체 내역을 볼 때만.
+          // 뒤로가기와 마주 보는 자리다. 아래 검색바(블러)와는 Stack 의 다른
+          // 자식이라 네이티브 버튼이 묻히지 않는다 (같은 Row 에 두면 탭이
+          // 안 먹는다). 둘 다 네이티브 버튼이라 서로는 나란히 둬도 된다.
+          //
+          // **사람 버튼이 늘 오른쪽 끝**이다 — 항목 필터가 생겼다고 예전부터
+          // 쓰던 버튼이 자리를 옮기면 안 된다.
+          SafeArea(
+            bottom: false,
+            child: Align(
+              alignment: Alignment.topRight,
+              child: Padding(
+                padding: EdgeInsets.only(top: 8, right: 16),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    PickFilterButton(
+                      stableId: 'env-item',
+                      options: _itemOptions,
+                      selected: _itemId,
+                      icon: CupertinoIcons.tag,
+                      symbol: 'tag',
+                      onSelect: (id) => setState(() => _itemId = id),
+                    ),
+                    if (_canSeeOthers && _all) ...[
+                      // PhoneDetailScaffold 의 actions 와 같은 간격
+                      SizedBox(width: 10),
+                      PickFilterButton(
+                        stableId: 'env-person',
+                        options: _people,
+                        selected: _personId,
+                        onSelect: (id) => setState(() => _personId = id),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ),
+          ),
           // 아래 떠 있는 글래스 검색바 — 세션 기록·칭찬 목록과 같은 부품이다
           GlassSearchBar(controller: _search, hint: '항목·이름 검색'),
         ],
