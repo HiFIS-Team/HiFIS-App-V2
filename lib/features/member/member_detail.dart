@@ -91,10 +91,15 @@ class _MemberDetailScreenState extends State<MemberDetailScreen>
 
   Future<void> _load() async {
     try {
+      // 등록권도 같이 받는다 — **다음 회차 번호가 여기서 나온다**.
+      // 일지가 한 장도 없는 옛 회원은 이미 받은 싸인 수가 곧 진도다
+      final request = MemberApi.registrations(widget.member.id);
       final logs = await WorkoutApi.list(widget.member.id);
+      final registrations = await request;
       if (!mounted) return;
       setState(() {
         _split(logs);
+        _signed = registrations.fold(0, (sum, r) => sum + r.usedSessions);
         endLoad();
       });
     } catch (error) {
@@ -103,6 +108,12 @@ class _MemberDetailScreenState extends State<MemberDetailScreen>
       AppToast.show(context, messageOf(error));
     }
   }
+
+  /// 이 회원이 지금까지 받은 싸인 수 — 등록권 전부를 더한 값
+  ///
+  /// **재등록해도 안 줄어든다.** 싸인은 등록권마다 1 부터 다시 세지만
+  /// 일지는 회원 평생 번호라 이어진다 (서버 `_next_session_no` 와 같은 셈법).
+  int _signed = 0;
 
   /// PT 는 **회차 순**으로 세운다 — 날짜 순으로 두면 1·2·3 이 뒤섞인다
   /// (몰아서 적으면 3회차를 1회차보다 먼저 쓰는 일이 생긴다)
@@ -190,7 +201,14 @@ class _MemberDetailScreenState extends State<MemberDetailScreen>
       member: widget.member,
       kind: WorkoutKind.pt,
       editable: true,
-      nextSessionNo: (_pt.lastOrNull?.sessionNo ?? 0) + 1,
+      // **받은 싸인과 쓴 일지 중 큰 쪽 다음**이다 — 서버가 매기는 번호와 같다.
+      // 일지 번호만 보면 일지가 생기기 전부터 있던 회원이 1 회차부터 다시
+      // 세어져서, 써도 싸인이 안 열린다 (2026-08-31 고침)
+      nextSessionNo:
+          (_signed > (_pt.lastOrNull?.sessionNo ?? 0)
+              ? _signed
+              : (_pt.lastOrNull?.sessionNo ?? 0)) +
+          1,
     );
     if (changed == true) await _reload();
   }
