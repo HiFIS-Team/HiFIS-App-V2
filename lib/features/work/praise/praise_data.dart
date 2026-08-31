@@ -51,6 +51,8 @@ class _Feedback {
     this.complaint = false,
     this.status = _Status.pending,
     this.about,
+    this.resolvedBy,
+    this.requestedBy,
   });
 
   /// 원본 설문 id — 처리 단계를 서버에 올릴 때 쓴다
@@ -67,6 +69,16 @@ class _Feedback {
 
   /// 누구에게 온 것인지 — **전사로 볼 때만** 채운다 (본인 것만 볼 때는 뻔하다)
   final String? about;
+
+  /// 이 컴플레인을 해결한 사람 — 끝난 것에만 채워진다 (2026-08-31 대표 요청)
+  ///
+  /// 대표가 승인해도 **올린 사람**이 여기 온다. 대표가 눌러 준다고 대표가
+  /// 치운 것은 아니다 (서버가 `resolvedById` 를 그렇게 채운다).
+  String? resolvedBy;
+
+  /// 완료를 올린 사람 — 승인 대기 중에만 채워진다.
+  /// 승인되면 이 사람이 그대로 [resolvedBy] 가 된다
+  final String? requestedBy;
 
   Color get color => Color(colorValue);
 }
@@ -137,6 +149,12 @@ Future<void> _loadSurveys({String? branchId}) async {
               time: row.submittedAt,
               complaint: true,
               status: _Status.of(row.improvementStatus),
+              resolvedBy: row.resolvedById == null
+                  ? null
+                  : _employeeName(row.resolvedById!),
+              requestedBy: row.doneRequestedById == null
+                  ? null
+                  : _employeeName(row.doneRequestedById!),
               about: _viewOnly ? _employeeName(row.praisedEmployeeId) : null,
             ),
         ],

@@ -174,9 +174,7 @@ class _Payslip {
         _PayItem(
           'PT 커미션 · 재등록',
           live?.incentiveRenewal ?? 0,
-          note: (live?.renewalSessions ?? 0) == 0
-              ? null
-              : '소개 포함 ${live!.renewalSessions}회',
+          note: _renewalNote(live?.renewalSessions ?? 0, downgraded),
           adjust: _Adjustable.incentiveRenewal,
         ),
       ];
@@ -193,12 +191,29 @@ class _Payslip {
         'PT 커미션 · 재등록',
         payslip.incentiveRenewal,
         // 서버가 재등록과 지인소개를 같은 요율로 한 통에 담는다
-        note: renewalSessions == 0 ? null : '소개 포함 $renewalSessions회',
+        note: _renewalNote(renewalSessions, downgraded),
         adjust: _Adjustable.incentiveRenewal,
       ),
       if (payslip.otherAllowances != 0)
         _PayItem('기타 수당', payslip.otherAllowances),
     ];
+  }
+
+  /// 재등록 요율이 **워크인 요율로 내려갔나** (트레이너만, 2026-08-31)
+  ///
+  /// 확정된 달은 명세서 근거에서, 진행 중인 주기는 실시간 값에서 읽는다.
+  bool get downgraded =>
+      source?.basis.renewalDowngraded ?? _live?.renewalDowngraded ?? false;
+
+  /// 재등록 줄 밑 한 마디 — 내려갔으면 **왜 낮은지**를 같이 적는다
+  ///
+  /// 안 적으면 트레이너가 "왜 50% 가 아니지" 를 알 길이 없어서, 급여를 받고
+  /// 나서야 물어보게 된다 (2026-08-31 대표 요청).
+  static String? _renewalNote(int sessions, bool downgraded) {
+    final count = sessions == 0 ? null : '소개 포함 $sessions회';
+    if (!downgraded) return count;
+    const why = '300만 미만이라 40% 적용';
+    return count == null ? why : '$count · $why';
   }
 
   /// 커미션이 왜 이 금액인지 — 카드 맨 아래 한 줄

@@ -76,7 +76,10 @@ class _FeedbackDetailCardState extends State<_FeedbackDetailCard> {
     }
 
     final before = feedback.status;
+    final beforeWho = feedback.resolvedBy;
     feedback.status = approve ? _Status.done : _Status.working;
+    // 서버가 **올린 사람**을 해결자로 찍는다 — 대표가 눌러도 대표가 아니다
+    if (approve) feedback.resolvedBy = feedback.requestedBy;
     widget.onChanged?.call();
     AppToast.show(context, approve ? '승인했어요' : '반려했어요');
     Navigator.of(context).pop();
@@ -89,6 +92,7 @@ class _FeedbackDetailCardState extends State<_FeedbackDetailCard> {
       }
     } catch (_) {
       feedback.status = before;
+      feedback.resolvedBy = beforeWho;
       widget.onChanged?.call();
     }
   }
@@ -172,11 +176,28 @@ class _FeedbackDetailCardState extends State<_FeedbackDetailCard> {
           if (withStatus) ...[
             SizedBox(height: 18),
             if (feedback.status == _Status.done)
-              // 이미 끝난 건은 손댈 수 없다 — 버튼 대신 안내만 둔다
-              Text(
-                '해결 완료된 컴플레인은 되돌릴 수 없어요',
-                textAlign: TextAlign.center,
-                style: AppTextStyles.caption,
+              // 이미 끝난 건은 손댈 수 없다 — 버튼 대신 안내만 둔다.
+              // **누가 치웠는지 같이 적는다** (2026-08-31 대표 요청) —
+              // 클레임해결 점수가 그 사람에게 붙어서, 나중에 점수를 되짚을 때
+              // 누구 것인지 알 수 있어야 한다
+              Column(
+                children: [
+                  if (feedback.resolvedBy case final who?) ...[
+                    Text(
+                      '$who님이 해결했어요',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.body2.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(height: 6),
+                  ],
+                  Text(
+                    '해결 완료된 컴플레인은 되돌릴 수 없어요',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.caption,
+                  ),
+                ],
               )
             // 올라온 완료를 대표가 본다 — 그 자리에서는 단계 버튼 대신 결재다
             else if (feedback.status == _Status.waiting &&
