@@ -108,6 +108,9 @@ double dialogWidth(BuildContext context, double design) {
 ///
 /// 눌렀는지(true) 여부를 돌려준다. 바깥을 눌러 닫으면 false다.
 /// [destructive]를 켜면 확인 버튼이 빨간색이 된다.
+///
+/// [icon] 을 주면 제목 위에 옅은 동그라미와 함께 그린다. **안 주면 예전
+/// 그대로다** — 이미 쓰는 자리가 여럿이라 다 같이 바뀌면 안 된다.
 Future<bool> showConfirmDialog(
   BuildContext context, {
   required String title,
@@ -115,6 +118,8 @@ Future<bool> showConfirmDialog(
   String confirmLabel = '확인',
   String cancelLabel = '취소',
   bool destructive = false,
+  IconData? icon,
+  Color? iconColor,
 }) async {
   final result = await showAppDialog<bool>(
     context,
@@ -124,6 +129,8 @@ Future<bool> showConfirmDialog(
       confirmLabel: confirmLabel,
       cancelLabel: cancelLabel,
       destructive: destructive,
+      icon: icon,
+      iconColor: iconColor,
     ),
   );
   return result ?? false;
@@ -136,6 +143,8 @@ class _ConfirmCard extends StatelessWidget {
     required this.confirmLabel,
     required this.cancelLabel,
     required this.destructive,
+    this.icon,
+    this.iconColor,
   });
 
   final String title;
@@ -143,6 +152,12 @@ class _ConfirmCard extends StatelessWidget {
   final String confirmLabel;
   final String cancelLabel;
   final bool destructive;
+
+  /// 제목 위 아이콘 — 없으면 안 그린다
+  final IconData? icon;
+
+  /// 아이콘 색. 안 주면 [destructive] 는 빨강, 아니면 포인트 컬러
+  final Color? iconColor;
 
   @override
   Widget build(BuildContext context) {
@@ -156,6 +171,26 @@ class _ConfirmCard extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (icon case final symbol?) ...[
+            Builder(
+              builder: (context) {
+                final tint =
+                    iconColor ??
+                    (destructive ? AppColors.error : AppColors.primary);
+                return Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    // 앱 전체가 쓰는 옅은 면 — 근태 배지·홈 카드와 같은 값이다
+                    color: tint.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(symbol, size: 28, color: tint),
+                );
+              },
+            ),
+            SizedBox(height: 16),
+          ],
           Text(title, textAlign: TextAlign.center, style: AppTextStyles.title3),
           if (message != null) ...[
             SizedBox(height: 10),

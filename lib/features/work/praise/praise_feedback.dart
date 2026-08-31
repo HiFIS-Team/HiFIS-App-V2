@@ -29,8 +29,10 @@ class _FeedbackDetailCardState extends State<_FeedbackDetailCard> {
     if (status == _Status.done && myRole != Role.master) {
       final ok = await showConfirmDialog(
         context,
-        title: '대표 승인이 필요해요',
-        message: '해결 완료는 대표가 확인해야 처리돼요.\n승인을 올릴까요?',
+        icon: Icons.verified_rounded,
+        iconColor: AppColors.warning,
+        title: '해결 완료 하시겠어요?',
+        message: '대표님이 확인해야 해결 완료로 처리돼요.',
         confirmLabel: '올리기',
       );
       if (!ok || !mounted) return;
