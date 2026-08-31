@@ -12,6 +12,7 @@ import '../../core/util/platform.dart';
 import '../../core/util/when.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/widgets/feedback/app_toast.dart';
+import '../../core/widgets/glass/glass_bottom_button.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/input/app_button.dart';
 import '../../core/widgets/input/date_picker.dart';
@@ -466,20 +467,21 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final save = AppButton(
-      label: widget.log == null ? '저장' : '수정',
-      filled: true,
-      busy: _busy,
-      onTap: _complete ? _save : () {},
-      color: _complete ? null : AppColors.gray100,
-      textColor: _complete ? null : AppColors.gray400,
-    );
-
     // 저장·삭제만 `true` 를 돌려준다. 그냥 뒤로 가면 `null` 이라 목록은 그대로 둔다.
-    return isDesktop ? _desktop(save) : _phone(save);
+    return isDesktop ? _desktop() : _phone();
   }
 
-  Widget _phone(Widget save) => PhoneDetailScaffold(
+  /// PC 폼의 저장 버튼 — 데스크톱에는 글래스 트레이가 없다
+  Widget _saveButton() => AppButton(
+    label: widget.log == null ? '저장' : '수정',
+    filled: true,
+    busy: _busy,
+    onTap: _complete ? _save : () {},
+    color: _complete ? null : AppColors.gray100,
+    textColor: _complete ? null : AppColors.gray400,
+  );
+
+  Widget _phone() => PhoneDetailScaffold(
     title: widget.member.name,
     background: AppColors.surface,
     actions: [
@@ -491,10 +493,19 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
           onPressed: _delete,
         ),
     ],
+    // **다른 폼과 같은 글래스 버튼이다** (2026-08-31 대표 지적). 예전에는
+    // 평평한 `AppButton` 을 바닥에 붙여서, 애플에서 다른 화면의 뜬 유리
+    // 버튼과 결이 달랐다. 저장 중에는 글자로 알린다 — 글래스 버튼에는
+    // 스피너 자리가 없어서 싸인 화면도 같은 방법을 쓴다
     bottomBar: widget.editable
-        ? Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-            child: save,
+        ? GlassBottomButton(
+            label: _busy
+                ? '저장 중…'
+                : widget.log == null
+                ? '저장'
+                : '수정',
+            active: _complete && !_busy,
+            onPressed: (_complete && !_busy) ? _save : () {},
           )
         : null,
     child: ListView(
@@ -502,13 +513,15 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
         20,
         PhoneDetailScaffold.topPadding,
         20,
-        bottomBarInset(context) + (widget.editable ? 60 : 0),
+        widget.editable
+            ? GlassBottomButton.inset(context)
+            : bottomBarInset(context),
       ),
       children: _body(),
     ),
   );
 
-  Widget _desktop(Widget save) => Scaffold(
+  Widget _desktop() => Scaffold(
     backgroundColor: AppColors.surface,
     body: Column(
       children: [
@@ -548,7 +561,7 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
         if (widget.editable)
           Padding(
             padding: const EdgeInsets.fromLTRB(28, 0, 28, 20),
-            child: save,
+            child: _saveButton(),
           ),
       ],
     ),
