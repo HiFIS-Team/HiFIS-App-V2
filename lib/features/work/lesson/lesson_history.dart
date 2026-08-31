@@ -224,7 +224,7 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
                 children: [
                   // 상단 고정 타이틀 영역만큼 비워둔다
                   SizedBox(height: 56),
-                  _MonthBar(
+                  MonthBar(
                     month: _month,
                     // 지금 아래에 서 있는 것을 센다 — 회원 갈래에서 싸인
                     // 건수를 세면 목록과 숫자가 어긋난다

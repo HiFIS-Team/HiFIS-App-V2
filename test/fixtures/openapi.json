@@ -2077,6 +2077,22 @@
    "properties": {},
    "required": []
   },
+  "MyTaskHistoryDay": {
+   "properties": {
+    "complete": {},
+    "date": {},
+    "done": {},
+    "doneTasks": {},
+    "leftTasks": {},
+    "total": {}
+   },
+   "required": [
+    "date",
+    "total",
+    "done",
+    "complete"
+   ]
+  },
   "MyTaskItem": {
    "properties": {
     "content": {},

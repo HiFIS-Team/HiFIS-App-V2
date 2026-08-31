@@ -110,7 +110,12 @@ class _HistoryCardState extends State<_HistoryCard> {
   }
 }
 
-/// 오늘 수행 내역 화면 — 옆에서 슬라이드되어 열린다
+/// 수행 내역 화면 — 옆에서 슬라이드되어 열린다
+///
+/// **한 달치를 한 번에 본다** (2026-08-31 대표 요청). 예전에는 하루씩 좌우
+/// 화살표로 넘겼는데, 그러면 "현수막을 며칠에 했지" 를 찾으려고 날짜를
+/// 하나씩 눌러야 했다. 세션 기록과 같은 모양이다 — 달을 고르고 **날짜별로
+/// 묶인 목록을 쭉 내린다.**
 ///
 /// 폰은 들어오는 문이 하나뿐이라 내 내역/전체 내역 탭으로 오간다.
 /// 데스크톱은 두 카드가 각각 '전체 보기'를 갖고 있어서, 누른 쪽만
@@ -153,12 +158,17 @@ class _HistoryScreenState extends State<_HistoryScreen>
   /// true면 전체 내역
   late bool _all = widget.initialAll;
 
-  /// 보고 있는 날짜 — **여기서만 옮긴다**
+  /// 보고 있는 달 — **여기서만 옮긴다**
   ///
   /// 업무 화면(칩)은 늘 오늘이다. `+` 가 서버에 **누른 시각**으로 남아서
   /// 지난 날짜에는 만들 수가 없는데, 거기에 날짜를 두면 칩과 내역이 서로
   /// 다른 날을 가리키게 된다. 그래서 지난 기록은 이 화면에서만 본다.
-  late DateTime _date = _WorkScreenState._todayDate();
+  late DateTime _month = _thisMonth();
+
+  static DateTime _thisMonth() {
+    final today = _WorkScreenState._todayDate();
+    return DateTime(today.year, today.month);
+  }
 
   late List<EnvTaskLog> _myLogs = widget.myLogs;
   late List<EnvTaskLog> _allLogs = widget.allLogs;
@@ -183,7 +193,11 @@ class _HistoryScreenState extends State<_HistoryScreen>
   /// 사람 필터와 **따로 돈다** — 둘 다 걸면 '유찬빈의 현수막' 만 남는다.
   /// 사람 필터와 달리 **내 내역에서도 보인다** (내가 뭘 몇 번 했는지를
   /// 보는 자리라 나 혼자여도 뜻이 있다).
-  String? _itemId;
+  ///
+  /// **id 가 아니라 이름이다.** 항목은 지점마다 따로 있어서 `건조기` 가
+  /// 지점 수만큼 다른 id 로 존재한다 — id 로 거르면 전 지점을 볼 때
+  /// 한 지점 것만 남는다 (2026-08-31 대표 지적).
+  String? _itemName;
 
   bool get _canSeeOthers => myRole != Role.member;
 
@@ -194,18 +208,23 @@ class _HistoryScreenState extends State<_HistoryScreen>
   /// 했지" 를 찾을 수 있다. 그날 것만 세우면 고르는 순간 그 항목이 메뉴에서
   /// 사라져서 필터를 풀 수도 없다.
   ///
-  /// 지점 항목을 못 받았으면([_HistoryScreen.items] 가 비었으면) 그날
-  /// 기록에서 이름순으로 뽑는다.
+  /// 지점 항목을 못 받았으면([_HistoryScreen.items] 가 비었으면) 그 달
+  /// 기록에서 이름순으로 뽑는다 — **비는 일은 이제 거의 없다** (업무 화면이
+  /// 누구에게나 받는다).
+  ///
+  /// 고르는 값이 **이름**이라 지점이 여럿이어도 한 줄만 선다.
   List<FilterOption> get _itemOptions {
     if (widget.items.isNotEmpty) {
       // 서버가 하루 일하는 흐름대로 세워 준다 — 앱이 다시 안 세운다
-      return [for (final item in widget.items) (id: item.id, name: item.name)];
+      return [
+        for (final item in widget.items) (id: item.name, name: item.name),
+      ];
     }
-    final names = <String, String>{};
+    final names = <String>{};
     for (final log in [..._allLogs, ..._myLogs]) {
-      names[log.envItemId] ??= log.itemName;
+      names.add(log.itemName);
     }
-    return [for (final e in names.entries) (id: e.key, name: e.value)]
+    return [for (final name in names) (id: name, name: name)]
       ..sort((a, b) => a.name.compareTo(b.name));
   }
 
@@ -229,55 +248,74 @@ class _HistoryScreenState extends State<_HistoryScreen>
   /// 항목 필터는 양쪽 다 건다.
   List<EnvTaskLog> _filter(List<EnvTaskLog> rows) {
     final person = _all ? _personId : null;
-    final item = _itemId;
+    final item = _itemName == null
+        ? null
+        : _WorkScreenState._envKey(_itemName!);
     final key = _WorkScreenState._envKey(_search.text.trim());
     if (key.isEmpty && person == null && item == null) return rows;
     return [
       for (final log in rows)
         if (person == null || log.employeeId == person)
-          if (item == null || log.envItemId == item)
+          if (item == null || _WorkScreenState._envKey(log.itemName) == item)
             if (key.isEmpty ||
                 _WorkScreenState._envKey(log.itemName).contains(key) ||
-                _WorkScreenState._envKey(_logAuthor(log)).contains(key))
+                _WorkScreenState._envKey(_logAuthor(log)).contains(key) ||
+                _dateKeys(log.createdAt).contains(key))
               log,
     ];
   }
 
-  /// 열 때 부모가 오늘 기록을 이미 넘겨줘서 뼈대 없이 시작한다
-  /// (세션 기록은 스스로 받아 와서 뼈대로 시작한다)
+  /// 날짜를 글자로 — **검색에서 `8월 31일` · `8/31` · `31` 이 다 걸린다**
+  ///
+  /// 한 달치를 쭉 내리게 되면서 "그날 뭘 했지" 를 찾을 길이 필요해졌다
+  /// (2026-08-31 대표 요청). 쓰는 사람마다 적는 모양이 달라서 한 줄에
+  /// 다 이어 붙여 두고 `contains` 로 본다.
+  static String _dateKeys(DateTime t) {
+    final mm = t.month.toString().padLeft(2, '0');
+    final dd = t.day.toString().padLeft(2, '0');
+    return '${t.year}-$mm-$dd|${t.month}월${t.day}일|${t.month}/${t.day}'
+        '|${t.month}.${t.day}|$mm$dd';
+  }
+
   @override
   void dispose() {
     _search.dispose();
     super.dispose();
   }
 
+  /// 부모가 넘겨준 **오늘** 기록을 깔아 두고 그 달치를 받아 온다
+  ///
+  /// 옛 줄을 안 지운 채로 갈아끼우므로, 빨리 오면 뼈대가 아예 안 뜬다
+  /// (`SkeletonDelay`). 화면이 열리자마자 빈 판이 되는 것을 막는다.
   @override
   void initState() {
     super.initState();
     _search.addListener(() => setState(() {}));
     skipFirstSkeleton();
+    _loadMonth(_month);
   }
 
-  static const _weekdays = ['월', '화', '수', '목', '금', '토', '일'];
+  bool get _isThisMonth => _month == _thisMonth();
 
-  bool get _isToday => _date == _WorkScreenState._todayDate();
+  /// 달을 옮긴다 — **다음 달로는 못 간다**
+  void _shiftMonth(int delta) {
+    final next = DateTime(_month.year, _month.month + delta);
+    if (next.isAfter(_thisMonth())) return;
+    setState(() => _month = next);
+    _loadMonth(next);
+  }
 
-  /// 날짜를 옮기고 그 날 기록을 받아 온다 — **다음 날로는 못 간다**
-  Future<void> _move(int step) async {
-    final next = DateTime(_date.year, _date.month, _date.day + step);
-    if (next.isAfter(_WorkScreenState._todayDate())) return;
-    setState(() {
-      _date = next;
-      beginLoad();
-    });
+  /// 그 달 기록을 받아 온다
+  Future<void> _loadMonth(DateTime month) async {
+    setState(beginLoad);
     try {
       final logs = await EnvApi.logs(
         branchId: widget.branchId,
-        date: dateKey(next),
+        period: periodKey(month),
       );
-      // 기다리는 사이 또 눌렀으면 이 응답은 버린다 (빠르게 여러 날 넘길 때
-      // 늦게 온 옛 응답이 새 날짜를 덮어쓰면 안 된다)
-      if (!mounted || _date != next) return;
+      // 기다리는 사이 또 눌렀으면 이 응답은 버린다 (빠르게 여러 달 넘길 때
+      // 늦게 온 옛 응답이 새 달을 덮어쓰면 안 된다)
+      if (!mounted || _month != month) return;
       setState(() {
         _allLogs = logs;
         _myLogs = [
@@ -293,34 +331,37 @@ class _HistoryScreenState extends State<_HistoryScreen>
     }
   }
 
-  /// 날짜 좌우 화살표 — **세션 기록의 달 이동바(`_MonthBar`)와 같은 모양**이다
-  ///
-  /// 테두리 없이 아이콘만 두고 여백으로 누를 자리를 만든다. 회색 상자를
-  /// 두르면 줄이 무거워진다 (2026-08-14, 세션 쪽이 낫다고 정했다).
-  ///
-  /// [onTap] 이 null 이면 흐린 채로 안 눌린다 (자리는 그대로 둔다).
-  Widget _arrow(IconData icon, VoidCallback? onTap) {
-    final enabled = onTap != null;
-    return Pressable(
-      onTap: onTap ?? () {},
-      child: Padding(
-        padding: EdgeInsets.all(8),
-        child: Icon(
-          icon,
-          size: 15,
-          color: enabled ? AppColors.textSecondary : AppColors.gray300,
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final date =
-        '${_date.month}월 ${_date.day}일 ${_weekdays[_date.weekday - 1]}요일';
     final logs = _filter(_all ? _allLogs : _myLogs);
     final sorted = List.of(logs)
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+    // 날짜가 바뀌는 지점마다 머리말을 끼워 넣는다 — 세션 기록과 같은 모양이다
+    final rows = <Widget>[];
+    String? label;
+    for (final log in sorted) {
+      final day = dayLabel(log.createdAt);
+      if (day != label) {
+        rows.add(
+          Padding(
+            padding: EdgeInsets.fromLTRB(4, label == null ? 4 : 22, 4, 4),
+            child: Text(
+              day,
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        );
+        label = day;
+      } else {
+        rows.add(Divider(height: 1, color: AppColors.divider));
+      }
+      // 전체 내역에서는 누가 했는지 이름을 함께 보여준다
+      rows.add(_LogRow(log: log, showName: _all));
+    }
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -336,39 +377,14 @@ class _HistoryScreenState extends State<_HistoryScreen>
                 children: [
                   // 상단 고정 타이틀 영역만큼 비워둔다
                   SizedBox(height: 56),
-                  Padding(
-                    // 세션 기록의 `_MonthBar` 와 같은 여백이다 — 왼쪽 16 인 것은
-                    // 화살표가 제 안에 8 을 갖고 있어서, 눈에 보이는 끝이 24 로
-                    // 아래 목록과 맞는다
-                    padding: EdgeInsets.fromLTRB(16, 6, 24, 6),
-                    child: Row(
-                      children: [
-                        _arrow(CupertinoIcons.chevron_left, () => _move(-1)),
-                        Text(
-                          date,
-                          style: AppTextStyles.body2.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        // 다음 날은 아직 안 왔으니 늘 비어 있다 — 흐려 두고 안 눌리게
-                        _arrow(
-                          CupertinoIcons.chevron_right,
-                          _isToday ? null : () => _move(1),
-                        ),
-                        Spacer(),
-                        // 받아 오는 동안은 건수도 뼈대다 (세션 기록과 같다)
-                        if (showSkeleton)
-                          Skeleton(width: 46, height: 12)
-                        else
-                          Text(
-                            '총 ${logs.length}회',
-                            style: AppTextStyles.caption.copyWith(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                      ],
-                    ),
+                  MonthBar(
+                    month: _month,
+                    count: logs.length,
+                    unit: '회',
+                    loading: showSkeleton,
+                    onPrev: () => _shiftMonth(-1),
+                    // 아직 오지 않은 달은 볼 게 없으니 막는다
+                    onNext: _isThisMonth ? null : () => _shiftMonth(1),
                   ),
                   SizedBox(height: widget.tabs ? 8 : 14),
                   // 내 내역 / 전체 내역 전환 탭 (업무 탭과 같은 밑줄 스타일)
@@ -390,9 +406,7 @@ class _HistoryScreenState extends State<_HistoryScreen>
                       child: Text(
                         _search.text.trim().isNotEmpty
                             ? '찾는 기록이 없어요'
-                            : _isToday
-                            ? (_all ? '오늘 완료된 항목이 없어요' : '오늘 완료한 항목이 없어요')
-                            : (_all ? '완료된 항목이 없어요' : '완료한 항목이 없어요'),
+                            : (_all ? '이 달에 완료된 항목이 없어요' : '이 달에 완료한 항목이 없어요'),
                         style: AppTextStyles.body2.copyWith(
                           color: AppColors.textTertiary,
                         ),
@@ -400,22 +414,17 @@ class _HistoryScreenState extends State<_HistoryScreen>
                     )
                   else
                     Expanded(
-                      child: ListView.separated(
-                        // 날짜·탭이 바뀌면 맨 위부터 다시 본다
-                        key: ValueKey('$_all-$_date'),
+                      child: ListView(
+                        // 달·탭이 바뀌면 맨 위부터 다시 본다
+                        key: ValueKey('$_all-$_month'),
                         // 아래 글래스 검색바에 마지막 줄이 가리지 않게 띄운다
                         padding: EdgeInsets.fromLTRB(
                           24,
-                          12,
+                          8,
                           24,
                           MediaQuery.paddingOf(context).bottom + 92,
                         ),
-                        itemCount: sorted.length,
-                        separatorBuilder: (_, _) =>
-                            Divider(height: 1, color: AppColors.divider),
-                        // 전체 내역에서는 누가 했는지 이름을 함께 보여준다
-                        itemBuilder: (_, index) =>
-                            _LogRow(log: sorted[index], showName: _all),
+                        children: rows,
                       ),
                     ),
                 ],
@@ -430,9 +439,9 @@ class _HistoryScreenState extends State<_HistoryScreen>
                 height: 56,
                 child: Center(
                   child: Text(
-                    // 날짜를 옮기면 '오늘' 이 틀린 말이 된다
+                    // 한 달치를 보므로 '오늘' 이 아니다
                     widget.tabs
-                        ? (_isToday ? '오늘 내역' : '수행 내역')
+                        ? '수행 내역'
                         : _all
                         ? '전체 내역'
                         : '내 내역',
@@ -472,10 +481,10 @@ class _HistoryScreenState extends State<_HistoryScreen>
                     PickFilterButton(
                       stableId: 'env-item',
                       options: _itemOptions,
-                      selected: _itemId,
+                      selected: _itemName,
                       icon: CupertinoIcons.tag,
                       symbol: 'tag',
-                      onSelect: (id) => setState(() => _itemId = id),
+                      onSelect: (name) => setState(() => _itemName = name),
                     ),
                     if (_canSeeOthers && _all) ...[
                       // PhoneDetailScaffold 의 actions 와 같은 간격
@@ -493,7 +502,7 @@ class _HistoryScreenState extends State<_HistoryScreen>
             ),
           ),
           // 아래 떠 있는 글래스 검색바 — 세션 기록·칭찬 목록과 같은 부품이다
-          GlassSearchBar(controller: _search, hint: '항목·이름 검색'),
+          GlassSearchBar(controller: _search, hint: '항목·이름·날짜 검색'),
         ],
       ),
     );

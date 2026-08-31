@@ -19,6 +19,7 @@ import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/layout.dart';
 import '../../core/util/photo.dart';
+import '../../core/util/when.dart';
 import '../../core/util/photo_cache.dart';
 import '../../core/util/platform.dart';
 import '../../core/util/sf_symbols.dart';
@@ -32,6 +33,7 @@ import '../../core/widgets/input/app_button.dart';
 import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/input/see_all_button.dart';
+import '../../core/widgets/nav/month_bar.dart';
 import '../../core/widgets/nav/pick_filter_button.dart';
 import '../../core/widgets/nav/desktop_header.dart';
 import '../member/member_info.dart';
@@ -292,12 +294,11 @@ class _WorkScreenState extends State<WorkScreen>
   Future<void> _loadEnv() async {
     final branchId = _branch;
     try {
-      // 점검 항목은 **직접 수행하는 사람**만 쓴다(`_canDoEnv`).
-      // 대표·관리자는 그리지도 않는 데다, 전 지점을 고르면 지점 수만큼
-      // 같은 항목이 겹쳐 오므로 아예 안 받는다.
-      final itemRequest = _canDoEnv
-          ? EnvApi.items(branchId: branchId)
-          : Future.value(const <EnvItem>[]);
+      // **누구에게나 받는다.** 점검 칩은 직접 수행하는 사람만 그리지만
+      // (`_canDoEnv`), 내역 화면의 **항목 필터**는 대표·관리자도 쓴다.
+      // 예전에는 안 받아서 그날 기록에서 이름을 뽑아 세웠는데, 그러면
+      // **그날 안 한 항목이 메뉴에 아예 없었다** (2026-08-31 대표 지적).
+      final itemRequest = EnvApi.items(branchId: branchId);
       // 화면이 "오늘 점검"이라 오늘 것만 받는다 — 서버가 한국 시간으로 잘라 준다
       final logRequest = EnvApi.logs(
         branchId: branchId,
@@ -307,8 +308,11 @@ class _WorkScreenState extends State<WorkScreen>
       final logs = await logRequest;
       if (!mounted) return;
       setState(() {
-        // 서버가 sortOrder 순으로 준다 — 앱이 다시 세우지 않는다
-        _envItems = items;
+        // 서버가 sortOrder 순으로 준다 — 앱이 다시 세우지 않는다.
+        // **전 지점이면 지점 수만큼 같은 이름이 겹쳐 온다** (항목은 지점마다
+        // 따로 있고 이름·차례가 같다). 이름으로 한 줄만 남긴다 — 안 그러면
+        // 필터 메뉴에 `건조기` 가 두 번 선다 (2026-08-31 대표 지적).
+        _envItems = _dedupeByName(items);
         _logs = logs;
         endLoad();
       });
@@ -317,6 +321,15 @@ class _WorkScreenState extends State<WorkScreen>
       setState(endLoad);
       AppToast.show(context, messageOf(error));
     }
+  }
+
+  /// 같은 이름은 **먼저 온 것 하나만** — 서버가 준 차례는 그대로 둔다
+  static List<EnvItem> _dedupeByName(List<EnvItem> items) {
+    final seen = <String>{};
+    return [
+      for (final item in items)
+        if (seen.add(_envKey(item.name))) item,
+    ];
   }
 
   /// 이름 비교용 열쇠 — 공백·대소문자를 지우고 맞춘다

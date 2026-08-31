@@ -24,9 +24,15 @@ import '../../../core/widgets/input/app_button.dart';
 import '../../../core/widgets/glass/glass_bottom_button.dart';
 import '../../../core/widgets/input/pressable.dart';
 import '../../../core/widgets/input/weekday_picker.dart';
+import '../../../core/widgets/glass/glass_icon_button.dart';
+import '../../../core/widgets/glass/glass_search_bar.dart';
+import '../../../core/widgets/input/mode_switch.dart';
+import '../../../core/widgets/input/see_all_button.dart';
+import '../../../core/widgets/nav/month_bar.dart';
 import '../../../core/widgets/nav/phone_scaffold.dart';
 
 part 'my_task_forms.dart';
+part 'my_task_history.dart';
 part 'my_task_roster.dart';
 
 /// 마지막으로 받아 둔 하루치 — **화면 밖에 둔다**
@@ -373,6 +379,10 @@ class _MyTaskSectionState extends State<MyTaskSection>
                     style: AppTextStyles.label,
                   ),
                 ),
+                // 지난 날 기록은 **여기서만** 본다 — 이 카드는 요일 고르개라
+                // 이번 주 안이고, 며칠에 누락했는지는 달로 봐야 한다
+                SeeAllButton(onTap: () => showMyTaskHistory(context)),
+                const SizedBox(width: 4),
                 _DoneBadge(day: day),
               ],
             ),

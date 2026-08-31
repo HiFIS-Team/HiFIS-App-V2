@@ -1,7 +1,7 @@
 import '../../data/data_signal.dart';
 import '../client/api_client.dart';
 
-export '../client/period.dart' show dateKey;
+export '../client/period.dart' show dateKey, periodKey;
 
 /// 내 업무 수정·삭제 결재 종류 (서버 `MyTaskRequestType`)
 enum MyTaskRequestType {
@@ -416,6 +416,46 @@ class MyTaskMissAlert {
   final List<MyTaskMissStaff> staff;
 }
 
+/// 한 달 내역의 하루 한 줄 (서버 `MyTaskHistoryDay`)
+///
+/// **근무일만 온다.** 쉬는 날과 종일 월차인 날은 서버가 빼고 준다 —
+/// 할 일이 없는 날까지 오면 빈 줄이 달력만큼 쌓인다.
+class MyTaskHistoryDay {
+  MyTaskHistoryDay({
+    required this.date,
+    required this.total,
+    required this.done,
+    required this.complete,
+    required this.doneTasks,
+    required this.leftTasks,
+  });
+
+  factory MyTaskHistoryDay.fromJson(
+    Map<String, dynamic> json,
+  ) => MyTaskHistoryDay(
+    date: DateTime.parse(json['date'] as String),
+    total: json['total'] as int? ?? 0,
+    done: json['done'] as int? ?? 0,
+    complete: json['complete'] as bool? ?? false,
+    doneTasks: [
+      for (final t in (json['doneTasks'] as List? ?? const [])) t.toString(),
+    ],
+    leftTasks: [
+      for (final t in (json['leftTasks'] as List? ?? const [])) t.toString(),
+    ],
+  );
+
+  final DateTime date;
+  final int total;
+  final int done;
+
+  /// 다 했나 — **업무를 하나도 안 정한 근무일은 누락이다**
+  final bool complete;
+
+  final List<String> doneTasks;
+  final List<String> leftTasks;
+}
+
 /// 대표·관리자가 보는 사람 한 줄 (서버 `MyTaskRosterRow`)
 class MyTaskRosterRow {
   MyTaskRosterRow({
@@ -487,6 +527,24 @@ class MyTaskApi {
   static Future<MyTaskMissAlert> missAlert() async {
     final data = await _client.get('/my-tasks/miss-alert');
     return MyTaskMissAlert.fromJson(data);
+  }
+
+  /// 한 달 내역 — **며칠에 무엇을 했고 무엇을 빠뜨렸나** (최신 날짜가 앞)
+  ///
+  /// [month] 는 `2026-08`. 안 주면 이번 달이고, 이번 달은 **오늘까지만** 온다.
+  /// [employeeId] 는 대표·관리자·점장만 쓴다 (그 밖에는 본인 것이 온다).
+  static Future<List<MyTaskHistoryDay>> history({
+    String? month,
+    String? employeeId,
+  }) async {
+    final rows = await _client.getList(
+      '/my-tasks/history',
+      query: {'month': ?month, 'employeeId': ?employeeId},
+    );
+    return [
+      for (final row in rows)
+        MyTaskHistoryDay.fromJson((row as Map).cast<String, dynamic>()),
+    ];
   }
 
   /// 추가 — **결재 없이 바로 들어간다.** 여러 개를 한 번에 보낸다.
