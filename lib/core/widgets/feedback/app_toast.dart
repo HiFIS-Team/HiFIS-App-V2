@@ -19,6 +19,14 @@ import '../../theme/app_shadows.dart';
 abstract final class AppToast {
   static OverlayEntry? _entry;
 
+  /// 지금 떠 있는 토스트 — 새 토스트가 오면 **이걸 갈아 끼운다**
+  ///
+  /// 예전에는 지우고 새로 끼웠다. 그러면 떠 있던 것이 **툭 사라졌다가**
+  /// 아래에서 다시 올라와서, 페이지를 나가는 순간과 겹치면 토스트가
+  /// 페이지를 따라 들어갔다 다시 생기는 것처럼 보였다 (2026-08-31 대표가 짚었다).
+  /// 자리를 그대로 두고 글자만 바꾸면 그 깜빡임이 없다.
+  static _ToastViewState? _live;
+
   /// **토스트만 사는 층** — [main.dart] 가 Navigator 위에 하나 깔아 준다
   ///
   /// 예전에는 Navigator 의 오버레이에 끼워 넣었다. 그러면 토스트가 화면들과
@@ -38,6 +46,12 @@ abstract final class AppToast {
   }
 
   static void _insert(OverlayState overlay, String message) {
+    // 떠 있는 게 있으면 그대로 두고 글자와 시계만 바꾼다
+    final live = _live;
+    if (live != null && live.mounted) {
+      live.replace(message);
+      return;
+    }
     _clear();
     late final OverlayEntry entry;
     entry = OverlayEntry(
@@ -83,19 +97,41 @@ class _ToastViewState extends State<_ToastView>
   );
   Timer? _timer;
 
+  /// 보여주는 시간 — 내려가는 240ms 는 여기에 안 든다
+  static const _hold = Duration(milliseconds: 1800);
+
+  /// 지금 띄우고 있는 글 — [replace] 로 갈린다
+  late String _message = widget.message;
+
   @override
   void initState() {
     super.initState();
+    AppToast._live = this;
     _controller.forward();
-    // 잠시 보여준 뒤 내려가며 사라진다
-    _timer = Timer(Duration(milliseconds: 1800), () async {
+    _countdown();
+  }
+
+  /// 잠시 보여준 뒤 내려가며 사라진다
+  void _countdown() {
+    _timer?.cancel();
+    _timer = Timer(_hold, () async {
       await _controller.reverse();
-      widget.onDismissed();
+      if (mounted) widget.onDismissed();
     });
+  }
+
+  /// 떠 있는 채로 글만 갈아 끼운다 — 지웠다 새로 끼우면 깜빡인다
+  ///
+  /// 내려가던 중이었으면 되돌려 올린다. 시계는 처음부터 다시 잰다.
+  void replace(String message) {
+    setState(() => _message = message);
+    _controller.forward();
+    _countdown();
   }
 
   @override
   void dispose() {
+    if (AppToast._live == this) AppToast._live = null;
     _timer?.cancel();
     _controller.dispose();
     super.dispose();
@@ -116,57 +152,64 @@ class _ToastViewState extends State<_ToastView>
       top: isDesktop ? 28 : null,
       bottom: isDesktop ? null : 104,
       child: IgnorePointer(
-        // 아래 화면과 따로 그린다 — 토스트가 240ms 동안 움직이는데 그때마다
-        // 뒤 목록까지 다시 칠하면 그 프레임이 흔들린다
-        child: RepaintBoundary(
-          // Material 바깥(Overlay)에서 텍스트에 노란 밑줄이 생기는 것을 막는다
-          child: Material(
-            type: MaterialType.transparency,
-            child: FadeTransition(
-              opacity: curved,
-              child: SlideTransition(
-                // 뜨는 자리 쪽에서 밀려 나온다 — 위에서 뜨는데 아래에서
-                // 올라오면 어디서 온 건지 안 읽힌다
-                position: Tween(
-                  begin: Offset(0, isDesktop ? -0.4 : 0.4),
-                  end: Offset.zero,
-                ).animate(curved),
-                child: Center(
-                  child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                    decoration: BoxDecoration(
-                      // 카드 톤과 맞춘 흰 캡슐 — 구분은 헤어라인과 그림자로
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.gray100),
-                      boxShadow: AppShadows.popup,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          CupertinoIcons.checkmark_circle_fill,
-                          size: 16,
-                          color: AppColors.success,
-                        ),
-                        SizedBox(width: 8),
-                        Flexible(
-                          child: Text(
-                            widget.message,
-                            style: AppTextStyles.body2.copyWith(
-                              color: AppColors.textPrimary,
-                              fontWeight: FontWeight.w600,
+        // **일부러 [RepaintBoundary] 를 안 쓴다 (2026-08-31).**
+        //
+        // 따로 된 층으로 만들면 뒤 화면을 다시 안 칠해도 되지만, iOS 는
+        // 글래스 버튼·탭바가 **네이티브 뷰**라 그 위에 얹는 Flutter 층을
+        // 페이지가 드나들 때마다 다시 짠다. 그때 따로 선 층이 같이 딸려가서
+        // 토스트가 페이지를 따라 들어갔다 다시 생기는 것처럼 보였다.
+        // 토스트는 화면 한 귀퉁이라 다시 칠해도 부담이 없다.
+        child:
+            // Material 바깥(Overlay)에서 텍스트에 노란 밑줄이 생기는 것을 막는다
+            Material(
+              type: MaterialType.transparency,
+              child: FadeTransition(
+                opacity: curved,
+                child: SlideTransition(
+                  // 뜨는 자리 쪽에서 밀려 나온다 — 위에서 뜨는데 아래에서
+                  // 올라오면 어디서 온 건지 안 읽힌다
+                  position: Tween(
+                    begin: Offset(0, isDesktop ? -0.4 : 0.4),
+                    end: Offset.zero,
+                  ).animate(curved),
+                  child: Center(
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        // 카드 톤과 맞춘 흰 캡슐 — 구분은 헤어라인과 그림자로
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.gray100),
+                        boxShadow: AppShadows.popup,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            CupertinoIcons.checkmark_circle_fill,
+                            size: 16,
+                            color: AppColors.success,
+                          ),
+                          SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              _message,
+                              style: AppTextStyles.body2.copyWith(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-        ),
       ),
     );
   }
