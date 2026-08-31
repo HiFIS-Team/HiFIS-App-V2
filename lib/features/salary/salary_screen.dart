@@ -99,7 +99,10 @@ class _SalaryScreenState extends State<SalaryScreen>
             if (p.status == PayslipStatus.approved) p,
         ];
         if (_inboxIndex >= _inbox.length) _inboxIndex = 0;
-        await _loadPayslips(employeeId: _target?.employeeId);
+        await _loadPayslips(
+          employeeId: _target?.employeeId,
+          month: _target?.yearMonth,
+        );
       } else {
         await _loadPayslips();
       }
@@ -116,7 +119,10 @@ class _SalaryScreenState extends State<SalaryScreen>
     if (next < 0) next += _inbox.length;
     setState(() => _inboxIndex = next);
     try {
-      await _loadPayslips(employeeId: _target?.employeeId);
+      await _loadPayslips(
+        employeeId: _target?.employeeId,
+        month: _target?.yearMonth,
+      );
       if (mounted) setState(() {});
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));

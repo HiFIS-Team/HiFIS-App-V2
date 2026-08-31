@@ -292,18 +292,23 @@ Accrued? _accrued;
 ///
 /// [employeeId] 를 주면 **그 사람 것**을 받는다 — 대표·관리자가 결재하면서
 /// 신청자 화면을 그대로 볼 때다. 안 주면 본인 것이다.
-Future<void> _loadPayslips({String? employeeId}) async {
+Future<void> _loadPayslips({String? employeeId, String? month}) async {
   // **달력 월이 아니라 급여 주기로 센다.** 동광주·첨단 트레이너는 지급일이
   // 익월 10일이라, 9월 15일에 진행 중인 것은 9월치가 아니라 10월치(9/10~10/9)다.
   // 서버가 알려 주는 그 달을 맨 위에 두고 거슬러 올라간다.
-  // (남의 화면을 볼 때는 못 받으므로 예전처럼 이번 달부터 센다)
+  //
+  // **남의 화면을 볼 때는 [month](= 그 사람이 낸 달)를 기준으로 잡는다.**
+  // 예전에는 이번 달부터 셌는데, 그러면 익월 지급인 사람의 신청이 범위 밖으로
+  // 밀려 **결재 화면에 금액이 한 줄도 안 떴다** (2026-08-31 대표가 짚었다) —
+  // 9월에 낸 것이 10월치라 8~3월만 받아 오면 0건이다.
   _accrued = employeeId == null ? await _fetchAccrued() : null;
   final now = DateTime.now();
-  final anchor = _accrued == null
+  final key = _accrued?.yearMonth ?? (employeeId == null ? null : month);
+  final anchor = key == null
       ? DateTime(now.year, now.month)
       : DateTime(
-          int.parse(_accrued!.yearMonth.substring(0, 4)),
-          int.parse(_accrued!.yearMonth.substring(5, 7)),
+          int.parse(key.substring(0, 4)),
+          int.parse(key.substring(5, 7)),
         );
   final months = [
     for (var i = 0; i < _monthsToLoad; i++)
