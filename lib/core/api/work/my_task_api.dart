@@ -355,6 +355,67 @@ class MyTaskMiss {
       excuseStatus == null || excuseStatus == MyTaskRequestStatus.rejected;
 }
 
+/// 남이 남기고 퇴근한 것 한 줄 (서버 `MyTaskMissStaffRow`)
+class MyTaskMissStaff {
+  MyTaskMissStaff({
+    required this.employeeId,
+    required this.name,
+    required this.count,
+  });
+
+  factory MyTaskMissStaff.fromJson(Map<String, dynamic> json) =>
+      MyTaskMissStaff(
+        employeeId: json['employeeId'] as String,
+        name: json['name'] as String,
+        count: json['count'] as int? ?? 0,
+      );
+
+  final String employeeId;
+
+  /// 서버가 이름을 그대로 준다 — 명단을 못 받은 화면에서도 빈칸이 안 된다
+  final String name;
+
+  final int count;
+}
+
+/// 앱을 열 때 띄울 **누락 경고** (서버 `MyTaskMissAlertOut`)
+///
+/// **판정은 서버가 한다.** 앱이 "퇴근을 찍었나 + 남은 것이 있나 + 지난
+/// 근무일에도 안 했나" 를 조합하면 매시간 푸시와 갈려서, 폰은 울리는데 앱을
+/// 열면 아무것도 안 뜬다.
+class MyTaskMissAlert {
+  MyTaskMissAlert({
+    required this.date,
+    required this.mine,
+    required this.lastChance,
+    required this.staff,
+  });
+
+  factory MyTaskMissAlert.fromJson(Map<String, dynamic> json) =>
+      MyTaskMissAlert(
+        date: DateTime.parse(json['date'] as String),
+        mine: [
+          for (final c in (json['mine'] as List? ?? const [])) c.toString(),
+        ],
+        lastChance: json['lastChance'] as bool? ?? false,
+        staff: [
+          for (final row in (json['staff'] as List? ?? const []))
+            MyTaskMissStaff.fromJson((row as Map).cast<String, dynamic>()),
+        ],
+      );
+
+  final DateTime date;
+
+  /// 본인이 남긴 업무 이름 — **비어 있으면 본인 경고가 없다**
+  final List<String> mine;
+
+  /// 오늘이 마지막 기회인가 — 안 하면 내일 확정 -20
+  final bool lastChance;
+
+  /// 남이 남긴 것 — MASTER·ADMIN 은 전 지점, 점장은 자기 지점, 그 밖은 빈 목록
+  final List<MyTaskMissStaff> staff;
+}
+
 /// 대표·관리자가 보는 사람 한 줄 (서버 `MyTaskRosterRow`)
 class MyTaskRosterRow {
   MyTaskRosterRow({
@@ -418,6 +479,14 @@ class MyTaskApi {
       for (final row in rows)
         MyTaskRosterRow.fromJson((row as Map).cast<String, dynamic>()),
     ];
+  }
+
+  /// 앱을 열 때 띄울 누락 경고 — **권한을 안 가린다** (서버가 골라 준다)
+  ///
+  /// 본인 것은 열 때마다, 남의 것은 한 번만 띄운다 (2026-08-31 대표 결정).
+  static Future<MyTaskMissAlert> missAlert() async {
+    final data = await _client.get('/my-tasks/miss-alert');
+    return MyTaskMissAlert.fromJson(data);
   }
 
   /// 추가 — **결재 없이 바로 들어간다.** 여러 개를 한 번에 보낸다.

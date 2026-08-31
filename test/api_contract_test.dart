@@ -44,6 +44,8 @@ void main() {
     'FolderTreeResult': 'FolderTreeNodeOut',
     'Member': 'app__schemas__members__member__MemberOut',
     'MemberCreated': 'MemberCreateOut',
+    'MyTaskMissAlert': 'MyTaskMissAlertOut',
+    'MyTaskMissStaff': 'MyTaskMissStaffRow',
     'NoticeReader': 'NoticeReaderItem',
     'PostComment': 'CommentOut',
     'RankingRow': 'RankingBoardItem',

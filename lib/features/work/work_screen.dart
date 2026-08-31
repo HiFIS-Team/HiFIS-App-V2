@@ -79,6 +79,19 @@ const workPeerReviewTab = 1;
 /// **화면이 아직 안 만들어져 있어도 된다** — 뜰 때 `initState` 가 집어 간다.
 final requestedWorkTab = ValueNotifier<int?>(null);
 
+/// 환경정비 안의 **목록바**를 어디로 열지 — [requestedWorkTab] 과 짝이다
+///
+/// | 값 | 무엇 |
+/// |---|---|
+/// | 0 | 공통 업무 (대표·관리자는 `지점 업무`) |
+/// | 1 | **내 업무** — 대표·관리자에게는 직원 목록 |
+/// | 2 | 직원 업무 — **점장만 있다** |
+///
+/// 업무 누락 모달이 쓴다. 탭만 요청하면 첫 칸(공통 업무)이 열려서 정작 봐야
+/// 할 목록을 한 번 더 찾아야 한다. **[requestedWorkTab] 보다 먼저 넣는다** —
+/// 화면은 저쪽 값이 바뀔 때 움직인다.
+final requestedWorkSubTab = ValueNotifier<int?>(null);
+
 class WorkScreen extends StatefulWidget {
   WorkScreen({super.key});
 
@@ -182,6 +195,7 @@ class _WorkScreenState extends State<WorkScreen>
     // 셸보다 늦게 만들어졌으면 요청이 이미 들어와 있다. 여기서는 setState 를
     // 못 부르므로(빌드 전이다) 값만 바로 넣는다
     if (_pickTab() case final tab?) _tab = tab;
+    if (_pickSubTab() case final sub?) _envTab = sub;
     _loadEnv();
     // 첫 화면이 환경정비라 여기서 한 번 맞춘다
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -206,13 +220,28 @@ class _WorkScreenState extends State<WorkScreen>
     return tab >= 0 && tab < _items.length ? tab : null;
   }
 
-  /// 밖에서 '이 탭으로 열어 달라' 고 했다 (동료평가 재촉 모달)
+  /// 환경정비 목록바가 몇 칸인가 — 점장만 세 칸이다 (`SegmentedTabs` 와 같다)
+  int get _envTabCount => myRole == Role.manager ? 3 : 2;
+
+  /// 들어온 목록바 요청 — **꺼내면서 비운다.** 없는 칸이면 버린다
+  int? _pickSubTab() {
+    final sub = requestedWorkSubTab.value;
+    if (sub == null) return null;
+    requestedWorkSubTab.value = null;
+    return sub >= 0 && sub < _envTabCount ? sub : null;
+  }
+
+  /// 밖에서 '이 탭으로 열어 달라' 고 했다 (동료평가 재촉·업무 누락 모달)
   void _onRequestedTab() {
     // **mounted 를 먼저 본다** — `_pickTab` 이 꺼내면서 비우므로, 못 쓸 때
     // 부르면 요청이 그냥 사라진다
     if (!mounted) return;
     if (_pickTab() case final tab?) {
-      setState(() => _tab = tab);
+      final sub = _pickSubTab();
+      setState(() {
+        _tab = tab;
+        if (sub != null) _envTab = sub;
+      });
       _syncHeaderAction();
     }
   }

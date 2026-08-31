@@ -2091,6 +2091,17 @@
     "content"
    ]
   },
+  "MyTaskMissAlertOut": {
+   "properties": {
+    "date": {},
+    "lastChance": {},
+    "mine": {},
+    "staff": {}
+   },
+   "required": [
+    "date"
+   ]
+  },
   "MyTaskMissOut": {
    "properties": {
     "contents": {
@@ -2126,6 +2137,18 @@
     "date",
     "taskCount",
     "createdAt"
+   ]
+  },
+  "MyTaskMissStaffRow": {
+   "properties": {
+    "count": {},
+    "employeeId": {},
+    "name": {}
+   },
+   "required": [
+    "employeeId",
+    "name",
+    "count"
    ]
   },
   "MyTaskOut": {
@@ -3974,5 +3997,5 @@
    ]
   }
  },
- "version": "0.22.0"
+ "version": "0.26.0"
 }
