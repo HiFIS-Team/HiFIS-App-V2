@@ -1,4 +1,6 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/api/client/api_exception.dart';
 import '../../core/api/work/lesson_api.dart';
@@ -19,6 +21,7 @@ import '../../core/widgets/feedback/empty_card.dart';
 import '../../core/widgets/feedback/skeleton.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/nav/phone_scaffold.dart';
+import '../../core/widgets/input/app_button.dart';
 import '../../core/widgets/input/mode_switch.dart';
 import 'member_edit.dart';
 
@@ -154,6 +157,23 @@ class _MemberInfoScreenState extends State<MemberInfoScreen>
   }
 }
 
+/// `01012345678` → `010-1234-5678`
+///
+/// 자릿수가 안 맞으면 **적힌 그대로** 둔다 — 예전에 손으로 넣은 값이나
+/// 검사용으로 아무 글자나 넣어 둔 것이 섞여 있다.
+String _phoneLabel(String raw) {
+  final digits = raw.replaceAll(RegExp(r'[^0-9]'), '');
+  if (digits.length == 11) {
+    return '${digits.substring(0, 3)}-${digits.substring(3, 7)}'
+        '-${digits.substring(7)}';
+  }
+  if (digits.length == 10) {
+    return '${digits.substring(0, 3)}-${digits.substring(3, 6)}'
+        '-${digits.substring(6)}';
+  }
+  return raw.trim().isEmpty ? '없음' : raw;
+}
+
 /// 회원 한 명 + 지금 등록권
 class _Row {
   const _Row({required this.source, required this.registration});
@@ -198,7 +218,7 @@ class _MemberRowCard extends StatelessWidget {
       final trainer = row.trainerName.isEmpty ? '담당 없음' : row.trainerName;
       return row.branchName.isEmpty ? trainer : '$trainer · ${row.branchName}';
     }
-    return row.source.phone;
+    return _phoneLabel(row.source.phone);
   }
 
   @override
@@ -307,12 +327,35 @@ class _MemberInfoDetailState extends State<_MemberInfoDetail> {
     }
   }
 
+  /// 여기서 바로 지운다 — **고치기 화면을 거치지 않는다**
+  ///
+  /// 지우려고 들어왔는데 수정 폼을 한 번 지나야 하면 한 단계가 헛돈다.
+  Future<void> _delete() async {
+    final ok = await showConfirmDialog(
+      context,
+      title: '${_member.name} 회원님을 삭제할까요?',
+      message: '등록권 · 세션 싸인 · 운동일지가 함께 지워지고 되돌릴 수 없어요',
+      confirmLabel: '삭제',
+      destructive: true,
+      icon: CupertinoIcons.trash,
+      iconColor: AppColors.error,
+    );
+    if (!ok || !mounted) return;
+    try {
+      await MemberApi.remove(_member.id);
+      if (mounted) Navigator.pop(context, true);
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final row = widget.row;
     final trainer =
         StaffDirectory.instance.byId(_member.ownerTrainerId)?.name ?? '없음';
     final branch = StaffDirectory.instance.branchName(_member.branchId);
+    final active = row.bucket == _Bucket.active;
 
     return PopScope(
       canPop: false,
@@ -329,50 +372,50 @@ class _MemberInfoDetailState extends State<_MemberInfoDetail> {
             bottomBarInset(context),
           ),
           children: [
+            // ── 누구인가 ──
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
               decoration: AppDecorations.card(),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    children: [
-                      Avatar(name: _member.name, size: 52),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _member.name,
-                              style: AppTextStyles.title3,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _member.phone,
-                              style: AppTextStyles.body2.copyWith(
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (_canEdit)
-                        Pressable(
-                          onTap: _edit,
-                          child: const Padding(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 4,
-                            ),
-                            child: _EditLabel(),
-                          ),
-                        ),
-                    ],
+                  Avatar(name: _member.name, size: 64),
+                  const SizedBox(height: 12),
+                  Text(
+                    _member.name,
+                    style: AppTextStyles.title2.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 8),
+                  _StatusChip(
+                    active: active,
+                    hasPass: row.registration != null,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            // ── 남은 회차 ──
+            if (row.registration != null) ...[
+              _PassCard(row: row, active: active),
+              const SizedBox(height: 12),
+            ],
+            // ── 인적 사항 ──
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 6, 20, 6),
+              decoration: AppDecorations.card(),
+              child: Column(
+                children: [
+                  // **전화번호가 제일 위다** — 회원에게 연락하려고 여는 자리다
+                  _Field(
+                    label: '연락처',
+                    value: _phoneLabel(_member.phone),
+                    onCopy: _member.phone.trim().isEmpty
+                        ? null
+                        : () => _copy(_member.phone),
+                  ),
                   _Field(label: '담당 트레이너', value: trainer),
                   if (branch.isNotEmpty) _Field(label: '지점', value: branch),
                   _Field(
@@ -383,68 +426,210 @@ class _MemberInfoDetailState extends State<_MemberInfoDetail> {
                     label: '방문 경로',
                     value: _member.visitPath?.label ?? '기록 없음',
                   ),
-                  _Field(
-                    label: '남은 회차',
-                    value: row.registration == null
-                        ? '등록권 없음'
-                        : '${row.total - row.used}회 (${row.used}/${row.total})',
-                  ),
                   if (_member.memo case final memo? when memo.trim().isNotEmpty)
-                    _Field(label: '메모', value: memo),
+                    _Field(label: '메모', value: memo, last: true)
+                  else
+                    const SizedBox(height: 8),
                 ],
               ),
             ),
+            // ── 고치기·지우기 ──
+            if (_canEdit) ...[
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: AppButton(
+                      label: '삭제',
+                      color: AppColors.error.withValues(alpha: 0.1),
+                      textColor: AppColors.error,
+                      onTap: _delete,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: AppButton(
+                      label: '정보 수정',
+                      filled: true,
+                      onTap: _edit,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _copy(String phone) async {
+    await Clipboard.setData(ClipboardData(text: phone));
+    if (mounted) AppToast.show(context, '전화번호를 복사했어요');
+  }
+}
+
+/// 활성·만료 알약 — 목록 카드의 회차 알약과 같은 색을 쓴다
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.active, required this.hasPass});
+
+  final bool active;
+  final bool hasPass;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = !hasPass
+        ? AppColors.gray400
+        : active
+        ? AppColors.primary
+        : AppColors.success;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        !hasPass
+            ? '등록권 없음'
+            : active
+            ? '활성'
+            : '만료',
+        style: AppTextStyles.caption.copyWith(
+          color: color,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );
   }
 }
 
-class _EditLabel extends StatelessWidget {
-  const _EditLabel();
+/// 남은 회차 — 숫자만 적으면 얼마나 남았는지가 안 읽힌다
+class _PassCard extends StatelessWidget {
+  const _PassCard({required this.row, required this.active});
+
+  final _Row row;
+  final bool active;
 
   @override
-  Widget build(BuildContext context) => Text(
-    '수정',
-    style: AppTextStyles.caption.copyWith(
-      color: AppColors.primary,
-      fontWeight: FontWeight.w700,
-    ),
-  );
+  Widget build(BuildContext context) {
+    final left = row.total - row.used;
+    final color = active ? AppColors.primary : AppColors.success;
+    final progress = row.total == 0 ? 0.0 : row.used / row.total;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+      decoration: AppDecorations.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                '남은 회차',
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.textTertiary,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '$left',
+                style: AppTextStyles.title2.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                ),
+              ),
+              const SizedBox(width: 2),
+              Text(
+                '회',
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              value: progress.clamp(0.0, 1.0),
+              minHeight: 6,
+              backgroundColor: AppColors.gray100,
+              valueColor: AlwaysStoppedAnimation(color),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${row.used} / ${row.total}회 사용',
+            style: AppTextStyles.caption.copyWith(fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// 카드 안 한 줄 — 왼쪽 이름표, 오른쪽 값
 class _Field extends StatelessWidget {
-  const _Field({required this.label, required this.value});
+  const _Field({
+    required this.label,
+    required this.value,
+    this.onCopy,
+    this.last = false,
+  });
 
   final String label;
   final String value;
 
+  /// 눌러서 복사 — 전화번호에만 준다
+  final VoidCallback? onCopy;
+
+  /// 마지막 줄이면 아래 선을 안 긋는다
+  final bool last;
+
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 10),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 84,
-          child: Text(
-            label,
-            style: AppTextStyles.caption.copyWith(
-              color: AppColors.textTertiary,
+  Widget build(BuildContext context) {
+    final row = Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 84,
+            child: Text(
+              label,
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.textTertiary,
+              ),
             ),
           ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w600),
+          Expanded(
+            child: Text(
+              value,
+              style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w600),
+            ),
           ),
-        ),
+          if (onCopy != null) ...[
+            const SizedBox(width: 8),
+            Icon(CupertinoIcons.doc_on_doc, size: 15, color: AppColors.gray400),
+          ],
+        ],
+      ),
+    );
+
+    return Column(
+      children: [
+        if (onCopy case final onCopy?)
+          Pressable(onTap: onCopy, child: row)
+        else
+          row,
+        if (!last) Container(height: 1, color: AppColors.gray50),
       ],
-    ),
-  );
+    );
+  }
 }
 
 class _ListSkeleton extends StatelessWidget {

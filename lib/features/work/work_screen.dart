@@ -138,7 +138,10 @@ class _WorkScreenState extends State<WorkScreen>
     // 폰에서 대표가 회원 목록에 닿는 길이 여기 하나다
     _setHeaderAction(
       item.members
-          ? HeaderAction(symbol: 'person', onPressed: _openMembers)
+          // **`person` 을 쓰면 안 된다** — 헤더 오른쪽 프로필 버튼과 같은
+          // 아이콘이라 한 줄에 똑같은 사람이 둘 선다. 여럿(`person.2`) 이
+          // 회원 명단이라는 뜻도 더 맞다
+          ? HeaderAction(symbol: 'person.2', onPressed: _openMembers)
           : null,
     );
   }
