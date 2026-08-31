@@ -378,6 +378,80 @@ String _monthLabel(DateTime value) => '${value.year}년 ${value.month}월';
 /// '8월 10일'
 String _dayLabel(DateTime value) => monthDayLabel(value);
 
+/// 이번 달 요약 뼈대 — 큰 금액 한 줄이 주인공이다
+Widget _summarySkeleton() => SkeletonCard(
+  children: [
+    Row(
+      children: [
+        Skeleton(width: 84, height: 13),
+        Spacer(),
+        Skeleton(width: 62, height: 24, radius: 12),
+      ],
+    ),
+    SizedBox(height: 14),
+    Skeleton(width: 190, height: 30, radius: 8),
+    SizedBox(height: 12),
+    Skeleton(width: 140, height: 12),
+  ],
+);
+
+/// 최근 추이 뼈대 — 막대 여섯 개
+Widget _trendSkeleton() => SkeletonCard(
+  children: [
+    Skeleton(width: 96, height: 14),
+    SizedBox(height: 20),
+    Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        for (var i = 0; i < 6; i++) ...[
+          if (i > 0) SizedBox(width: 10),
+          Expanded(child: Skeleton(height: 40.0 + i * 12, radius: 6)),
+        ],
+      ],
+    ),
+    SizedBox(height: 10),
+    Row(
+      children: [
+        for (var i = 0; i < 6; i++) ...[
+          if (i > 0) SizedBox(width: 10),
+          Expanded(child: Center(child: Skeleton(width: 22, height: 10))),
+        ],
+      ],
+    ),
+  ],
+);
+
+/// 지급 항목 뼈대 — 이름과 금액이 마주 보는 줄들
+Widget _paySkeleton() => SkeletonCard(
+  children: [
+    Skeleton(width: 72, height: 14),
+    SizedBox(height: 18),
+    for (var i = 0; i < 4; i++) ...[
+      if (i > 0) SizedBox(height: 14),
+      Row(
+        children: [
+          Skeleton(width: 76, height: 12),
+          Spacer(),
+          Skeleton(width: 92, height: 12),
+        ],
+      ),
+    ],
+  ],
+);
+
+/// 명세서 카드 세 장의 뼈대 — 요약 · 추이 · 지급
+///
+/// 본인 급여 화면과 **결재 상세**([_PayslipReview])가 같이 쓴다. 두 화면이
+/// 같은 카드를 그리므로 기다리는 모양도 같아야 한다 — 결재 상세만 파란
+/// 스피너였다 (2026-08-31 대표가 "선이 그어지다 확 나온다"고 짚었다).
+List<Widget> _payslipSkeletonCards() => [
+  _summarySkeleton(),
+  SizedBox(height: 12),
+  _trendSkeleton(),
+  SizedBox(height: 12),
+  _paySkeleton(),
+];
+
 /// 받아오는 동안의 뼈대 — 요약 · 신청 안내 · 추이 · 지급 내역 순서를 잡아 둔다
 ///
 /// 탭 줄은 **권한으로 정해지는 것**이라 받아오기 전에도 있을지 없을지 안다.
@@ -394,24 +468,9 @@ class _SalarySkeleton extends StatelessWidget {
           ? Skeleton(height: 48, radius: 14)
           : null,
       children: [
-        // 이번 달 요약 — 큰 금액 한 줄이 주인공이다
-        SkeletonCard(
-          children: [
-            Row(
-              children: [
-                Skeleton(width: 84, height: 13),
-                Spacer(),
-                Skeleton(width: 62, height: 24, radius: 12),
-              ],
-            ),
-            SizedBox(height: 14),
-            Skeleton(width: 190, height: 30, radius: 8),
-            SizedBox(height: 12),
-            Skeleton(width: 140, height: 12),
-          ],
-        ),
+        _summarySkeleton(),
         SizedBox(height: 12),
-        // 신청 안내 (대표는 결재함)
+        // 신청 안내 (대표는 결재함) — 결재 상세에는 없는 카드다
         SkeletonCard(
           children: [
             Skeleton(width: 150, height: 14),
@@ -422,51 +481,9 @@ class _SalarySkeleton extends StatelessWidget {
           ],
         ),
         SizedBox(height: 12),
-        // 최근 추이 — 막대 여섯 개
-        SkeletonCard(
-          children: [
-            Skeleton(width: 96, height: 14),
-            SizedBox(height: 20),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                for (var i = 0; i < 6; i++) ...[
-                  if (i > 0) SizedBox(width: 10),
-                  Expanded(child: Skeleton(height: 40.0 + i * 12, radius: 6)),
-                ],
-              ],
-            ),
-            SizedBox(height: 10),
-            Row(
-              children: [
-                for (var i = 0; i < 6; i++) ...[
-                  if (i > 0) SizedBox(width: 10),
-                  Expanded(
-                    child: Center(child: Skeleton(width: 22, height: 10)),
-                  ),
-                ],
-              ],
-            ),
-          ],
-        ),
+        _trendSkeleton(),
         SizedBox(height: 12),
-        // 지급 항목 — 이름과 금액이 마주 보는 줄들
-        SkeletonCard(
-          children: [
-            Skeleton(width: 72, height: 14),
-            SizedBox(height: 18),
-            for (var i = 0; i < 4; i++) ...[
-              if (i > 0) SizedBox(height: 14),
-              Row(
-                children: [
-                  Skeleton(width: 76, height: 12),
-                  Spacer(),
-                  Skeleton(width: 92, height: 12),
-                ],
-              ),
-            ],
-          ],
-        ),
+        _paySkeleton(),
       ],
     ),
   );

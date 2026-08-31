@@ -390,6 +390,9 @@ class _PayslipReviewState extends State<_PayslipReview> {
     ];
   }
 
+  /// 아직 받는 중이면 뼈대 물결을 돌린다 — 다 받았으면 그냥 통과시킨다
+  Widget _wait(Widget child) => _ready ? child : SkeletonGroup(child: child);
+
   @override
   Widget build(BuildContext context) {
     final title = '$_name · ${_monthOf(_payslip)}월 급여';
@@ -400,16 +403,16 @@ class _PayslipReviewState extends State<_PayslipReview> {
       return PhoneDetailScaffold(
         title: title,
         bottomBar: actions,
-        child: ListView(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            PhoneDetailScaffold.topPadding,
-            20,
-            actions == null ? 32 : GlassBottomButton.inset(context),
+        child: _wait(
+          ListView(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              PhoneDetailScaffold.topPadding,
+              20,
+              actions == null ? 32 : GlassBottomButton.inset(context),
+            ),
+            children: _ready ? cards : _payslipSkeletonCards(),
           ),
-          children: _ready
-              ? cards
-              : [SizedBox(height: 120, child: Center(child: DelayedSpinner()))],
         ),
       );
     }
@@ -428,16 +431,11 @@ class _PayslipReviewState extends State<_PayslipReview> {
           Text(title, style: AppTextStyles.title3),
           SizedBox(height: 14),
           Flexible(
-            child: ListView(
-              shrinkWrap: true,
-              children: _ready
-                  ? cards
-                  : [
-                      SizedBox(
-                        height: 120,
-                        child: Center(child: DelayedSpinner()),
-                      ),
-                    ],
+            child: _wait(
+              ListView(
+                shrinkWrap: true,
+                children: _ready ? cards : _payslipSkeletonCards(),
+              ),
             ),
           ),
           if (actions != null) ...[SizedBox(height: 16), actions],
