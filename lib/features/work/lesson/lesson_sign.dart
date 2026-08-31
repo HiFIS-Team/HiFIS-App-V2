@@ -119,32 +119,39 @@ class _SignScreenState extends State<_SignScreen> {
       backgroundColor: AppColors.surface,
       body: Stack(
         children: [
-          SafeArea(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 32),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.warning_amber_rounded,
-                    size: 72,
-                    color: AppColors.warning,
-                  ),
-                  SizedBox(height: 24),
-                  Text(
-                    '운동 일지를\n작성해주세요',
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.title1.copyWith(height: 1.4),
-                  ),
-                  SizedBox(height: 12),
-                  Text(
-                    '${member.name}님 ${member.nextWorkoutNo}회차 일지가 아직 없어요',
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.body2.copyWith(
-                      color: AppColors.textSecondary,
+          // **`Positioned.fill` 이 있어야 가운데로 온다.** `Stack` 은 위치를
+          // 안 준 자식에게 **느슨한** 제약을 주는데, 그러면 이 칸은 가로로
+          // 제일 넓은 글줄만큼만 차지하고 `Stack` 이 그걸 **왼쪽 위**에 붙인다
+          // (세로는 `MainAxisSize.max` 라 다 차서 가운데로 보였고, 가로만
+          // 왼쪽으로 쏠려 있었다 — 2026-08-31 대표 지적).
+          Positioned.fill(
+            child: SafeArea(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      size: 72,
+                      color: AppColors.warning,
                     ),
-                  ),
-                ],
+                    SizedBox(height: 24),
+                    Text(
+                      '운동 일지를\n작성해주세요',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.title1.copyWith(height: 1.4),
+                    ),
+                    SizedBox(height: 12),
+                    Text(
+                      '${member.name}님 ${member.nextWorkoutNo}회차 일지가 아직 없어요',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.body2.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
