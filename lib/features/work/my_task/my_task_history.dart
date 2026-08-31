@@ -7,11 +7,26 @@ part of 'my_task_section.dart';
 ///
 /// **세션 기록·환경정비 내역과 같은 모양이다** — 달을 고르고 날짜별로 묶인
 /// 목록을 쭉 내리고, 아래 글래스 검색바로 찾는다.
-Future<void> showMyTaskHistory(BuildContext context) =>
-    showFullPage<void>(context, (_) => const _MyTaskHistoryScreen());
+///
+/// [employeeId] 를 주면 **그 사람 것**이다 — 대표·관리자·점장이 조직 판에서
+/// 사람을 골라 들어온다. 안 주면 본인 것이다.
+Future<void> showMyTaskHistory(
+  BuildContext context, {
+  String? employeeId,
+  String? name,
+}) => showFullPage<void>(
+  context,
+  (_) => _MyTaskHistoryScreen(employeeId: employeeId, name: name),
+);
 
 class _MyTaskHistoryScreen extends StatefulWidget {
-  const _MyTaskHistoryScreen();
+  const _MyTaskHistoryScreen({this.employeeId, this.name});
+
+  /// null 이면 본인 것 — 서버가 조용히 본인으로 고정한다
+  final String? employeeId;
+
+  /// 제목에 쓸 이름 — null 이면 `업무 내역`
+  final String? name;
 
   @override
   State<_MyTaskHistoryScreen> createState() => _MyTaskHistoryScreenState();
@@ -66,7 +81,10 @@ class _MyTaskHistoryScreenState extends State<_MyTaskHistoryScreen>
   Future<void> _load(DateTime month) async {
     setState(beginLoad);
     try {
-      final rows = await MyTaskApi.history(month: periodKey(month));
+      final rows = await MyTaskApi.history(
+        month: periodKey(month),
+        employeeId: widget.employeeId,
+      );
       // 기다리는 사이 또 눌렀으면 이 응답은 버린다 (빠르게 여러 달 넘길 때
       // 늦게 온 옛 응답이 새 달을 덮어쓰면 안 된다)
       if (!mounted || _month != month) return;
@@ -198,12 +216,18 @@ class _MyTaskHistoryScreenState extends State<_MyTaskHistoryScreen>
             ),
           ),
           // 상단 중앙 고정 타이틀 (터치는 아래로 통과)
-          const IgnorePointer(
+          IgnorePointer(
             child: SafeArea(
               bottom: false,
               child: SizedBox(
                 height: 56,
-                child: Center(child: _HistoryTitle()),
+                child: Center(
+                  child: Text(
+                    // 남의 것을 볼 때는 누구 것인지가 제목에 있어야 한다
+                    widget.name == null ? '업무 내역' : '${widget.name} 업무 내역',
+                    style: AppTextStyles.title3,
+                  ),
+                ),
               ),
             ),
           ),
@@ -224,14 +248,6 @@ class _MyTaskHistoryScreenState extends State<_MyTaskHistoryScreen>
       ),
     );
   }
-}
-
-class _HistoryTitle extends StatelessWidget {
-  const _HistoryTitle();
-
-  @override
-  Widget build(BuildContext context) =>
-      Text('업무 내역', style: AppTextStyles.title3);
 }
 
 /// 하루 한 장 — 날짜 · 완료·누락 · 몇 개 중 몇 개, 그리고 이름들

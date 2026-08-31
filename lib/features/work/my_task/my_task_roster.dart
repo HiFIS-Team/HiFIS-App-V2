@@ -360,6 +360,16 @@ class _PersonTaskCardBody extends StatelessWidget {
                     style: AppTextStyles.label,
                   ),
                 ),
+                // 이 요일 줄은 **이번 주**뿐이다 — 며칠에 누락했는지는
+                // 달로 봐야 한다. 직원 본인 화면과 같은 자리에 둔다
+                SeeAllButton(
+                  onTap: () => showMyTaskHistory(
+                    context,
+                    employeeId: row.employeeId,
+                    name: row.name,
+                  ),
+                ),
+                const SizedBox(width: 4),
                 if (day != null) _DoneBadge(day: day!),
               ],
             ),
