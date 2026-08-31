@@ -48,6 +48,12 @@ void main() {
     'PostComment': 'CommentOut',
     'RankingRow': 'RankingBoardItem',
     'ScoreSummary': 'app__schemas__scoring__score__ScoreSummary',
+    // 운동일지 — 표 두 줄은 서버도 이름이 그대로다(In·Out 을 안 나눴다)
+    'WeightRow': 'WeightRow',
+    'CardioRow': 'CardioRow',
+    'MediaItem': 'MediaItemOut',
+    'MediaGroup': 'MediaGroupOut',
+    'WorkoutLog': 'WorkoutLogOut',
   };
 
   /// 서버 응답이 아닌 것 — 여기 있는 이름은 대조하지 않는다.

@@ -91,6 +91,19 @@ class _LessonStore {
     return active ?? latest;
   }
 
+  /// 회원이 지금까지 쓴 회차 — **등록권 전부를 더한 값**
+  ///
+  /// 싸인은 등록권마다 1 부터 다시 세는데(`used_sessions + 1`) 운동일지는
+  /// 회원 평생 번호라 재등록해도 11·12 로 이어진다. 일지를 찾으려면 이 값이
+  /// 있어야 한다 — 서버 `_require_workout` 과 같은 셈법이다.
+  int lifetimeDoneOf(String memberId) {
+    var used = 0;
+    for (final registration in registrations) {
+      if (registration.memberId == memberId) used += registration.usedSessions;
+    }
+    return used;
+  }
+
   /// 내가 담당하는 회원
   List<_LessonMember> get myMembers => [
     for (final member in members)
@@ -98,6 +111,7 @@ class _LessonStore {
         _LessonMember(
           source: member,
           registration: currentRegistrationOf(member.id),
+          lifetimeDone: lifetimeDoneOf(member.id),
         ),
   ];
 
@@ -109,12 +123,22 @@ class _LessonStore {
 
 /// 화면이 다루는 회원 한 명 — 서버 회원에 지금 쓰는 등록권을 붙인 것
 class _LessonMember {
-  _LessonMember({required this.source, required this.registration});
+  _LessonMember({
+    required this.source,
+    required this.registration,
+    this.lifetimeDone = 0,
+  });
 
   final Member source;
 
   /// 지금 쓰는 등록권 — 등록권이 하나도 없는 회원이면 null
   final Registration? registration;
+
+  /// 등록권 전부를 더해 지금까지 쓴 회차 — 운동일지 번호와 짝이다
+  final int lifetimeDone;
+
+  /// 이번에 찍을 운동일지 번호 (= 다음 회차)
+  int get nextWorkoutNo => lifetimeDone + 1;
 
   String get id => source.id;
   String get name => source.name;

@@ -13,12 +13,59 @@ class _SignScreen extends StatefulWidget {
 class _SignScreenState extends State<_SignScreen> {
   final List<List<Offset>> _strokes = [];
 
+  /// 이번 회차 운동일지를 찾는 중
+  bool _checking = true;
+
+  /// 일지가 없다 — 서명 패드 대신 경고를 그린다
+  bool _needsLog = false;
+
   /// 서명 당시 패드 크기 — 이 크기로 PNG를 굽는다
   Size _padSize = Size.zero;
 
   bool _saving = false;
 
   bool get _signed => _strokes.any((stroke) => stroke.length > 1);
+
+  @override
+  void initState() {
+    super.initState();
+    _checkWorkout();
+  }
+
+  /// **일지를 써야 싸인이다** (2026-08-31 대표 요청)
+  ///
+  /// 서버도 `NO_WORKOUT_LOG` 로 막지만, 거기까지 가면 **회원이 이미 서명을
+  /// 마친 뒤**라 다시 받아야 한다. 그래서 패드를 그리기 전에 먼저 본다.
+  ///
+  /// 못 받아오면 **막지 않는다** — 통신이 흔들렸다고 싸인을 못 받으면
+  /// 회원을 앞에 세워 두고 손을 놓게 된다. 그 경우는 서버가 걸러 준다.
+  Future<void> _checkWorkout() async {
+    try {
+      final logs = await WorkoutApi.list(
+        widget.member.id,
+        kind: WorkoutKind.pt,
+      );
+      var written = 0;
+      for (final log in logs) {
+        final no = log.sessionNo ?? 0;
+        if (no > written) written = no;
+      }
+      if (!mounted) return;
+      setState(() {
+        _needsLog = written < widget.member.nextWorkoutNo;
+        _checking = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _checking = false);
+    }
+  }
+
+  /// 경고에서 나가면 **수업 개수 화면까지** 돌아간다 (회원 고르기도 같이 닫는다)
+  void _exitToLesson() {
+    final navigator = Navigator.of(context);
+    navigator.pop();
+    if (navigator.canPop()) navigator.pop();
+  }
 
   void _clear() => setState(_strokes.clear);
 
@@ -63,9 +110,76 @@ class _SignScreenState extends State<_SignScreen> {
     }
   }
 
+  /// 일지가 없다 — **서명 패드를 아예 안 연다** (2026-08-31 대표 요청)
+  ///
+  /// 예전에는 다 받고 나서 아래 토스트로 알렸다. 그러면 회원이 서명을 마친
+  /// 뒤에 무를 수 없다는 말을 듣게 된다.
+  Widget _needWorkout(_LessonMember member) {
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    size: 72,
+                    color: AppColors.warning,
+                  ),
+                  SizedBox(height: 24),
+                  Text(
+                    '운동 일지를\n작성해주세요',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.title1.copyWith(height: 1.4),
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    '${member.name}님 ${member.nextWorkoutNo}회차 일지가 아직 없어요',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.body2.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: BottomActionBar(
+              children: [
+                Expanded(
+                  child: BottomActionButton(
+                    id: 'sign-need-workout',
+                    label: '나가기',
+                    onPressed: _exitToLesson,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final member = widget.member;
+
+    // 일지를 확인하는 동안은 패드를 안 그린다 — 그렸다가 경고로 바뀌면
+    // 회원이 이미 손을 대고 있다
+    if (_checking) {
+      return Scaffold(
+        backgroundColor: AppColors.surface,
+        body: Center(child: DelayedSpinner.bare()),
+      );
+    }
+    if (_needsLog) return _needWorkout(member);
 
     return Scaffold(
       backgroundColor: AppColors.surface,

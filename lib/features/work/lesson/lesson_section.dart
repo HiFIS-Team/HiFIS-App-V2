@@ -19,6 +19,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/util/platform.dart';
 import '../../../core/widgets/feedback/app_dialog.dart';
 import '../../../core/widgets/feedback/app_toast.dart';
+import '../../../core/widgets/feedback/delayed_spinner.dart';
 import '../../../core/util/skeleton_delay.dart';
 import '../../../core/widgets/feedback/empty_card.dart';
 import '../../../core/widgets/glass/glass_bottom_button.dart';
@@ -29,6 +30,8 @@ import '../../../core/widgets/input/mode_switch.dart';
 import '../../../core/widgets/input/pressable.dart';
 import '../../../core/widgets/input/see_all_button.dart';
 import '../../../core/util/when.dart';
+import '../../../core/api/work/workout_api.dart';
+import '../../member/member_screen.dart';
 import '../work_skeleton.dart';
 import '../../../core/widgets/feedback/skeleton.dart';
 part 'lesson_data.dart';
@@ -95,6 +98,15 @@ class _LessonSectionState extends State<LessonSection>
     if (added == true && mounted) await _load();
   }
 
+  /// 운동일지를 쓰러 간다 — 회원 관리 화면이 곧 일지 목록이다
+  ///
+  /// **홈 바로가기에 있던 자리를 여기로 옮겼다** (2026-08-31 대표 요청).
+  /// 일지를 써야 싸인이 되므로 수업 흐름이 한 화면에서 이어져야 한다.
+  Future<void> _openWorkouts() async {
+    await showFullPage<void>(context, (_) => MemberScreen());
+    if (mounted) await _load();
+  }
+
   /// 회원을 골라 싸인을 받는다
   Future<void> _pickAndSign() async {
     final signed = await showFullPage<bool>(
@@ -114,11 +126,14 @@ class _LessonSectionState extends State<LessonSection>
     if (showSkeleton) return WorkSectionSkeleton();
 
     // 상단 액션 버튼 두 개 — 폰·PC 공통. 대표·관리자는 수행자가 아니라 안 그린다
+    // 폭은 3:3:4 다 — '세션 싸인 받기' 가 여섯 글자라 똑같이 나누면 폰에서
+    // 넘친다. 옆 둘은 네 글자라 좁혀도 남는다.
     final actions = _viewOnly
         ? SizedBox.shrink()
         : Row(
             children: [
               Expanded(
+                flex: 3,
                 child: _ActionButton(
                   icon: CupertinoIcons.person_add,
                   label: '회원 등록',
@@ -127,6 +142,16 @@ class _LessonSectionState extends State<LessonSection>
               ),
               SizedBox(width: 10),
               Expanded(
+                flex: 3,
+                child: _ActionButton(
+                  icon: CupertinoIcons.doc_text,
+                  label: '운동 일지',
+                  onTap: _openWorkouts,
+                ),
+              ),
+              SizedBox(width: 10),
+              Expanded(
+                flex: 4,
                 child: _ActionButton(
                   icon: CupertinoIcons.signature,
                   label: '세션 싸인 받기',
@@ -278,19 +303,24 @@ class _ActionButton extends StatelessWidget {
                 : AppColors.gray100,
           ),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 17, color: color),
-            SizedBox(width: 7),
-            Text(
-              label,
-              style: AppTextStyles.body2.copyWith(
-                color: color,
-                fontWeight: FontWeight.w700,
+        // 셋이 나란히 서면서 제일 좁은 폰(375)에서 아슬아슬해졌다.
+        // 남을 때는 아무 일도 안 하고 모자랄 때만 줄어든다
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 17, color: color),
+              SizedBox(width: 7),
+              Text(
+                label,
+                style: AppTextStyles.body2.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -512,6 +512,22 @@
     "file"
    ]
   },
+  "Body_upload_training_media_training__token__media_post": {
+   "properties": {
+    "file": {}
+   },
+   "required": [
+    "file"
+   ]
+  },
+  "Body_upload_workout_media_workouts_media_post": {
+   "properties": {
+    "file": {}
+   },
+   "required": [
+    "file"
+   ]
+  },
   "BranchCreate": {
    "properties": {
     "name": {},
@@ -560,6 +576,13 @@
    "required": [
     "platform"
    ]
+  },
+  "CardioRow": {
+   "properties": {
+    "duration": {},
+    "name": {}
+   },
+   "required": []
   },
   "ChatAuditMessageOut": {
    "properties": {
@@ -1680,6 +1703,40 @@
     "password"
    ]
   },
+  "MediaGroupIn": {
+   "properties": {
+    "feedback": {},
+    "items": {}
+   },
+   "required": []
+  },
+  "MediaGroupOut": {
+   "properties": {
+    "feedback": {},
+    "items": {}
+   },
+   "required": []
+  },
+  "MediaItemIn": {
+   "properties": {
+    "kind": {},
+    "url": {}
+   },
+   "required": [
+    "url",
+    "kind"
+   ]
+  },
+  "MediaItemOut": {
+   "properties": {
+    "kind": {},
+    "url": {}
+   },
+   "required": [
+    "url",
+    "kind"
+   ]
+  },
   "MeetingCreate": {
    "properties": {
     "attendeeIds": {},
@@ -1813,6 +1870,7 @@
   "MemberCreateOut": {
    "properties": {
     "branchId": {},
+    "goals": {},
     "id": {},
     "memo": {
      "nullable": true
@@ -1825,6 +1883,9 @@
     },
     "registeredAt": {},
     "registration": {
+     "nullable": true
+    },
+    "trainingToken": {
      "nullable": true
     },
     "visitPath": {
@@ -1863,6 +1924,9 @@
   },
   "MemberUpdate": {
    "properties": {
+    "goals": {
+     "nullable": true
+    },
     "memo": {
      "nullable": true
     },
@@ -2506,6 +2570,19 @@
     "email",
     "avatarColor",
     "branchId"
+   ]
+  },
+  "PersonalLogIn": {
+   "properties": {
+    "cardio": {},
+    "media": {},
+    "performedOn": {},
+    "title": {},
+    "weights": {}
+   },
+   "required": [
+    "title",
+    "performedOn"
    ]
   },
   "ProjectActivityKind": {
@@ -3580,6 +3657,43 @@
     "ip"
    ]
   },
+  "TrainingLogOut": {
+   "properties": {
+    "cardio": {},
+    "id": {},
+    "kind": {},
+    "media": {},
+    "mine": {},
+    "performedOn": {},
+    "sessionNo": {
+     "nullable": true
+    },
+    "title": {},
+    "trainerFeedback": {
+     "nullable": true
+    },
+    "weights": {}
+   },
+   "required": [
+    "id",
+    "kind",
+    "title",
+    "performedOn"
+   ]
+  },
+  "TrainingPageOut": {
+   "properties": {
+    "goals": {},
+    "memberName": {},
+    "personal": {},
+    "pt": {},
+    "trainerName": {}
+   },
+   "required": [
+    "memberName",
+    "trainerName"
+   ]
+  },
   "TvOut": {
    "properties": {
     "branchName": {},
@@ -3616,9 +3730,110 @@
    "properties": {},
    "required": []
   },
+  "WeightRow": {
+   "properties": {
+    "load": {},
+    "name": {},
+    "part": {},
+    "sets": {}
+   },
+   "required": []
+  },
   "WorkStatus": {
    "properties": {},
    "required": []
+  },
+  "WorkoutKind": {
+   "properties": {},
+   "required": []
+  },
+  "WorkoutLogCreate": {
+   "properties": {
+    "cardio": {},
+    "kind": {},
+    "media": {},
+    "memberId": {},
+    "performedOn": {},
+    "sessionNo": {
+     "nullable": true
+    },
+    "title": {},
+    "trainerFeedback": {
+     "nullable": true
+    },
+    "weights": {}
+   },
+   "required": [
+    "memberId",
+    "kind",
+    "title",
+    "performedOn"
+   ]
+  },
+  "WorkoutLogOut": {
+   "properties": {
+    "authorId": {
+     "nullable": true
+    },
+    "cardio": {},
+    "id": {},
+    "kind": {},
+    "media": {},
+    "memberId": {},
+    "performedOn": {},
+    "sessionNo": {
+     "nullable": true
+    },
+    "title": {},
+    "trainerFeedback": {
+     "nullable": true
+    },
+    "weights": {}
+   },
+   "required": [
+    "id",
+    "memberId",
+    "kind",
+    "title",
+    "performedOn"
+   ]
+  },
+  "WorkoutLogUpdate": {
+   "properties": {
+    "cardio": {
+     "nullable": true
+    },
+    "media": {
+     "nullable": true
+    },
+    "performedOn": {
+     "nullable": true
+    },
+    "title": {
+     "nullable": true
+    },
+    "trainerFeedback": {
+     "nullable": true
+    },
+    "weights": {
+     "nullable": true
+    }
+   },
+   "required": []
+  },
+  "WorkoutMediaKind": {
+   "properties": {},
+   "required": []
+  },
+  "WorkoutMediaOut": {
+   "properties": {
+    "kind": {},
+    "url": {}
+   },
+   "required": [
+    "url",
+    "kind"
+   ]
   },
   "app__api__public__history__MemberOut": {
    "properties": {
@@ -3661,6 +3876,7 @@
   "app__schemas__members__member__MemberOut": {
    "properties": {
     "branchId": {},
+    "goals": {},
     "id": {},
     "memo": {
      "nullable": true
@@ -3672,6 +3888,9 @@
      "nullable": true
     },
     "registeredAt": {},
+    "trainingToken": {
+     "nullable": true
+    },
     "visitPath": {
      "nullable": true
     }
