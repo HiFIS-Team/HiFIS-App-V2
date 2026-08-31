@@ -469,8 +469,12 @@ class ChatStore extends ChangeNotifier {
         memberIds: old.memberIds,
         lastMessage: old.lastMessage,
         unreadCount: count,
+        muted: old.muted,
         updatedAt: old.updatedAt,
       );
+    // 여기서 다시 세야 헤더 배지가 그 자리에서 꺼진다 — 안 부르면 방을 읽고
+    // 나와도 빨간 점이 남고, 목록을 다시 받을 때(`loadRooms`)에야 사라진다
+    _syncUnread();
     notifyListeners();
   }
 
