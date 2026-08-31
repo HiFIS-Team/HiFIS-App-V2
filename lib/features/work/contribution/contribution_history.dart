@@ -16,8 +16,9 @@ class _HistoryCard extends StatelessWidget {
   final int total;
   final VoidCallback onOpenAll;
 
-  /// 깎인 줄을 되돌린다 — null 이면 아이콘이 안 뜬다 (대표가 아니다)
-  final void Function(_Contribution item)? onRevert;
+  /// 깎인 줄을 되돌린다 — null 이면 아이콘이 안 뜬다 (대표가 아니다).
+  /// **되돌렸으면 true** (확인창에서 취소하면 false).
+  final Future<bool> Function(_Contribution item)? onRevert;
 
   @override
   Widget build(BuildContext context) {
@@ -261,7 +262,12 @@ class _ContributionHistoryScreen extends StatefulWidget {
   final List<_Contribution> items;
 
   /// 깎인 줄을 되돌린다 — null 이면 아이콘이 안 뜬다 (대표가 아니다)
-  final void Function(_Contribution item)? onRevert;
+  /// 되돌렸으면 true — **확인창에서 취소하면 false 다.**
+  ///
+  /// 값을 안 돌려받던 때는 아이콘을 누르는 순간 줄이 사라졌다. 확인창은
+  /// 떠 있는데 화면에서는 이미 되돌아간 것처럼 보였고, 취소를 눌러도 줄이
+  /// 안 돌아왔다 (2026-08-31 대표 지적).
+  final Future<bool> Function(_Contribution item)? onRevert;
 
   @override
   State<_ContributionHistoryScreen> createState() =>
@@ -275,8 +281,10 @@ class _ContributionHistoryScreenState
   /// (전체 화면으로 덮여 있어서 그 화면은 새로 안 그려진다).
   late List<_Contribution> _items = widget.items;
 
-  void _revert(_Contribution item) {
-    widget.onRevert?.call(item);
+  /// **되돌아간 뒤에만** 줄을 뺀다 — 확인창에서 취소하면 그대로 남는다
+  Future<void> _revert(_Contribution item) async {
+    final done = await widget.onRevert?.call(item) ?? false;
+    if (!done || !mounted) return;
     setState(() {
       _items = [
         for (final row in _items)

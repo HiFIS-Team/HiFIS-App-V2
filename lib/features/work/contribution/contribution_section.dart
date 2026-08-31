@@ -236,9 +236,12 @@ class _ContributionSectionState extends State<ContributionSection>
   static bool get _canRevert => myRole == Role.master;
 
   /// 깎인 점수 한 줄을 되돌린다 — 한 번 더 묻는다
-  Future<void> _revert(_Contribution item) async {
+  ///
+  /// **되돌렸으면 true.** 부르는 쪽(내역 화면)이 이 값을 보고 줄을 뺀다 —
+  /// 안 돌려주면 확인창을 띄우는 사이에 줄이 먼저 사라진다.
+  Future<bool> _revert(_Contribution item) async {
     final id = item.eventId;
-    if (id == null) return;
+    if (id == null) return false;
     final who = item.person == null ? '' : '${item.person}님의 ';
     final ok = await showConfirmDialog(
       context,
@@ -249,10 +252,10 @@ class _ContributionSectionState extends State<ContributionSection>
           '되돌리면 다시 깎을 수 없어요.',
       confirmLabel: '되돌리기',
     );
-    if (!ok || !mounted) return;
+    if (!ok || !mounted) return false;
     try {
       await ScoreApi.revert(id);
-      if (!mounted) return;
+      if (!mounted) return true;
       // 목록에서 바로 빼고 조용히 다시 받는다 — 지운 줄이 남아 있으면
       // 한 번 더 누르게 되고 그때는 404 다
       setState(() {
@@ -263,8 +266,10 @@ class _ContributionSectionState extends State<ContributionSection>
         _rebuild();
       });
       AppToast.show(context, '${item.points.abs()}점을 되돌렸어요');
+      return true;
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
+      return false;
     }
   }
 
