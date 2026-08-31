@@ -9,6 +9,7 @@ part of 'praise_section.dart';
 /// 응답인지 가리지 않고 원본을 그대로 보여준다.
 class _Survey {
   _Survey({
+    required this.id,
     required this.name,
     required this.phone,
     required this.colorValue,
@@ -18,6 +19,9 @@ class _Survey {
     required this.time,
     this.consent = true,
   });
+
+  /// 원본 설문 id — 컴플레인을 지울 때 어느 줄인지 찾는다
+  final String id;
 
   /// 성함
   final String name;
@@ -33,7 +37,9 @@ class _Survey {
   final String praised;
 
   /// 개선했으면 하는 부분 (안 적었으면 빈 값)
-  final String improve;
+  ///
+  /// 대표가 컴플레인을 지우면 서버가 이 칸만 비우므로 여기도 비운다
+  String improve;
 
   /// 개인정보 수집 및 이용 동의
   final bool consent;

@@ -4,6 +4,9 @@ part of 'praise_section.dart';
 enum _Status {
   pending('미처리'),
   working('해결중'),
+
+  /// 완료를 올렸고 대표가 아직 안 봤다 (2026-08-31)
+  waiting('완료 승인 대기'),
   done('해결 완료');
 
   const _Status(this.label);
@@ -13,18 +16,23 @@ enum _Status {
   Color get color => switch (this) {
     _Status.pending => AppColors.warning,
     _Status.working => AppColors.primary,
+    // 대기는 '아직 안 끝났다' 쪽이라 미처리와 같은 주황을 쓴다
+    _Status.waiting => AppColors.warning,
     _Status.done => AppColors.success,
   };
 
   ComplaintStatus get wire => switch (this) {
     _Status.pending => ComplaintStatus.pending,
     _Status.working => ComplaintStatus.working,
+    // 대기는 서버가 매기는 값이라 보낼 일이 없다 — 누르는 건 늘 '완료'다
+    _Status.waiting => ComplaintStatus.done,
     _Status.done => ComplaintStatus.done,
   };
 
   static _Status of(ComplaintStatus status) => switch (status) {
     ComplaintStatus.pending => _Status.pending,
     ComplaintStatus.working => _Status.working,
+    ComplaintStatus.doneRequested => _Status.waiting,
     ComplaintStatus.done => _Status.done,
   };
 }
@@ -92,6 +100,7 @@ Future<void> _loadSurveys({String? branchId}) async {
     ..addAll([
       for (final row in rows)
         _Survey(
+          id: row.id,
           name: row.memberName,
           phone: row.memberPhone,
           colorValue: avatarColorFor(row.memberName).toARGB32(),
@@ -195,6 +204,17 @@ void _showFeedbackDetail(
 /// 창이 이미 닫힌 뒤라 여기서 토스트를 띄울 자리가 없다. 실패하면 목록의
 /// 알약이 원래 색으로 돌아가는 것이 신호다. 그래서 위젯이 아니라 값만
 /// 넘겨받는다 (닫힌 위젯의 `widget` 을 만지면 터진다).
+/// 컴플레인을 지운 뒤 화면에서도 뺀다
+///
+/// **서버는 개선 의견만 비운다** — 칭찬 줄과 설문 원본은 그대로 있어야 한다.
+/// 그래서 컴플레인 줄만 빼고 설문의 개선 칸을 비운다.
+void _dropComplaint(String surveyId) {
+  _feedbacks.removeWhere((f) => f.complaint && f.surveyId == surveyId);
+  for (final survey in _surveys) {
+    if (survey.id == surveyId) survey.improve = '';
+  }
+}
+
 Future<void> _push(
   String id,
   _Feedback feedback,

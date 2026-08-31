@@ -20,8 +20,22 @@ class _FeedbackDetailCardState extends State<_FeedbackDetailCard> {
   ///
   /// **고르면 바로 닫고 토스트로 알린다.** 창을 열어둔 채 색만 바꾸면
   /// 처리가 됐는지 안 됐는지 알 수가 없다.
-  void _pick(_Status status) {
+  Future<void> _pick(_Status status) async {
     final feedback = widget.feedback;
+
+    // **해결 완료는 대표 승인을 받는다** (2026-08-31 대표 요청).
+    // 완료를 찍으면 찍은 사람에게 환경정비 '클레임해결' 점수가 붙어서,
+    // 아무나 찍을 수 있으면 점수를 그냥 가져갈 수 있다.
+    if (status == _Status.done && myRole != Role.master) {
+      final ok = await showConfirmDialog(
+        context,
+        title: '대표 승인이 필요해요',
+        message: '해결 완료는 대표가 확인해야 처리돼요.\n승인을 올릴까요?',
+        confirmLabel: '올리기',
+      );
+      if (!ok || !mounted) return;
+    }
+
     // 완료는 되돌리는 길이 없으므로 같은 버튼을 다시 눌러도 완료다
     final next = status != _Status.done && feedback.status == status
         ? _Status.pending
@@ -30,19 +44,76 @@ class _FeedbackDetailCardState extends State<_FeedbackDetailCard> {
 
     // 누르는 순간 바꾸고 서버에 올린다. 실패하면 되돌린다 —
     // 창을 닫고 나서 결과를 기다리면 목록이 잠깐 거짓말을 한다.
-    feedback.status = next;
+    final shown = next == _Status.done && myRole != Role.master
+        ? _Status.waiting
+        : next;
+    feedback.status = shown;
     widget.onChanged?.call();
 
     final id = feedback.surveyId;
-    if (id != null) _push(id, feedback, next, before, widget.onChanged);
+    if (id != null) _push(id, feedback, shown, before, widget.onChanged);
 
-    AppToast.show(
-      context,
-      next == _Status.pending
-          ? '미처리로 되돌렸어요'
-          : '${next.label}${_particleRo(next.label)} 바꿨어요',
-    );
+    AppToast.show(context, switch (shown) {
+      _Status.pending => '미처리로 되돌렸어요',
+      _Status.waiting => '대표 승인을 올렸어요',
+      _ => '${shown.label}${_particleRo(shown.label)} 바꿨어요',
+    });
     Navigator.of(context).pop();
+  }
+
+  /// 대표가 승인·반려한다 — 승인하면 **올린 사람에게** 클레임해결 점수가 간다
+  Future<void> _decide(bool approve) async {
+    final feedback = widget.feedback;
+    final id = feedback.surveyId;
+    if (id == null) return;
+
+    String? reason;
+    if (!approve) {
+      reason = await askRejectReason(context, hint: '예) 아직 샤워실이 그대로예요');
+      if (reason == null || !mounted) return;
+    }
+
+    final before = feedback.status;
+    feedback.status = approve ? _Status.done : _Status.working;
+    widget.onChanged?.call();
+    AppToast.show(context, approve ? '승인했어요' : '반려했어요');
+    Navigator.of(context).pop();
+
+    try {
+      if (approve) {
+        await KindnessApi.approve(id);
+      } else {
+        await KindnessApi.reject(id, reason: reason);
+      }
+    } catch (_) {
+      feedback.status = before;
+      widget.onChanged?.call();
+    }
+  }
+
+  /// 컴플레인 지우기 — **대표만.** 칭찬은 남고 이 줄만 사라진다
+  Future<void> _delete() async {
+    final feedback = widget.feedback;
+    final id = feedback.surveyId;
+    if (id == null) return;
+
+    final ok = await showConfirmDialog(
+      context,
+      title: '이 컴플레인을 지울까요?',
+      message: '지운 글은 되돌릴 수 없어요.\n같은 회원이 남긴 칭찬은 그대로 남아요.',
+      confirmLabel: '지우기',
+      destructive: true,
+    );
+    if (!ok || !mounted) return;
+
+    Navigator.of(context).pop();
+    try {
+      await KindnessApi.removeComplaint(id);
+      _dropComplaint(id);
+      widget.onChanged?.call();
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
   }
 
   @override
@@ -104,6 +175,27 @@ class _FeedbackDetailCardState extends State<_FeedbackDetailCard> {
                 textAlign: TextAlign.center,
                 style: AppTextStyles.caption,
               )
+            // 올라온 완료를 대표가 본다 — 그 자리에서는 단계 버튼 대신 결재다
+            else if (feedback.status == _Status.waiting &&
+                myRole == Role.master)
+              Row(
+                children: [
+                  Expanded(
+                    child: _DecideButton(
+                      label: '반려',
+                      onTap: () => _decide(false),
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: _DecideButton(
+                      label: '승인',
+                      filled: true,
+                      onTap: () => _decide(true),
+                    ),
+                  ),
+                ],
+              )
             else
               Row(
                 children: [
@@ -124,8 +216,64 @@ class _FeedbackDetailCardState extends State<_FeedbackDetailCard> {
                   ),
                 ],
               ),
+            // 대표만 지운다 — 칭찬은 남고 이 줄만 사라진다
+            if (myRole == Role.master) ...[
+              SizedBox(height: 6),
+              Pressable(
+                onTap: _delete,
+                padding: EdgeInsets.symmetric(vertical: 10),
+                child: Text(
+                  '컴플레인 지우기',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.error,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// 대표가 누르는 승인·반려 버튼 — 단계 버튼과 같은 크기·모양이다
+class _DecideButton extends StatelessWidget {
+  _DecideButton({
+    required this.label,
+    required this.onTap,
+    this.filled = false,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+
+  /// 승인은 채우고 반려는 테두리만 — 어느 쪽이 기본인지 보인다
+  final bool filled;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      child: Container(
+        height: 44,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: filled ? AppColors.primary : AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: filled ? AppColors.primary : AppColors.gray200,
+          ),
+        ),
+        child: Text(
+          label,
+          style: AppTextStyles.body2.copyWith(
+            color: filled ? Colors.white : AppColors.textSecondary,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ),
     );
   }

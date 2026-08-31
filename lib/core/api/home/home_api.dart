@@ -56,7 +56,10 @@ enum InboxKind {
   project('PROJECT'),
 
   /// 개인 업무 **누락 사유서** — 주소가 달라서 [myTask] 와 따로다 (2026-08-21)
-  taskMiss('TASK_MISS');
+  taskMiss('TASK_MISS'),
+
+  /// 컴플레인 **해결 완료** — 찍으면 클레임해결 점수가 붙어서 대표가 본다 (2026-08-31)
+  complaint('COMPLAINT');
 
   const InboxKind(this.wire);
 

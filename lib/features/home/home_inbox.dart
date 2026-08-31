@@ -171,6 +171,8 @@ class _InboxCardState extends State<_InboxCard> with SkeletonDelay<_InboxCard> {
         await MyTaskApi.approveMiss(item.id);
       case InboxKind.project:
         await ProjectApi.approve(item.id);
+      case InboxKind.complaint:
+        await KindnessApi.approve(item.id);
     }
   }, '승인했어요');
 
@@ -185,6 +187,7 @@ class _InboxCardState extends State<_InboxCard> with SkeletonDelay<_InboxCard> {
         InboxKind.myTask => '예) 그 업무는 계속 해야 해요',
         InboxKind.taskMiss => '예) 그날 다른 일이 있었다는 근거가 필요해요',
         InboxKind.project => '예) 그 기한이면 다음 달 일정과 겹쳐요',
+        InboxKind.complaint => '예) 아직 샤워실이 그대로예요',
       },
     );
     if (reason == null || !mounted) return;
@@ -204,6 +207,8 @@ class _InboxCardState extends State<_InboxCard> with SkeletonDelay<_InboxCard> {
           await MyTaskApi.rejectMiss(item.id, reason);
         case InboxKind.project:
           await ProjectApi.reject(item.id, reason: reason);
+        case InboxKind.complaint:
+          await KindnessApi.reject(item.id, reason: reason);
       }
     }, '반려했어요');
   }

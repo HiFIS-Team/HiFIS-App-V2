@@ -53,7 +53,7 @@ Future<bool?> showMemberRegister(BuildContext context) =>
 /// 수업 개수 탭 콘텐츠
 ///
 /// 수업은 회원의 싸인을 받아야 인정된다.
-/// - 상단: 회원 등록 / 세션 싸인 받기 버튼
+/// - 상단: 회원 등록 / 운동 일지 / 세션 싸인 버튼
 /// - 세션 기록: 받은 싸인 기록 (서명 미리보기·회차·시각)
 class LessonSection extends StatefulWidget {
   LessonSection({super.key, this.branchId});
@@ -126,14 +126,12 @@ class _LessonSectionState extends State<LessonSection>
     if (showSkeleton) return WorkSectionSkeleton();
 
     // 상단 액션 버튼 두 개 — 폰·PC 공통. 대표·관리자는 수행자가 아니라 안 그린다
-    // 폭은 3:3:4 다 — '세션 싸인 받기' 가 여섯 글자라 똑같이 나누면 폰에서
-    // 넘친다. 옆 둘은 네 글자라 좁혀도 남는다.
+    // 셋 다 네 글자라 똑같이 나눠도 폰에서 안 넘친다
     final actions = _viewOnly
         ? SizedBox.shrink()
         : Row(
             children: [
               Expanded(
-                flex: 3,
                 child: _ActionButton(
                   icon: CupertinoIcons.person_add,
                   label: '회원 등록',
@@ -142,7 +140,6 @@ class _LessonSectionState extends State<LessonSection>
               ),
               SizedBox(width: 10),
               Expanded(
-                flex: 3,
                 child: _ActionButton(
                   icon: CupertinoIcons.doc_text,
                   label: '운동 일지',
@@ -151,10 +148,9 @@ class _LessonSectionState extends State<LessonSection>
               ),
               SizedBox(width: 10),
               Expanded(
-                flex: 4,
                 child: _ActionButton(
                   icon: CupertinoIcons.signature,
-                  label: '세션 싸인 받기',
+                  label: '세션 싸인',
                   highlighted: true,
                   onTap: _pickAndSign,
                 ),
@@ -303,24 +299,19 @@ class _ActionButton extends StatelessWidget {
                 : AppColors.gray100,
           ),
         ),
-        // 셋이 나란히 서면서 제일 좁은 폰(375)에서 아슬아슬해졌다.
-        // 남을 때는 아무 일도 안 하고 모자랄 때만 줄어든다
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 17, color: color),
-              SizedBox(width: 7),
-              Text(
-                label,
-                style: AppTextStyles.body2.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w700,
-                ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 17, color: color),
+            SizedBox(width: 7),
+            Text(
+              label,
+              style: AppTextStyles.body2.copyWith(
+                color: color,
+                fontWeight: FontWeight.w700,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

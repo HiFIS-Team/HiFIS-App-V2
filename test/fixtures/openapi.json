@@ -1568,6 +1568,12 @@
   "KindnessSurveyOut": {
    "properties": {
     "consent": {},
+    "doneRequestedAt": {
+     "nullable": true
+    },
+    "doneRequestedById": {
+     "nullable": true
+    },
     "id": {},
     "improvement": {
      "nullable": true

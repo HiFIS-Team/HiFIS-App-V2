@@ -7,6 +7,12 @@ import '../client/api_client.dart';
 enum ComplaintStatus {
   pending('PENDING', '미처리'),
   working('WORKING', '해결중'),
+
+  /// 완료 승인 대기 — MANAGER·MEMBER 가 완료를 눌렀고 대표가 아직 안 봤다
+  ///
+  /// 완료를 찍으면 찍은 사람에게 환경정비 `클레임해결` 점수가 붙어서
+  /// 대표가 한 번 본다 (2026-08-31).
+  doneRequested('DONE_REQUESTED', '완료 승인 대기'),
   done('DONE', '해결 완료');
 
   const ComplaintStatus(this.wire, this.label);
@@ -33,6 +39,7 @@ class KindnessSurvey {
     required this.consent,
     required this.submittedAt,
     required this.improvementStatus,
+    this.doneRequestedById,
     this.improvement,
     this.resolvedAt,
     this.resolvedById,
@@ -51,6 +58,7 @@ class KindnessSurvey {
     improvementStatus: ComplaintStatus.parse(
       json['improvementStatus'] as String?,
     ),
+    doneRequestedById: json['doneRequestedById'] as String?,
     resolvedAt: json['resolvedAt'] == null
         ? null
         : DateTime.parse(json['resolvedAt'] as String).toLocal(),
@@ -78,6 +86,9 @@ class KindnessSurvey {
   final DateTime submittedAt;
 
   final ComplaintStatus improvementStatus;
+
+  /// 완료를 올린 사람 — 승인되면 이 사람에게 점수가 간다 (대기 중에만 채워진다)
+  final String? doneRequestedById;
   final DateTime? resolvedAt;
   final String? resolvedById;
 
@@ -126,4 +137,18 @@ class KindnessApi {
     );
     return KindnessSurvey.fromJson(data!);
   }
+
+  /// 해결 완료 승인 — **MASTER 만.** 점수는 올린 사람에게 간다
+  static Future<KindnessSurvey> approve(String id) async {
+    final data = await _client.post('/kindness-surveys/$id/approve');
+    return KindnessSurvey.fromJson(data!);
+  }
+
+  /// 해결 완료 반려 — **해결중으로 되돌린다** (미처리로 내리지 않는다)
+  static Future<void> reject(String id, {String? reason}) =>
+      _client.post('/kindness-surveys/$id/reject', query: {'reason': ?reason});
+
+  /// 컴플레인 지우기 — **MASTER 만.** 개선 의견만 지우고 칭찬은 남긴다
+  static Future<void> removeComplaint(String id) =>
+      _client.delete('/kindness-surveys/$id/complaint');
 }
