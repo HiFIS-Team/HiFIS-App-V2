@@ -638,7 +638,7 @@ class _FeedbackHistoryScreenState extends State<_FeedbackHistoryScreen> {
               query.isEmpty || f.name.contains(query) || f.text.contains(query),
         )
         .toList();
-    final title = widget.complaint ? '컴플레인' : '내게 온 칭찬';
+    final title = widget.complaint ? '컴플레인' : '칭찬';
     final unresolved = widget.complaint && _showStatus
         ? sorted.where((f) => f.status == _Status.pending).length
         : 0;

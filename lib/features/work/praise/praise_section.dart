@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 
 import '../../../core/api/client/api_exception.dart';
 import '../../../core/api/work/kindness_api.dart';
-import '../../../core/data/current_user.dart';
 import '../../../core/data/employee.dart';
 import '../../../core/data/staff.dart';
 import '../../../core/data/staff_directory.dart';
@@ -51,7 +50,7 @@ class PraiseSection extends StatefulWidget {
 
 class _PraiseSectionState extends State<PraiseSection>
     with SkeletonDelay<PraiseSection> {
-  /// 0 내게 온 칭찬 · 1 컴플레인 · 2 전체(설문 원본)
+  /// 0 칭찬 · 1 컴플레인 · 2 전체(설문 원본)
   int _tab = 0;
 
   bool get _complaint => _tab == 1;
@@ -97,10 +96,14 @@ class _PraiseSectionState extends State<PraiseSection>
     showFullPage<void>(context, (_) => _SurveyHistoryScreen());
   }
 
-  /// 세그먼트 — '전체'는 누구에게 온 건지 가리지 않고 설문 원본을 그대로 본다
+  /// 세그먼트 — '전체'는 설문 원본(응답자·동기·대상자)을 그대로 본다
+  ///
+  /// **'칭찬' 은 지점 것을 다 본다.** 예전에는 직원·점장에게만 '내게 온 칭찬'
+  /// 이었는데, 지점 사람은 다 볼 수 있어야 해서 이름이 하나가 됐다
+  /// (2026-08-31 대표 요청). 누구에 대한 것인지는 카드에 이름으로 붙는다.
   Widget _tabs() {
     return SegmentedTabs(
-      labels: [_viewOnly ? '칭찬' : '내게 온 칭찬', '컴플레인', '전체'],
+      labels: ['칭찬', '컴플레인', '전체'],
       selected: _tab,
       onSelect: (i) => setState(() => _tab = i),
     );
@@ -188,7 +191,7 @@ class _PraiseSectionState extends State<PraiseSection>
     final items = _feedbacks.where((f) => f.complaint == _complaint).toList();
     // 카드에는 최근 5건만 — 나머지는 전체 보기 화면에서
     final recent = items.take(5).toList();
-    final title = _complaint ? '컴플레인' : (_viewOnly ? '칭찬' : '내게 온 칭찬');
+    final title = _complaint ? '컴플레인' : '칭찬';
     final unresolved = _complaint && _showStatus
         ? items.where((f) => f.status == _Status.pending).length
         : 0;

@@ -83,12 +83,6 @@ class _Feedback {
   Color get color => Color(colorValue);
 }
 
-/// 현장 업무를 안 하는 사람 — 대표·관리자
-///
-/// 설문은 트레이너를 칭찬하는 것이라 대표·관리자는 받을 일이 없다.
-/// 본인 것으로 거르면 늘 비어서, 대신 **전사 칭찬·컴플레인**을 조회로 본다.
-bool get _viewOnly => !(currentUser?.role.doesFieldWork ?? true);
-
 /// 컴플레인 처리 단계 UI를 그릴지
 ///
 /// 예전에는 폰에서만 그렸는데, 컴플레인을 챙기는 대표·관리자가 PC 를 쓴다.
@@ -98,14 +92,14 @@ bool get _showStatus => true;
 /// 서버에서 받은 설문 — 화면 셋이 같이 쓴다
 ///
 /// **한 번만 받아 둘로 나눈다.** '전체' 탭은 설문 원본을 그대로 보고,
-/// '내게 온 칭찬'·'컴플레인' 은 그중 내가 칭찬받은 것만 줄로 편다
+/// '칭찬'·'컴플레인' 은 같은 설문을 줄로 편다
 /// (설문 하나에서 칭찬 한 줄 · 개선 의견 한 줄이 나온다).
+/// 둘 다 **지점 것을 다 담는다** — 거르는 것은 서버의 지점 필터뿐이다.
 final _feedbacks = <_Feedback>[];
 final _surveys = <_Survey>[];
 
 Future<void> _loadSurveys({String? branchId}) async {
   final rows = await KindnessApi.list(branchId: branchId);
-  final me = currentUser?.id;
 
   _surveys
     ..clear()
@@ -128,36 +122,40 @@ Future<void> _loadSurveys({String? branchId}) async {
   _feedbacks
     ..clear()
     ..addAll([
-      for (final row in rows)
-        // 직원·점장은 본인에게 온 것만, 대표·관리자는 전사를 본다
-        if (_viewOnly || row.praisedEmployeeId == me) ...[
-          if (row.praiseComment.trim().isNotEmpty)
-            _Feedback(
-              surveyId: row.id,
-              name: row.memberName,
-              colorValue: avatarColorFor(row.memberName).toARGB32(),
-              text: row.praiseComment,
-              time: row.submittedAt,
-              about: _viewOnly ? _employeeName(row.praisedEmployeeId) : null,
-            ),
-          if (row.isComplaint)
-            _Feedback(
-              surveyId: row.id,
-              name: row.memberName,
-              colorValue: avatarColorFor(row.memberName).toARGB32(),
-              text: row.improvement!,
-              time: row.submittedAt,
-              complaint: true,
-              status: _Status.of(row.improvementStatus),
-              resolvedBy: row.resolvedById == null
-                  ? null
-                  : _employeeName(row.resolvedById!),
-              requestedBy: row.doneRequestedById == null
-                  ? null
-                  : _employeeName(row.doneRequestedById!),
-              about: _viewOnly ? _employeeName(row.praisedEmployeeId) : null,
-            ),
-        ],
+      // **누구에게 온 것이든 다 세운다.** 예전에는 직원·점장에게 본인 것만
+      // 보여줬는데, 칭찬도 컴플레인도 **매장이 같이 보는 것**이라 지점 사람은
+      // 다 볼 수 있어야 한다 (2026-08-31 대표 요청).
+      // 서버가 이미 지점으로 잘라 주므로(`branch_filter`) 여기서 더 거르지 않는다 —
+      // MEMBER·MANAGER 는 본인 지점, MASTER·ADMIN 은 고른 지점이 온다.
+      // 설문 하나에서 칭찬 한 줄 · 개선 의견 한 줄이 나온다 (둘 다 없을 수도 있다)
+      for (final row in rows) ...[
+        if (row.praiseComment.trim().isNotEmpty)
+          _Feedback(
+            surveyId: row.id,
+            name: row.memberName,
+            colorValue: avatarColorFor(row.memberName).toARGB32(),
+            text: row.praiseComment,
+            time: row.submittedAt,
+            about: _employeeName(row.praisedEmployeeId),
+          ),
+        if (row.isComplaint)
+          _Feedback(
+            surveyId: row.id,
+            name: row.memberName,
+            colorValue: avatarColorFor(row.memberName).toARGB32(),
+            text: row.improvement!,
+            time: row.submittedAt,
+            complaint: true,
+            status: _Status.of(row.improvementStatus),
+            resolvedBy: row.resolvedById == null
+                ? null
+                : _employeeName(row.resolvedById!),
+            requestedBy: row.doneRequestedById == null
+                ? null
+                : _employeeName(row.doneRequestedById!),
+            about: _employeeName(row.praisedEmployeeId),
+          ),
+      ],
     ]);
 
   // **여기서 한 번만 정렬한다.** 최신순은 이 두 목록의 성질이지 화면마다
