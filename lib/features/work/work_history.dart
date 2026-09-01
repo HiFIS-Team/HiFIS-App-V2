@@ -244,13 +244,32 @@ class _HistoryScreenState extends State<_HistoryScreen>
       ..sort((a, b) => a.name.compareTo(b.name));
   }
 
-  /// 고를 수 있는 사람 — 이름순
+  /// 고를 수 있는 사람 — **명단을 다 세운다** (항목 필터와 같은 규칙)
   ///
-  /// 명단 전체가 아니라 **그날 기록에 이름이 있는 사람만** 세운다
-  /// (세션 기록과 같은 규칙). 스무 명 메뉴에서 오늘 일한 셋을 찾게 하면
-  /// 고르는 일이 더 번거롭다.
+  /// 예전에는 그 달 기록에 이름이 있는 사람만 세웠는데, 그러면 **고른 사람이
+  /// 달을 넘기는 순간 메뉴에서 사라져서 필터를 풀 수도 없다** — 항목 필터가
+  /// 지점 항목을 다 세우는 것과 똑같은 사정이다 (2026-09-01 대표 지적).
+  /// "이 사람이 지난달에 뭘 했나"는 아무것도 안 한 달을 지나가야 닿는다.
+  ///
+  /// 세우는 사람
+  /// - 보고 있는 지점의 **재직 중인 현장 인원** (MANAGER·MEMBER)
+  /// - 거기 없어도 **그 달 기록에 이름이 있는 사람** — 나갔거나 지점을 옮겼어도
+  ///   그때 남긴 기록은 걸러 볼 수 있어야 한다
+  ///
+  /// MASTER·ADMIN 은 뺀다. 서버가 `POST /env-logs` 를 안 받아서
+  /// ([_WorkScreenState._canDoEnv]) 골라 봐야 늘 0건이다.
   List<FilterOption> get _people {
     final names = <String, String>{};
+    for (final employee in StaffDirectory.instance.employees) {
+      if (!employee.role.doesFieldWork) continue;
+      if (employee.status != EmployeeStatus.active) continue;
+      // 전 지점을 볼 때(null)는 안 가린다
+      if (widget.branchId != null && employee.branchId != widget.branchId) {
+        continue;
+      }
+      names[employee.id] = employee.name;
+    }
+    // 명단에서 빠진 사람이라도 기록이 있으면 세운다
     for (final log in _allLogs) {
       names[log.employeeId] ??= _logAuthor(log);
     }
