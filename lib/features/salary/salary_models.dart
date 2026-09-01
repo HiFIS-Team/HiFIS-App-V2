@@ -456,6 +456,36 @@ List<Widget> _payslipSkeletonCards() => [
 ///
 /// 탭 줄은 **권한으로 정해지는 것**이라 받아오기 전에도 있을지 없을지 안다.
 /// 그래서 있을 사람에게만 자리를 비워 둔다 — 다 받아왔을 때 안 밀린다.
+/// 대표·관리자 결재함 뼈대 — **줄 목록 모양이다**
+///
+/// 본인 급여 뼈대([_SalarySkeleton])를 쓰면 카드 세 장이 떴다가 사람 목록으로
+/// 바뀌어서 모양이 통째로 갈린다. 대표는 그 화면을 아예 안 본다.
+class _BoxSkeleton extends StatelessWidget {
+  _BoxSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = SkeletonGroup(
+      child: SkeletonCard(children: [SkeletonRows(rows: 6, avatar: 44)]),
+    );
+    if (!isDesktop) {
+      return PhoneListScaffold(
+        title: '급여',
+        // SegmentedTabs 와 같은 높이(48)
+        filter: SkeletonGroup(child: Skeleton(height: 48, radius: 14)),
+        children: [rows],
+      );
+    }
+    return SkeletonDesktopPage(
+      children: [
+        SkeletonGroup(child: Skeleton(height: 48, radius: 14)),
+        SizedBox(height: 16),
+        rows,
+      ],
+    );
+  }
+}
+
 class _SalarySkeleton extends StatelessWidget {
   _SalarySkeleton();
 

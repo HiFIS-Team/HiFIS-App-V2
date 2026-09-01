@@ -87,9 +87,6 @@ class _SalaryScreenState extends State<SalaryScreen>
 
   List<Payslip> get _box => _boxes[_boxTab];
 
-  /// 들어온 것이 하나도 없나 — 그러면 대표·관리자도 본인 화면을 본다
-  bool get _boxEmpty => _boxes.every((rows) => rows.isEmpty);
-
   /// 탭에 다시 들어오거나 앱이 다시 앞으로 나왔을 때 조용히 다시 받는다
   @override
   Future<void> onScreenRefresh() => _load();
@@ -128,14 +125,16 @@ class _SalaryScreenState extends State<SalaryScreen>
             ],
         ];
         // 보던 줄이 비면 뭐라도 있는 줄로 옮겨 준다 — 빈 칸을 보고 있을
-        // 이유가 없다. 아무 데도 없으면 그대로 두고 아래에서 본인 화면으로 간다
+        // 이유가 없다. 아무 데도 없으면 그대로 두고 빈 카드를 그린다
+        //
+        // **본인 명세서로 새지 않는다.** MASTER·ADMIN 은 급여를 받는 쪽이
+        // 아니라 주는 쪽이라 본인 명세서가 아예 없다. 예전에는 결재함이 비면
+        // 본인 화면으로 떨어져서, 마감 전 운영에서 대표 폰에
+        // **`9월 급여 0원 · 9월 30일 지급 예정`** 이 떴다 (2026-09-01 지적).
         if (_box.isEmpty) {
           final found = _boxes.indexWhere((rows) => rows.isNotEmpty);
           if (found >= 0) _boxTab = found;
         }
-        // 들어온 것이 하나도 없을 때만 본인 것을 받는다 — 목록만 그릴 때는
-        // 안 쓰는 값이라 그때 받으면 왕복만 는다
-        if (_boxEmpty) await _loadPayslips();
       } else {
         await _loadPayslips();
       }
@@ -244,9 +243,10 @@ class _SalaryScreenState extends State<SalaryScreen>
 
   @override
   Widget build(BuildContext context) {
-    // 대표·관리자에게 들어온 신청이 있으면 **줄부터 세운다.** 그때는 본인
-    // 명세서를 안 받으므로 아래 뼈대 조건(`_payslips.isEmpty`)에 걸리면 안 된다
-    if (_isPayBoss && !_boxEmpty && !showSkeleton) return _boxScreen();
+    // 대표·관리자는 **늘 결재함이다.** 본인 명세서를 안 받으므로 아래 뼈대
+    // 조건(`_payslips.isEmpty`)에 걸리면 안 된다.
+    // 빈 탭은 `_PayrollBoxList` 가 빈 카드로 그려 준다 — 화면이 비지 않는다
+    if (_isPayBoss) return showSkeleton ? _BoxSkeleton() : _boxScreen();
 
     if (showSkeleton || _payslips.isEmpty) {
       if (!isDesktop) return _SalarySkeleton();
