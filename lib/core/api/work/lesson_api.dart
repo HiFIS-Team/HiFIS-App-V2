@@ -323,6 +323,7 @@ class MemberApi {
         'memo': ?memo,
       },
     );
+    notifyMemberChanged();
     return Member.fromJson(data!);
   }
 
@@ -330,8 +331,9 @@ class MemberApi {
   ///
   /// 등록권·세션 싸인·운동일지·동의와 거기서 쌓인 **매출·수업 점수까지**
   /// 같이 걷힌다. 안 그러면 지워도 랭킹에 결제액이 남아 중복이 안 풀린다.
-  static Future<void> remove(String id) =>
-      ApiClient.instance.delete('/members/$id');
+  static Future<void> remove(String id) => ApiClient.instance
+      .delete('/members/$id')
+      .then((_) => notifyMemberChanged());
 
   /// 운동을 하는 이유 — **통째로 덮어쓴다** (빈 줄은 서버가 걸러 낸다)
   static Future<Member> updateGoals(String id, List<String> goals) async {
@@ -394,6 +396,7 @@ class MemberApi {
           },
       },
     );
+    notifyMemberChanged();
     return MemberCreated.fromJson(data!);
   }
 }

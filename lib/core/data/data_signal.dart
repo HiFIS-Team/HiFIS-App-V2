@@ -66,3 +66,17 @@ void notifyApprovalChanged() => approvalChanged.value++;
 final sessionSignChanged = ValueNotifier<int>(0);
 
 void notifySessionSignChanged() => sessionSignChanged.value++;
+
+/// 회원 명단이 방금 바뀌었다 — **등록 · 수정 · 삭제**
+///
+/// 회원을 지우는 자리(회원 정보 화면)와 재등록 목록이 **서로 남남이다.**
+/// 재등록 탭은 `_LessonStore` 가 들고 있는 명단을 읽는데, 그 저장소는 수업
+/// 화면이 만들어질 때만 받아 온다 — 지우고 바로 등록하러 가면 **없는 회원이
+/// 목록에 그대로 서 있었다** (2026-09-01 화순 점장이 겪었다. 서버에서는
+/// 지워졌는데 앱만 옛 값을 들고 있었다).
+///
+/// **셋을 한 신호로 둔다.** 이름을 고치는 것도 목록에 찍히는 값이 바뀌는
+/// 일이라 다시 받아야 하고, 갈래를 나누면 화면마다 셋을 다 적게 된다.
+final memberChanged = ValueNotifier<int>(0);
+
+void notifyMemberChanged() => memberChanged.value++;

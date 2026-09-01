@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/api/client/api_exception.dart';
 import '../../core/api/work/lesson_api.dart';
 import '../../core/data/branch_scope.dart';
+import '../../core/data/data_signal.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/staff.dart';
 import '../../core/data/staff_directory.dart';
@@ -97,6 +98,11 @@ class _MemberScreenState extends State<MemberScreen>
     _search.dispose();
     super.dispose();
   }
+
+  /// 회원이 다른 화면에서 바뀌면 다시 받는다 — PC 는 목록·상세가 두 칸이라
+  /// 상세에서 지운 줄이 왼쪽 목록에 그대로 남아 있으면 안 된다
+  @override
+  List<ValueNotifier<int>> get watchSignals => [memberChanged];
 
   @override
   Future<void> onScreenRefresh() => _load();

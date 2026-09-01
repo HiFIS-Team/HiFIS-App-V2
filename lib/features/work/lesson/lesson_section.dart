@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import '../../../core/api/client/api_exception.dart';
 import '../../../core/api/work/lesson_api.dart';
 import '../../../core/data/branch_scope.dart';
+import '../../../core/data/data_signal.dart';
 import '../../../core/data/current_user.dart';
 import '../../../core/data/employee.dart';
 import '../../../core/data/staff.dart';
@@ -20,6 +21,7 @@ import '../../../core/util/platform.dart';
 import '../../../core/widgets/feedback/app_dialog.dart';
 import '../../../core/widgets/feedback/app_toast.dart';
 import '../../../core/widgets/feedback/delayed_spinner.dart';
+import '../../../core/util/screen_refresh.dart';
 import '../../../core/util/skeleton_delay.dart';
 import '../../../core/widgets/feedback/empty_card.dart';
 import '../../../core/widgets/glass/glass_bottom_button.dart';
@@ -70,7 +72,22 @@ class LessonSection extends StatefulWidget {
 }
 
 class _LessonSectionState extends State<LessonSection>
-    with SkeletonDelay<LessonSection> {
+    with ScreenRefresh<LessonSection>, SkeletonDelay<LessonSection> {
+  /// **회원 명단이 바뀌면 다시 받는다.**
+  ///
+  /// 재등록 목록이 `_LessonStore` 의 명단을 읽는데, 회원을 지우는 자리는
+  /// 다른 화면(회원 정보)이라 여기까지 안 온다 — 지우고 바로 등록하러 가면
+  /// **없는 회원이 목록에 그대로 섰다** (2026-09-01 화순 점장이 겪었다.
+  /// 서버에서는 지워졌는데 앱만 옛 값을 들고 있었다).
+  ///
+  /// 안 보이는 동안 바뀌면 믹스인이 표시만 해 뒀다가 다시 보일 때 받는다 —
+  /// 회원 하나 지울 때마다 안 쓰는 탭이 서버를 부르면 안 된다.
+  @override
+  List<ValueNotifier<int>> get watchSignals => [memberChanged];
+
+  @override
+  Future<void> onScreenRefresh() => _load();
+
   @override
   void initState() {
     super.initState();
