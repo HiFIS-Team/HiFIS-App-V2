@@ -45,6 +45,10 @@ enum RegistrationStatus {
 enum VisitPath {
   walkIn('WALK_IN', '워크인'),
   referral('REFERRAL', '지인소개'),
+  // **지인소개와 다르다** (2026-09-01 요청) — 저쪽은 기존 회원이 데려온 것이라
+  // 아래 `소개한 회원` 칸이 차고, 이쪽은 트레이너가 직접 딴 것이라 안 찬다.
+  // 요율은 둘 다 재등록(50%)이다.
+  sales('SALES', '개인영업'),
   blog('BLOG', '블로그'),
   instagram('INSTAGRAM', '인스타'),
   otToPt('OT_TO_PT', 'OT → PT');
