@@ -394,15 +394,9 @@ class _MyTaskSectionState extends State<MyTaskSection>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 진행 막대 — `3/5` 만으로는 얼마나 남았는지가 눈에 안 들어온다
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: ProgressBar(
-                  ratio: day.total == 0 ? 0 : day.done / day.total,
-                  height: 6,
-                ),
-              ),
-              const SizedBox(height: 18),
+              // **진행 막대를 뺐다** (2026-09-01 대표 요청). 머리말이 카드
+              // 밖으로 나가면서 `3/5` 배지가 카드 위에 바로 서서, 같은 값을
+              // 두 번 그리는 셈이 됐다
               // 요일 줄 — 눌러서 그날 목록을 본다
               _DayTabs(selected: _viewDay, onSelect: _pickDay),
               const SizedBox(height: 6),

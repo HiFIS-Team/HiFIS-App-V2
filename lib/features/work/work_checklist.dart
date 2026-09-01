@@ -172,13 +172,19 @@ class _CountChip extends StatelessWidget {
       // 애플 손가락 최소 44 보다 넉넉하게 — 하루에 수십 번 누르는 자리다
       height: 56,
       decoration: BoxDecoration(
-        color: active ? AppColors.primaryLight : AppColors.gray50,
+        // **안 한 칩은 흰 면이다** (2026-09-01 대표 지적). 예전에는 `gray50`
+        // 이었는데, 흰 카드를 걷으면서 그 색이 화면 바탕과 **완전히 같아졌다**
+        // (라이트에서 둘 다 `#F2F4F6`) — 칩 테두리가 사라져 −/+ 버튼만
+        // 떠 있는 것처럼 보였다. 폼 화면을 흰 바탕으로 두는 것과 같은 사정이다
+        // (`PhoneDetailScaffold.background`).
+        color: active ? AppColors.primaryLight : AppColors.surface,
         borderRadius: BorderRadius.circular(14),
-        // 활성 칩에만 은은한 파란 테두리
+        // 활성 칩은 파란 테두리, 안 한 칩은 옅은 회색 — 흰 면끼리 붙어 있어도
+        // 칸이 갈려 보여야 한다
         border: Border.all(
           color: active
               ? AppColors.primary.withValues(alpha: 0.25)
-              : Colors.transparent,
+              : AppColors.gray100,
         ),
       ),
       child: Row(
