@@ -73,8 +73,11 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
     for (final member in _members) {
       add(member.ownerTrainerId);
     }
-    return [for (final e in names.entries) (id: e.key, name: e.value)]
-      ..sort((a, b) => a.name.compareTo(b.name));
+    // 앱 공통 차례 (지점 → 직급 → 이름)
+    return [for (final e in names.entries) (id: e.key, name: e.value)]..sort(
+      (a, b) =>
+          StaffDirectory.instance.compareStaffIds(a.id, b.id, a.name, b.name),
+    );
   }
 
   @override

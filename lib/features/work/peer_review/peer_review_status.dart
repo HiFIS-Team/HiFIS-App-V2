@@ -73,8 +73,13 @@ List<_Submission> _submissionsOf(List<PeerReview> reviews, {String? branchId}) {
           rating: ratings[employee.id],
         ),
   ]..sort((a, b) {
+    // 아직 안 낸 사람이 먼저 — 여기가 재촉하는 자리다
     if (a.complete != b.complete) return a.complete ? 1 : -1;
-    return a.done.compareTo(b.done);
+    final done = a.done.compareTo(b.done);
+    // 그다음은 앱 공통 차례 (지점 → 직급 → 이름)
+    return done != 0
+        ? done
+        : StaffDirectory.instance.compareStaff(a.person, b.person);
   });
 }
 

@@ -67,6 +67,44 @@ class StaffDirectory {
     return at < 0 ? _order.length : at;
   }
 
+  /// 사람을 세우는 **공통 차례 — 지점 → 직급 → 이름**
+  ///
+  /// | 순위 | 기준 | 차례 |
+  /// |---|---|---|
+  /// | 1 | 지점 | 전 지점(HQ) · 화순 · 첨단 · 동광주 ([branchRank]) |
+  /// | 2 | 직급 | 대표 · 개발자 · 마케터 · 점장 · 팀장 · 트레이너 · FC |
+  /// | 3 | 이름 | 가나다 |
+  ///
+  /// 직급 차례는 [Rank] **선언 순서 그대로**다 (backend-gap 61번). 여기에
+  /// 표를 새로 만들면 둘이 갈린다.
+  ///
+  /// **명단을 세우는 자리는 다 이걸 쓴다** (조직도·동료평가·환경정비 사람
+  /// 필터·수업 트레이너·일정 참석자·사내톡 멤버·홈 출근). 화면마다 이름순으로
+  /// 세우면 같은 사람이 화면마다 다른 자리에 있어서 눈이 자리를 못 외운다.
+  ///
+  /// 먼저 볼 것이 따로 있는 화면(홈은 근무중, 동료평가 현황은 미제출)은
+  /// 그 기준을 앞에 두고 **여기를 뒷차례로** 쓴다.
+  int compareStaff(Employee a, Employee b) {
+    final branch = branchRank(a.branchId).compareTo(branchRank(b.branchId));
+    if (branch != 0) return branch;
+    final rank = a.rank.index.compareTo(b.rank.index);
+    if (rank != 0) return rank;
+    return a.name.compareTo(b.name);
+  }
+
+  /// id 로 세우는 공통 차례 — **고르개**가 쓴다
+  ///
+  /// 필터 메뉴는 사람 객체가 아니라 `(id, 이름)` 짝만 들고 있다. 명단에서
+  /// 못 찾은 사람(지워진 계정 등)은 뒤로 밀고 이름순으로 둔다.
+  int compareStaffIds(String aId, String bId, String aName, String bName) {
+    final a = byId(aId);
+    final b = byId(bId);
+    if (a != null && b != null) return compareStaff(a, b);
+    if (a != null) return -1;
+    if (b != null) return 1;
+    return aName.compareTo(bName);
+  }
+
   /// uuid 로 찾기 — 서버 데이터를 다루는 화면이 쓴다
   Employee? byId(String id) {
     for (final employee in employees) {

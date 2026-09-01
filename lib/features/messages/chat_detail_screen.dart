@@ -66,9 +66,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       for (final id in room.memberIds) ?StaffDirectory.instance.byId(id),
     ];
     found.sort((a, b) {
+      // 방장이 먼저 — 그다음은 앱 공통 차례 (지점 → 직급 → 이름)
       final owner =
           (a.id == room.ownerId ? 0 : 1) - (b.id == room.ownerId ? 0 : 1);
-      return owner != 0 ? owner : a.name.compareTo(b.name);
+      return owner != 0 ? owner : StaffDirectory.instance.compareStaff(a, b);
     });
     return found;
   }
@@ -521,10 +522,13 @@ class _MembersScreen extends StatelessWidget {
               ?StaffDirectory.instance.byId(id),
           ];
           people.sort((a, b) {
+            // 방장이 먼저 — 그다음은 앱 공통 차례
             final owner =
                 (a.id == room?.ownerId ? 0 : 1) -
                 (b.id == room?.ownerId ? 0 : 1);
-            return owner != 0 ? owner : a.name.compareTo(b.name);
+            return owner != 0
+                ? owner
+                : StaffDirectory.instance.compareStaff(a, b);
           });
 
           return Stack(

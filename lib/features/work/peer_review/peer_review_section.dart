@@ -147,8 +147,9 @@ class _PeerReviewSectionState extends State<PeerReviewSection>
   /// 모달은 서버 값으로 '남은 2명' 이라는데 화면에는 3줄이 서 있었다.
   static List<Employee> _targetsOf(Employee? me) {
     if (me == null || !me.role.doesFieldWork) return const [];
-    return [
-      me,
+    // **나는 늘 맨 앞이다** (자기 평가부터 낸다). 나머지는 앱 공통 차례로
+    // 세운다 — 같은 지점이라 실질은 직급순(점장 → 트레이너 → FC)이다
+    final others = [
       for (final employee in StaffDirectory.instance.employees)
         if (employee.branchId == me.branchId &&
             employee.id != me.id &&
@@ -156,7 +157,8 @@ class _PeerReviewSectionState extends State<PeerReviewSection>
             // 나간 사람은 평가하지 않는다 — 서버도 안 센다
             employee.status == EmployeeStatus.active)
           employee,
-    ];
+    ]..sort(StaffDirectory.instance.compareStaff);
+    return [me, ...others];
   }
 
   /// 이 사람을 눌러서 열 수 있나 — null 이면 안 눌린다

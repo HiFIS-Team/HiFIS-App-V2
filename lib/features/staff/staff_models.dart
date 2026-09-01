@@ -202,23 +202,13 @@ void _replaceMember(Employee saved) {
   if (at >= 0) directory.employees = [...directory.employees]..[at] = saved;
 }
 
-/// 명단 정렬 — **권한이 먼저, 그다음 지점**
+/// 명단 정렬 — 앱 공통 차례([StaffDirectory.compareStaff])
 ///
-/// MASTER·ADMIN 은 한 지점 소속이 아니라 전사를 본다. 권한을 먼저 보므로
-/// 그 둘은 지점과 상관없이 늘 맨 앞에 선다.
-/// 같은 권한 안에서는 지점 차례(본사 → 화순 → 첨단 → 동광주), 그다음 이름순.
-int _byRoleThenBranch(_Member a, _Member b) {
-  final role = a.permission.index.compareTo(b.permission.index);
-  if (role != 0) return role;
-
-  final directory = StaffDirectory.instance;
-  final branch = directory
-      .branchRank(a.source.branchId)
-      .compareTo(directory.branchRank(b.source.branchId));
-  if (branch != 0) return branch;
-
-  return a.name.compareTo(b.name);
-}
+/// **지점 → 직급 → 이름.** MASTER·ADMIN 은 HQ 소속이라 지점 차례에서 이미
+/// 맨 앞이라, 예전처럼 권한을 먼저 보지 않아도 자리가 같다. 대신 같은 지점
+/// 안이 **점장 → 팀장 → 트레이너 → FC** 로 서서 다른 화면과 맞는다.
+int _byRoleThenBranch(_Member a, _Member b) =>
+    StaffDirectory.instance.compareStaff(a.source, b.source);
 
 /// 지점 필터 목록 — 맨 앞은 모든 지점을 함께 보는 '전 지점'
 ///

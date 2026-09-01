@@ -443,7 +443,7 @@ class _PersonPicker extends StatelessWidget {
     final people = [
       for (final person in StaffDirectory.instance.employees)
         if (person.id != me) person,
-    ]..sort((a, b) => a.name.compareTo(b.name));
+    ]..sort(StaffDirectory.instance.compareStaff);
 
     return Container(
       width: dialogWidth(context, 320),

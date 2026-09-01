@@ -238,8 +238,11 @@ class _HistoryScreenState extends State<_HistoryScreen>
     for (final log in _allLogs) {
       names[log.employeeId] ??= _logAuthor(log);
     }
-    return [for (final e in names.entries) (id: e.key, name: e.value)]
-      ..sort((a, b) => a.name.compareTo(b.name));
+    // 앱 공통 차례 (지점 → 직급 → 이름)
+    return [for (final e in names.entries) (id: e.key, name: e.value)]..sort(
+      (a, b) =>
+          StaffDirectory.instance.compareStaffIds(a.id, b.id, a.name, b.name),
+    );
   }
 
   /// 공백·대소문자를 지우고 맞춘다 ('화장실 청소' 로 쳐도 찾히게)

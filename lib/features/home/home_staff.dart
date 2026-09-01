@@ -36,8 +36,9 @@ class _TodayStaffCard extends StatelessWidget {
     };
     final sorted = [...staff]
       ..sort((a, b) {
+        // 근무중이 먼저 — 그다음은 앱 공통 차례 (지점 → 직급 → 이름)
         final gap = rank(a).compareTo(rank(b));
-        return gap != 0 ? gap : a.name.compareTo(b.name);
+        return gap != 0 ? gap : StaffDirectory.instance.compareStaff(a, b);
       });
     final working = staff.where((e) => e.todayStatus?.working ?? false).length;
 
