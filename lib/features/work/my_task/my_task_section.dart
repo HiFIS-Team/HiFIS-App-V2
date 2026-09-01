@@ -362,78 +362,89 @@ class _MyTaskSectionState extends State<MyTaskSection>
   }
 
   Widget _card(MyTaskDay day) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: AppDecorations.card(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _isToday ? '오늘 할 일' : '${_dayNames[_viewDay - 1]}요일 할 일',
-                    style: AppTextStyles.label,
-                  ),
-                ),
-                // 지난 날 기록은 **여기서만** 본다 — 이 카드는 요일 고르개라
-                // 이번 주 안이고, 며칠에 누락했는지는 달로 봐야 한다
-                SeeAllButton(onTap: () => showMyTaskHistory(context)),
-                const SizedBox(width: 4),
-                _DoneBadge(day: day),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          // 진행 막대 — `3/5` 만으로는 얼마나 남았는지가 눈에 안 들어온다
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: ProgressBar(
-              ratio: day.total == 0 ? 0 : day.done / day.total,
-              height: 6,
-            ),
-          ),
-          const SizedBox(height: 18),
-          // 요일 줄 — 눌러서 그날 목록을 본다
-          _DayTabs(selected: _viewDay, onSelect: _pickDay),
-          const SizedBox(height: 6),
-          if (day.tasks.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Center(
-                child: Text(
-                  '아직 정한 업무가 없어요',
-                  style: AppTextStyles.body2.copyWith(color: AppColors.gray400),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 머리말은 **카드 밖**이다 (2026-09-01 대표 요청) — 공통 업무·세션
+        // 기록과 같은 모양이다
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Row(
+            children: [
+              Text(
+                _isToday ? '오늘 할 일' : '${_dayNames[_viewDay - 1]}요일 할 일',
+                style: AppTextStyles.label.copyWith(
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-            )
-          else
-            for (var i = 0; i < day.tasks.length; i++) ...[
-              // 밀려 온 것이 시작되는 자리에 선을 긋는다 — 서버가 제 차례
-              // 것을 앞에, 밀려 온 것을 뒤에 담아 주므로 첫 줄에서만 걸린다
-              if (day.tasks[i].carriedFrom != null &&
-                  (i == 0 || day.tasks[i - 1].carriedFrom == null)) ...[
-                if (i > 0) const SizedBox(height: 12),
-                const _CarriedDivider(),
-                const SizedBox(height: 4),
-              ] else if (i > 0)
-                const _RowDivider(),
-              _TaskRow(
-                task: day.tasks[i],
-                // **오늘이 아니면 못 체크한다.** 서버는 체크를 늘 오늘로 찍어서
-                // (`check_my_task` 가 `_today()`), 다른 요일을 보다 누르면
-                // 엉뚱한 날에 찍힌다
-                busy: _busy.contains(day.tasks[i].id) || !_isToday,
-                onCheck: () => _check(day.tasks[i]),
-                onEdit: () => _change(day.tasks[i], MyTaskRequestType.edit),
-                onDelete: () => _change(day.tasks[i], MyTaskRequestType.delete),
-              ),
+              const Spacer(),
+              // 지난 날 기록은 **여기서만** 본다 — 이 카드는 요일 고르개라
+              // 이번 주 안이고, 며칠에 누락했는지는 달로 봐야 한다
+              SeeAllButton(onTap: () => showMyTaskHistory(context)),
+              const SizedBox(width: 4),
+              _DoneBadge(day: day),
             ],
-        ],
-      ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: AppDecorations.card(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 진행 막대 — `3/5` 만으로는 얼마나 남았는지가 눈에 안 들어온다
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: ProgressBar(
+                  ratio: day.total == 0 ? 0 : day.done / day.total,
+                  height: 6,
+                ),
+              ),
+              const SizedBox(height: 18),
+              // 요일 줄 — 눌러서 그날 목록을 본다
+              _DayTabs(selected: _viewDay, onSelect: _pickDay),
+              const SizedBox(height: 6),
+              if (day.tasks.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                    child: Text(
+                      '아직 정한 업무가 없어요',
+                      style: AppTextStyles.body2.copyWith(
+                        color: AppColors.gray400,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                for (var i = 0; i < day.tasks.length; i++) ...[
+                  // 밀려 온 것이 시작되는 자리에 선을 긋는다 — 서버가 제 차례
+                  // 것을 앞에, 밀려 온 것을 뒤에 담아 주므로 첫 줄에서만 걸린다
+                  if (day.tasks[i].carriedFrom != null &&
+                      (i == 0 || day.tasks[i - 1].carriedFrom == null)) ...[
+                    if (i > 0) const SizedBox(height: 12),
+                    const _CarriedDivider(),
+                    const SizedBox(height: 4),
+                  ] else if (i > 0)
+                    const _RowDivider(),
+                  _TaskRow(
+                    task: day.tasks[i],
+                    // **오늘이 아니면 못 체크한다.** 서버는 체크를 늘 오늘로 찍어서
+                    // (`check_my_task` 가 `_today()`), 다른 요일을 보다 누르면
+                    // 엉뚱한 날에 찍힌다
+                    busy: _busy.contains(day.tasks[i].id) || !_isToday,
+                    onCheck: () => _check(day.tasks[i]),
+                    onEdit: () => _change(day.tasks[i], MyTaskRequestType.edit),
+                    onDelete: () =>
+                        _change(day.tasks[i], MyTaskRequestType.delete),
+                  ),
+                ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

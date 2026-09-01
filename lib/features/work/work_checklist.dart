@@ -1,7 +1,11 @@
 part of 'work_screen.dart';
 
-/// 환경정비 점검 카드 — 항목이 2열로 내려가며 배치되고,
+/// 환경정비 점검 — 항목이 2열로 내려가며 배치되고,
 /// 각 항목의 좌우 −/+ 버튼으로 오늘 수행 횟수를 조절한다.
+///
+/// **흰 카드를 안 두른다** (2026-09-01 대표 요청). 머리말은 세션 기록·회원
+/// 친절도처럼 바탕 위에 서고, 칩은 화면 폭을 다 쓴다 — 카드 여백 20이 좌우로
+/// 빠지면서 칩이 그만큼 넓어져서 누르기 편하다.
 class _ChecklistCard extends StatelessWidget {
   _ChecklistCard({
     required this.items,
@@ -25,81 +29,83 @@ class _ChecklistCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final total = counts.values.fold(0, (sum, c) => sum + c);
 
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(20),
-      decoration: AppDecorations.card(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 4),
-            child: Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 머리말은 **카드 밖**이다 — 세션 기록과 같은 모양이다
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 4),
+          child: Row(
+            children: [
+              Text(
+                '오늘 점검 항목',
+                style: AppTextStyles.label.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              Spacer(),
+              // 데스크톱은 아래에 내역 카드가 있어 총 횟수만 적고,
+              // 폰은 누르면 오늘 수행 내역이 열린다
+              if (isDesktop)
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Text(
+                    '총 $total회',
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                )
+              else
+                SeeAllButton(onTap: onShowHistory, label: '총 $total회'),
+            ],
+          ),
+        ),
+        SizedBox(height: 12),
+        // 데스크톱은 폭이 넓어 한 줄에 여러 개를 넣는다.
+        // 칩이 찌그러지지 않게 남는 폭에 맞춰 개수를 정한다(최대 4개).
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final columns = isDesktop
+                ? (constraints.maxWidth / 220).floor().clamp(2, 4)
+                : 2;
+            // 칩마다 글자를 알아서 줄이면 긴 라벨('화장실청소')만 작아 보인다.
+            // 제일 긴 라벨이 들어가는 크기를 구해 모든 칩이 같이 쓴다 —
+            // 폰은 칸이 좁아 애플·안드로이드 모두 필요하다.
+            final chipWidth =
+                (constraints.maxWidth - 10 * (columns - 1)) / columns;
+            final fontSize = _chipFontSize([
+              for (final item in items) item.name,
+            ], chipWidth);
+            return Column(
               children: [
-                Expanded(child: Text('오늘 점검 항목', style: AppTextStyles.label)),
-                // 데스크톱은 아래에 내역 카드가 있어 총 횟수만 적고,
-                // 폰은 누르면 오늘 수행 내역이 열린다
-                if (isDesktop)
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    child: Text(
-                      '총 $total회',
-                      style: AppTextStyles.caption.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  )
-                else
-                  SeeAllButton(onTap: onShowHistory, label: '총 $total회'),
-              ],
-            ),
-          ),
-          SizedBox(height: 12),
-          // 데스크톱은 폭이 넓어 한 줄에 여러 개를 넣는다.
-          // 칩이 찌그러지지 않게 남는 폭에 맞춰 개수를 정한다(최대 4개).
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final columns = isDesktop
-                  ? (constraints.maxWidth / 220).floor().clamp(2, 4)
-                  : 2;
-              // 칩마다 글자를 알아서 줄이면 긴 라벨('화장실청소')만 작아 보인다.
-              // 제일 긴 라벨이 들어가는 크기를 구해 모든 칩이 같이 쓴다 —
-              // 폰은 칸이 좁아 애플·안드로이드 모두 필요하다.
-              final chipWidth =
-                  (constraints.maxWidth - 10 * (columns - 1)) / columns;
-              final fontSize = _chipFontSize([
-                for (final item in items) item.name,
-              ], chipWidth);
-              return Column(
-                children: [
-                  for (var i = 0; i < items.length; i += columns) ...[
-                    if (i > 0) SizedBox(height: 10),
-                    Row(
-                      children: [
-                        for (var col = 0; col < columns; col++) ...[
-                          if (col > 0) SizedBox(width: 10),
-                          Expanded(
-                            child: i + col < items.length
-                                ? _CountChip(
-                                    label: items[i + col].name,
-                                    count: counts[items[i + col].id] ?? 0,
-                                    fontSize: fontSize,
-                                    onAdjust: (delta) =>
-                                        onAdjust(items[i + col], delta),
-                                  )
-                                : SizedBox(),
-                          ),
-                        ],
+                for (var i = 0; i < items.length; i += columns) ...[
+                  if (i > 0) SizedBox(height: 10),
+                  Row(
+                    children: [
+                      for (var col = 0; col < columns; col++) ...[
+                        if (col > 0) SizedBox(width: 10),
+                        Expanded(
+                          child: i + col < items.length
+                              ? _CountChip(
+                                  label: items[i + col].name,
+                                  count: counts[items[i + col].id] ?? 0,
+                                  fontSize: fontSize,
+                                  onAdjust: (delta) =>
+                                      onAdjust(items[i + col], delta),
+                                )
+                              : SizedBox(),
+                        ),
                       ],
-                    ),
-                  ],
+                    ],
+                  ),
                 ],
-              );
-            },
-          ),
-        ],
-      ),
+              ],
+            );
+          },
+        ),
+      ],
     );
   }
 }
@@ -151,7 +157,10 @@ class _CountChip extends StatelessWidget {
   final double fontSize;
 
   /// 좌우 −/+ 버튼 한 개의 폭
-  static const double buttonWidth = 42;
+  ///
+  /// **48 이다** (2026-09-01 대표 요청 — "누르기 편하게"). 흰 카드를 걷으면서
+  /// 칩이 좌우로 40 넓어졌는데, 그 자리를 글자만 쓰면 버튼은 그대로 좁다.
+  static const double buttonWidth = 48;
 
   @override
   Widget build(BuildContext context) {
@@ -160,7 +169,8 @@ class _CountChip extends StatelessWidget {
     return AnimatedContainer(
       duration: Duration(milliseconds: 180),
       curve: Curves.easeOut,
-      height: 48,
+      // 애플 손가락 최소 44 보다 넉넉하게 — 하루에 수십 번 누르는 자리다
+      height: 56,
       decoration: BoxDecoration(
         color: active ? AppColors.primaryLight : AppColors.gray50,
         borderRadius: BorderRadius.circular(14),
