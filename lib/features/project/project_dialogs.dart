@@ -631,14 +631,20 @@ class _DeleteDialogState extends State<_DeleteDialog> {
   }
 }
 
-/// 인원 추가 신청 창 — **넣기만 한다** (2026-08-19)
+/// 인원 추가 창 — **넣기만 한다** (2026-08-19)
 ///
 /// 빼는 자리를 안 둔 이유가 있다. 참여 멤버에서 빼면 그 사람에게 걸린
 /// 할 일(`_Todo.assignee`)이 붕 뜨고, 무엇으로 대신할지가 안 정해졌다.
 /// 서버도 같은 이유로 `addIds` 만 받는다.
 ///
-/// **삭제 신청 창과 같은 틀이다** — 사유 칸과 버튼이 그대로고, 위에
-/// 고르는 줄만 하나 얹었다.
+/// **바로 넣는 사람에게는 신청 창이 아니다** ([_canEditNow] — MASTER 는 늘,
+/// ADMIN 은 참여 중일 때). 그 사람들은 [_ProjectDetail._applyMembers] 로
+/// 곧장 가는데, 창은 그걸 안 가려서 **`인원 추가 신청` 이라고 묻고 사유까지
+/// 받아 냈다.** 받은 사유는 쓰는 데가 없어서 그대로 버려졌다
+/// (2026-09-01 대표 지적).
+///
+/// 결재로 올리는 사람에게는 **삭제 신청 창과 같은 틀**이다 — 사유 칸과
+/// 버튼이 그대로고, 위에 고르는 줄만 하나 얹었다.
 Future<({List<String> names, String reason})?> _showMembersDialog(
   BuildContext context,
   _Project project,
@@ -664,6 +670,9 @@ class _MembersDialogState extends State<_MembersDialog> {
 
   /// 이번에 넣을 사람 — 이름이다 (폼이 아직 이름을 사람 키로 쓴다)
   final _picked = <String>[];
+
+  /// 결재를 안 거치고 **바로 넣는 사람인가** — 상세와 같은 판정을 쓴다
+  late final _direct = _canEditNow(widget.project);
 
   /// 고를 수 있는 사람 — **이미 참여 중인 사람은 뺀다.**
   /// 넣어 봐야 서버가 `ALREADY_MEMBER` 로 되돌린다
@@ -691,7 +700,8 @@ class _MembersDialogState extends State<_MembersDialog> {
       return;
     }
     final reason = _reason.text.trim();
-    if (reason.isEmpty) {
+    // 바로 넣는 사람에게는 사유를 안 묻는다 — 결재가 없어 읽을 사람이 없다
+    if (!_direct && reason.isEmpty) {
       AppToast.show(context, '추가 사유를 입력해주세요');
       _reasonFocus.requestFocus();
       return;
@@ -719,10 +729,12 @@ class _MembersDialogState extends State<_MembersDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('인원 추가 신청', style: AppTextStyles.title2),
+          Text(_direct ? '인원 추가' : '인원 추가 신청', style: AppTextStyles.title2),
           SizedBox(height: 6),
           Text(
-            '승인되면 참여 멤버로 들어옵니다. 승인 전까지는 그대로예요',
+            _direct
+                ? '고른 사람이 바로 참여 멤버로 들어옵니다'
+                : '승인되면 참여 멤버로 들어옵니다. 승인 전까지는 그대로예요',
             style: AppTextStyles.caption,
           ),
           SizedBox(height: 16),
@@ -735,45 +747,38 @@ class _MembersDialogState extends State<_MembersDialog> {
             ConstrainedBox(
               constraints: BoxConstraints(maxHeight: 260),
               child: SingleChildScrollView(
-                child: LayoutBuilder(
-                  builder: (context, box) {
-                    const gap = 8.0;
-                    final width = (box.maxWidth - gap * 2) / 3;
-                    return Wrap(
-                      spacing: gap,
-                      runSpacing: gap,
-                      children: [
-                        // 명단 차례 그대로 — 누를 때마다 자리가 바뀌면 안 된다
-                        for (final staff in _candidates)
-                          SizedBox(
-                            width: width,
-                            child: PersonCard(
-                              staff: staff,
-                              joined: _picked.contains(staff.name),
-                              onTap: () => setState(() {
-                                if (!_picked.remove(staff.name)) {
-                                  _picked.add(staff.name);
-                                }
-                              }),
-                            ),
-                          ),
-                      ],
-                    );
-                  },
+                child: PersonWrap(
+                  children: [
+                    // 명단 차례 그대로 — 누를 때마다 자리가 바뀌면 안 된다
+                    for (final staff in _candidates)
+                      PersonCard(
+                        staff: staff,
+                        joined: _picked.contains(staff.name),
+                        onTap: () => setState(() {
+                          if (!_picked.remove(staff.name)) {
+                            _picked.add(staff.name);
+                          }
+                        }),
+                      ),
+                  ],
                 ),
               ),
             ),
-          SizedBox(height: 14),
-          _Field(
-            controller: _reason,
-            focusNode: _reasonFocus,
-            hint: '왜 넣나요? (대표가 이걸 보고 결재해요)',
-            lines: 3,
-          ),
+          if (!_direct) ...[
+            SizedBox(height: 14),
+            _Field(
+              controller: _reason,
+              focusNode: _reasonFocus,
+              hint: '왜 넣나요? (대표가 이걸 보고 결재해요)',
+              lines: 3,
+            ),
+          ],
           SizedBox(height: 18),
           _DialogActions(
-            label: '추가 신청',
-            ready: _picked.isNotEmpty && _reason.text.trim().isNotEmpty,
+            label: _direct ? '추가' : '추가 신청',
+            ready:
+                _picked.isNotEmpty &&
+                (_direct || _reason.text.trim().isNotEmpty),
             onSubmit: _submit,
           ),
         ],
