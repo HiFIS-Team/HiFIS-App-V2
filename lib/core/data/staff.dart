@@ -44,18 +44,20 @@ Role get myRole => currentUser?.role ?? Role.member;
 /// getter 인 이유는 두 가지다 — 명단을 받아오면 곧바로 반영돼야 하고,
 /// 첫 줄이 로그인한 사람이라 [me]가 바뀌면 같이 바뀌어야 한다.
 /// 상수로 두면 앱 시작 시점(로그아웃 상태)에 굳어 버린다.
-List<Staff> get staffList {
-  final employees = StaffDirectory.instance.employees;
-  return [
-    for (final employee in employees)
-      Staff(
-        employee.name,
-        employee.rank.label,
-        employee.color ?? avatarColorFor(employee.name),
-        imageUrl: employee.avatarImageUrl,
-      ),
-  ];
-}
+List<Staff> get staffList => [
+  for (final employee in StaffDirectory.instance.employees) staffFrom(employee),
+];
+
+/// 명단의 한 사람을 화면용 [Staff] 로 바꾼다
+///
+/// **[Employee] 를 손에 쥔 화면이 쓴다.** [staffOf] 는 이름으로 찾아서
+/// 동명이인이 오면 엉뚱한 사람이 잡히는데, 여기는 그 사람 자체를 받는다.
+Staff staffFrom(Employee employee) => Staff(
+  employee.name,
+  employee.rank.label,
+  employee.color ?? avatarColorFor(employee.name),
+  imageUrl: employee.avatarImageUrl,
+);
 
 /// 아바타 색을 이름에서 만든다
 ///

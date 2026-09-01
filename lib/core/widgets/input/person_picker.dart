@@ -96,6 +96,34 @@ class PersonGrid extends StatelessWidget {
   /// 잠긴 폼 — 모양은 그대로 두고 안 눌리게만 한다
   final bool locked;
 
+  @override
+  Widget build(BuildContext context) {
+    return PersonWrap(
+      children: [
+        // 명단 차례 그대로 — 누를 때마다 순서가 바뀌면 자리를 못 외운다
+        for (final staff in people)
+          PersonCard(
+            staff: staff,
+            joined: selected.contains(staff.name),
+            onTap: locked ? null : () => onToggle(staff.name),
+          ),
+      ],
+    );
+  }
+}
+
+/// 사람 칸을 **한 줄에 셋씩** 세우는 판 — 칸 폭을 재서 나눈다
+///
+/// [PersonGrid](이름으로 여럿 고르기)와 **id 로 한 사람만 고르는 자리**
+/// (기여 점수 주기)가 같이 쓴다. 칸 크기·간격이 화면마다 갈리면 안 된다 —
+/// [PersonCard] 를 공용으로 만든 것과 같은 이유다.
+///
+/// 고정값으로 박으면 폰 폭이 다를 때(SE·Max) 마지막 칸이 넘치거나 남는다.
+class PersonWrap extends StatelessWidget {
+  const PersonWrap({super.key, required this.children});
+
+  final List<Widget> children;
+
   static const _perRow = 3;
   static const _gap = 8.0;
 
@@ -108,16 +136,7 @@ class PersonGrid extends StatelessWidget {
           spacing: _gap,
           runSpacing: _gap,
           children: [
-            // 명단 차례 그대로 — 누를 때마다 순서가 바뀌면 자리를 못 외운다
-            for (final staff in people)
-              SizedBox(
-                width: width,
-                child: PersonCard(
-                  staff: staff,
-                  joined: selected.contains(staff.name),
-                  onTap: locked ? null : () => onToggle(staff.name),
-                ),
-              ),
+            for (final child in children) SizedBox(width: width, child: child),
           ],
         );
       },

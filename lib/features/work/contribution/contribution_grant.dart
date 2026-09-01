@@ -34,13 +34,14 @@ class _GrantScreenState extends State<_GrantScreen> {
     if (me == null) return const [];
     final sameBranchOnly = me.role == Role.manager;
     final allowed = _grantable[me.role] ?? const <Role>{};
+    // 앱 공통 차례 (지점 → 직급 → 이름)
     return [
       for (final employee in StaffDirectory.instance.employees)
         if (employee.id != me.id &&
             allowed.contains(employee.role) &&
             (!sameBranchOnly || employee.branchId == me.branchId))
           employee,
-    ];
+    ]..sort(StaffDirectory.instance.compareStaff);
   }
 
   /// 누가 누구에게 줄 수 있나 — 서버 `GRANTABLE` 과 같은 표
@@ -131,10 +132,17 @@ class _GrantScreenState extends State<_GrantScreen> {
                 SizedBox(height: 20),
                 _label('받을 사람'),
                 SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [for (final person in _people) _personChip(person)],
+                // **다른 화면과 같은 칸이다** (프로젝트 담당·일정 참석자·
+                // 회의록·칭찬·동료평가). 예전에는 여기만 알약으로 남아 있었다
+                PersonWrap(
+                  children: [
+                    for (final person in _people)
+                      PersonCard(
+                        staff: staffFrom(person),
+                        joined: person.id == _target?.id,
+                        onTap: () => setState(() => _target = person),
+                      ),
+                  ],
                 ),
                 SizedBox(height: 20),
                 _label('내용'),
@@ -245,40 +253,6 @@ class _GrantScreenState extends State<_GrantScreen> {
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
                 color: on ? AppColors.primary : AppColors.gray400,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _personChip(Employee person) {
-    final on = person.id == _target?.id;
-    return Pressable(
-      onTap: () => setState(() => _target = person),
-      child: AnimatedContainer(
-        duration: Duration(milliseconds: 140),
-        height: 44,
-        padding: EdgeInsets.fromLTRB(6, 6, 14, 6),
-        decoration: BoxDecoration(
-          color: on ? AppColors.primaryLight : AppColors.gray50,
-          borderRadius: BorderRadius.circular(100),
-          border: Border.all(
-            color: on ? AppColors.primary : Colors.transparent,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Avatar(name: person.name, size: 32),
-            SizedBox(width: 8),
-            Text(
-              person.name,
-              style: AppTextStyles.body2.copyWith(
-                fontSize: 14,
-                fontWeight: on ? FontWeight.w700 : FontWeight.w500,
-                color: on ? AppColors.primary : AppColors.textPrimary,
               ),
             ),
           ],
