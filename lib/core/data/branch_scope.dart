@@ -10,6 +10,7 @@ library;
 
 import 'package:flutter/foundation.dart';
 
+import 'current_user.dart';
 import 'employee.dart';
 import 'staff.dart';
 import 'staff_directory.dart';
@@ -63,6 +64,17 @@ String get branchScopeName {
   final name = StaffDirectory.instance.branchName(id);
   return name.isEmpty ? allBranchesLabel : name;
 }
+
+/// **명단·고르개를 세울 때 걸 지점** — 안 골랐으면 내 지점이다
+///
+/// [branchScopeId] 와 갈리는 자리가 하나 있다. 그건 '전 지점'일 때 null 인데,
+/// 서버는 그때도 MEMBER·MANAGER 를 **본인 지점으로 고정**한다(`branch_filter`).
+/// 그래서 null 을 그대로 '전사'로 읽으면, 지점을 안 고른 점장의 사람 고르개에
+/// **다른 지점 사람이 줄줄이 서고 골라도 늘 0건**이 된다.
+///
+/// 전사를 실제로 보는 것은 MASTER·ADMIN 뿐이라 그때만 null 이다.
+String? get rosterBranchId =>
+    branchScopeId ?? (myRole.boss ? null : currentUser?.branchId);
 
 /// 로그아웃할 때 되돌린다 — 다음 사람에게 앞사람이 보던 지점이 남지 않게
 void resetBranchScope() => branchScope.value = null;

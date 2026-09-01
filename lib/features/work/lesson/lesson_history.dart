@@ -58,13 +58,30 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
   /// 받으면 되고 트레이너를 바꿀 때 기다릴 일이 없다.
   String? _trainerId;
 
-  /// 고를 수 있는 트레이너 — 이름순
+  /// 고를 수 있는 트레이너 — **명단을 다 세운다**
   ///
-  /// 명단 전체가 아니라 **이 화면에 이름이 있는 사람만** 세운다. 이 달 싸인을
-  /// 한 사람과 회원을 맡고 있는 사람을 **합쳐서** 세운다 — 갈래를 옮길 때마다
-  /// 메뉴가 늘었다 줄었다 하면 고른 사람이 목록에서 사라진다.
+  /// 환경정비 사람 필터와 같은 규칙이다 (2026-09-01 대표 지적). 화면에 이름이
+  /// 있는 사람만 세우면 **고른 사람이 달을 넘기는 순간 메뉴에서 사라져서
+  /// 필터를 풀 수도 없다.** "이 트레이너가 지난달에 몇 개 했나"는 0건인 달을
+  /// 지나가야 닿는 자리다.
+  ///
+  /// 세우는 사람
+  /// - 보고 있는 지점의 **재직 중인 현장 인원** (MANAGER·MEMBER)
+  /// - 거기 없어도 **이 달 싸인을 했거나 회원을 맡고 있는 사람** — 나갔거나
+  ///   지점을 옮겨도 그때 남긴 기록은 걸러 볼 수 있어야 한다
+  ///
+  /// MASTER·ADMIN 은 뺀다. 서버가 `POST /session-signs` 를 안 받아서
+  /// (backend-gap 24번) 골라 봐야 늘 0건이다.
   List<({String id, String name})> get _trainers {
     final names = <String, String>{};
+    for (final employee in StaffDirectory.instance.employees) {
+      if (!employee.role.doesFieldWork) continue;
+      if (employee.status != EmployeeStatus.active) continue;
+      // 대표·관리자가 전 지점을 볼 때만 null 이라 안 가린다 ([rosterBranchId])
+      final branch = rosterBranchId;
+      if (branch != null && employee.branchId != branch) continue;
+      names[employee.id] = employee.name;
+    }
     void add(String id) =>
         names[id] ??= StaffDirectory.instance.byId(id)?.name ?? '알 수 없음';
     for (final sign in _rows) {

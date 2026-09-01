@@ -263,10 +263,9 @@ class _HistoryScreenState extends State<_HistoryScreen>
     for (final employee in StaffDirectory.instance.employees) {
       if (!employee.role.doesFieldWork) continue;
       if (employee.status != EmployeeStatus.active) continue;
-      // 전 지점을 볼 때(null)는 안 가린다
-      if (widget.branchId != null && employee.branchId != widget.branchId) {
-        continue;
-      }
+      // 대표·관리자가 전 지점을 볼 때만 null 이라 안 가린다 ([rosterBranchId])
+      final branch = rosterBranchId;
+      if (branch != null && employee.branchId != branch) continue;
       names[employee.id] = employee.name;
     }
     // 명단에서 빠진 사람이라도 기록이 있으면 세운다
