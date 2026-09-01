@@ -50,62 +50,78 @@ class _HistoryCardState extends State<_HistoryCard> {
     final sorted = List.of(widget.logs)
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-    return Container(
-      padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
-      decoration: AppDecorations.card(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 4),
-            child: Row(
-              children: [
-                Text(widget.title, style: AppTextStyles.label),
-                SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    '총 ${sorted.length}회',
-                    style: AppTextStyles.caption.copyWith(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w700,
-                    ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 머리말은 **카드 밖**이다 (2026-09-01 대표 요청) — 공통 업무·오늘
+        // 할 일·세션 기록과 같은 모양이다
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 4),
+          child: Row(
+            children: [
+              Text(
+                widget.title,
+                style: AppTextStyles.label.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '총 ${sorted.length}회',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                SeeAllButton(onTap: widget.onOpenAll),
-              ],
-            ),
+              ),
+              SeeAllButton(onTap: widget.onOpenAll),
+            ],
           ),
-          // 기록 수가 달라도 좌우 카드 높이가 어긋나지 않게 높이를 고정한다
-          SizedBox(
-            height: _listHeight,
-            child: sorted.isEmpty
-                ? Padding(
-                    padding: EdgeInsets.fromLTRB(4, 20, 4, 20),
-                    child: Text(
-                      widget.emptyText,
-                      style: AppTextStyles.body2.copyWith(
-                        color: AppColors.textTertiary,
+        ),
+        SizedBox(height: 12),
+        Container(
+          padding: EdgeInsets.fromLTRB(20, 12, 20, 8),
+          decoration: AppDecorations.card(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 기록 수가 달라도 좌우 카드 높이가 어긋나지 않게 높이를 고정한다
+              SizedBox(
+                height: _listHeight,
+                child: sorted.isEmpty
+                    // 빈 상태는 **앱 공통 모양**이다 (홈 프로젝트·공지,
+                    // 결재함과 같은 [EmptyCard]). 이미 카드 안이라 테두리는 뺀다
+                    ? Center(
+                        child: EmptyCard(
+                          icon: CupertinoIcons.checkmark_circle,
+                          text: widget.emptyText,
+                          framed: false,
+                        ),
+                      )
+                    : Scrollbar(
+                        controller: _scrollController,
+                        child: SingleChildScrollView(
+                          controller: _scrollController,
+                          child: Column(
+                            children: [
+                              for (var i = 0; i < sorted.length; i++) ...[
+                                if (i > 0)
+                                  Divider(height: 1, color: AppColors.divider),
+                                _LogRow(
+                                  log: sorted[i],
+                                  showName: widget.showName,
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-                  )
-                : Scrollbar(
-                    controller: _scrollController,
-                    child: SingleChildScrollView(
-                      controller: _scrollController,
-                      child: Column(
-                        children: [
-                          for (var i = 0; i < sorted.length; i++) ...[
-                            if (i > 0)
-                              Divider(height: 1, color: AppColors.divider),
-                            _LogRow(log: sorted[i], showName: widget.showName),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
