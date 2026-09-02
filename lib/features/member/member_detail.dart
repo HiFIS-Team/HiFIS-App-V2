@@ -16,6 +16,7 @@ import '../../core/util/when.dart';
 import '../../core/widgets/display/avatar.dart';
 import '../../core/widgets/display/section_header.dart';
 import '../../core/widgets/feedback/app_toast.dart';
+import '../../core/widgets/display/field_rows.dart';
 import '../../core/widgets/feedback/empty_card.dart';
 import '../../core/widgets/feedback/skeleton.dart';
 import '../../core/widgets/input/pressable.dart';
@@ -675,7 +676,8 @@ class _ProfileCard extends StatelessWidget {
     final branch = StaffDirectory.instance.branchName(member.branchId);
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+      // 아래는 6 이다 — 마지막 줄에 세로 14 가 붙어 위와 같은 20 이 된다
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 6),
       decoration: AppDecorations.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -706,50 +708,32 @@ class _ProfileCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 18),
-          _Field(label: '담당 트레이너', value: trainer),
-          if (branch.isNotEmpty) _Field(label: '지점', value: branch),
-          _Field(label: '등록일', value: fullDateLabel(member.registeredAt)),
-          _Field(label: '방문 경로', value: member.visitPath?.label ?? '기록 없음'),
-          if (member.memo case final memo? when memo.trim().isNotEmpty)
-            _Field(label: '메모', value: memo),
+          const SizedBox(height: 14),
+          // 머리(이름·연락처)와 줄들 사이를 선으로 가른다 — 회원 정보 화면과
+          // **같은 부품**이라 이름표 폭·줄 높이가 갈릴 수 없다
+          Container(height: 1, color: AppColors.gray50),
+          FieldRows(
+            fields: [
+              (label: '담당', value: trainer, onCopy: null),
+              if (branch.isNotEmpty) (label: '지점', value: branch, onCopy: null),
+              (
+                label: '등록일',
+                value: fullDateLabel(member.registeredAt),
+                onCopy: null,
+              ),
+              (
+                label: '방문 경로',
+                value: member.visitPath?.label ?? '기록 없음',
+                onCopy: null,
+              ),
+              if (member.memo case final memo? when memo.trim().isNotEmpty)
+                (label: '메모', value: memo, onCopy: null),
+            ],
+          ),
         ],
       ),
     );
   }
-}
-
-/// 카드 안 한 줄 — 왼쪽 이름표, 오른쪽 값
-class _Field extends StatelessWidget {
-  const _Field({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 10),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 84,
-          child: Text(
-            label,
-            style: AppTextStyles.caption.copyWith(
-              color: AppColors.textTertiary,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w600),
-          ),
-        ),
-      ],
-    ),
-  );
 }
 
 /// 회원에게 보내는 수업 주소 — 눌러서 복사

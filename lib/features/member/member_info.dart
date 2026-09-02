@@ -18,6 +18,7 @@ import '../../core/util/when.dart';
 import '../../core/widgets/display/avatar.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/widgets/feedback/app_toast.dart';
+import '../../core/widgets/display/field_rows.dart';
 import '../../core/widgets/feedback/empty_card.dart';
 import '../../core/widgets/feedback/skeleton.dart';
 import '../../core/widgets/glass/glass_bottom_button.dart';
@@ -480,7 +481,7 @@ class _MemberInfoDetailState extends State<_MemberInfoDetail> {
             // 카드 아래가 열린 것처럼 보인다 (2026-09-02 대표 지적).
             // 메모가 있고 없고에 따라 마지막 줄이 바뀌어서, 손으로 `last` 를
             // 붙이면 반드시 어긋난다
-            _FieldCard(
+            FieldCard(
               fields: [
                 // **전화번호가 제일 위다** — 회원에게 연락하려고 여는 자리다
                 (
@@ -634,102 +635,6 @@ class _PassCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// 인적 사항 한 줄의 재료
-typedef _FieldRow = ({String label, String value, VoidCallback? onCopy});
-
-/// 인적 사항 카드 — 줄 사이에만 선을 긋는다
-///
-/// **마지막 줄 아래에는 선이 없다.** 있으면 카드 아래가 열린 것처럼 보이는데,
-/// 메모가 있고 없고에 따라 마지막 줄이 바뀌어서 손으로 붙이면 반드시 어긋난다
-/// (실제로 어긋나 있었다 — 2026-09-02 대표 지적).
-class _FieldCard extends StatelessWidget {
-  const _FieldCard({required this.fields});
-
-  final List<_FieldRow> fields;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      // 위아래를 같게 — 줄마다 세로 14 이 붙으므로 6 을 더하면 20 씩이다
-      padding: const EdgeInsets.fromLTRB(20, 6, 20, 6),
-      decoration: AppDecorations.card(),
-      child: Column(
-        children: [
-          for (var i = 0; i < fields.length; i++)
-            _Field(
-              label: fields[i].label,
-              value: fields[i].value,
-              onCopy: fields[i].onCopy,
-              last: i == fields.length - 1,
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 카드 안 한 줄 — 왼쪽 이름표, 오른쪽 값
-class _Field extends StatelessWidget {
-  const _Field({
-    required this.label,
-    required this.value,
-    this.onCopy,
-    this.last = false,
-  });
-
-  final String label;
-  final String value;
-
-  /// 눌러서 복사 — 전화번호에만 준다
-  final VoidCallback? onCopy;
-
-  /// 마지막 줄이면 아래 선을 안 긋는다
-  final bool last;
-
-  @override
-  Widget build(BuildContext context) {
-    final row = Padding(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // '담당 트레이너' 를 '담당' 으로 줄이면서 제일 긴 것이 '방문 경로' 가
-          // 됐다 — 칸을 그만큼만 잡아야 값이 가운데로 밀리지 않는다
-          SizedBox(
-            width: 68,
-            child: Text(
-              label,
-              style: AppTextStyles.caption.copyWith(
-                color: AppColors.textTertiary,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w600),
-            ),
-          ),
-          if (onCopy != null) ...[
-            const SizedBox(width: 8),
-            Icon(CupertinoIcons.doc_on_doc, size: 15, color: AppColors.gray400),
-          ],
-        ],
-      ),
-    );
-
-    return Column(
-      children: [
-        if (onCopy case final onCopy?)
-          Pressable(onTap: onCopy, child: row)
-        else
-          row,
-        if (!last) Container(height: 1, color: AppColors.gray50),
-      ],
     );
   }
 }
