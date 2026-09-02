@@ -6,11 +6,13 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:gal/gal.dart';
 
 import '../../core/api/chat/chat_api.dart';
 import '../../core/api/client/api_client.dart' show ApiClient, fileUrl;
 import '../../core/api/client/api_exception.dart';
+import '../../core/api/notice/reaction_api.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/staff.dart';
 import '../../core/data/staff_directory.dart';
@@ -18,6 +20,8 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/photo_cache.dart';
 import '../../core/util/platform.dart';
+import '../../core/util/when.dart';
+import '../../core/widgets/editor/reaction_row.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/glass/glass_input_bar.dart';
@@ -338,7 +342,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         _scrollController.jumpTo(bottom);
       }
       // 자리를 잡았으니 이제 보여준다 — 빈 목록에는 안 켠다 (아직 받는 중이라
-      // 켜 두면 '오늘' 한 줄만 떴다가 대화가 채워지는 게 보인다)
+      // 켜 두면 날짜 구분선 한 줄만 떴다가 대화가 채워지는 게 보인다)
       if (!_placed && _messages.isNotEmpty) setState(() => _placed = true);
       _pinToBottom(
         after: animate ? Duration(milliseconds: 260) : Duration.zero,
@@ -658,6 +662,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         previousTime.minute == messageTime.minute;
   }
 
+  /// 하루가 바뀌는 자리에 날짜 구분선을 넣기 위해 본다
+  static bool _sameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
   String _messageTime(DateTime time) {
     final hour = time.hour % 12 == 0 ? 12 : time.hour % 12;
     final minute = time.minute.toString().padLeft(2, '0');
@@ -678,7 +686,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           child: Text(
             message.body,
             textAlign: TextAlign.center,
-            style: AppTextStyles.caption,
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.textSecondary,
+            ),
           ),
         ),
       );
@@ -687,9 +697,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final mine = _isMine(message);
     final sender = StaffDirectory.instance.byId(message.senderId);
     final name = sender?.name ?? '알 수 없음';
-    final reaction = message.reactions.isEmpty
-        ? null
-        : message.reactions.first.emoji;
 
     return _RemovableMessage(
       key: ValueKey(message.id),
@@ -712,7 +719,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     showTime: showTime,
                     attachments: message.attachments,
                     replyTo: message.replyTo?.preview,
-                    reaction: reaction,
                     pending: message.pending,
                     onDoubleTap: () => _toggleHeart(message),
                     onLongPress: () => _openMessageMenu(message),
@@ -729,16 +735,39 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     showTime: showTime,
                     attachments: message.attachments,
                     replyTo: message.replyTo?.preview,
-                    reaction: reaction,
                     onDoubleTap: () => _toggleHeart(message),
                     onLongPress: () => _openMessageMenu(message),
                     actions: desktop ? _hoverActions(message) : null,
                   ),
-            // 리액션 알약이 말풍선 아래로 삐져나오는 만큼 간격을 더 준다
-            AnimatedContainer(
+            // 리액션 알약은 **말풍선 아래 제 줄**에 선다.
+            //
+            // 예전에는 말풍선 모서리에 겹쳐 띄웠는데, 이모지 종류가 둘 이상
+            // 붙으면 알약 줄이 짧은 말풍선보다 길어져서 **옆에 선 시각을 덮었다.**
+            // 자리를 따로 주면 몇 종이 붙어도 겹칠 일이 없다.
+            AnimatedSize(
               duration: Duration(milliseconds: 200),
               curve: Curves.easeOut,
-              height: reaction != null ? 22 : 8,
+              alignment: Alignment.topCenter,
+              child: message.reactions.isEmpty
+                  ? SizedBox(width: double.infinity, height: 8)
+                  : Padding(
+                      // 상대 말풍선은 프로필 자리(48) 만큼 들어와서 선다
+                      padding: EdgeInsets.fromLTRB(
+                        mine ? 0 : 52,
+                        4,
+                        mine ? 4 : 0,
+                        10,
+                      ),
+                      child: Align(
+                        alignment: mine
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: _ReactionPills(
+                          reactions: message.reactions,
+                          mine: mine,
+                        ),
+                      ),
+                    ),
             ),
           ],
         ),
@@ -771,9 +800,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   MediaQuery.paddingOf(context).bottom + 72,
                 ),
                 children: [
-                  Center(child: Text('오늘', style: AppTextStyles.caption)),
-                  SizedBox(height: 16),
-                  for (var index = 0; index < _messages.length; index++)
+                  // 인스타 DM 처럼 **하루마다** 구분선을 넣는다. 예전에는 맨 위에
+                  // '오늘' 이 한 줄 박혀 있어서, 어제 대화도 오늘 것처럼 보였다
+                  for (var index = 0; index < _messages.length; index++) ...[
+                    if (index == 0 ||
+                        !_sameDay(
+                          _messages[index - 1].createdAt,
+                          _messages[index].createdAt,
+                        ))
+                      _DaySeparator(day: _messages[index].createdAt),
                     _messageRow(
                       _messages[index],
                       desktop,
@@ -788,6 +823,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                             _messages[index + 1],
                           ),
                     ),
+                  ],
                   if (_readLabel case final label?)
                     Align(
                       alignment: Alignment.centerRight,
@@ -795,7 +831,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         padding: EdgeInsets.only(right: 4),
                         child: Text(
                           label,
-                          style: AppTextStyles.caption.copyWith(fontSize: 12),
+                          style: AppTextStyles.caption.copyWith(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                       ),
                     ),
@@ -808,6 +848,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                           label,
                           style: AppTextStyles.caption.copyWith(
                             fontSize: 12,
+                            fontWeight: FontWeight.w500,
                             color: AppColors.primary,
                           ),
                         ),

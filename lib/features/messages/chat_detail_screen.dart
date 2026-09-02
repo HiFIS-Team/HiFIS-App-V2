@@ -735,7 +735,10 @@ class _SharedThumb extends StatelessWidget {
           maxLines: 2,
           textAlign: TextAlign.center,
           overflow: TextOverflow.ellipsis,
-          style: AppTextStyles.caption.copyWith(fontSize: 11),
+          style: AppTextStyles.caption.copyWith(
+            fontSize: 12,
+            color: AppColors.textSecondary,
+          ),
         ),
       ],
     ),

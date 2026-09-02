@@ -1,5 +1,39 @@
 part of 'chat_screen.dart';
 
+/// 하루가 바뀌는 자리에 서는 날짜 구분선 (인스타 DM 과 같은 가운데 한 줄)
+///
+/// 예전에는 목록 맨 위에 '오늘' 이 **고정 문자열로** 한 번 박혀 있어서,
+/// 어제·지난주 대화도 오늘 것처럼 보였다 (2026-09-03 대표 지적).
+class _DaySeparator extends StatelessWidget {
+  _DaySeparator({required this.day});
+
+  final DateTime day;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(top: 8, bottom: 16),
+      child: Center(
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          decoration: BoxDecoration(
+            color: AppColors.gray50,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            chatDayLabel(day),
+            style: AppTextStyles.caption.copyWith(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _RemovableMessage extends StatelessWidget {
   _RemovableMessage({
     super.key,
@@ -42,6 +76,13 @@ bool _photoOnly(String text, String? replyTo, List<String> attachments) =>
     replyTo == null &&
     attachments.isNotEmpty &&
     attachments.every(isImageAttachment);
+
+/// 말풍선 옆 시각 — 10px 회색(gray400)이라 밝은 데서 거의 안 읽혔다.
+/// 한 단계 키우고 한 단계 진하게 한다 (2026-09-03 대표 지적).
+TextStyle get _timeStyle => AppTextStyles.caption.copyWith(
+  fontSize: 11,
+  color: AppColors.textSecondary,
+);
 
 /// 첨부 — 사진은 격자로, 나머지는 파일 이름 한 줄
 ///
@@ -344,7 +385,6 @@ class _MyBubble extends StatelessWidget {
     required this.showTime,
     this.attachments = const [],
     this.replyTo,
-    this.reaction,
     this.pending = false,
     this.onDoubleTap,
     this.onLongPress,
@@ -361,7 +401,6 @@ class _MyBubble extends StatelessWidget {
 
   final List<String> attachments;
   final String? replyTo;
-  final String? reaction;
 
   /// 아직 서버 응답을 못 받았다 — 살짝 흐리게 그려 보내는 중임을 알린다
   final bool pending;
@@ -381,10 +420,7 @@ class _MyBubble extends StatelessWidget {
         children: [
           if (actions != null) ...[actions!, SizedBox(width: 4)],
           if (showTime) ...[
-            Text(
-              timeLabel,
-              style: AppTextStyles.caption.copyWith(fontSize: 10),
-            ),
+            Text(timeLabel, style: _timeStyle),
             SizedBox(width: 6),
           ],
           Flexible(child: _bubble()),
@@ -397,95 +433,80 @@ class _MyBubble extends StatelessWidget {
     return Opacity(
       // 보내는 중에는 살짝 흐리다 — 서버가 받으면 또렷해진다
       opacity: pending ? 0.55 : 1,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          GestureDetector(
-            onDoubleTap: onDoubleTap,
-            onLongPress: onLongPress,
-            // 사진만 보냈으면 말풍선 없이 그림만 (더블탭·길게누르기는 그대로)
-            child: _photoOnly(text, replyTo, attachments)
-                ? _Attachments(
-                    urls: attachments,
-                    mine: true,
-                    sender: sender,
-                    sentAt: sentAt,
-                    bare: true,
-                    onDoubleTap: onDoubleTap,
-                    onLongPress: onLongPress,
-                  )
-                : Container(
-                    constraints: BoxConstraints(maxWidth: 280),
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(20),
-                        topRight: Radius.circular(6),
-                        bottomLeft: Radius.circular(20),
-                        bottomRight: Radius.circular(20),
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (replyTo != null)
-                          Container(
-                            margin: EdgeInsets.only(bottom: 6),
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.18),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              replyTo!,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppTextStyles.caption.copyWith(
-                                color: Colors.white.withValues(alpha: 0.85),
-                              ),
-                            ),
-                          ),
-                        // 상대 말풍선과 같은 차례 — 첨부가 위, 글이 아래.
-                        // 여기가 빠져 있어서 **내가 보낸 사진이 빈 말풍선으로** 떴다
-                        // (받는 쪽에서는 보였다). 본문이 없으면 글줄도 안 그린다
-                        if (attachments.isNotEmpty)
-                          _Attachments(
-                            urls: attachments,
-                            mine: true,
-                            sender: sender,
-                            sentAt: sentAt,
-                            onDoubleTap: onDoubleTap,
-                            onLongPress: onLongPress,
-                          ),
-                        if (text.isNotEmpty) ...[
-                          if (attachments.isNotEmpty) SizedBox(height: 6),
-                          Text(
-                            text,
-                            style: AppTextStyles.body2.copyWith(
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
+      child: GestureDetector(
+        onDoubleTap: onDoubleTap,
+        onLongPress: onLongPress,
+        // 사진만 보냈으면 말풍선 없이 그림만 (더블탭·길게누르기는 그대로)
+        child: _photoOnly(text, replyTo, attachments)
+            ? _Attachments(
+                urls: attachments,
+                mine: true,
+                sender: sender,
+                sentAt: sentAt,
+                bare: true,
+                onDoubleTap: onDoubleTap,
+                onLongPress: onLongPress,
+              )
+            : Container(
+                constraints: BoxConstraints(maxWidth: 280),
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(6),
+                    bottomLeft: Radius.circular(20),
+                    bottomRight: Radius.circular(20),
                   ),
-          ),
-          if (reaction != null)
-            Positioned(
-              bottom: -14,
-              right: 10,
-              child: _ReactionPill(
-                key: ValueKey(reaction!),
-                emoji: reaction!,
-                onTap: onLongPress,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (replyTo != null)
+                      Container(
+                        margin: EdgeInsets.only(bottom: 6),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          replyTo!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.caption.copyWith(
+                            color: Colors.white.withValues(alpha: 0.85),
+                          ),
+                        ),
+                      ),
+                    // 상대 말풍선과 같은 차례 — 첨부가 위, 글이 아래.
+                    // 여기가 빠져 있어서 **내가 보낸 사진이 빈 말풍선으로** 떴다
+                    // (받는 쪽에서는 보였다). 본문이 없으면 글줄도 안 그린다
+                    if (attachments.isNotEmpty)
+                      _Attachments(
+                        urls: attachments,
+                        mine: true,
+                        sender: sender,
+                        sentAt: sentAt,
+                        onDoubleTap: onDoubleTap,
+                        onLongPress: onLongPress,
+                      ),
+                    if (text.isNotEmpty) ...[
+                      if (attachments.isNotEmpty) SizedBox(height: 6),
+                      Text(
+                        text,
+                        style: AppTextStyles.body2.copyWith(
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
-            ),
-        ],
       ),
     );
   }
@@ -503,7 +524,6 @@ class _TheirBubble extends StatelessWidget {
     this.attachments = const [],
     this.emoji,
     this.replyTo,
-    this.reaction,
     this.onDoubleTap,
     this.onLongPress,
     this.actions,
@@ -522,7 +542,7 @@ class _TheirBubble extends StatelessWidget {
   final bool showTime;
   final List<String> attachments;
   final String? replyTo;
-  final String? reaction;
+
   final VoidCallback? onDoubleTap;
   final VoidCallback? onLongPress;
 
@@ -552,94 +572,83 @@ class _TheirBubble extends StatelessWidget {
                         name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: AppTextStyles.caption.copyWith(fontSize: 11),
+                        style: AppTextStyles.caption.copyWith(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ),
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      GestureDetector(
-                        onDoubleTap: onDoubleTap,
-                        onLongPress: onLongPress,
-                        // 사진만 왔으면 말풍선 없이 그림만 (내 쪽과 같은 기준)
-                        child: _photoOnly(text, replyTo, attachments)
-                            ? _Attachments(
-                                urls: attachments,
-                                mine: false,
-                                sender: name,
-                                sentAt: sentAt,
-                                bare: true,
-                                onDoubleTap: onDoubleTap,
-                                onLongPress: onLongPress,
-                              )
-                            : Container(
-                                constraints: BoxConstraints(maxWidth: 260),
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 10,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.gray50,
-                                  borderRadius: BorderRadius.only(
-                                    topLeft: Radius.circular(6),
-                                    topRight: Radius.circular(20),
-                                    bottomLeft: Radius.circular(20),
-                                    bottomRight: Radius.circular(20),
-                                  ),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (replyTo != null)
-                                      Container(
-                                        margin: EdgeInsets.only(bottom: 6),
-                                        padding: EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 6,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.gray100,
-                                          borderRadius: BorderRadius.circular(
-                                            10,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          replyTo!,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: AppTextStyles.caption,
-                                        ),
-                                      ),
-                                    if (attachments.isNotEmpty)
-                                      _Attachments(
-                                        urls: attachments,
-                                        mine: false,
-                                        sender: name,
-                                        sentAt: sentAt,
-                                        onDoubleTap: onDoubleTap,
-                                        onLongPress: onLongPress,
-                                      ),
-                                    if (text.isNotEmpty) ...[
-                                      if (attachments.isNotEmpty)
-                                        SizedBox(height: 6),
-                                      Text(text, style: AppTextStyles.body2),
-                                    ],
-                                  ],
-                                ),
+                  GestureDetector(
+                    onDoubleTap: onDoubleTap,
+                    onLongPress: onLongPress,
+                    // 사진만 왔으면 말풍선 없이 그림만 (내 쪽과 같은 기준)
+                    child: _photoOnly(text, replyTo, attachments)
+                        ? _Attachments(
+                            urls: attachments,
+                            mine: false,
+                            sender: name,
+                            sentAt: sentAt,
+                            bare: true,
+                            onDoubleTap: onDoubleTap,
+                            onLongPress: onLongPress,
+                          )
+                        : Container(
+                            constraints: BoxConstraints(maxWidth: 260),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.gray50,
+                              borderRadius: BorderRadius.only(
+                                topLeft: Radius.circular(6),
+                                topRight: Radius.circular(20),
+                                bottomLeft: Radius.circular(20),
+                                bottomRight: Radius.circular(20),
                               ),
-                      ),
-                      if (reaction != null)
-                        Positioned(
-                          bottom: -14,
-                          left: 10,
-                          child: _ReactionPill(
-                            key: ValueKey(reaction!),
-                            emoji: reaction!,
-                            onTap: onLongPress,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (replyTo != null)
+                                  Container(
+                                    margin: EdgeInsets.only(bottom: 6),
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.gray100,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      replyTo!,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: AppTextStyles.caption.copyWith(
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                if (attachments.isNotEmpty)
+                                  _Attachments(
+                                    urls: attachments,
+                                    mine: false,
+                                    sender: name,
+                                    sentAt: sentAt,
+                                    onDoubleTap: onDoubleTap,
+                                    onLongPress: onLongPress,
+                                  ),
+                                if (text.isNotEmpty) ...[
+                                  if (attachments.isNotEmpty)
+                                    SizedBox(height: 6),
+                                  Text(text, style: AppTextStyles.body2),
+                                ],
+                              ],
+                            ),
                           ),
-                        ),
-                    ],
                   ),
                 ],
               ),
@@ -648,10 +657,7 @@ class _TheirBubble extends StatelessWidget {
               SizedBox(width: 6),
               Padding(
                 padding: EdgeInsets.only(bottom: 3),
-                child: Text(
-                  timeLabel,
-                  style: AppTextStyles.caption.copyWith(fontSize: 10),
-                ),
+                child: Text(timeLabel, style: _timeStyle),
               ),
             ],
             if (actions != null) ...[SizedBox(width: 4), actions!],

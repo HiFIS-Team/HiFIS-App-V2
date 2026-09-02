@@ -1,12 +1,58 @@
 part of 'chat_screen.dart';
 
-/// 말풍선 모서리에 겹쳐 붙는 리액션 알약. 탭하면 피커가 다시 열린다.
+/// 말풍선 아래에 서는 리액션 알약 줄 — 이모지 종류마다 하나씩.
+///
+/// 탭하면 **누가 눌렀는지** 시트가 열린다. 공지·회의록·프로젝트가 쓰던
+/// [showReactionPeople] 을 그대로 부르므로 모양도 같다.
+///
+/// **[Row] 가 아니라 [Wrap] 이다.** PC 사내톡 도크는 폭이 380 뿐이라, 이모지가
+/// 여러 종 붙으면 한 줄에 안 들어가 노란 빗금이 뜬다. 넘치면 아랫줄로 내린다.
+class _ReactionPills extends StatelessWidget {
+  _ReactionPills({required this.reactions, required this.mine});
+
+  final List<ReactionAgg> reactions;
+
+  /// 내 말풍선이면 오른쪽부터 채운다 (두 줄로 넘어갔을 때 갈린다)
+  final bool mine;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 4,
+      runSpacing: 4,
+      alignment: mine ? WrapAlignment.end : WrapAlignment.start,
+      children: [
+        for (final reaction in reactions)
+          _ReactionPill(
+            key: ValueKey(reaction.emoji),
+            emoji: reaction.emoji,
+            count: reaction.count,
+            onTap: () {
+              HapticFeedback.selectionClick();
+              showReactionPeople(context, reactions, emoji: reaction.emoji);
+            },
+          ),
+      ],
+    );
+  }
+}
+
+/// 알약 하나 — 이모지와 누른 사람 수.
 /// key가 이모지 값이라, 리액션이 새로 달리거나 바뀔 때마다 팝 애니메이션이 재생된다.
 class _ReactionPill extends StatelessWidget {
-  _ReactionPill({super.key, required this.emoji, this.onTap});
+  _ReactionPill({
+    super.key,
+    required this.emoji,
+    required this.count,
+    required this.onTap,
+  });
 
   final String emoji;
-  final VoidCallback? onTap;
+
+  /// 누른 사람 수 — 1명이면 굳이 안 적는다 (알약이 길어지기만 한다)
+  final int count;
+
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +64,8 @@ class _ReactionPill extends StatelessWidget {
         scale: t,
         child: Opacity(opacity: t.clamp(0.0, 1.0), child: child),
       ),
-      child: GestureDetector(
+      // [Pressable] 이라야 PC 에서 손가락 커서가 뜬다 — 눌러서 볼 것이 있는 자리다
+      child: Pressable(
         onTap: onTap,
         child: Container(
           height: 24,
@@ -36,7 +83,23 @@ class _ReactionPill extends StatelessWidget {
               ),
             ],
           ),
-          child: _EmojiText(emoji, size: 13),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _EmojiText(emoji, size: 13),
+              if (count > 1) ...[
+                SizedBox(width: 5),
+                Text(
+                  '$count',
+                  style: AppTextStyles.caption.copyWith(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );

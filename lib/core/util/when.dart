@@ -37,6 +37,19 @@ String dayLabel(DateTime time, {DateTime? now}) {
   return dateLabel(time);
 }
 
+/// `오늘` · `어제` · `8월 5일` · `2025년 8월 5일`
+///
+/// 대화가 하루씩 갈리는 자리에 쓴다 (사내톡 날짜 구분선). [dayLabel] 과 달리
+/// 월·일을 다 적고 해가 넘어가면 연도까지 붙인다 — 위로 한참 올려 보는
+/// 자리라 `8.5` 만으로는 언제인지 읽히지 않는다.
+String chatDayLabel(DateTime time, {DateTime? now}) {
+  final today = _midnight(now ?? DateTime.now());
+  final days = today.difference(_midnight(time)).inDays;
+  if (days <= 0) return '오늘';
+  if (days == 1) return '어제';
+  return time.year == today.year ? monthDayLabel(time) : fullDateLabel(time);
+}
+
 /// `방금` · `12분 전` · `3시간 전` · `2일 전` · `8.5`
 ///
 /// 방금 올라온 것이 섞이는 목록에 쓴다 (프로젝트 활동·모니터링·랭킹 변동).

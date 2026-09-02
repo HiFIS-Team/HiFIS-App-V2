@@ -709,9 +709,12 @@ class _ConversationTile extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: AppTextStyles.caption.copyWith(
+                      // 읽은 방은 gray400 이라 밝은 데서 미리보기가 거의 안
+                      // 읽혔다. 한 단계만 올린다 — gray600 까지 가면 안 읽은
+                      // 방(gray900 굵게)과 위계가 뭉개진다
                       color: typing
                           ? AppColors.primary
-                          : (unread ? AppColors.gray900 : AppColors.gray400),
+                          : (unread ? AppColors.gray900 : AppColors.gray500),
                       fontWeight: unread || typing
                           ? FontWeight.w600
                           : FontWeight.w400,

@@ -374,31 +374,34 @@ class _HistoryScreenState extends State<_HistoryScreen>
     final sorted = List.of(logs)
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-    // 날짜가 바뀌는 지점마다 머리말을 끼워 넣는다 — 세션 기록과 같은 모양이다
-    final rows = <Widget>[];
-    String? label;
+    // 하루치를 **한 줄로 접는다** (2026-09-03 대표 요청). 하루에 100건 넘게
+    // 쌓이는 지점이 있어서, 먼저 보여야 하는 것은 그날 몇 번·몇 점이다.
+    // 개별 기록은 그 줄을 눌러 펼쳐 본다.
+    //
+    // 다만 **거르고 있을 때는 펼쳐 둔다** — 검색어를 쳤는데 접힌 날짜 줄만
+    // 뜨면 찾은 것을 보려고 한 번 더 눌러야 한다.
+    final filtering =
+        _search.text.trim().isNotEmpty ||
+        _itemName != null ||
+        (_all && _personId != null);
+    final days = <DateTime, List<EnvTaskLog>>{};
     for (final log in sorted) {
-      final day = dayLabel(log.createdAt);
-      if (day != label) {
-        rows.add(
-          Padding(
-            padding: EdgeInsets.fromLTRB(4, label == null ? 4 : 22, 4, 4),
-            child: Text(
-              day,
-              style: AppTextStyles.caption.copyWith(
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        );
-        label = day;
-      } else {
-        rows.add(Divider(height: 1, color: AppColors.divider));
-      }
-      // 전체 내역에서는 누가 했는지 이름을 함께 보여준다
-      rows.add(_LogRow(log: log, showName: _all));
+      final at = log.createdAt;
+      (days[DateTime(at.year, at.month, at.day)] ??= []).add(log);
     }
+    final rows = [
+      for (final (index, day) in days.entries.indexed)
+        _DayGroup(
+          key: ValueKey(day.key),
+          day: day.key,
+          logs: day.value,
+          // 전체 내역에서는 누가 했는지 이름을 함께 보여준다
+          showName: _all,
+          expanded: filtering,
+          // 마지막 줄 아래 선은 검색바와 사이에 붕 떠 보인다
+          divider: index < days.length - 1,
+        ),
+    ];
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -542,6 +545,118 @@ class _HistoryScreenState extends State<_HistoryScreen>
           GlassSearchBar(controller: _search, hint: '항목·이름·날짜 검색'),
         ],
       ),
+    );
+  }
+}
+
+/// 수행 내역 하루치 — 접혀 있을 때는 `날짜 · N회 · +N점` 한 줄이다
+///
+/// 누르면 그날 개별 기록이 펼쳐진다. 예전에는 날짜 머리말 아래에 그날 기록이
+/// 전부 깔려서, 한 달을 보려면 수백 줄을 내려야 했다 (2026-09-03 대표 요청).
+class _DayGroup extends StatefulWidget {
+  _DayGroup({
+    super.key,
+    required this.day,
+    required this.logs,
+    required this.showName,
+    required this.expanded,
+    required this.divider,
+  });
+
+  final DateTime day;
+
+  /// 그날 기록 (최신순)
+  final List<EnvTaskLog> logs;
+
+  final bool showName;
+
+  /// 거르고 있는 동안은 펼친 채로 둔다 — 손으로 접었다 폈던 것보다 우선한다
+  final bool expanded;
+
+  /// 아래에 구분선을 그릴지 (마지막 줄만 안 그린다)
+  final bool divider;
+
+  @override
+  State<_DayGroup> createState() => _DayGroupState();
+}
+
+class _DayGroupState extends State<_DayGroup> {
+  late bool _open = widget.expanded;
+
+  @override
+  void didUpdateWidget(covariant _DayGroup old) {
+    super.didUpdateWidget(old);
+    // 검색어를 치거나 지우는 순간 펼침 상태를 다시 맞춘다
+    if (widget.expanded != old.expanded) _open = widget.expanded;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // 가산점까지 더한 값이다 — 개별 줄의 `+N` 과 같은 기준
+    var points = 0;
+    for (final log in widget.logs) {
+      points += log.totalPoints;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Pressable(
+          onTap: () => setState(() => _open = !_open),
+          padding: EdgeInsets.symmetric(vertical: 12),
+          child: Row(
+            children: [
+              Text(
+                dayLabel(widget.day),
+                style: AppTextStyles.body2.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${widget.logs.length}회',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+              Text(
+                '+$points',
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              SizedBox(width: 6),
+              // 폭을 개별 줄의 완료 아이콘(16)에 맞춰야 `+N` 이 세로로 선다
+              SizedBox(
+                width: 16,
+                child: Icon(
+                  _open
+                      ? CupertinoIcons.chevron_up
+                      : CupertinoIcons.chevron_down,
+                  size: 13,
+                  color: AppColors.gray400,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (_open)
+          Padding(
+            padding: EdgeInsets.only(left: 8, bottom: 4),
+            child: Column(
+              children: [
+                for (var i = 0; i < widget.logs.length; i++) ...[
+                  if (i > 0) Divider(height: 1, color: AppColors.divider),
+                  _LogRow(log: widget.logs[i], showName: widget.showName),
+                ],
+              ],
+            ),
+          ),
+        if (widget.divider) Divider(height: 1, color: AppColors.divider),
+      ],
     );
   }
 }

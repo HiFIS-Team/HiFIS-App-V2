@@ -19,6 +19,10 @@ import '../input/pressable.dart';
 /// 반응한 사람 시트 열기 — 알약을 꾹 눌렀을 때
 ///
 /// 사내톡 말풍선도 같은 걸 쓸 수 있게 밖으로 열어 둔다.
+///
+/// **폭을 [_maxWidth] 로 묶는다.** 안 묶으면 PC 전체보기(넓은 오른쪽 칸)에서
+/// 시트가 칸 폭만큼 늘어나, 이름 몇 줄이 텅 빈 가로줄에 흩어진다.
+/// 폰은 화면이 그보다 좁아 예전 그대로다.
 void showReactionPeople(
   BuildContext context,
   List<ReactionAgg> reactions, {
@@ -30,9 +34,13 @@ void showReactionPeople(
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     barrierColor: Colors.black.withValues(alpha: 0.35),
+    constraints: BoxConstraints(maxWidth: _maxWidth),
     builder: (_) => _ReactionPeopleSheet(reactions: reactions, first: emoji),
   );
 }
+
+/// 시트 최대 폭 — 읽기 좋은 한 칸 (앱 공통 모달 폭 620 보다 좁게 잡는다)
+const _maxWidth = 460.0;
 
 /// 이모지별로 누른 사람 — 위 칸을 눌러 이모지를 옮긴다
 class _ReactionPeopleSheet extends StatefulWidget {
