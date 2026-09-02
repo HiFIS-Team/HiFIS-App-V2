@@ -281,6 +281,30 @@ class _ContributionHistoryScreenState
   /// (전체 화면으로 덮여 있어서 그 화면은 새로 안 그려진다).
   late List<_Contribution> _items = widget.items;
 
+  /// 검색어 — 항목·상대 이름·내용·날짜를 같이 훑는다
+  ///
+  /// 환경정비 전체 내역·세션 기록·칭찬 목록과 **같은 글래스 검색바**다
+  /// (2026-09-02 대표 요청).
+  final _search = TextEditingController();
+
+  /// 오른쪽 위 필터로 고른 항목 — null 이면 전체
+  String? _kind;
+
+  /// 오른쪽 위 필터로 고른 사람 — null 이면 전체
+  String? _person;
+
+  @override
+  void initState() {
+    super.initState();
+    _search.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
   /// **되돌아간 뒤에만** 줄을 뺀다 — 확인창에서 취소하면 그대로 남는다
   Future<void> _revert(_Contribution item) async {
     final done = await widget.onRevert?.call(item) ?? false;
@@ -293,9 +317,91 @@ class _ContributionHistoryScreenState
     });
   }
 
+  /// 깎인 줄을 한 칸으로 묶는 이름 — 지각·업무 누락을 따로 안 세운다
+  ///
+  /// 필터에 사유를 다 펴면 칸이 달마다 늘었다 줄었다 한다. 쓰는 사람이
+  /// 찾는 것은 "깎인 줄" 하나라 **한 칸으로 묶는다** (2026-09-02 대표 요청).
+  static const _cutLabel = '차감';
+
+  /// 그 줄이 무슨 항목인가 — **받은 것은 기여 항목, 깎인 것은 [_cutLabel]**
+  static String _kindLabelOf(_Contribution item) =>
+      item.kind?.label ?? _cutLabel;
+
+  /// 항목 필터 — **늘 다섯 칸이다** (기여 넷 + 차감)
+  ///
+  /// 이번 달에 있는 것만 세우면 **칸이 달마다 달라져서** 자리를 못 외운다.
+  /// 골랐는데 비면 '조건에 맞는 기록이 없어요' 로 알린다 — 그게 없는 것보다
+  /// 낫다 (2026-09-02 대표 요청).
+  static final List<FilterOption> _kindOptions = [
+    for (final type in ContribType.values) (id: type.label, name: type.label),
+    (id: _cutLabel, name: _cutLabel),
+  ];
+
+  /// 사람 필터 — **명단 전체다** (환경정비 전체 내역과 같은 규칙)
+  ///
+  /// 기록이 있는 사람만 세우면 칸이 달마다 달라진다. 지점은
+  /// [rosterBranchId] 가 가른다 — 안 고른 점장에게 다른 지점 사람이 서면
+  /// 골라도 늘 0건이다.
+  ///
+  /// **대표·관리자는 뺀다.** 기여는 자기보다 아래에만 주는 것이라(서버
+  /// `GRANTABLE`) 그 둘은 받지 않고, 출퇴근도 안 남겨서 차감도 안 붙는다.
+  ///
+  /// 이름을 키로 쓴다 — [_Contribution.person] 이 이름뿐이라서다
+  /// (backend-gap 10). 동명이인은 한 칸으로 묶인다.
+  List<FilterOption> get _people {
+    final branch = rosterBranchId;
+    final rows = <Employee>[];
+    for (final employee in StaffDirectory.instance.employees) {
+      if (!employee.role.doesFieldWork) continue;
+      if (employee.status != EmployeeStatus.active) continue;
+      if (branch != null && employee.branchId != branch) continue;
+      rows.add(employee);
+    }
+    // 앱 공통 차례 (지점 → 직급 → 이름)
+    rows.sort(StaffDirectory.instance.compareStaff);
+    final names = <String>[];
+    for (final employee in rows) {
+      if (!names.contains(employee.name)) names.add(employee.name);
+    }
+    return [for (final name in names) (id: name, name: name)];
+  }
+
+  /// 검색·필터를 다 태운 목록
+  List<_Contribution> get _shown {
+    final key = _search.text.trim();
+    if (key.isEmpty && _kind == null && _person == null) return _items;
+    return [
+      for (final item in _items)
+        if (_kind == null || _kindLabelOf(item) == _kind)
+          if (_person == null || item.person == _person)
+            if (key.isEmpty ||
+                item.title.contains(key) ||
+                _kindLabelOf(item).contains(key) ||
+                // 깎인 줄은 항목 이름이 '차감' 이라 사유가 따로 걸려야
+                // `지각`·`업무 누락` 으로 찾을 수 있다
+                (item.penalty?.label ?? '').contains(key) ||
+                (item.person ?? '').contains(key) ||
+                _dateKeys(item.date).contains(key))
+              item,
+    ];
+  }
+
+  /// 날짜를 글자로 — **`8월 31일` · `8/31` · `0831` 이 다 걸린다**
+  ///
+  /// 환경정비 전체 내역과 **같은 규칙**이다. 쓰는 사람마다 적는 모양이 달라서
+  /// 한 줄에 다 이어 붙여 두고 `contains` 로 본다.
+  static String _dateKeys(DateTime t) {
+    final mm = t.month.toString().padLeft(2, '0');
+    final dd = t.day.toString().padLeft(2, '0');
+    return '${t.year}-$mm-$dd|${t.month}월${t.day}일|${t.month}/${t.day}'
+        '|${t.month}.${t.day}|$mm$dd';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final mine = _items;
+    final mine = _shown;
+    final people = _people;
+    final kinds = _kindOptions;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -304,13 +410,22 @@ class _ContributionHistoryScreenState
           SafeArea(
             bottom: false,
             child: ListView(
-              padding: EdgeInsets.fromLTRB(24, 68, 24, 32),
+              // 아래 글래스 검색바에 마지막 줄이 가리지 않게 띄운다
+              // (환경정비 전체 내역과 같은 값)
+              padding: EdgeInsets.fromLTRB(
+                24,
+                68,
+                24,
+                MediaQuery.paddingOf(context).bottom + 92,
+              ),
               children: [
                 if (mine.isEmpty)
                   Padding(
                     padding: EdgeInsets.fromLTRB(0, 32, 0, 32),
                     child: Text(
-                      '이번 달 기여 기록이 없어요',
+                      // 걸러서 빈 것과 원래 없는 것을 가른다 — 안 가르면
+                      // 필터를 걸어 둔 걸 잊고 "기록이 사라졌다" 로 본다
+                      _items.isEmpty ? '이번 달 기여 기록이 없어요' : '조건에 맞는 기록이 없어요',
                       style: AppTextStyles.body2.copyWith(
                         color: AppColors.textTertiary,
                       ),
@@ -350,6 +465,47 @@ class _ContributionHistoryScreenState
               ),
             ),
           ),
+          // 우측 상단 필터 둘 — 뒤로가기와 마주 보는 자리다.
+          //
+          // **아래 검색바(블러)와는 Stack 의 다른 자식이어야 한다.** 같은 Row 에
+          // 두면 네이티브 버튼이 블러 레이어에 묻혀 탭이 안 먹는다
+          // (환경정비 전체 내역과 같은 구조).
+          //
+          // **둘 다 늘 뜬다.** 있는 것만 세우면 칸이 달마다 달라져서 자리를
+          // 못 외운다 (2026-09-02 대표 요청).
+          SafeArea(
+            bottom: false,
+            child: Align(
+              alignment: Alignment.topRight,
+              child: Padding(
+                padding: EdgeInsets.only(top: 8, right: 16),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    PickFilterButton(
+                      stableId: 'contrib-kind',
+                      options: kinds,
+                      selected: _kind,
+                      icon: CupertinoIcons.tag,
+                      symbol: 'tag',
+                      onSelect: (name) => setState(() => _kind = name),
+                    ),
+                    // PhoneDetailScaffold 의 actions 와 같은 간격
+                    SizedBox(width: 10),
+                    // **사람 버튼이 늘 오른쪽 끝**이다 (환경정비와 같은 자리)
+                    PickFilterButton(
+                      stableId: 'contrib-person',
+                      options: people,
+                      selected: _person,
+                      onSelect: (name) => setState(() => _person = name),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // 아래 떠 있는 글래스 검색바 — 환경정비 전체 내역과 같은 부품이다
+          GlassSearchBar(controller: _search, hint: '항목·이름·날짜 검색'),
         ],
       ),
     );
