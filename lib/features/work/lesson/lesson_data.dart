@@ -228,21 +228,90 @@ String _formatStamp(DateTime time) {
   return '${time.month}.${time.day} $period $hour:$minute';
 }
 
-/// 저장된 서명 이미지 — 실패해도 화면이 안 죽게 자리만 남긴다
-class _SignImage extends StatelessWidget {
-  _SignImage({required this.url});
+/// 저장된 서명 이미지 — **파일로 남겨 두고 쓴다** (아바타·사내톡 사진과 같은 길)
+///
+/// 예전에는 `Image.network` 하나였는데, 목록 한 장에 스물몇 개가 한꺼번에
+/// 뜨는 자리라 **약한 신호에서 몇 개씩 실패했다.** 실패한 자리는 기본 아이콘이
+/// 되고 다시 시도하지 않아서, 같은 싸인이 목록에서는 안 보이는데 눌러서 크게
+/// 보면 멀쩡히 뜬다 (2026-09-02 대표 지적 — 실제로 그 화면을 봤다).
+///
+/// [PhotoCache] 는 **한 번 받은 것을 파일로 남긴다.** 그래서
+///
+/// - 두 번째부터는 바로 뜬다 (신호와 무관하다)
+/// - 못 받았으면 다음에 그릴 때 **다시 받는다** — 굳지 않는다
+///
+/// 실패해도 자리는 남긴다 — 줄 높이가 흔들리면 목록이 출렁인다.
+class _SignImage extends StatefulWidget {
+  const _SignImage({required this.url});
 
   final String url;
 
   @override
-  Widget build(BuildContext context) => Image.network(
-    url,
-    fit: BoxFit.contain,
-    // 서명 URL 은 7일이면 만료된다 — 그때는 목록을 다시 받아야 새 주소가 온다
-    errorBuilder: (context, error, stack) => Center(
-      child: Icon(CupertinoIcons.signature, size: 16, color: AppColors.gray300),
-    ),
-  );
+  State<_SignImage> createState() => _SignImageState();
+}
+
+class _SignImageState extends State<_SignImage> {
+  File? _file;
+
+  /// 지금 그리고 있는 서명의 열쇠 — 주소의 서명(`?sig=`)만 갈린 것은 같은 파일이다
+  String? _key;
+
+  /// 받다 실패했다 — 그때만 서버에서 바로 그려 본다 (아바타와 같은 순서)
+  bool _failed = false;
+
+  /// **빌드 도중에 부른다** — `setState` 를 여기서 안 부르는 이유가 그것이다.
+  /// 이미 받아 둔 것은 값만 갈아 두고 이번 프레임이 그린다 (깜빡임 없음).
+  void _sync(String url) {
+    final key = PhotoCache.keyOf(url);
+    if (key == _key) return;
+    _key = key;
+    _file = null;
+    _failed = false;
+
+    final saved = PhotoCache.ready(url);
+    if (saved != null) {
+      _file = saved;
+      return;
+    }
+    PhotoCache.fetch(url).then((file) {
+      // 받는 사이에 줄이 바뀌었으면 버린다 (늦게 온 것이 새것을 덮으면 안 된다)
+      if (!mounted || key != _key) return;
+      setState(() {
+        _file = file;
+        _failed = file == null;
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    _sync(widget.url);
+
+    if (_file case final file?) {
+      return Image.file(file, fit: BoxFit.contain, errorBuilder: _blank);
+    }
+    // 파일로 못 남겼을 때만 서버에서 바로 그린다 — 예전 동작 그대로다
+    if (_failed) {
+      return Image.network(
+        widget.url,
+        fit: BoxFit.contain,
+        errorBuilder: _blank,
+        loadingBuilder: (context, child, progress) =>
+            progress == null ? child : _blank(context, null, null),
+      );
+    }
+    return _blank(context, null, null);
+  }
+
+  /// 아직 없거나 못 받았을 때 — 자리만 남긴다
+  Widget _blank(BuildContext context, Object? error, StackTrace? stack) =>
+      Center(
+        child: Icon(
+          CupertinoIcons.signature,
+          size: 16,
+          color: AppColors.gray300,
+        ),
+      );
 }
 
 /// 기록 줄을 누르면 서명을 크게 보여준다

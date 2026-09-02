@@ -3,6 +3,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' as ui;
 
+import 'dart:io';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -17,6 +19,7 @@ import '../../../core/data/staff_directory.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/util/photo_cache.dart';
 import '../../../core/util/platform.dart';
 import '../../../core/widgets/feedback/app_dialog.dart';
 import '../../../core/widgets/feedback/app_toast.dart';
