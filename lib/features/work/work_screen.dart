@@ -42,6 +42,7 @@ import 'contribution/contribution_section.dart';
 import 'lesson/lesson_section.dart';
 import 'my_task/my_task_section.dart';
 import 'peer_review/peer_review_section.dart';
+import 'praise/praise_draw.dart';
 import 'praise/praise_section.dart';
 import '../../core/widgets/nav/pane_transition.dart';
 import '../../core/util/screen_refresh.dart';
@@ -136,6 +137,15 @@ class _WorkScreenState extends State<WorkScreen>
       );
       return;
     }
+    if (item.draw) {
+      // **권한을 안 가린다** (2026-09-01 대표 결정) — 직원이 각자 자기
+      // 인스타에 올리는 것까지가 목적이라 대표만 여는 자리가 아니다.
+      // 지점은 서버가 가른다 (직원·점장은 자기 지점 것만 온다)
+      _setHeaderAction(
+        HeaderAction(symbol: 'trophy.fill', onPressed: _openDraw),
+      );
+      return;
+    }
     // **권한을 안 가린다.** 목록을 보는 것뿐이고, 누가 무엇을 보는지는
     // 회원 화면이 스스로 가른다 (담당자는 본인 것, 대표·관리자는 전체).
     // 폰에서 대표가 회원 목록에 닿는 길이 여기 하나다
@@ -147,6 +157,14 @@ class _WorkScreenState extends State<WorkScreen>
           ? HeaderAction(symbol: 'person.2', onPressed: _openMembers)
           : null,
     );
+  }
+
+  /// 이번 달 추첨을 연다 — 당첨자 셋과 **인스타에 올릴 게임 영상**
+  ///
+  /// 지점 고르개를 그대로 물려준다 — 지점마다 추첨이 따로라 '전 지점' 이면
+  /// 볼 수 있는 지점이 다 선다 (대표·관리자만 그렇다).
+  void _openDraw() {
+    showFullPage<void>(context, (_) => DrawScreen(branchId: _branch));
   }
 
   /// 회원 정보를 연다 — 헤더 왼쪽 끝 사람 버튼 (2026-08-31 대표 요청)
@@ -463,7 +481,7 @@ class _WorkScreenState extends State<WorkScreen>
   static const _items = [
     _WorkItem(label: '환경정비', checklist: true),
     _WorkItem(label: '동료 평가'),
-    _WorkItem(label: '회원 친절도'),
+    _WorkItem(label: '회원 친절도', draw: true),
     _WorkItem(label: '수업 개수', members: true),
     _WorkItem(label: '센터 기여도'),
   ];

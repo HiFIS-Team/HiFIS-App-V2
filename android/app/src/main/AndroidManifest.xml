@@ -75,5 +75,14 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- 추첨 영상을 사진 앱에 저장한 뒤 인스타그램을 열어 준다
+             (features/work/praise/praise_draw.dart).
+             **안드로이드 11(API 30)부터 여기 없으면 안 보인다** — 다른 앱을
+             물어보려면 미리 적어 둬야 해서, 안 적으면 깔려 있어도 못 찾는다.
+             iOS 의 LSApplicationQueriesSchemes 와 같은 사정이다. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="instagram"/>
+        </intent>
     </queries>
 </manifest>

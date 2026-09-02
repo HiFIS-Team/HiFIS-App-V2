@@ -897,6 +897,31 @@
    },
    "required": []
   },
+  "DrawOut": {
+   "properties": {
+    "entries": {},
+    "game": {},
+    "period": {},
+    "seed": {},
+    "winnerIndexes": {}
+   },
+   "required": [
+    "period",
+    "game",
+    "seed",
+    "entries"
+   ]
+  },
+  "DrawWinnerOut": {
+   "properties": {
+    "name": {},
+    "rank": {}
+   },
+   "required": [
+    "rank",
+    "name"
+   ]
+  },
   "EmployeeConsentCreate": {
    "properties": {
     "docType": {},
@@ -1080,6 +1105,16 @@
   "EmploymentType": {
    "properties": {},
    "required": []
+  },
+  "EntryOut": {
+   "properties": {
+    "name": {},
+    "phone": {}
+   },
+   "required": [
+    "name",
+    "phone"
+   ]
   },
   "EnvItemCreate": {
    "properties": {
@@ -2018,6 +2053,30 @@
     "count",
     "avgMs",
     "errors"
+   ]
+  },
+  "MonthDrawOut": {
+   "properties": {
+    "branchId": {},
+    "branchName": {},
+    "entryCount": {},
+    "game": {},
+    "period": {},
+    "videoAt": {
+     "nullable": true
+    },
+    "videoUrl": {
+     "nullable": true
+    },
+    "winners": {}
+   },
+   "required": [
+    "period",
+    "game",
+    "branchId",
+    "branchName",
+    "winners",
+    "entryCount"
    ]
   },
   "MyTaskCheckCreate": {

@@ -18,11 +18,21 @@
 	     그 화면이 뜨고, 카메라 버튼이 있고, 찍은 사진에 촬영 위치가 붙는다.
 	     file_picker 를 빼지 않는 한 셋 다 있어야 한다. -->
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>사내톡에서 받은 사진을 사진첩에 저장합니다.</string>
+	<string>사내톡에서 받은 사진과 추첨 게임 영상을 사진 앱에 저장합니다.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>사내톡에 사진을 첨부하거나 프로필 사진을 바꿀 때 사진 보관함에서 사진을 고릅니다.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>출퇴근 QR 을 읽고, 사진을 고르는 화면에서 바로 찍어 첨부할 때 카메라를 사용합니다.</string>
+	<!-- 추첨 영상을 사진 앱에 저장한 뒤 인스타그램을 열어 준다
+	     (features/work/praise/praise_draw.dart).
+	     **여기 없으면 `canLaunchUrl` 이 늘 false 다** — iOS 9 부터 물어볼 수 있는
+	     스킴을 미리 적어 두게 되어 있어서, 안 적으면 깔려 있어도 '없다' 로 온다.
+	     못 열어도 저장은 되므로 앱이 조용히 넘어가는데, 그래서 **빠뜨려도
+	     티가 안 난다.** -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>instagram</string>
+	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>카메라로 찍은 사진에 촬영 위치를 기록할 때 사용합니다. 앱이 따로 위치를 수집하지는 않습니다.</string>
 	<key>CFBundleExecutable</key>

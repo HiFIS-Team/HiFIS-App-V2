@@ -6,6 +6,7 @@ class _WorkItem {
     required this.label,
     this.checklist = false,
     this.members = false,
+    this.draw = false,
   });
 
   final String label;
@@ -19,6 +20,13 @@ class _WorkItem {
   /// 탭 번호를 손으로 적지 않으려고 항목에 표시를 둔다. 항목이 하나 늘면
   /// 번호가 밀리는데 그건 눈에 안 띈다 ([checklist] 와 같은 방식).
   final bool members;
+
+  /// 헤더 오른쪽 끝에 **이번 달 추첨으로 가는 트로피 버튼**을 세우는 항목인지
+  /// (회원 친절도만 — 2026-09-01 대표 요청)
+  ///
+  /// 추첨 대상이 그 탭에 서 있는 **설문 응답자**라 문맥이 같고, 지점 고르개도
+  /// 여기 것을 그대로 쓴다. 자리를 [members] 와 같은 방식으로 표시한다.
+  final bool draw;
 }
 
 // 밑줄 탭 위젯(`_WorkTab`)은 [UnderlineTabs] 로 옮겼다 (2026-08-21).
