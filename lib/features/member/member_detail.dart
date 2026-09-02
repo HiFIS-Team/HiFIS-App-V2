@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/api/client/api_exception.dart';
 import '../../core/api/work/lesson_api.dart';
+import '../../core/api/work/supplement_api.dart';
 import '../../core/api/work/workout_api.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/staff_directory.dart';
@@ -21,9 +22,10 @@ import '../../core/widgets/feedback/empty_card.dart';
 import '../../core/widgets/feedback/skeleton.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/nav/phone_scaffold.dart';
+import 'supplement_sheet.dart';
 import 'workout_log.dart';
 
-/// 회원 한 명 — 인적 사항 · 운동을 하는 이유 · PT 일지 · 개인 운동
+/// 회원 한 명 — 인적 사항 · 운동을 하는 이유 · PT 일지 · 개인 운동 · 영양제
 ///
 /// 목록에서 들어오는 자리다. 목록이 이미 회원 값을 들고 있어서 첫 프레임부터
 /// 이름·전화가 채워지고, **일지만** 여기서 받는다.
@@ -44,6 +46,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen>
     with SkeletonDelay<MemberDetailScreen> {
   List<WorkoutLog> _pt = const [];
   List<WorkoutLog> _personal = const [];
+  List<Supplement> _supplements = const [];
 
   /// 운동을 하는 이유 — 화면이 살아 있는 동안 입력을 들고 있는다
   late final List<TextEditingController> _goals = _seedGoals();
@@ -100,11 +103,14 @@ class _MemberDetailScreenState extends State<MemberDetailScreen>
       // 등록권도 같이 받는다 — **다음 회차 번호가 여기서 나온다**.
       // 일지가 한 장도 없는 옛 회원은 이미 받은 싸인 수가 곧 진도다
       final request = MemberApi.registrations(widget.member.id);
+      final pills = SupplementApi.list(widget.member.id);
       final logs = await WorkoutApi.list(widget.member.id);
       final registrations = await request;
+      final supplements = await pills;
       if (!mounted) return;
       setState(() {
         _split(logs);
+        _supplements = supplements;
         _signed = registrations.fold(0, (sum, r) => sum + r.usedSessions);
         endLoad();
       });
@@ -138,6 +144,15 @@ class _MemberDetailScreenState extends State<MemberDetailScreen>
     try {
       final logs = await WorkoutApi.list(widget.member.id);
       if (mounted) setState(() => _split(logs));
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+  }
+
+  Future<void> _reloadSupplements() async {
+    try {
+      final rows = await SupplementApi.list(widget.member.id);
+      if (mounted) setState(() => _supplements = rows);
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
     }
@@ -310,6 +325,76 @@ class _MemberDetailScreenState extends State<MemberDetailScreen>
       onAdd: _addPersonal,
       canAdd: _canWrite,
     ),
+    const SizedBox(height: 24),
+    ..._supplementSection(),
+  ];
+
+  // ── 영양제 ────────────────────────────────────
+
+  Future<void> _addSupplement() async {
+    if (await addSupplement(context, memberId: widget.member.id)) {
+      await _reloadSupplements();
+    }
+  }
+
+  Future<void> _editSupplement(Supplement row) async {
+    if (await editSupplement(context, row)) await _reloadSupplements();
+  }
+
+  /// 영양제 — 트레이너가 권한 것이 그대로 회원 화면에도 뜬다
+  ///
+  /// 일지와 달리 **줄 하나가 곧 하나의 권유**라 페이지를 안 열고 팝업에서
+  /// 고친다 ([addSupplement]).
+  ///
+  /// **넓으면 표, 좁으면 카드다.** 원본이 다섯 칸짜리 표라 PC·태블릿에서는
+  /// 그대로 세워야 회원 사이를 훑으며 비교할 수 있다. 폰은 그 폭이 안 나온다 —
+  /// 다섯 칸을 억지로 밀어 넣으면 `1000~3000mg` 이 세로로 쪼개진다.
+  List<Widget> _supplementSection() => [
+    SectionHeader(
+      title: '영양제',
+      info: Text(
+        _supplements.isEmpty ? '복용 안내' : '${_supplements.length}개',
+        style: AppTextStyles.caption.copyWith(color: AppColors.textTertiary),
+      ),
+    ),
+    const SizedBox(height: 12),
+    if (showSkeleton)
+      SkeletonGroup(
+        child: SkeletonCard(children: [Skeleton(width: 160, height: 14)]),
+      )
+    else ...[
+      if (_supplements.isEmpty)
+        EmptyCard(
+          icon: Icons.medication_liquid_rounded,
+          text: _canWrite ? '챙겨 드시면 좋을 영양제를 담아 두세요' : '아직 담아 둔 영양제가 없어요',
+        )
+      else
+        LayoutBuilder(
+          builder: (context, box) => box.maxWidth >= _SupplementTable.minWidth
+              ? _SupplementTable(
+                  rows: _supplements,
+                  onTap: _canWrite ? _editSupplement : null,
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var i = 0; i < _supplements.length; i++) ...[
+                      if (i > 0) const SizedBox(height: 10),
+                      _SupplementRow(
+                        row: _supplements[i],
+                        onTap: _canWrite
+                            ? () => _editSupplement(_supplements[i])
+                            : null,
+                      ),
+                    ],
+                  ],
+                ),
+        ),
+      if (_canWrite) ...[
+        const SizedBox(height: 10),
+        _AddButton(label: '영양제 추가', onTap: _addSupplement),
+      ],
+    ],
   ];
 
   /// 운동을 하는 이유 — 번호를 매겨 적는다
@@ -625,6 +710,212 @@ class _LogRow extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// 영양제 표 — **넓은 화면에서만 선다** (PC · 태블릿)
+///
+/// 트레이너가 쓰던 원본이 다섯 칸짜리 표다. 칸을 나눠 세우면 `언제` 끼리
+/// 세로로 맞아서 "아침에 먹는 게 몇 개인지" 를 훑어 셀 수 있다 — 카드로
+/// 쌓으면 그게 안 된다.
+///
+/// [Table] 이 아니라 [Row] 를 쌓는다. `Table` 은 줄 전체를 누르게 만들 수
+/// 없어서(칸마다 손짓을 걸어야 한다) 고치러 들어가는 길이 막힌다.
+/// `Expanded(flex:)` 가 줄마다 같은 값이라 칸은 그대로 맞아 선다.
+class _SupplementTable extends StatelessWidget {
+  const _SupplementTable({required this.rows, this.onTap});
+
+  final List<Supplement> rows;
+
+  /// 담당 트레이너가 아니면 null — 볼 수만 있다
+  final void Function(Supplement row)? onTap;
+
+  /// 이 폭부터 표로 선다 — 다섯 칸이 안 쪼개지는 최소치
+  static const double minWidth = 620;
+
+  static const _labels = ['영양제', '얼마나?', '언제?', '왜?', '기억하기'];
+
+  /// `왜?`·`기억하기` 가 길어서 두 칸을 넓게 잡는다
+  static const _flex = [3, 3, 3, 4, 4];
+
+  /// 줄 끝 화살표 자리 — 머리줄도 같은 폭을 비워야 칸이 어긋나지 않는다
+  static const _chevron = 20.0;
+
+  /// 칸 사이 세로선 — 가로선만 있으면 다섯 칸이 한 문장으로 읽힌다
+  static Widget line() => Container(width: 1, color: AppColors.divider);
+
+  /// 칸 하나 — 세로선이 줄 높이만큼 늘어나야 해서 여백을 칸 안에 넣는다
+  static Widget cell({
+    required int index,
+    required double gap,
+    required Widget child,
+  }) => Expanded(
+    flex: _flex[index],
+    child: Padding(
+      padding: EdgeInsets.fromLTRB(index == 0 ? 18 : 12, gap, 12, gap),
+      child: Align(alignment: Alignment.topLeft, child: child),
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: AppDecorations.card(radius: 18),
+      // 머리줄 회색이 모서리 밖으로 새지 않게 잘라 낸다
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ColoredBox(
+            color: AppColors.gray50,
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < _labels.length; i++) ...[
+                    if (i > 0) line(),
+                    cell(
+                      index: i,
+                      gap: 11,
+                      child: Text(
+                        _labels[i],
+                        style: AppTextStyles.caption.copyWith(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                  SizedBox(width: onTap == null ? 0 : _chevron),
+                ],
+              ),
+            ),
+          ),
+          for (var i = 0; i < rows.length; i++) ...[
+            Divider(height: 1, color: AppColors.divider),
+            _SupplementTableRow(
+              row: rows[i],
+              onTap: onTap == null ? null : () => onTap!(rows[i]),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SupplementTableRow extends StatelessWidget {
+  const _SupplementTableRow({required this.row, this.onTap});
+
+  final Supplement row;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cells = [row.name, row.dose, row.timing, row.reason, row.note];
+
+    final line = IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < cells.length; i++) ...[
+            if (i > 0) _SupplementTable.line(),
+            _SupplementTable.cell(
+              index: i,
+              gap: 14,
+              child: Text(
+                // 빈 칸은 가운뎃줄로 — 안 적은 것과 못 적은 것이 갈린다
+                cells[i].isEmpty ? '—' : cells[i],
+                style: AppTextStyles.body2.copyWith(
+                  fontWeight: i == 0 ? FontWeight.w700 : FontWeight.w400,
+                  color: cells[i].isEmpty
+                      ? AppColors.gray300
+                      : (i == 0
+                            ? AppColors.textPrimary
+                            : AppColors.textSecondary),
+                ),
+              ),
+            ),
+          ],
+          if (onTap != null)
+            SizedBox(
+              width: _SupplementTable._chevron,
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 14),
+                  child: Icon(
+                    Icons.chevron_right_rounded,
+                    size: 20,
+                    color: AppColors.gray400,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+    return onTap == null ? line : Pressable(onTap: onTap!, child: line);
+  }
+}
+
+/// 영양제 한 줄 — `오메가3` 와 `1000~3000mg · 아침식후`
+///
+/// **`왜?`·`기억하기` 는 여기 안 편다.** 다섯 칸을 다 늘어놓으면 줄 하나가
+/// 카드만큼 커져서, 대여섯 개만 담아도 회원 상세가 영양제로 가득 찬다.
+/// 눌러서 여는 팝업에 다 있다.
+class _SupplementRow extends StatelessWidget {
+  const _SupplementRow({required this.row, this.onTap});
+
+  final Supplement row;
+
+  /// 담당 트레이너가 아니면 null — 볼 수만 있다
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final card = Container(
+      padding: const EdgeInsets.fromLTRB(18, 14, 12, 14),
+      decoration: AppDecorations.card(radius: 18),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  row.name,
+                  style: AppTextStyles.body1.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (row.summary.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    row.summary,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (onTap != null)
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 20,
+              color: AppColors.gray400,
+            ),
+        ],
+      ),
+    );
+    return onTap == null ? card : Pressable(onTap: onTap!, child: card);
   }
 }
 

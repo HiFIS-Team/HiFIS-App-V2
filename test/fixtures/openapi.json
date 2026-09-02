@@ -3582,6 +3582,65 @@
     "ip"
    ]
   },
+  "SupplementCreate": {
+   "properties": {
+    "dose": {},
+    "memberId": {},
+    "name": {},
+    "note": {},
+    "reason": {},
+    "timing": {}
+   },
+   "required": [
+    "memberId",
+    "name"
+   ]
+  },
+  "SupplementOut": {
+   "properties": {
+    "authorId": {
+     "nullable": true
+    },
+    "dose": {},
+    "id": {},
+    "memberId": {},
+    "name": {},
+    "note": {},
+    "reason": {},
+    "sortOrder": {},
+    "timing": {}
+   },
+   "required": [
+    "id",
+    "memberId",
+    "name",
+    "dose",
+    "timing",
+    "reason",
+    "note",
+    "sortOrder"
+   ]
+  },
+  "SupplementUpdate": {
+   "properties": {
+    "dose": {
+     "nullable": true
+    },
+    "name": {
+     "nullable": true
+    },
+    "note": {
+     "nullable": true
+    },
+    "reason": {
+     "nullable": true
+    },
+    "timing": {
+     "nullable": true
+    }
+   },
+   "required": []
+  },
   "SupplyOrderCreate": {
    "properties": {
     "branchId": {},
@@ -3832,6 +3891,7 @@
     "memberName": {},
     "personal": {},
     "pt": {},
+    "supplements": {},
     "trainerName": {}
    },
    "required": [
