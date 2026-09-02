@@ -38,6 +38,7 @@ import '../../core/widgets/nav/month_bar.dart';
 import '../../core/widgets/nav/pick_filter_button.dart';
 import '../../core/widgets/nav/desktop_header.dart';
 import '../member/member_info.dart';
+import '../member/member_screen.dart';
 import 'contribution/contribution_section.dart';
 import 'lesson/lesson_section.dart';
 import 'my_task/my_task_section.dart';
@@ -130,31 +131,42 @@ class _WorkScreenState extends State<WorkScreen>
   void _syncHeaderAction() {
     final item = _items[_tab];
     if (item.checklist) {
-      _setHeaderAction(
-        _canDoEnv && _envTab != 2
-            ? HeaderAction(symbol: 'plus', onPressed: _addMyTask)
-            : null,
-      );
+      _setHeaderAction([
+        if (_canDoEnv && _envTab != 2)
+          HeaderAction(symbol: 'plus', onPressed: _addMyTask),
+      ]);
       return;
     }
     if (item.draw) {
       // **권한을 안 가린다** (2026-09-01 대표 결정) — 직원이 각자 자기
       // 인스타에 올리는 것까지가 목적이라 대표만 여는 자리가 아니다.
       // 지점은 서버가 가른다 (직원·점장은 자기 지점 것만 온다)
-      _setHeaderAction(HeaderAction(symbol: 'film', onPressed: _openDraw));
+      _setHeaderAction([HeaderAction(symbol: 'film', onPressed: _openDraw)]);
       return;
     }
     // **권한을 안 가린다.** 목록을 보는 것뿐이고, 누가 무엇을 보는지는
     // 회원 화면이 스스로 가른다 (담당자는 본인 것, 대표·관리자는 전체).
-    // 폰에서 대표가 회원 목록에 닿는 길이 여기 하나다
-    _setHeaderAction(
-      item.members
-          // **`person` 을 쓰면 안 된다** — 헤더 오른쪽 프로필 버튼과 같은
-          // 아이콘이라 한 줄에 똑같은 사람이 둘 선다. 여럿(`person.2`) 이
-          // 회원 명단이라는 뜻도 더 맞다
-          ? HeaderAction(symbol: 'person.2', onPressed: _openMembers)
-          : null,
-    );
+    // 폰에서 대표가 회원 목록·운동일지에 닿는 길이 여기 하나다
+    _setHeaderAction([
+      if (item.members) ...[
+        // **`person` 을 쓰면 안 된다** — 헤더 오른쪽 프로필 버튼과 같은
+        // 아이콘이라 한 줄에 똑같은 사람이 둘 선다. 여럿(`person.2`) 이
+        // 회원 명단이라는 뜻도 더 맞다
+        HeaderAction(symbol: 'person.2', onPressed: _openMembers),
+        // 운동 일지 — **사람 바로 옆이다** (2026-09-02 대표 요청).
+        // 예전에는 화면 안 버튼이었는데 대표·관리자에게는 그 줄이 통째로
+        // 안 그려져서 일지로 가는 길이 없었다
+        HeaderAction(symbol: 'doc.text', onPressed: _openWorkouts),
+      ],
+    ]);
+  }
+
+  /// 운동일지를 연다 — 회원을 고르면 그 사람 일지가 열린다
+  ///
+  /// 수업 개수 칸의 `운동 일지` 버튼과 **같은 화면**이다. 그 버튼은 수행자
+  /// (직원·점장)에게만 서고, 이 아이콘은 누구에게나 선다.
+  void _openWorkouts() {
+    showFullPage<void>(context, (_) => MemberScreen());
   }
 
   /// 이번 달 추첨을 연다 — 당첨자 셋과 **인스타에 올릴 게임 영상**
@@ -179,8 +191,17 @@ class _WorkScreenState extends State<WorkScreen>
   /// 탭이 보이고 가려지는 신호(`TickerMode`)가 **빌드 도중**에 온다.
   /// 그때 값을 바꾸면 헤더가 빌드 중에 다시 빌드되라고 표시돼서
   /// `setState() called during build` 로 죽는다 (실제로 겪었다).
-  void _setHeaderAction(HeaderAction? next) {
-    if (headerAction.value == next) return;
+  void _setHeaderAction(List<HeaderAction> next) {
+    // 길이만 비교한다 — [HeaderAction] 은 만들 때마다 새 객체라 값 비교가
+    // 늘 다르다고 나온다. 같은 탭에서 버튼 수가 그대로면 다시 안 그린다
+    if (headerAction.value.length == next.length &&
+        headerAction.value.isNotEmpty == next.isNotEmpty) {
+      final same = [
+        for (var i = 0; i < next.length; i++)
+          headerAction.value[i].symbol == next[i].symbol,
+      ];
+      if (!same.contains(false)) return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) headerAction.value = next;
     });
@@ -234,7 +255,7 @@ class _WorkScreenState extends State<WorkScreen>
     if (visible) {
       _syncHeaderAction();
     } else {
-      _setHeaderAction(null);
+      _setHeaderAction(const []);
     }
   }
 
@@ -259,7 +280,7 @@ class _WorkScreenState extends State<WorkScreen>
     branchScope.removeListener(_onBranchScope);
     requestedWorkTab.removeListener(_onRequestedTab);
     // 안 비우면 다른 탭에서도 이 버튼이 남는다
-    headerAction.value = null;
+    headerAction.value = const [];
     super.dispose();
   }
 

@@ -34,7 +34,6 @@ import '../../../core/widgets/input/pressable.dart';
 import '../../../core/widgets/input/see_all_button.dart';
 import '../../../core/util/when.dart';
 import '../../../core/api/work/workout_api.dart';
-import '../../member/member_screen.dart';
 import '../work_skeleton.dart';
 import '../../../core/widgets/feedback/skeleton.dart';
 part 'lesson_data.dart';
@@ -116,15 +115,6 @@ class _LessonSectionState extends State<LessonSection>
     if (added == true && mounted) await _load();
   }
 
-  /// 운동일지를 쓰러 간다 — 회원 관리 화면이 곧 일지 목록이다
-  ///
-  /// **홈 바로가기에 있던 자리를 여기로 옮겼다** (2026-08-31 대표 요청).
-  /// 일지를 써야 싸인이 되므로 수업 흐름이 한 화면에서 이어져야 한다.
-  Future<void> _openWorkouts() async {
-    await showFullPage<void>(context, (_) => MemberScreen());
-    if (mounted) await _load();
-  }
-
   /// 회원을 골라 싸인을 받는다
   Future<void> _pickAndSign() async {
     final signed = await showFullPage<bool>(
@@ -143,18 +133,14 @@ class _LessonSectionState extends State<LessonSection>
   Widget build(BuildContext context) {
     if (showSkeleton) return WorkSectionSkeleton();
 
-    // 상단 액션 버튼 — 폰·PC 공통. 셋 다 네 글자라 똑같이 나눠도 폰에서 안 넘친다
+    // 상단 액션 버튼 둘 — 폰·PC 공통. 대표·관리자는 수행자가 아니라 안 그린다
     //
-    // **대표·관리자는 `운동 일지` 하나만 본다** (2026-09-02 대표 지적).
-    // 등록·싸인은 수행자가 하는 일이라 예전부터 안 그렸는데, 일지로 가는 문이
-    // 여기 하나뿐이라 **남이 쓴 일지를 볼 길이 통째로 없었다.**
-    // 서버는 원래 열려 있다 — 앱에만 버튼이 없었다.
+    // **`운동 일지` 는 여기 없다** (2026-09-02 대표 요청) — 헤더 왼쪽
+    // 사람 아이콘 옆으로 옮겼다 (`work_screen.dart` 의 `_openWorkouts`).
+    // 여기 있을 때는 대표·관리자에게 이 줄이 통째로 안 그려져서
+    // **남이 쓴 일지를 볼 길이 없었다.**
     final actions = _viewOnly
-        ? _ActionButton(
-            icon: CupertinoIcons.doc_text,
-            label: '운동 일지',
-            onTap: _openWorkouts,
-          )
+        ? SizedBox.shrink()
         : Row(
             children: [
               Expanded(
@@ -162,14 +148,6 @@ class _LessonSectionState extends State<LessonSection>
                   icon: CupertinoIcons.person_add,
                   label: '회원 등록',
                   onTap: _register,
-                ),
-              ),
-              SizedBox(width: 10),
-              Expanded(
-                child: _ActionButton(
-                  icon: CupertinoIcons.doc_text,
-                  label: '운동 일지',
-                  onTap: _openWorkouts,
                 ),
               ),
               SizedBox(width: 10),

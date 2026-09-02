@@ -52,6 +52,9 @@ const _icons = <String, IconData>{
   'briefcase.fill': Icons.work_rounded,
   'folder.fill': Icons.folder_rounded,
   'doc.fill': Icons.insert_drive_file_rounded,
+  // 운동일지 — 헤더 왼쪽에서 사람 아이콘 옆에 선다. **속을 안 채운 것**이라야
+  // 옆 버튼들(외곽선)과 결이 맞는다 (`film` 과 같은 이유)
+  'doc.text': Icons.description_outlined,
   'square.grid.2x2.fill': Icons.grid_view_rounded,
   'clock.fill': Icons.schedule_rounded,
   'wonsign.circle.fill': Icons.payments_rounded,

@@ -876,7 +876,11 @@ class _ChatDockState extends State<_ChatDock> {
 /// `Align(topRight)` 라, 거기에 아무리 앞에 넣어도 오른쪽 뭉치의 왼쪽일 뿐
 /// 화면 왼쪽 끝이 아니다 (그렇게 만들었다가 고쳤다 — 2026-08-14).
 ///
-/// 값은 [headerAction] 하나가 들고, 지금은 업무 화면의 `내 업무 추가` 가 쓴다.
+/// 값은 [headerAction] 이 들고, 업무 화면이 탭마다 갈아 끼운다.
+///
+/// **여럿이 설 수 있다** (2026-09-02) — 수업 개수 탭이 회원 목록과 운동 일지를
+/// 나란히 세운다. `stableId` 에 자리 번호를 붙여야 네이티브 버튼이 서로
+/// 안 섞인다 (같은 값이면 심볼만 바뀌고 둘이 한 버튼으로 보인다).
 class _HeaderLeading extends StatelessWidget {
   _HeaderLeading();
 
@@ -888,15 +892,22 @@ class _HeaderLeading extends StatelessWidget {
       // 오른쪽 뭉치와 같은 높이·같은 여백 (top 8 · 가장자리 16)
       child: Padding(
         padding: EdgeInsets.only(top: 8, left: 16),
-        child: ValueListenableBuilder<HeaderAction?>(
+        child: ValueListenableBuilder<List<HeaderAction>>(
           valueListenable: headerAction,
-          builder: (context, action, child) => action == null
-              ? SizedBox.shrink()
-              : GlassIconButton(
-                  symbol: action.symbol,
-                  stableId: 'header-leading',
-                  onPressed: action.onPressed,
+          builder: (context, actions, child) => Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var i = 0; i < actions.length; i++) ...[
+                // 오른쪽 뭉치와 같은 간격
+                if (i > 0) SizedBox(width: 10),
+                GlassIconButton(
+                  symbol: actions[i].symbol,
+                  stableId: 'header-leading-$i',
+                  onPressed: actions[i].onPressed,
                 ),
+              ],
+            ],
+          ),
         ),
       ),
     ),
