@@ -143,10 +143,18 @@ class _LessonSectionState extends State<LessonSection>
   Widget build(BuildContext context) {
     if (showSkeleton) return WorkSectionSkeleton();
 
-    // 상단 액션 버튼 두 개 — 폰·PC 공통. 대표·관리자는 수행자가 아니라 안 그린다
-    // 셋 다 네 글자라 똑같이 나눠도 폰에서 안 넘친다
+    // 상단 액션 버튼 — 폰·PC 공통. 셋 다 네 글자라 똑같이 나눠도 폰에서 안 넘친다
+    //
+    // **대표·관리자는 `운동 일지` 하나만 본다** (2026-09-02 대표 지적).
+    // 등록·싸인은 수행자가 하는 일이라 예전부터 안 그렸는데, 일지로 가는 문이
+    // 여기 하나뿐이라 **남이 쓴 일지를 볼 길이 통째로 없었다.**
+    // 서버는 원래 열려 있다 — 앱에만 버튼이 없었다.
     final actions = _viewOnly
-        ? SizedBox.shrink()
+        ? _ActionButton(
+            icon: CupertinoIcons.doc_text,
+            label: '운동 일지',
+            onTap: _openWorkouts,
+          )
         : Row(
             children: [
               Expanded(
