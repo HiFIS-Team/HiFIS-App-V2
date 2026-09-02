@@ -337,6 +337,20 @@ class _ContributionHistoryScreenState
     (id: _cutLabel, name: _cutLabel),
   ];
 
+  /// 사람 필터를 띄우나 — **점장 이상** (2026-09-02 대표 결정)
+  ///
+  /// 기준은 "남의 이름이 붙은 줄을 보느냐" 다.
+  ///
+  /// | | 무엇을 보나 | 상대 이름 |
+  /// |---|---|---|
+  /// | 직원 | 받은 기여 · 본인 자동·차감 | **준 사람**(대표·관리자)뿐 |
+  /// | 점장 | 위 + **내가 준 기여** | 받은 사람 — 트레이너·점장이다 |
+  /// | 대표·관리자 | 내가 준 것 + **전 직원** 자동·차감 | 전부 |
+  ///
+  /// **직원에게는 안 띄운다.** 그 화면의 상대는 준 사람(대표·관리자)인데
+  /// 아래 목록은 받는 쪽(트레이너·점장)이라 **골라도 늘 0건**이 된다.
+  static bool get _canPickPerson => myRole.canGrant;
+
   /// 사람 필터 — **명단 전체다** (환경정비 전체 내역과 같은 규칙)
   ///
   /// 기록이 있는 사람만 세우면 칸이 달마다 달라진다. 지점은
@@ -369,11 +383,14 @@ class _ContributionHistoryScreenState
   /// 검색·필터를 다 태운 목록
   List<_Contribution> get _shown {
     final key = _search.text.trim();
-    if (key.isEmpty && _kind == null && _person == null) return _items;
+    // 버튼이 안 뜨는 사람에게는 사람 필터를 안 건다 — 안 그러면 어딘가에서
+    // 값이 남았을 때 못 푸는 필터가 걸린 채로 화면이 빈다
+    final person = _canPickPerson ? _person : null;
+    if (key.isEmpty && _kind == null && person == null) return _items;
     return [
       for (final item in _items)
         if (_kind == null || _kindLabelOf(item) == _kind)
-          if (_person == null || item.person == _person)
+          if (person == null || item.person == person)
             if (key.isEmpty ||
                 item.title.contains(key) ||
                 _kindLabelOf(item).contains(key) ||
@@ -482,6 +499,8 @@ class _ContributionHistoryScreenState
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // 항목 필터는 **누구에게나** 뜬다 — 본인 기록도 항목별로
+                    // 보는 자리다
                     PickFilterButton(
                       stableId: 'contrib-kind',
                       options: kinds,
@@ -490,15 +509,17 @@ class _ContributionHistoryScreenState
                       symbol: 'tag',
                       onSelect: (name) => setState(() => _kind = name),
                     ),
-                    // PhoneDetailScaffold 의 actions 와 같은 간격
-                    SizedBox(width: 10),
-                    // **사람 버튼이 늘 오른쪽 끝**이다 (환경정비와 같은 자리)
-                    PickFilterButton(
-                      stableId: 'contrib-person',
-                      options: people,
-                      selected: _person,
-                      onSelect: (name) => setState(() => _person = name),
-                    ),
+                    if (_canPickPerson) ...[
+                      // PhoneDetailScaffold 의 actions 와 같은 간격
+                      SizedBox(width: 10),
+                      // **사람 버튼이 늘 오른쪽 끝**이다 (환경정비와 같은 자리)
+                      PickFilterButton(
+                        stableId: 'contrib-person',
+                        options: people,
+                        selected: _person,
+                        onSelect: (name) => setState(() => _person = name),
+                      ),
+                    ],
                   ],
                 ),
               ),

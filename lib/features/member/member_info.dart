@@ -64,17 +64,24 @@ class _MemberInfoScreenState extends State<MemberInfoScreen>
   /// 걸 것이 없다 (담당 이름 줄도 그때만 뜬다 — `showTrainer`).
   String? _trainerId;
 
-  /// 사람 필터 — **명단 전체다** (환경정비·기여 내역과 같은 규칙)
+  /// 담당 필터 — **회원을 맡는 직군만** (2026-09-02 대표 요청)
   ///
-  /// 회원이 있는 트레이너만 세우면 칸이 달마다 달라져서 자리를 못 외운다.
+  /// 회원이 있는 사람만 세우면 칸이 달마다 달라져서 자리를 못 외운다. 그래서
+  /// 명단에서 세우되 **직군으로** 좁힌다 — FC·팀장·마케터는 회원을 안 맡아서
+  /// 세워도 늘 0건이다.
+  ///
+  /// **점장도 센다.** 운영에서 실제로 회원을 담당하고 있다 (2026-09-02 기준
+  /// 트레이너 75명 · 점장 17명). 빼면 그 17명은 담당으로 못 거른다.
+  ///
   /// 지점은 [rosterBranchId] 가 가른다.
-  ///
   /// **id 로 거른다** — [Member.ownerTrainerId] 가 id 라 동명이인이 안 섞인다.
+  static const _ownerRanks = {Rank.trainer, Rank.storeManager};
+
   List<FilterOption> get _people {
     final branch = rosterBranchId;
     final rows = [
       for (final employee in StaffDirectory.instance.employees)
-        if (employee.role.doesFieldWork &&
+        if (_ownerRanks.contains(employee.rank) &&
             employee.status == EmployeeStatus.active &&
             (branch == null || employee.branchId == branch))
           employee,
