@@ -5,7 +5,6 @@ import '../../core/api/client/api_exception.dart';
 import '../../core/api/work/lesson_api.dart';
 import '../../core/api/work/workout_api.dart';
 import '../../core/data/current_user.dart';
-import '../../core/data/staff.dart';
 import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
@@ -82,12 +81,18 @@ class _MemberDetailScreenState extends State<MemberDetailScreen>
     super.dispose();
   }
 
-  /// 일지를 쓸 수 있는 사람 — 담당 트레이너와 대표·관리자
+  /// 일지를 쓸 수 있는 사람 — **담당 트레이너 본인뿐이다**
   ///
   /// 다른 트레이너의 회원은 **보기만 한다.** 서버도 같은 줄로 막는다
   /// (`NOT_MY_MEMBER`) — 여기서 감추는 건 헛걸음을 줄이려는 것뿐이다.
-  bool get _canWrite =>
-      myRole.boss || currentUser?.id == widget.member.ownerTrainerId;
+  ///
+  /// **대표·관리자도 못 쓴다** (2026-09-02 대표 결정). 그 둘은 수업을 안 하니
+  /// 남길 것이 없고, 일지는 수업한 사람이 적은 기록이라 남이 손대면 누가 쓴
+  /// 것인지가 흐려진다. **서버는 아직 그 둘을 통과시킨다**(`_ensure_can_write`)
+  /// — 앱이 더 좁게 잡은 것이라 인사 정보 변경(backend-gap 63)과 같은 자리다.
+  ///
+  /// 점장은 담당인 회원에 한해 쓴다 — 본인이 수업한 것이라서다.
+  bool get _canWrite => currentUser?.id == widget.member.ownerTrainerId;
 
   Future<void> _load() async {
     try {
@@ -239,7 +244,8 @@ class _MemberDetailScreenState extends State<MemberDetailScreen>
   Future<void> _addPersonal() async {
     if (isDesktop) {
       setState(
-        () => _view = const _LogView(kind: WorkoutKind.personal, editable: true),
+        () =>
+            _view = const _LogView(kind: WorkoutKind.personal, editable: true),
       );
       return;
     }
