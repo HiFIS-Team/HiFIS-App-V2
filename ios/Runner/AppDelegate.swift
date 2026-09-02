@@ -104,6 +104,7 @@ import UserNotifications
     }
 
     wirePush(messenger: registrar.messenger())
+    ReelsShare.wire(messenger: registrar.messenger())
 
     let center = NotificationCenter.default
     center.addObserver(

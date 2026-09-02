@@ -4,7 +4,7 @@ import '../client/api_client.dart';
 ///
 /// 전달에 친절도 설문을 낸 회원 중 **세 명**을 뽑아 매장 TV 가 게임으로 굴려
 /// 보여준다. 여기서 더 받는 것은 **찍어 둔 게임 영상**이다 — 인스타에
-/// 올리려고 서버가 매월 1일 새벽에 구워 둔다.
+/// 올리려고 서버가 매월 1일 아침(09:20 KST)에 구워 둔다.
 class MonthDraw {
   MonthDraw({
     required this.period,
@@ -49,7 +49,7 @@ class MonthDraw {
 
   /// 찍어 둔 게임 영상 — **아직 안 구웠으면 null**
   ///
-  /// 매월 1일 새벽에 서버가 굽는다. 그 사이거나 굽다 실패했으면 비어 있다.
+  /// 매월 1일 아침에 서버가 굽는다. 그 사이거나 굽다 실패했으면 비어 있다.
   final String? videoUrl;
   final DateTime? videoAt;
 

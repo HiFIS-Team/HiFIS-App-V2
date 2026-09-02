@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 릴스로 넘길 영상만 내준다 (core/util/reels_share.dart).
+
+     `cache/reels/` 한 칸만 연다 — `.` 을 주면 캐시 전체가 열린다.
+     인스타는 이 자리에서 영상을 읽어 간다. -->
+<paths>
+    <cache-path name="reels" path="reels/" />
+</paths>

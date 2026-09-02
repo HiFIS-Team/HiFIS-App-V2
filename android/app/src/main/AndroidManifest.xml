@@ -64,6 +64,23 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- 릴스로 넘길 영상을 내주는 자리 (core/util/reels_share.dart).
+             인텐트에 `file://` 을 실으면 안드로이드 7 부터 터진다
+             (`FileUriExposedException`) — content:// 로 줘야 한다.
+
+             **권한(`authorities`)을 다른 것과 안 겹치게 둔다** — 플러그인이
+             저마다 FileProvider 를 달고 오는데, 같은 이름이면 설치가 통째로
+             실패한다(`INSTALL_FAILED_CONFLICTING_PROVIDER`). -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.reels"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/reels_paths"/>
+        </provider>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
@@ -84,5 +101,9 @@
             <action android:name="android.intent.action.VIEW"/>
             <data android:scheme="instagram"/>
         </intent>
+        <!-- 릴스 작성 화면으로 바로 보낼 때 인텐트를 받을 앱이 있는지 본다
+             (core/util/reels_share.dart). `resolveActivity` 가 여기 없으면
+             늘 null 이라 **버튼이 아예 안 뜬다.** -->
+        <package android:name="com.instagram.android"/>
     </queries>
 </manifest>

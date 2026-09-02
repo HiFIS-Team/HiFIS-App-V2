@@ -3,8 +3,6 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:gal/gal.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/api/client/api_exception.dart';
 import '../../../core/api/work/draw_api.dart';
@@ -12,6 +10,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/util/platform.dart';
+import '../../../core/util/reels_share.dart';
 import '../../../core/util/skeleton_delay.dart';
 import '../../../core/widgets/feedback/app_toast.dart';
 import '../../../core/widgets/feedback/empty_card.dart';
@@ -22,16 +21,19 @@ import '../../../core/widgets/nav/phone_scaffold.dart';
 // ── 이번 달 추첨 · 영상 ──
 //
 // 설문을 낸 회원 중 셋을 뽑아 매장 TV 가 게임으로 굴려 보여준다. 그 게임을
-// 서버가 세로 영상(1080×1920)으로 찍어 두는데, 여기서 그걸 폰에 저장한다 —
-// 인스타 릴스에 올리려고 만든 자리다 (2026-09-01 대표 요청).
+// 서버가 세로 영상(1080×1920)으로 찍어 두는데, 여기서 그걸 **인스타 릴스
+// 작성 화면으로 바로 보낸다** (2026-09-01 대표 요청).
+//
+// 캡션을 쓰고 올리는 것은 사람이 인스타 안에서 한다 — 우리가 대신 올리는 게
+// 아니라서 심사가 없다 ([ReelsShare] 참고).
+//
+// **PC 는 파일로 저장한다** — 거기엔 인스타 앱이 없다.
 //
 // **권한을 안 가린다** (2026-09-01 대표 결정). 직원이 각자 자기 인스타에
 // 올리는 것까지가 목적이라 대표만 여는 자리가 아니다. 지점은 서버가 가른다 —
 // 직원·점장은 자기 지점 것만 온다.
 
 /// 인스타그램 앱을 여는 주소 — 없으면 아무 일도 안 한다
-const _instagramUrl = 'instagram://app';
-
 /// 이번 달 추첨 — 당첨자와 게임 영상
 class DrawScreen extends StatefulWidget {
   DrawScreen({super.key, this.branchId});
@@ -74,11 +76,8 @@ class _DrawScreenState extends State<DrawScreen>
   /// 한 판의 열쇠 — 지점·달이 같은 추첨은 하나뿐이다
   String _keyOf(MonthDraw draw) => '${draw.branchId}:${draw.period}';
 
-  /// 영상을 폰에 저장한다 — PC 는 파일로
-  ///
-  /// **공유 시트를 안 쓴다.** 사진 앱에 넣어 두면 인스타에서 릴스로 고를 때
-  /// 그대로 보이고, 나중에 다시 올릴 수도 있다. 새 의존성도 안 는다.
-  Future<void> _save(MonthDraw draw) async {
+  /// 영상을 인스타로 넘긴다 — PC 는 파일로 저장한다
+  Future<void> _send(MonthDraw draw) async {
     if (_saving != null || !draw.hasVideo) return;
     setState(() => _saving = _keyOf(draw));
     final name = '피트니스스타_${draw.branchName}_${draw.period}';
@@ -94,44 +93,40 @@ class _DrawScreenState extends State<DrawScreen>
         );
         if (mounted && target != null) AppToast.show(context, '영상을 저장했어요');
       } else {
-        // `Gal.putVideo` 는 바이트가 아니라 **파일 경로**를 받는다.
-        // `path_provider` 를 더 넣지 않으려고 시스템 임시 폴더를 쓴다 —
-        // 앱 전용 자리라 다른 앱이 못 본다.
-        final file = File(
-          '${Directory.systemTemp.path}/$name-${DateTime.now().millisecondsSinceEpoch}.mp4',
-        );
-        await file.writeAsBytes(bytes);
-        try {
-          await Gal.putVideo(file.path);
-        } finally {
-          // 사진 앱에 들어갔으면 사본은 필요 없다
-          if (file.existsSync()) await file.delete();
+        final file = await _writeTemp(bytes, name);
+        // 시트가 안 뜨면 알린다 — 아무 일도 안 일어나면 고장으로 보인다
+        if (!await ReelsShare.share(file.path) && mounted) {
+          AppToast.show(context, '공유 화면을 열지 못했어요');
         }
-        if (mounted) AppToast.show(context, '사진 앱에 저장했어요');
-        await _openInstagram();
       }
     } catch (error) {
-      if (mounted) {
-        AppToast.show(
-          context,
-          error is GalException ? '사진 앱에 저장하지 못했어요' : messageOf(error),
-        );
-      }
+      if (mounted) AppToast.show(context, messageOf(error));
     }
     if (mounted) setState(() => _saving = null);
   }
 
-  /// 인스타그램을 열어 준다 — **안 깔려 있으면 그냥 넘어간다**
+  /// 넘겨줄 파일을 임시 자리에 쓴다 — **지난 것들을 먼저 치운다**
   ///
-  /// 저장은 이미 끝났으므로 여기서 실패해도 알릴 것이 없다. 못 연다고
-  /// 오류를 띄우면 잘 된 일을 실패로 알리는 셈이다.
-  Future<void> _openInstagram() async {
-    try {
-      final uri = Uri.parse(_instagramUrl);
-      if (await canLaunchUrl(uri)) await launchUrl(uri);
-    } catch (_) {
-      // 안 깔려 있거나 스킴이 막혔다 — 사진 앱에 있으니 손으로 올리면 된다
+  /// 공유 시트가 읽어 가는 동안 지우면 안 돼서 넘긴 뒤 바로 못 지운다. 그래서
+  /// **다음에 올 때** 치운다 — 안 그러면 폰에 영상이 달마다 쌓인다.
+  /// `path_provider` 를 더 넣지 않으려고 시스템 임시 폴더를 쓴다 (앱 전용
+  /// 자리라 다른 앱이 못 본다).
+  Future<File> _writeTemp(Uint8List bytes, String name) async {
+    final dir = Directory('${Directory.systemTemp.path}/reels');
+    if (dir.existsSync()) {
+      for (final old in dir.listSync()) {
+        try {
+          await old.delete();
+        } catch (_) {
+          // 인스타가 아직 들고 있을 수 있다 — 다음에 치우면 된다
+        }
+      }
+    } else {
+      dir.createSync(recursive: true);
     }
+    final file = File('${dir.path}/$name.mp4');
+    await file.writeAsBytes(bytes);
+    return file;
   }
 
   @override
@@ -168,9 +163,9 @@ class _DrawScreenState extends State<DrawScreen>
           _DrawCard(
             draw: _draws[i],
             busy: _saving == _keyOf(_draws[i]),
-            // 하나를 받는 동안 다른 카드도 잠근다 — 두 개를 같이 받으면
-            // 어느 것이 사진 앱에 들어갔는지 알리기 어렵다
-            onSave: _saving == null ? () => _save(_draws[i]) : null,
+            // 하나를 받는 동안 다른 카드도 잠근다 — 두 개를 같이 보내면
+            // 어느 것이 인스타로 갔는지 알기 어렵다
+            onSend: _saving == null ? () => _send(_draws[i]) : null,
           ),
         ],
       ],
@@ -180,11 +175,11 @@ class _DrawScreenState extends State<DrawScreen>
 
 /// 추첨 한 판 — 지점·게임·당첨자 셋과 영상 버튼
 class _DrawCard extends StatelessWidget {
-  _DrawCard({required this.draw, required this.busy, required this.onSave});
+  _DrawCard({required this.draw, required this.busy, required this.onSend});
 
   final MonthDraw draw;
   final bool busy;
-  final VoidCallback? onSave;
+  final VoidCallback? onSend;
 
   /// 등수별 색 — 매장 TV 시상대(금·은·동)와 같은 결이다
   static const _medals = [
@@ -263,7 +258,7 @@ class _DrawCard extends StatelessWidget {
             SizedBox.shrink()
           else if (!draw.hasVideo)
             Text(
-              // 매월 1일 새벽에 굽는다 — 그 전이거나 굽다 실패한 달이다
+              // 매월 1일 아침에 굽는다 — 그 전이거나 굽다 실패한 달이다
               '영상을 만들고 있어요',
               style: AppTextStyles.caption.copyWith(
                 color: AppColors.textTertiary,
@@ -271,10 +266,10 @@ class _DrawCard extends StatelessWidget {
             )
           else
             AppButton(
-              label: isDesktop ? '영상 저장' : '사진 앱에 저장',
+              label: isDesktop ? '영상 저장' : '릴스 올리기',
               filled: true,
               busy: busy,
-              onTap: onSave ?? () {},
+              onTap: onSend ?? () {},
             ),
         ],
       ),

@@ -10,6 +10,8 @@ import android.os.Bundle
 import android.view.WindowManager
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
+import java.io.File
 import com.google.firebase.messaging.FirebaseMessaging
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -26,6 +28,81 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         wireCapture(flutterEngine)
         wirePush(flutterEngine)
+        wireReels(flutterEngine)
+    }
+
+    /**
+     * 추첨 영상을 인스타그램으로 넘긴다.
+     *
+     * 길이 둘인데 **어느 쪽이든 캡션은 사람이 인스타 안에서 쓴다.** 우리가
+     * 대신 올리는 게 아니라서 심사가 없다.
+     *
+     * | | 언제 | 어디로 |
+     * |---|---|---|
+     * | **공유 시트** | 늘 된다 (기본) | 인스타를 고르면 인스타가 릴스·스토리를 묻는다 |
+     * | 릴스 직행 | 메타 앱 ID 가 있을 때 | 릴스 작성 화면이 영상을 물고 열린다 |
+     *
+     * 공유 시트는 **앱 ID 가 필요 없다** — 그냥 파일을 넘기는 것이라 인스타와
+     * 아무 약속이 없다. 직행은 인스타가 우리를 알아야 해서 ID 를 본다.
+     *
+     * `file://` 을 인텐트에 실으면 안드로이드 7 부터 터진다
+     * (`FileUriExposedException`) — 둘 다 FileProvider 로 `content://` 를 준다.
+     */
+    private fun wireReels(flutterEngine: FlutterEngine) {
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.hifis/reels")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    // 공유 시트는 늘 있다 — 인스타가 안 깔려 있어도 시트는 뜬다
+                    "available" -> result(true)
+                    "share" -> {
+                        val path = call.argument<String>("path")
+                        if (path.isNullOrEmpty()) {
+                            result(false)
+                        } else {
+                            result(shareVideo(path, call.argument<String>("appId") ?: ""))
+                        }
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+    }
+
+    private fun shareVideo(path: String, appId: String): Boolean {
+        return try {
+            val uri = FileProvider.getUriForFile(this, "$packageName.reels", File(path))
+
+            // ① 앱 ID 가 있으면 릴스 작성 화면으로 바로 — 시트를 한 번 덜 거친다
+            if (appId.isNotEmpty()) {
+                val direct = Intent("com.instagram.share.ADD_TO_REEL").apply {
+                    setPackage("com.instagram.android")
+                    type = "video/*"
+                    putExtra("com.instagram.platform.extra.APPLICATION_ID", appId)
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+                }
+                if (packageManager.resolveActivity(direct, 0) != null) {
+                    // `FLAG_GRANT_READ_URI_PERMISSION` 만으로는 못 읽는 기기가 있다 —
+                    // 메타 문서가 이걸 같이 부르라고 한다
+                    grantUriPermission(
+                        "com.instagram.android", uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                    startActivity(direct)
+                    return true
+                }
+            }
+
+            // ② 없으면 공유 시트 — 여기서 인스타를 고르면 릴스로 갈 수 있다
+            val send = Intent(Intent.ACTION_SEND).apply {
+                type = "video/mp4"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+            }
+            startActivity(Intent.createChooser(send, "추첨 영상 공유"))
+            // **연 것까지만 참이다.** 올렸는지는 우리가 알 수 없다
+            true
+        } catch (e: Exception) {
+            false
+        }
     }
 
     /**

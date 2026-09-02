@@ -32,6 +32,9 @@
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>instagram</string>
+		<!-- 릴스 작성 화면으로 바로 보내기 (core/util/reels_share.dart).
+		     **여기 없으면 `canOpenURL` 이 늘 false 라 버튼이 아예 안 뜬다.** -->
+		<string>instagram-reels</string>
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>카메라로 찍은 사진에 촬영 위치를 기록할 때 사용합니다. 앱이 따로 위치를 수집하지는 않습니다.</string>
