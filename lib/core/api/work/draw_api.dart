@@ -14,6 +14,7 @@ class MonthDraw {
     required this.winners,
     required this.entryCount,
     this.videoUrl,
+    this.posterUrl,
     this.videoAt,
   });
 
@@ -28,6 +29,7 @@ class MonthDraw {
     ],
     entryCount: json['entryCount'] as int? ?? 0,
     videoUrl: json['videoUrl'] as String?,
+    posterUrl: json['posterUrl'] as String?,
     videoAt: json['videoAt'] == null
         ? null
         : DateTime.parse(json['videoAt'] as String).toLocal(),
@@ -51,6 +53,12 @@ class MonthDraw {
   ///
   /// 매월 1일 아침에 서버가 굽는다. 그 사이거나 굽다 실패했으면 비어 있다.
   final String? videoUrl;
+
+  /// 영상 **마지막 프레임** — 화면 히어로에 그린다 (영상과 같이 구워진다)
+  ///
+  /// 폭죽이 걷힌 시상대라 한 장으로 그달을 말해 준다. 앱에 재생기를 안 넣으려고
+  /// 두는 것이라, 영상은 눌렀을 때 시스템 재생기로 튼다.
+  final String? posterUrl;
   final DateTime? videoAt;
 
   bool get hasVideo => (videoUrl ?? '').isNotEmpty;
