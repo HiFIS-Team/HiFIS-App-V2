@@ -417,7 +417,8 @@ class _MemberInfoDetailState extends State<_MemberInfoDetail> {
         if (!didPop) Navigator.pop(context, _changed);
       },
       child: PhoneDetailScaffold(
-        title: '${_member.name} 회원님',
+        // **이름을 안 적는다** — 아래 머리에 크게 서 있어서 두 번 나온다
+        title: '회원 정보',
         // 지우기는 **우측 상단 휴지통** — 운동일지·공지·회의록과 같은 자리다.
         // 아래에 빨간 버튼으로 두면 '정보 수정' 옆에서 눈에 먼저 들어온다
         actions: [
@@ -445,65 +446,66 @@ class _MemberInfoDetailState extends State<_MemberInfoDetail> {
           ),
           children: [
             // ── 누구인가 ──
-            Container(
-              padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
-              decoration: AppDecorations.card(),
-              child: Column(
-                children: [
-                  Avatar(name: _member.name, size: 64),
-                  const SizedBox(height: 12),
-                  Text(
-                    _member.name,
-                    style: AppTextStyles.title2.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 8),
-                  _StatusChip(
-                    active: active,
-                    hasPass: row.registration != null,
-                  ),
-                ],
+            //
+            // **카드에 안 담는다.** 흰 판 셋이 나란히 서면 결이 똑같아서
+            // 무엇부터 봐야 할지가 안 읽힌다. 머리를 회색 바탕에 그대로 앉히면
+            // 아래 카드가 정보 칸으로 살아난다 (홈·프로필과 같은 결이다).
+            //
+            // **아바타를 안 그린다** (2026-09-02 대표 지적) — 회원은 사진을
+            // 올릴 데가 없어서 이름 첫 글자로 만든 동그라미만 떴다.
+            // 뜻이 없는 그림이라 이름과 상태만 남긴다.
+            const SizedBox(height: 10),
+            Text(
+              _member.name,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.title1.copyWith(fontWeight: FontWeight.w800),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 10),
+            Center(
+              child: _StatusChip(
+                active: active,
+                hasPass: row.registration != null,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 26),
             // ── 남은 회차 ──
             if (row.registration != null) ...[
               _PassCard(row: row, active: active),
               const SizedBox(height: 12),
             ],
             // ── 인적 사항 ──
-            Container(
-              padding: const EdgeInsets.fromLTRB(20, 6, 20, 6),
-              decoration: AppDecorations.card(),
-              child: Column(
-                children: [
-                  // **전화번호가 제일 위다** — 회원에게 연락하려고 여는 자리다
-                  _Field(
-                    label: '연락처',
-                    value: _phoneLabel(_member.phone),
-                    onCopy: _member.phone.trim().isEmpty
-                        ? null
-                        : () => _copy(_member.phone),
-                  ),
-                  _Field(label: '담당 트레이너', value: trainer),
-                  if (branch.isNotEmpty) _Field(label: '지점', value: branch),
-                  _Field(
-                    label: '등록일',
-                    value: fullDateLabel(_member.registeredAt),
-                  ),
-                  _Field(
-                    label: '방문 경로',
-                    value: _member.visitPath?.label ?? '기록 없음',
-                  ),
-                  if (_member.memo case final memo? when memo.trim().isNotEmpty)
-                    _Field(label: '메모', value: memo, last: true)
-                  else
-                    const SizedBox(height: 8),
-                ],
-              ),
+            // **줄을 목록으로 만든다** — 마지막 줄 아래에 선이 남아 있으면
+            // 카드 아래가 열린 것처럼 보인다 (2026-09-02 대표 지적).
+            // 메모가 있고 없고에 따라 마지막 줄이 바뀌어서, 손으로 `last` 를
+            // 붙이면 반드시 어긋난다
+            _FieldCard(
+              fields: [
+                // **전화번호가 제일 위다** — 회원에게 연락하려고 여는 자리다
+                (
+                  label: '연락처',
+                  value: _phoneLabel(_member.phone),
+                  onCopy: _member.phone.trim().isEmpty
+                      ? null
+                      : () => _copy(_member.phone),
+                ),
+                (label: '담당', value: trainer, onCopy: null),
+                if (branch.isNotEmpty)
+                  (label: '지점', value: branch, onCopy: null),
+                (
+                  label: '등록일',
+                  value: fullDateLabel(_member.registeredAt),
+                  onCopy: null,
+                ),
+                (
+                  label: '방문 경로',
+                  value: _member.visitPath?.label ?? '기록 없음',
+                  onCopy: null,
+                ),
+                if (_member.memo case final memo? when memo.trim().isNotEmpty)
+                  (label: '메모', value: memo, onCopy: null),
+              ],
             ),
           ],
         ),
@@ -552,7 +554,11 @@ class _StatusChip extends StatelessWidget {
   }
 }
 
-/// 남은 회차 — 숫자만 적으면 얼마나 남았는지가 안 읽힌다
+/// 남은 회차 — **숫자가 주인공이다**
+///
+/// 예전에는 `남은 회차` 와 숫자가 한 줄 양 끝에 있었는데, 그러면 카드에서
+/// 제일 큰 것이 **빈 진행바**가 된다 (0회 사용이면 회색 막대만 길게 남는다).
+/// 숫자를 크게 왼쪽에 두고 막대를 얇게 깔면 눈이 숫자부터 잡는다.
 class _PassCard extends StatelessWidget {
   const _PassCard({required this.row, required this.active});
 
@@ -571,48 +577,95 @@ class _PassCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Text(
+            '남은 회차',
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.textTertiary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
               Text(
-                '남은 회차',
-                style: AppTextStyles.caption.copyWith(
-                  color: AppColors.textTertiary,
-                ),
-              ),
-              const Spacer(),
-              Text(
                 '$left',
-                style: AppTextStyles.title2.copyWith(
+                style: AppTextStyles.display.copyWith(
                   fontWeight: FontWeight.w800,
                   color: color,
                 ),
               ),
-              const SizedBox(width: 2),
+              const SizedBox(width: 3),
               Text(
                 '회',
-                style: AppTextStyles.caption.copyWith(
+                style: AppTextStyles.body1.copyWith(
+                  fontWeight: FontWeight.w700,
                   color: AppColors.textSecondary,
+                ),
+              ),
+              const Spacer(),
+              // 총 회차는 옆에 조용히 — 큰 숫자와 겨루면 안 된다
+              Text(
+                '전체 ${row.total}회',
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.textTertiary,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 14),
           ClipRRect(
             borderRadius: BorderRadius.circular(3),
             child: LinearProgressIndicator(
               value: progress.clamp(0.0, 1.0),
               minHeight: 6,
-              backgroundColor: AppColors.gray100,
+              // 아직 한 번도 안 썼을 때 회색 막대가 튀지 않게 옅게 깐다
+              backgroundColor: AppColors.gray50,
               valueColor: AlwaysStoppedAnimation(color),
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            '${row.used} / ${row.total}회 사용',
-            style: AppTextStyles.caption.copyWith(fontSize: 12),
+            row.used == 0 ? '아직 안 썼어요' : '${row.used}회 썼어요',
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.textTertiary,
+            ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 인적 사항 한 줄의 재료
+typedef _FieldRow = ({String label, String value, VoidCallback? onCopy});
+
+/// 인적 사항 카드 — 줄 사이에만 선을 긋는다
+///
+/// **마지막 줄 아래에는 선이 없다.** 있으면 카드 아래가 열린 것처럼 보이는데,
+/// 메모가 있고 없고에 따라 마지막 줄이 바뀌어서 손으로 붙이면 반드시 어긋난다
+/// (실제로 어긋나 있었다 — 2026-09-02 대표 지적).
+class _FieldCard extends StatelessWidget {
+  const _FieldCard({required this.fields});
+
+  final List<_FieldRow> fields;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      // 위아래를 같게 — 줄마다 세로 14 이 붙으므로 6 을 더하면 20 씩이다
+      padding: const EdgeInsets.fromLTRB(20, 6, 20, 6),
+      decoration: AppDecorations.card(),
+      child: Column(
+        children: [
+          for (var i = 0; i < fields.length; i++)
+            _Field(
+              label: fields[i].label,
+              value: fields[i].value,
+              onCopy: fields[i].onCopy,
+              last: i == fields.length - 1,
+            ),
         ],
       ),
     );
@@ -644,8 +697,10 @@ class _Field extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // '담당 트레이너' 를 '담당' 으로 줄이면서 제일 긴 것이 '방문 경로' 가
+          // 됐다 — 칸을 그만큼만 잡아야 값이 가운데로 밀리지 않는다
           SizedBox(
-            width: 84,
+            width: 68,
             child: Text(
               label,
               style: AppTextStyles.caption.copyWith(
