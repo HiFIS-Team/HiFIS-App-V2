@@ -6,6 +6,7 @@ import '../../core/api/client/api_exception.dart';
 import '../../core/api/work/lesson_api.dart';
 import '../../core/data/branch_scope.dart';
 import '../../core/data/current_user.dart';
+import '../../core/data/employee.dart';
 import '../../core/data/staff.dart';
 import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
@@ -23,6 +24,7 @@ import '../../core/widgets/glass/glass_bottom_button.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/nav/phone_scaffold.dart';
+import '../../core/widgets/nav/pick_filter_button.dart';
 import '../../core/widgets/input/mode_switch.dart';
 import 'member_edit.dart';
 
@@ -55,6 +57,30 @@ class _MemberInfoScreenState extends State<MemberInfoScreen>
 
   /// 남의 회원까지 보는 사람인가 — 대표·관리자
   bool get _seesAll => myRole.boss;
+
+  /// 오른쪽 위 필터로 고른 담당 트레이너 — null 이면 전체
+  ///
+  /// **[_seesAll] 일 때만 뜬다.** 나머지는 서버가 본인 담당으로 줄여 주므로
+  /// 걸 것이 없다 (담당 이름 줄도 그때만 뜬다 — `showTrainer`).
+  String? _trainerId;
+
+  /// 사람 필터 — **명단 전체다** (환경정비·기여 내역과 같은 규칙)
+  ///
+  /// 회원이 있는 트레이너만 세우면 칸이 달마다 달라져서 자리를 못 외운다.
+  /// 지점은 [rosterBranchId] 가 가른다.
+  ///
+  /// **id 로 거른다** — [Member.ownerTrainerId] 가 id 라 동명이인이 안 섞인다.
+  List<FilterOption> get _people {
+    final branch = rosterBranchId;
+    final rows = [
+      for (final employee in StaffDirectory.instance.employees)
+        if (employee.role.doesFieldWork &&
+            employee.status == EmployeeStatus.active &&
+            (branch == null || employee.branchId == branch))
+          employee,
+    ]..sort(StaffDirectory.instance.compareStaff);
+    return [for (final e in rows) (id: e.id, name: e.name)];
+  }
 
   @override
   void initState() {
@@ -99,9 +125,19 @@ class _MemberInfoScreenState extends State<MemberInfoScreen>
   }
 
   List<_Row> get _visible => [
-    for (final row in _rows)
+    for (final row in _matched)
       if (row.bucket == _bucket) row,
   ];
+
+  /// 담당 트레이너 필터까지 태운 줄들 — 탭 건수도 이걸 센다
+  ///
+  /// 안 태우면 `활성 12` 라고 적어 두고 아래에 0줄이 뜬다.
+  List<_Row> get _matched => _trainerId == null
+      ? _rows
+      : [
+          for (final row in _rows)
+            if (row.source.ownerTrainerId == _trainerId) row,
+        ];
 
   /// 회원 하나를 연다 — 고치거나 지우면 목록을 다시 받는다
   Future<void> _open(_Row row) async {
@@ -113,13 +149,23 @@ class _MemberInfoScreenState extends State<MemberInfoScreen>
   }
 
   int _count(_Bucket bucket) =>
-      _rows.where((row) => row.bucket == bucket).length;
+      _matched.where((row) => row.bucket == bucket).length;
 
   @override
   Widget build(BuildContext context) {
     final rows = _visible;
     return PhoneDetailScaffold(
       title: '회원 정보',
+      // 담당 트레이너 필터 — 남의 회원까지 보는 사람에게만 (환경정비와 같은 규칙)
+      actions: [
+        if (_seesAll)
+          PickFilterButton(
+            stableId: 'member-trainer',
+            options: _people,
+            selected: _trainerId,
+            onSelect: (id) => setState(() => _trainerId = id),
+          ),
+      ],
       child: ListView(
         padding: EdgeInsets.fromLTRB(
           20,
@@ -139,7 +185,11 @@ class _MemberInfoScreenState extends State<MemberInfoScreen>
           else if (rows.isEmpty)
             EmptyCard(
               icon: Icons.people_alt_rounded,
-              text: _bucket == _Bucket.active
+              // 걸러서 빈 것과 원래 없는 것을 가른다 — 안 가르면 필터를
+              // 걸어 둔 걸 잊고 "회원이 사라졌다" 로 본다
+              text: _trainerId != null
+                  ? '그 트레이너의 회원이 없어요'
+                  : _bucket == _Bucket.active
                   ? '회차가 남은 회원이 없어요'
                   : '만료된 회원이 없어요',
             )
