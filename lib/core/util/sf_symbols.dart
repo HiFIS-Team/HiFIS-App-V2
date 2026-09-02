@@ -55,6 +55,9 @@ const _icons = <String, IconData>{
   // 운동일지 — 헤더 왼쪽에서 사람 아이콘 옆에 선다. **속을 안 채운 것**이라야
   // 옆 버튼들(외곽선)과 결이 맞는다 (`film` 과 같은 이유)
   'doc.text': Icons.description_outlined,
+  // 운동일지 펜 모드 고르개 — 켜짐·꺼짐이 둘 다 필요하다 (`pen_mode.dart`)
+  'pencil.tip': Icons.edit_outlined,
+  'keyboard': Icons.keyboard_outlined,
   'square.grid.2x2.fill': Icons.grid_view_rounded,
   'clock.fill': Icons.schedule_rounded,
   'wonsign.circle.fill': Icons.payments_rounded,

@@ -6,6 +6,7 @@ import 'core/data/current_user.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/theme_controller.dart';
 import 'core/theme/app_theme.dart';
+import 'core/util/pen_mode.dart';
 import 'core/util/app_trail.dart';
 import 'core/util/capture_guard.dart';
 import 'core/widgets/feedback/app_toast.dart';
@@ -24,6 +25,10 @@ void main() async {
   unawaited(CaptureGuard.apply());
   // 테마를 먼저 되살린다 — 뒤에 하면 라이트로 한 번 그려졌다 바뀌어 깜빡인다
   await ThemeController.restore();
+  // 운동일지 펜 모드 — 기기에 기억해 둔 값이다 (`pen_mode.dart`).
+  // 기다려도 되는 이유는 위 테마와 같다 — 켜져 있는데 꺼진 채로 한 번
+  // 그려지면 표가 작았다 커지며 튄다
+  await PenMode.restore();
   // 자동 로그인 여부를 먼저 읽어야 스플래시 뒤에서 맞는 화면을 그릴 수 있다
   await AuthSession.instance.restore();
   runApp(HiFISApp());

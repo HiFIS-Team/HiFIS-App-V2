@@ -9,6 +9,7 @@ import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_shadows.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/layout.dart';
+import '../../core/util/pen_mode.dart';
 import '../../core/util/platform.dart';
 import '../../core/util/when.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
@@ -113,10 +114,17 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
     super.initState();
     // 제목을 고치면 위 큰 글씨(`1회차(가슴, 삼두)`)가 같이 바뀐다
     _title.addListener(_onEdit);
+    _pen = PenMode.on.value;
+    PenMode.on.addListener(_onPen);
+  }
+
+  void _onPen() {
+    if (mounted) setState(() => _pen = PenMode.on.value);
   }
 
   @override
   void dispose() {
+    PenMode.on.removeListener(_onPen);
     _title.dispose();
     _trainer.dispose();
     for (final row in _weights) {
@@ -364,7 +372,8 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             for (var i = 0; i < _weights.length; i++) ...[
-              if (i > 0) const SizedBox(height: 10),
+              // 펜 모드는 더 벌린다 — 손바닥이 옆 줄을 안 건드리게
+              if (i > 0) SizedBox(height: _rowGap(context) + 2),
               _WeightRowFields(
                 row: _weights[i],
                 number: i + 1,
@@ -393,7 +402,7 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             for (var i = 0; i < _cardio.length; i++) ...[
-              if (i > 0) const SizedBox(height: 8),
+              if (i > 0) SizedBox(height: _rowGap(context)),
               _CardioRowFields(
                 row: _cardio[i],
                 editable: editable,
@@ -482,7 +491,14 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
   @override
   Widget build(BuildContext context) {
     // 저장·삭제만 `true` 를 돌려준다. 그냥 뒤로 가면 `null` 이라 목록은 그대로 둔다.
-    return isDesktop ? _desktop() : _phone();
+    //
+    // **표 칸들이 [_Pen] 을 읽어 크기를 정한다** — 화면을 통째로 감싸야
+    // `_Input`·`_SetsStepper` 같은 아래쪽 위젯까지 닿는다.
+    return _Pen(
+      // 읽기만 하는 화면은 칸을 안 키운다 — 쓸 일이 없다
+      on: _pen && widget.editable,
+      child: isDesktop ? _desktop() : _phone(),
+    );
   }
 
   /// PC 폼의 저장 버튼 — 데스크톱에는 글래스 트레이가 없다
@@ -495,10 +511,21 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
     textColor: _complete ? null : AppColors.gray400,
   );
 
+  /// 지금 펜 모드인가 — [PenMode] 를 듣고 다시 그린다
+  bool _pen = false;
+
   Widget _phone() => PhoneDetailScaffold(
     title: widget.member.name,
     background: AppColors.surface,
     actions: [
+      // 펜 모드 — **적을 수 있을 때만** 뜬다. 읽기만 하는 화면에서는 칸을
+      // 키울 이유가 없다. 지금 무슨 모드인지를 아이콘이 말해 준다
+      if (widget.editable)
+        GlassIconButton(
+          symbol: _pen ? 'keyboard' : 'pencil.tip',
+          stableId: 'workout-pen-mode',
+          onPressed: () => PenMode.toggle(),
+        ),
       if (widget.editable && widget.log != null)
         GlassIconButton(
           symbol: 'trash',
@@ -644,6 +671,40 @@ const _parts = ['가슴', '등', '어깨', '하체', '팔', '복근', '전신'];
 ///
 /// **무게와 횟수를 한 칸에 적는다.** 맨몸·밴드처럼 무게가 없는 운동이 많아
 /// 숫자 칸을 따로 두면 절반이 빈 채로 남는다.
+/// 펜 모드인가 — 표 칸을 키워 **펜으로 쓸 자리**를 만든다 (2026-09-02 대표 요청)
+///
+/// 트레이너가 수업하면서 적는데, 폰은 자판이고 **패드는 펜이 편하다.**
+///
+/// **손글씨를 글자로 바꾸는 것은 우리가 안 한다** — OS 가 해 준다
+/// (아이패드는 Scribble, 안드로이드 14 이상은 Scribe). 플러터가 `TextField`
+/// 에 그대로 붙여 두었고 기본이 켜짐이라, 여기서 하는 일은 **칸을 크게 펴는
+/// 것뿐**이다. 자판도 우리가 막을 필요가 없다 — 펜으로 쓰기 시작하면 OS 가
+/// 자판 대신 필기를 띄우고, 손으로 누를 때만 자판이 뜬다.
+class _Pen extends InheritedWidget {
+  const _Pen({required this.on, required super.child});
+
+  final bool on;
+
+  static bool of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_Pen>()?.on ?? false;
+
+  @override
+  bool updateShouldNotify(_Pen old) => old.on != on;
+}
+
+/// 표 한 칸의 높이 — 펜 모드면 넉넉하게
+///
+/// 40 은 손가락으로 누르기에 맞춘 값이라 펜으로 **쓰기**에는 자리가 없다.
+/// 글씨가 칸을 넘으면 OS 가 인식을 못 한다.
+double _rowHeight(BuildContext context) => _Pen.of(context) ? 58 : 40;
+
+/// 표 칸 글자 — 펜 모드면 한 단계 크게 (쓴 것이 작으면 다시 확인하게 된다)
+TextStyle _cellStyle(BuildContext context) =>
+    _Pen.of(context) ? AppTextStyles.body1 : AppTextStyles.body2;
+
+/// 줄 사이 — 펜 모드면 손바닥이 옆 줄을 안 건드리게 벌린다
+double _rowGap(BuildContext context) => _Pen.of(context) ? 12 : 8;
+
 class _WeightEditor {
   _WeightEditor(WeightRow? row)
     : part = TextEditingController(text: row?.part ?? ''),
@@ -798,7 +859,7 @@ class _IndexBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     width: 22,
-    height: 40,
+    height: _rowHeight(context),
     alignment: Alignment.center,
     child: Text(
       '$number',
@@ -827,7 +888,7 @@ class _SetsStepper extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     width: _setsWidth,
-    height: 40,
+    height: _rowHeight(context),
     decoration: BoxDecoration(
       color: AppColors.surface,
       borderRadius: BorderRadius.circular(10),
@@ -874,7 +935,7 @@ class _StepButton extends StatelessWidget {
     onTap: onTap,
     child: SizedBox(
       width: 30,
-      height: 40,
+      height: _rowHeight(context),
       child: Icon(icon, size: 16, color: AppColors.primary),
     ),
   );
@@ -946,7 +1007,7 @@ class _PartField extends StatelessWidget {
       return Pressable(
         onTap: editable ? () => _choose(context) : () {},
         child: Container(
-          height: 40,
+          height: _rowHeight(context),
           alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 6),
           decoration: BoxDecoration(
@@ -1139,7 +1200,7 @@ class _Input extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = controller.text.trim();
     return Container(
-      height: 40,
+      height: _rowHeight(context),
       alignment: align == TextAlign.left
           ? Alignment.centerLeft
           : Alignment.center,
@@ -1152,13 +1213,13 @@ class _Input extends StatelessWidget {
           ? TextField(
               controller: controller,
               textAlign: align,
-              style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w600),
+              style: _cellStyle(context).copyWith(fontWeight: FontWeight.w600),
               cursorColor: AppColors.primary,
               decoration: InputDecoration(
                 hintText: hint,
-                hintStyle: AppTextStyles.body2.copyWith(
-                  color: AppColors.gray400,
-                ),
+                hintStyle: _cellStyle(
+                  context,
+                ).copyWith(color: AppColors.gray400),
                 // 비어 있을 땐 안 붙인다 — `세트` 만 덩그러니 남는다
                 suffixText: text.isEmpty ? null : suffix,
                 suffixStyle: AppTextStyles.caption.copyWith(
@@ -1173,7 +1234,7 @@ class _Input extends StatelessWidget {
               textAlign: align,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: AppTextStyles.body2.copyWith(
+              style: _cellStyle(context).copyWith(
                 fontWeight: FontWeight.w600,
                 color: text.isEmpty ? AppColors.gray400 : AppColors.textPrimary,
               ),
@@ -1194,7 +1255,7 @@ class _AddRow extends StatelessWidget {
   Widget build(BuildContext context) => Pressable(
     onTap: onTap,
     child: Container(
-      height: 42,
+      height: _rowHeight(context) + 2,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: AppColors.primary.withValues(alpha: 0.08),
