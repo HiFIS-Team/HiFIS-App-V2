@@ -295,7 +295,7 @@ class _LogRowState extends State<_LogRow> {
     if (!identical(widget.log, old.log)) _log = widget.log;
   }
 
-  /// 남긴 사진이 있는지 — 현수막·족자만 채워진다 ([_photoRequiredItems])
+  /// 남긴 사진이 있는지 — 현수막·족자·전단지만 채워진다 ([_photoRequiredItems])
   bool get _hasPhoto => (_log.photoUrl ?? '').isNotEmpty;
 
   /// 눌러서 볼 것이 있는지 — 블로그는 주소와 가산점이 창에 있다

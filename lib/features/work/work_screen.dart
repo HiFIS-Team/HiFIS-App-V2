@@ -386,7 +386,8 @@ class _WorkScreenState extends State<WorkScreen>
           );
           if (note == null || !mounted) return;
         }
-        // 현수막은 사진과 위치를 먼저 받는다 — 창 안에서 사진까지 올리고 온다
+        // 현수막·족자·전단지는 사진과 위치를 먼저 받는다 —
+        // 창 안에서 사진까지 올리고 온다
         String? photoUrl;
         String? place;
         if (_needsPhoto(item)) {
@@ -879,7 +880,9 @@ class _WriteInCardState extends State<_WriteInCard> {
 ///
 /// 여기서 안 막아도 서버가 400 으로 되돌려 보내지만, 그러면 사용자는 누른 뒤에야
 /// 알게 된다. 한쪽만 늘리면 그 항목이 눌러도 안 되는 칩이 되므로 같이 고친다.
-const _photoRequiredItems = {'현수막', '족자'};
+///
+/// **전단지가 2026-09-02 에 들어왔다** (대표 요청) — 셋 다 같은 창을 쓴다.
+const _photoRequiredItems = {'현수막', '족자', '전단지'};
 
 bool _needsPhoto(EnvItem item) => _photoRequiredItems
     .map(_WorkScreenState._envKey)
@@ -913,7 +916,7 @@ bool _isAwardable(EnvTaskLog log) => _awardableItems
 /// 한다. `canApprove` 와 지금은 값이 같지만 **이유가 달라서** 따로 둔다.
 bool get _canAwardEnv => myRole == Role.master;
 
-/// 현수막처럼 확인이 필요한 항목의 `+` 를 눌렀을 때 뜨는 창
+/// 확인이 필요한 항목의 `+` 를 눌렀을 때 뜨는 창 — 현수막·족자·전단지
 ///
 /// **사진과 위치를 둘 다 채워야 완료가 눌린다.** 걸었다고 칩만 누르면 실제로
 /// 걸었는지 확인할 방법이 없어서 대표님이 요청한 자리다 (2026-08-18).
@@ -998,7 +1001,10 @@ class _PhotoProofCardState extends State<_PhotoProofCard> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('어디에 걸었나요?', style: AppTextStyles.title3),
+          // **'걸었나요' 가 아니다** (2026-09-02 대표 요청) — 전단지가 들어오면서
+          // 셋을 한 문구로 맞췄다. 현수막·족자는 걸고 전단지는 붙이는 것이라
+          // 한 동사로 묶을 수가 없다
+          Text('어디에 했나요?', style: AppTextStyles.title3),
           SizedBox(height: 6),
           Text(
             '${widget.item.name}은(는) 사진과 위치를 남겨야 기록돼요.',

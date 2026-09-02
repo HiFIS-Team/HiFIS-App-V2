@@ -102,10 +102,10 @@ class EnvTaskLog {
   final DateTime createdAt;
   final String? note;
 
-  /// 수행 사진 — **현수막만 채워진다** (그 항목은 사진 없이 못 남긴다)
+  /// 수행 사진 — **현수막·족자·전단지만 채워진다** (그 셋은 사진 없이 못 남긴다)
   final String? photoUrl;
 
-  /// 어디에 했는지 — 사진과 짝이다 (현수막을 어디에 걸었나)
+  /// 어디에 했는지 — 사진과 짝이다 (현수막을 어디에 걸었나·전단지를 어디에 돌렸나)
   final String? place;
 
   /// 글 주소 — **블로그만 채워진다** (2026-08-28)
@@ -219,7 +219,7 @@ class EnvApi {
   ///
   /// **기록 만들기와 두 번에 나뉘어 있다.** `/env-logs` 는 JSON 을 받는데 파일을
   /// 실으려면 multipart 로 바꿔야 하고, 그러면 사진이 필요 없는 나머지 21개
-  /// 항목까지 다 같이 바뀐다. 사진을 받는 건 현수막 하나뿐이라 그 항목만
+  /// 항목까지 다 같이 바뀐다. 사진을 받는 건 현수막·족자·전단지뿐이라 그 항목만
   /// 한 번 더 부른다.
   static Future<String> uploadPhoto(String path, {String? filename}) async {
     final form = FormData.fromMap({
