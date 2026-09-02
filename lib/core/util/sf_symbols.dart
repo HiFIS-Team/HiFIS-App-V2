@@ -58,6 +58,11 @@ const _icons = <String, IconData>{
   'banknote.fill': Icons.payments_rounded,
   'megaphone.fill': Icons.campaign_rounded,
   'trophy.fill': Icons.emoji_events_rounded,
+  // 추첨 게임 영상 — **트로피를 안 쓴다.** 그건 이미 랭킹이라
+  // (사이드바·안드로이드 탭바·랭킹 알림) 같이 쓰면 헷갈린다.
+  // 속을 안 채운 것을 골랐다 — 헤더 왼쪽에 서면 옆 버튼들이 다 외곽선이라
+  // 채운 심볼은 **혼자 새까맣게 뜬다** (실제로 그렇게 보였다)
+  'film': Icons.movie_outlined,
 };
 
 IconData iconForSymbol(String symbol) =>

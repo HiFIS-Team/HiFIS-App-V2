@@ -141,9 +141,7 @@ class _WorkScreenState extends State<WorkScreen>
       // **권한을 안 가린다** (2026-09-01 대표 결정) — 직원이 각자 자기
       // 인스타에 올리는 것까지가 목적이라 대표만 여는 자리가 아니다.
       // 지점은 서버가 가른다 (직원·점장은 자기 지점 것만 온다)
-      _setHeaderAction(
-        HeaderAction(symbol: 'trophy.fill', onPressed: _openDraw),
-      );
+      _setHeaderAction(HeaderAction(symbol: 'film', onPressed: _openDraw));
       return;
     }
     // **권한을 안 가린다.** 목록을 보는 것뿐이고, 누가 무엇을 보는지는
