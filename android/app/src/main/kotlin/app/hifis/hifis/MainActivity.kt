@@ -53,13 +53,13 @@ class MainActivity : FlutterActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     // 공유 시트는 늘 있다 — 인스타가 안 깔려 있어도 시트는 뜬다
-                    "available" -> result(true)
+                    "available" -> result.success(true)
                     "share" -> {
                         val path = call.argument<String>("path")
                         if (path.isNullOrEmpty()) {
-                            result(false)
+                            result.success(false)
                         } else {
-                            result(shareVideo(path, call.argument<String>("appId") ?: ""))
+                            result.success(shareVideo(path, call.argument<String>("appId") ?: ""))
                         }
                     }
                     else -> result.notImplemented()
