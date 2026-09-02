@@ -1,13 +1,11 @@
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/api/work/my_task_api.dart';
 import '../../../core/data/employee.dart';
 import '../../../core/data/staff.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/feedback/app_dialog.dart';
-import '../../../core/widgets/input/app_button.dart';
 import '../../notifications/notification_screen.dart'
     show NotificationTarget, requestedScreen;
 import '../work_screen.dart' show requestedWorkSubTab, requestedWorkTab;
@@ -73,7 +71,7 @@ Future<bool> showMyTaskMissModal(BuildContext context) async {
   // **본인 것이 먼저다.** 점수가 깎이는 쪽이고, 남의 것은 오늘 안에 한 번만
   // 뜨면 되므로 다음에 켤 때 그대로 남아 있다
   if (alert.mine.isNotEmpty) {
-    await showAppDialog<void>(context, (_) => _MineWarning(alert: alert));
+    await _warnMine(context, alert);
     return true;
   }
   if (alert.staff.isEmpty) return false;
@@ -87,7 +85,7 @@ Future<bool> showMyTaskMissModal(BuildContext context) async {
   await prefs.setString(_staffSeenKey, today);
 
   if (!context.mounted) return false;
-  await showAppDialog<void>(context, (_) => _StaffWarning(alert: alert));
+  await _warnStaff(context, alert);
   return true;
 }
 
@@ -96,149 +94,6 @@ String _summary(List<String> names) {
   if (names.length <= _listMax) return names.join(' · ');
   final head = names.take(_listMax).join(' · ');
   return '$head 외 ${names.length - _listMax}개';
-}
-
-/// 색 면 머리 + 본문 + 버튼 둘 — 동료평가 재촉 모달과 같은 틀
-class _Shell extends StatelessWidget {
-  _Shell({
-    required this.tone,
-    required this.badge,
-    required this.title,
-    required this.lead,
-    required this.body,
-    required this.hint,
-    required this.action,
-    required this.onGo,
-  });
-
-  final Color tone;
-  final String badge;
-  final String title;
-  final String lead;
-  final String body;
-  final String hint;
-  final String action;
-  final VoidCallback onGo;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: dialogWidth(context, 320),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 머리 — 얼마나 급한지를 색 면으로 먼저 보여준다
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.fromLTRB(22, 22, 22, 20),
-            color: tone.withValues(alpha: 0.10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: tone,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    badge,
-                    style: AppTextStyles.label.copyWith(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.surface,
-                    ),
-                  ),
-                ),
-                SizedBox(height: 12),
-                Text(
-                  title,
-                  style: AppTextStyles.title2.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(lead, style: AppTextStyles.body2.copyWith(color: tone)),
-              ],
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.fromLTRB(22, 18, 22, 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: AppColors.gray50,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    body,
-                    style: AppTextStyles.body2.copyWith(
-                      fontWeight: FontWeight.w600,
-                      height: 1.5,
-                    ),
-                  ),
-                ),
-                SizedBox(height: 10),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      CupertinoIcons.info_circle,
-                      size: 13,
-                      color: AppColors.gray400,
-                    ),
-                    SizedBox(width: 5),
-                    Expanded(
-                      child: Text(
-                        hint,
-                        style: AppTextStyles.caption.copyWith(
-                          fontSize: 12,
-                          height: 1.5,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 18),
-                Row(
-                  children: [
-                    Expanded(
-                      child: AppButton(
-                        label: '나중에',
-                        onTap: () => Navigator.pop(context),
-                      ),
-                    ),
-                    SizedBox(width: 8),
-                    Expanded(
-                      flex: 2,
-                      child: AppButton(
-                        label: action,
-                        filled: true,
-                        onTap: () {
-                          Navigator.pop(context);
-                          onGo();
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 /// 업무 화면의 환경정비 탭 + [pane] 칸으로 보낸다
@@ -251,48 +106,40 @@ void _goWork(int pane) {
 }
 
 /// 본인이 남기고 퇴근했다 — **열 때마다** 뜬다
-class _MineWarning extends StatelessWidget {
-  _MineWarning({required this.alert});
-
-  final MyTaskMissAlert alert;
-
-  @override
-  Widget build(BuildContext context) {
-    // 마지막 기회면 붉게 — 오늘 안 하면 내일 그대로 깎인다
-    final tone = alert.lastChance ? AppColors.error : AppColors.warning;
-    return _Shell(
-      tone: tone,
-      badge: alert.lastChance ? '오늘까지' : '내일까지',
-      title: '안 한 업무가 있어요',
-      lead: alert.lastChance ? '오늘이 지나면 누락으로 확정돼요' : '다음 근무일까지 하면 돼요',
-      body: _summary(alert.mine),
-      hint: '누락이 확정되면 20점이 깎여요 · 사유가 있으면 사유서를 낼 수 있어요',
-      action: '하러 가기',
-      onGo: () => _goWork(_myTaskPane),
-    );
-  }
+Future<void> _warnMine(BuildContext context, MyTaskMissAlert alert) async {
+  // 마지막 기회면 붉게 — 오늘 안 하면 내일 그대로 깎인다
+  final last = alert.lastChance;
+  final go = await showConfirmDialog(
+    context,
+    icon: Icons.assignment_late_rounded,
+    iconColor: last ? AppColors.error : AppColors.warning,
+    title: '안 한 업무가 있어요',
+    message:
+        '${_summary(alert.mine)}\n\n'
+        '${last ? '오늘이 지나면 누락으로 확정돼요' : '다음 근무일까지 하면 돼요'}\n'
+        '확정되면 20점이 깎여요 · 사유가 있으면 사유서를 낼 수 있어요',
+    cancelLabel: '나중에',
+    confirmLabel: '하러 가기',
+  );
+  if (go) _goWork(_myTaskPane);
 }
 
 /// 남이 남기고 퇴근했다 — **하루 한 번**만 뜬다
-class _StaffWarning extends StatelessWidget {
-  _StaffWarning({required this.alert});
-
-  final MyTaskMissAlert alert;
-
-  @override
-  Widget build(BuildContext context) {
-    final names = [for (final s in alert.staff) s.name];
-    return _Shell(
-      tone: AppColors.warning,
-      badge: '오늘',
-      title: '${names.length}명이 업무를 남기고 퇴근했어요',
-      lead: '다음 근무일까지 안 하면 누락으로 확정돼요',
-      body: _summary(names),
-      hint: '오늘 한 번만 알려드려요',
-      action: '보러 가기',
-      // 점장만 세 번째 칸(직원 업무)이 있다 — 대표·관리자는 두 번째 칸이
-      // 곧 사람 목록이다
-      onGo: () => _goWork(myRole == Role.manager ? _staffPane : _myTaskPane),
-    );
-  }
+Future<void> _warnStaff(BuildContext context, MyTaskMissAlert alert) async {
+  final names = [for (final s in alert.staff) s.name];
+  final go = await showConfirmDialog(
+    context,
+    icon: Icons.groups_rounded,
+    iconColor: AppColors.warning,
+    title: '${names.length}명이 업무를 남기고 퇴근했어요',
+    message:
+        '${_summary(names)}\n\n'
+        '다음 근무일까지 안 하면 누락으로 확정돼요\n'
+        '오늘 한 번만 알려드려요',
+    cancelLabel: '나중에',
+    confirmLabel: '보러 가기',
+  );
+  // 점장만 세 번째 칸(직원 업무)이 있다 — 대표·관리자는 두 번째 칸이
+  // 곧 사람 목록이다
+  if (go) _goWork(myRole == Role.manager ? _staffPane : _myTaskPane);
 }

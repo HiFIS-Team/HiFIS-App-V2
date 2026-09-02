@@ -88,7 +88,7 @@ Future<void> showProjectDueModal(BuildContext context) async {
   await _writeSeen(prefs, next);
 
   if (target == null || !context.mounted) return;
-  await showAppDialog<void>(context, (_) => _ProjectDueDialog(project: target));
+  await _showDueDialog(context, target);
 }
 
 /// 모달 대상 — **내가 참여한**, 아직 안 끝난 프로젝트
@@ -163,187 +163,45 @@ int _daysLeft(_Project project, DateTime today) => DateTime(
   project.due.day,
 ).difference(DateTime(today.year, today.month, today.day)).inDays;
 
-/// 마감 임박 모달
-class _ProjectDueDialog extends StatelessWidget {
-  _ProjectDueDialog({required this.project});
+/// 마감 임박 팝업 — 삭제 확인 팝업과 같은 틀(아이콘 + 제목 + 본문 + 버튼 둘)
+Future<void> _showDueDialog(BuildContext context, _Project project) async {
+  final days = _daysLeft(project, DateTime.now());
+  final due = project.due;
+  final go = await showConfirmDialog(
+    context,
+    icon: Icons.flag_rounded,
+    iconColor: _dueTone(project, days),
+    title: _dueTitle(days),
+    // 얼마나 했는지를 같이 적는다 — 급한 정도만 보여주면 판단이 안 선다
+    message:
+        '${project.name} · 진행률 ${(project.progress * 100).round()}%\n\n'
+        '마감 ${due.year}년 ${due.month}월 ${due.day}일\n'
+        '${_dueSub(days)}',
+    cancelLabel: '나중에',
+    confirmLabel: '프로젝트 보기',
+  );
+  if (!go) return;
+  requestedProjectId.value = project.id;
+  requestedScreen.value = NotificationTarget.project;
+}
 
-  final _Project project;
+/// 급할수록 붉게 — 당일부터는 빨강, 임박은 주황, 그 밖은 프로젝트 색
+Color _dueTone(_Project project, int days) {
+  if (days <= 0) return AppColors.error;
+  if (days <= _dueSoonFrom) return AppColors.warning;
+  return project.color;
+}
 
-  int get _days => _daysLeft(project, DateTime.now());
+String _dueTitle(int days) {
+  if (days < 0) return '마감이 지났어요';
+  if (days == 0) return '오늘이 마감이에요';
+  if (days <= _dueSoonFrom) return '마감이 얼마 안 남았어요';
+  return '마감이 다가와요';
+}
 
-  /// 배지에 크게 찍는 말 — `D-3` · `D-DAY` · `D+2`
-  String get _dday {
-    final days = _days;
-    if (days == 0) return 'D-DAY';
-    if (days < 0) return 'D+${-days}';
-    return 'D-$days';
-  }
-
-  String get _title {
-    final days = _days;
-    if (days < 0) return '마감이 지났어요';
-    if (days == 0) return '오늘이 마감이에요';
-    if (days <= _dueSoonFrom) return '마감이 얼마 안 남았어요';
-    return '마감이 다가와요';
-  }
-
-  String get _sub {
-    final days = _days;
-    if (days < 0) return '${-days}일 지났어요. 지금 확인해 주세요';
-    if (days == 0) return '오늘 안에 마무리해 주세요';
-    return '$days일 뒤 마감이에요';
-  }
-
-  /// 급할수록 붉게 — 당일부터는 빨강, 임박은 주황, 그 밖은 프로젝트 색
-  Color get _tone {
-    final days = _days;
-    if (days <= 0) return AppColors.error;
-    if (days <= _dueSoonFrom) return AppColors.warning;
-    return project.color;
-  }
-
-  String get _dueLabel =>
-      '${project.due.year}년 ${project.due.month}월 ${project.due.day}일';
-
-  @override
-  Widget build(BuildContext context) {
-    final tone = _tone;
-    final percent = (project.progress * 100).round();
-
-    return Container(
-      width: dialogWidth(context, 320),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 머리 — 급한 정도를 색 면으로 먼저 보여준다
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.fromLTRB(22, 22, 22, 20),
-            color: tone.withValues(alpha: 0.10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: tone,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    _dday,
-                    style: AppTextStyles.label.copyWith(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.surface,
-                    ),
-                  ),
-                ),
-                SizedBox(height: 12),
-                Text(
-                  _title,
-                  style: AppTextStyles.title2.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(_sub, style: AppTextStyles.body2.copyWith(color: tone)),
-              ],
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.fromLTRB(22, 18, 22, 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: project.color,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        project.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTextStyles.body1.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 12),
-                // 얼마나 했는지 — 급한 정도만 보여주면 판단이 안 선다
-                Row(
-                  children: [
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(3),
-                        child: LinearProgressIndicator(
-                          value: project.progress.clamp(0.0, 1.0),
-                          minHeight: 6,
-                          backgroundColor: AppColors.gray100,
-                          valueColor: AlwaysStoppedAnimation(project.color),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 10),
-                    Text(
-                      '$percent%',
-                      style: AppTextStyles.caption.copyWith(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 8),
-                Text(
-                  '마감 $_dueLabel',
-                  style: AppTextStyles.caption.copyWith(fontSize: 12),
-                ),
-                SizedBox(height: 18),
-                Row(
-                  children: [
-                    Expanded(
-                      child: AppButton(
-                        label: '나중에',
-                        onTap: () => Navigator.pop(context),
-                      ),
-                    ),
-                    SizedBox(width: 8),
-                    Expanded(
-                      flex: 2,
-                      child: AppButton(
-                        label: '프로젝트 보기',
-                        filled: true,
-                        onTap: () {
-                          Navigator.pop(context);
-                          requestedProjectId.value = project.id;
-                          requestedScreen.value = NotificationTarget.project;
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+/// `D-3 · 3일 남았어요` — 배지 자리가 없어져서 D-day 를 본문에 같이 적는다
+String _dueSub(int days) {
+  if (days < 0) return 'D+${-days} · ${-days}일 지났어요';
+  if (days == 0) return 'D-DAY · 오늘 안에 마무리해 주세요';
+  return 'D-$days · $days일 남았어요';
 }
