@@ -41,6 +41,7 @@ import '../member/member_info.dart';
 import '../member/member_screen.dart';
 import 'contribution/contribution_section.dart';
 import 'lesson/lesson_section.dart';
+import 'lesson/pt_survey_screen.dart';
 import 'my_task/my_task_section.dart';
 import 'peer_review/peer_review_section.dart';
 import 'praise/praise_draw.dart';
@@ -71,6 +72,12 @@ const _writeInMaxLength = 80;
 /// 밖에서 이 탭을 열려고 번호를 손으로 적으면, 항목이 하나 늘 때 조용히
 /// 딴 탭이 열린다. 이름을 붙여 한 자리에 둔다.
 const workPeerReviewTab = 1;
+
+/// 업무 화면의 **수업 개수** 탭 번호 — `_items` 순서와 같아야 한다
+///
+/// PT 만족도 폼 알림이 이리로 보낸다 — 그 화면으로 가는 버튼이 이 탭 머리에
+/// 있어서, 탭까지 안 열어 주면 첫 칸(환경정비)이 떴다.
+const workLessonTab = 3;
 
 /// 업무 화면을 **어느 탭으로** 열지 — 넣고 나서 화면을 요청한다
 ///
@@ -118,47 +125,48 @@ class _WorkScreenState extends State<WorkScreen>
   /// 헤더 `+` 로 업무를 추가하면 오른다 — [MyTaskSection] 이 다시 받는다
   int _myTaskReload = 0;
 
-  /// 화면 왼쪽 끝 버튼을 켜고 끈다 — 탭마다 다른 것이 선다
+  /// 화면 왼쪽 끝 버튼을 칸마다 갈아 끼운다
   ///
-  /// | 탭 | 버튼 |
+  /// | 칸 | 버튼 |
   /// |---|---|
   /// | 환경정비 | `+` 내 업무 추가 (직접 수행하는 사람만) |
-  /// | 수업 개수 | 사람 — **회원 목록** (2026-08-31 대표 요청) |
+  /// | 회원 친절도 | 필름 — 이번 달 추첨 |
+  /// | 수업 개수 | 사람 둘 — 회원 정보 / 문서 — 운동일지 / 별 — PT 만족도 |
+  ///
+  /// **회원 화면으로 가는 큰 길은 홈 왼쪽 위 버튼이다** (2026-09-06 되돌림).
+  /// 여기 것은 수업 개수를 보다가 바로 넘어가는 곁길이라 그 칸에만 둔다.
   ///
   /// **환경정비의 `+` 는 그 탭에 있는 내내 둔다.** 공통 업무 / 내 업무 칸을
   /// 옮길 때마다 켰다 껐다 하면 버튼이 생겼다 없어져서 그게 곧 깜빡임이다.
   /// 공통 업무를 보다가 눌러도 되게, 만들고 나면 내 업무 칸으로 옮겨 준다.
   void _syncHeaderAction() {
     final item = _items[_tab];
-    if (item.checklist) {
-      _setHeaderAction([
-        if (_canDoEnv && _envTab != 2)
-          HeaderAction(symbol: 'plus', onPressed: _addMyTask),
-      ]);
-      return;
-    }
-    if (item.draw) {
+    _setHeaderAction([
+      if (item.checklist && _canDoEnv && _envTab != 2)
+        HeaderAction(symbol: 'plus', onPressed: _addMyTask),
       // **권한을 안 가린다** (2026-09-01 대표 결정) — 직원이 각자 자기
       // 인스타에 올리는 것까지가 목적이라 대표만 여는 자리가 아니다.
       // 지점은 서버가 가른다 (직원·점장은 자기 지점 것만 온다)
-      _setHeaderAction([HeaderAction(symbol: 'film', onPressed: _openDraw)]);
-      return;
-    }
-    // **권한을 안 가린다.** 목록을 보는 것뿐이고, 누가 무엇을 보는지는
-    // 회원 화면이 스스로 가른다 (담당자는 본인 것, 대표·관리자는 전체).
-    // 폰에서 대표가 회원 목록·운동일지에 닿는 길이 여기 하나다
-    _setHeaderAction([
+      if (item.draw) HeaderAction(symbol: 'film', onPressed: _openDraw),
       if (item.members) ...[
         // **`person` 을 쓰면 안 된다** — 헤더 오른쪽 프로필 버튼과 같은
         // 아이콘이라 한 줄에 똑같은 사람이 둘 선다. 여럿(`person.2`) 이
         // 회원 명단이라는 뜻도 더 맞다
         HeaderAction(symbol: 'person.2', onPressed: _openMembers),
-        // 운동 일지 — **사람 바로 옆이다** (2026-09-02 대표 요청).
-        // 예전에는 화면 안 버튼이었는데 대표·관리자에게는 그 줄이 통째로
-        // 안 그려져서 일지로 가는 길이 없었다
         HeaderAction(symbol: 'doc.text', onPressed: _openWorkouts),
       ],
+      // PT 만족도 폼 — **볼 수 있는 사람에게만 세운다** (2026-09-05).
+      // 트레이너(MEMBER)는 서버가 403 을 주므로 눌러도 빈 화면만 뜬다
+      if (item.members && myRole != Role.member)
+        HeaderAction(symbol: 'star.bubble', onPressed: _openPtSurveys),
     ]);
+  }
+
+  /// PT 만족도 폼 결과를 연다 — 신규 회원 7회차에 나간 설문이다
+  ///
+  /// 지점 고르개를 그대로 물려준다 — 세션 기록과 같은 범위를 본다.
+  void _openPtSurveys() {
+    showFullPage<void>(context, (_) => PtSurveyScreen(branchId: _branch));
   }
 
   /// 운동일지를 연다 — 회원을 고르면 그 사람 일지가 열린다

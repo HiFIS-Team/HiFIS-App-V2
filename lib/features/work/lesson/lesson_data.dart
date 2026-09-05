@@ -343,7 +343,9 @@ void _showSignDetail(BuildContext context, SessionSign sign) {
                   color: AppColors.gray50,
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: _SignImage(url: sign.signatureFullUrl),
+                child: sign.signatureFullUrl == null
+                    ? _NoSignature(size: 32)
+                    : _SignImage(url: sign.signatureFullUrl!),
               ),
               SizedBox(height: 14),
               Text(
@@ -354,6 +356,19 @@ void _showSignDetail(BuildContext context, SessionSign sign) {
               ),
               SizedBox(height: 4),
               Text(_formatStamp(sign.signedAt), style: AppTextStyles.caption),
+              if (sign.signatureSkipped) ...[
+                SizedBox(height: 10),
+                _SkippedBadge(),
+                if (sign.signatureSkippedByName case final who?) ...[
+                  SizedBox(height: 6),
+                  Text(
+                    '$who 님이 싸인 없이 기록했어요',
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                ],
+              ],
             ],
           ),
         ),

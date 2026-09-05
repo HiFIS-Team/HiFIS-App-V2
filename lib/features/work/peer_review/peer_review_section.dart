@@ -25,6 +25,7 @@ import '../../../core/widgets/glass/glass_bottom_button.dart';
 import '../../../core/widgets/glass/glass_icon_button.dart';
 import '../../../core/widgets/input/mode_switch.dart';
 import '../../../core/widgets/input/pressable.dart';
+import '../../../core/widgets/nav/month_bar.dart';
 import '../work_skeleton.dart';
 part 'peer_review_status.dart';
 part 'peer_review_submission.dart';
@@ -87,11 +88,38 @@ class _PeerReviewSectionState extends State<PeerReviewSection>
   /// 제출에서 400 이 나면 그게 더 나쁘다.
   PeerWindow _window = PeerWindow.closed;
 
-  /// 보고 있는 달 — 열려 있으면 지금 창, 닫혀 있으면 마지막 창이다.
+  /// 보고 있는 달 — 처음 열 때는 **서버가 준 창의 달**이다 (null 이면 아직 못 받았다)
   ///
   /// **오늘 날짜로 세지 않는다.** 9월 1일에 쓰는 평가는 9월이 아니라 **8월**
-  /// 것이고, 9월 15일에 읽는 것도 8월 것이다. 서버가 알려 준다.
-  String get _period => _window.period ?? periodKey(DateTime.now());
+  /// 것이고, 9월 15일에 읽는 것도 8월 것이다. 그래서 첫 달은 서버가 준
+  /// `window.period` 를 되돌려 쓴다 ([periodMonth]).
+  DateTime? _month;
+
+  /// 달을 넘기는 중 — 머리의 건수만 뼈대로 두고 아래 명단은 옛 것을 들고 있는다
+  ///
+  /// 통째로 뼈대를 깔면 달을 넘길 때마다 화면이 한 번 비워졌다 다시 찬다.
+  bool _switching = false;
+
+  /// 지금 보고 있는 기간 (`2026-08`)
+  String get _period => _month != null
+      ? periodKey(_month!)
+      : (_window.period ?? periodKey(DateTime.now()));
+
+  /// 서버가 열어 둔 **바로 그 달**을 보고 있나
+  ///
+  /// 지난달을 뒤적이는 동안에는 **평가를 쓰게 하면 안 된다.** 서버는 낸 평가를
+  /// 늘 열린 창의 기간으로 저장하므로(클라가 보낸 기간을 안 믿는다), 8월을
+  /// 펼쳐 놓고 낸 평가가 9월 것으로 들어간다.
+  bool get _atWindow => _window.period != null && _period == _window.period;
+
+  /// 더 앞으로 갈 데가 없나 — **서버 창의 달이 끝이다**
+  ///
+  /// 창을 못 받았으면(통신 오류) 이번 달로 막는다 — 안 막으면 오지도 않은
+  /// 달로 한없이 넘어간다.
+  bool get _atLatest {
+    final limit = periodMonth(_window.period) ?? _thisMonth();
+    return !(_month ?? limit).isBefore(limit);
+  }
 
   /// 평가를 쓰는 사람인가 — 대표·관리자는 현황만 본다
   bool get _canReview => currentUser?.role.doesFieldWork ?? false;
@@ -111,13 +139,20 @@ class _PeerReviewSectionState extends State<PeerReviewSection>
 
   Future<void> _load() async {
     final me = currentUser;
+    // 기다리는 사이 또 넘겼으면 이 응답은 버린다 — 늦게 온 옛 달이 새 달을
+    // 덮어쓰면 머리의 달과 명단이 어긋난다 (세션 기록과 같은 잠금이다)
+    final asked = _month;
     try {
       // 창을 먼저 받아야 어느 달을 볼지 정해진다 — 목록이 그 값에 매달린다
       final window = await PeerReviewApi.window();
-      final reviews = await PeerReviewApi.list(period: window.period);
-      if (!mounted) return;
+      // 처음 열 때만 서버 창을 따라간다. 달을 넘겨 둔 뒤라면 그 달을 지킨다 —
+      // 평가를 내고 돌아왔을 때 보던 달이 튀면 안 된다
+      final month = _month ?? periodMonth(window.period) ?? _thisMonth();
+      final reviews = await PeerReviewApi.list(period: periodKey(month));
+      if (!mounted || _month != asked) return;
       setState(() {
         _window = window;
+        _month = month;
         _targets = _targetsOf(me);
         _all = reviews;
         // 대표·관리자는 남이 쓴 평가까지 오므로 내가 쓴 것만 남긴다
@@ -126,16 +161,36 @@ class _PeerReviewSectionState extends State<PeerReviewSection>
           for (final review in reviews)
             if (review.reviewerId == me?.id) review.revieweeId: review,
         };
+        _switching = false;
         endLoad();
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || _month != asked) return;
       setState(() {
         _targets = _targetsOf(me);
+        _switching = false;
         endLoad();
       });
       AppToast.show(context, messageOf(error));
     }
+  }
+
+  static DateTime _thisMonth() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month);
+  }
+
+  /// 달을 옮긴다 — 목록만 그달 것으로 갈아끼운다
+  ///
+  /// **앞으로는 서버 창의 달까지만 간다.** 그 너머는 아직 오지 않은 평가라
+  /// 늘 비어 있고, 거기서 평가를 쓰게 두면 엉뚱한 달로 저장된다.
+  void _shiftMonth(int delta) {
+    final month = _month ?? _thisMonth();
+    setState(() {
+      _month = DateTime(month.year, month.month + delta);
+      _switching = true;
+    });
+    _load();
   }
 
   /// 평가 대상 — 같은 지점에서 **현장 업무를 하는 재직자**(직원·점장), 본인이 맨 앞
@@ -165,8 +220,11 @@ class _PeerReviewSectionState extends State<PeerReviewSection>
   ///
   /// 창이 닫혀 있어도 **이미 낸 것은 읽을 수 있다.** 못 여는 것은 아직 안 낸
   /// 사람뿐이다 — 지난달에 뭐라고 썼는지는 언제든 볼 수 있어야 한다.
+  ///
+  /// **지난달을 펼쳐 놓고는 새로 못 쓴다** ([_atWindow]). 서버가 낸 평가를 늘
+  /// 열린 창의 기간으로 저장해서, 8월을 보면서 낸 것이 9월로 들어간다.
   VoidCallback? _tapOf(Employee person) =>
-      _window.isOpen || _mine.containsKey(person.id)
+      (_window.isOpen && _atWindow) || _mine.containsKey(person.id)
       ? () => _openForm(person)
       : null;
 
@@ -185,16 +243,49 @@ class _PeerReviewSectionState extends State<PeerReviewSection>
     if (submitted == true && mounted) await _load();
   }
 
+  /// 명단 위에 붙는 안내 한 줄 — 없으면 빈 목록이다
+  ///
+  /// 둘은 못 쓰는 이유가 달라서 문구를 가른다. 창이 닫힌 것은 **때가 아니라서**
+  /// 고, 지난달은 **때가 지나서** 다. 같은 말로 묶으면 지난달을 펼쳐 놓고
+  /// "곧 열리나" 하고 기다리게 된다.
+  List<Widget> _notice() {
+    // 창을 알 때만 지난달이라고 말할 수 있다 — 못 받았으면 어느 달이 창인지 모른다
+    if (_window.period != null && !_atWindow) {
+      return [_Notice('지난 달은 읽기만 해요 · 새로 쓰려면 이번 달로 오세요'), SizedBox(height: 14)];
+    }
+    if (!_window.isOpen) {
+      return [_Notice('동료평가는 매월 말일과 다음 달 1일에만 열려요'), SizedBox(height: 14)];
+    }
+    return const [];
+  }
+
+  /// 달 이동 줄 — 세 갈래 화면(현황·폰·PC)이 같은 것을 쓴다
+  Widget _monthBar(int count, {String unit = '건'}) => MonthBar(
+    month: _month ?? _thisMonth(),
+    count: count,
+    loading: _switching,
+    onPrev: () => _shiftMonth(-1),
+    onNext: _atLatest ? null : () => _shiftMonth(1),
+    unit: unit,
+  );
+
   @override
   Widget build(BuildContext context) {
     if (showSkeleton) return WorkSectionSkeleton();
 
     // 대표·관리자는 평가를 쓰지 않는다 — 누가 냈는지만 본다
     if (!_canReview) {
-      return _SubmissionCard(
-        reviews: _all,
-        period: _period,
-        branchId: widget.branchId,
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _monthBar(_all.length, unit: '건'),
+          SizedBox(height: 8),
+          _SubmissionCard(
+            reviews: _all,
+            period: _period,
+            branchId: widget.branchId,
+          ),
+        ],
       );
     }
 
@@ -216,7 +307,9 @@ class _PeerReviewSectionState extends State<PeerReviewSection>
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (!_window.isOpen) ...[_ClosedNotice(), SizedBox(height: 14)],
+          _monthBar(_mine.length, unit: '건'),
+          SizedBox(height: 8),
+          ..._notice(),
           _FilterTabs(
             selected: _filter,
             onSelect: (filter) => setState(() => _filter = filter),
@@ -228,8 +321,8 @@ class _PeerReviewSectionState extends State<PeerReviewSection>
               text: _targets.isEmpty
                   ? '평가할 사람이 없어요'
                   : _filter == _Filter.pending
-                  ? '이번 달 평가를 모두 마쳤어요'
-                  : '아직 평가한 사람이 없어요',
+                  ? (_atWindow ? '이번 달 평가를 모두 마쳤어요' : '그 달 평가를 모두 마쳤어요')
+                  : '그 달에 평가한 사람이 없어요',
             )
           else
             for (var i = 0; i < shown.length; i++) ...[
@@ -250,12 +343,16 @@ class _PeerReviewSectionState extends State<PeerReviewSection>
       // 사람이 적으면 통째로 가운데로 밀린다 — 조직도에서 겪었다)
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (!_window.isOpen) ...[_ClosedNotice(), SizedBox(height: 14)],
+        _monthBar(_mine.length, unit: '건'),
+        SizedBox(height: 8),
+        ..._notice(),
         _ReviewProgress(done: done.length, total: _targets.length),
         SizedBox(height: 16),
         // 흰 카드로 감싸지 않는다 — 조직도처럼 머리말 선으로만 가른다
         SectionHeader(
-          title: '평가 작성',
+          // 지난달에는 쓸 수가 없다 — '작성' 이라고 두면 눌러 보고 안 열려서
+          // 고장으로 읽는다
+          title: _atWindow ? '평가 작성' : '평가 기록',
           info: Text(
             pending.isEmpty ? '모두 마쳤어요' : '남은 ${pending.length}명',
             style: AppTextStyles.caption.copyWith(
@@ -293,15 +390,17 @@ class _PeerReviewSectionState extends State<PeerReviewSection>
   }
 }
 
-/// 평가 창이 닫혔을 때의 안내 한 줄
+/// 명단 위에 붙는 안내 한 줄
 ///
 /// **명단은 그대로 두고 이 줄만 더한다** (2026-08-31 결정). 탭을 통째로
 /// 감추면 한 달에 이틀만 생겼다 사라져서 자리를 못 외운다. 지난달에 낸 것은
 /// 눌러서 그대로 읽힌다 — 못 여는 것은 아직 안 낸 사람뿐이다.
 ///
 /// 모양은 급여 신청서·세션 등록의 각주와 같다 (info_circle 13 · gray400).
-class _ClosedNotice extends StatelessWidget {
-  _ClosedNotice();
+class _Notice extends StatelessWidget {
+  _Notice(this.message);
+
+  final String message;
 
   @override
   Widget build(BuildContext context) => Row(
@@ -311,7 +410,7 @@ class _ClosedNotice extends StatelessWidget {
       SizedBox(width: 5),
       Expanded(
         child: Text(
-          '동료평가는 매월 말일과 다음 달 1일에만 열려요',
+          message,
           style: AppTextStyles.caption.copyWith(fontSize: 12, height: 1.5),
         ),
       ),

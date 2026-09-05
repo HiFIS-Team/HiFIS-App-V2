@@ -67,6 +67,26 @@ class _SignScreenState extends State<_SignScreen> {
     if (navigator.canPop()) navigator.pop();
   }
 
+  /// 싸인을 못 받고 회차만 올린다 (2026-09-05 요청)
+  ///
+  /// 회원이 먼저 가 버렸거나 서명을 받을 수 없는 자리가 있다. **싸인은 수업을
+  /// 했다는 증거**라 쉽게 건너뛰면 회차만 줄고 근거가 안 남는다 — 그래서
+  /// 한 번 묻고, 누가 올렸는지를 서버가 기록에 남긴다.
+  Future<void> _skipSignature() async {
+    if (_saving) return;
+    final member = widget.member;
+    final ok = await showConfirmDialog(
+      context,
+      title: '싸인 없이 기록할까요?',
+      message:
+          '${member.name}님 ${member.done + 1}회차가 차감돼요.\n'
+          '싸인을 못 받은 기록으로 남고, 누가 올렸는지도 같이 남아요.',
+      confirmLabel: '싸인 없이 기록',
+    );
+    if (!ok || !mounted) return;
+    await _save(skipSignature: true);
+  }
+
   void _clear() => setState(_strokes.clear);
 
   Future<void> _complete() async {
@@ -93,21 +113,50 @@ class _SignScreenState extends State<_SignScreen> {
         _padSize,
         pixelRatio: pixelRatio,
       );
-      final result = await SessionSignApi.create(
-        registrationId: registration.id,
-        signatureBase64: image,
-      );
-      if (!mounted) return;
-      AppToast.show(
-        context,
-        '${member.name}님 ${result.sign.sessionNo}회차 수업이 기록되었습니다',
-      );
-      Navigator.pop(context, true);
+      await _send(registration.id, signature: image);
     } catch (error) {
       if (!mounted) return;
       setState(() => _saving = false);
       AppToast.show(context, messageOf(error));
     }
+  }
+
+  /// 싸인 없이 회차만 올린다 — 서명을 굽는 과정이 통째로 없다
+  Future<void> _save({required bool skipSignature}) async {
+    final registration = widget.member.registration;
+    if (registration == null) {
+      AppToast.show(context, '등록권이 없어 기록할 수 없어요');
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      await _send(registration.id, skipSignature: skipSignature);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      AppToast.show(context, messageOf(error));
+    }
+  }
+
+  /// 서버에 올리고 화면을 닫는다 — 두 길(서명·생략)이 같은 끝을 쓴다
+  Future<void> _send(
+    String registrationId, {
+    String? signature,
+    bool skipSignature = false,
+  }) async {
+    final result = await SessionSignApi.create(
+      registrationId: registrationId,
+      signatureBase64: signature,
+      skipSignature: skipSignature,
+    );
+    if (!mounted) return;
+    AppToast.show(
+      context,
+      skipSignature
+          ? '${widget.member.name}님 ${result.sign.sessionNo}회차를 싸인 없이 기록했어요'
+          : '${widget.member.name}님 ${result.sign.sessionNo}회차 수업이 기록되었습니다',
+    );
+    Navigator.pop(context, true);
   }
 
   /// 일지가 없다 — **서명 패드를 아예 안 연다** (2026-08-31 대표 요청)
@@ -326,6 +375,17 @@ class _SignScreenState extends State<_SignScreen> {
             alignment: Alignment.bottomCenter,
             child: BottomActionBar(
               children: [
+                // 싸인을 못 받는 자리 — **채우지 않는다.** 기본은 받는 쪽이고
+                // 이건 어쩔 수 없을 때 쓰는 길이다 (2026-09-05 요청)
+                Expanded(
+                  child: BottomActionButton(
+                    id: 'sign-skip',
+                    label: '싸인 없이 기록',
+                    filled: false,
+                    onPressed: _skipSignature,
+                  ),
+                ),
+                SizedBox(width: 10),
                 Expanded(
                   child: BottomActionButton(
                     id: 'sign-done',

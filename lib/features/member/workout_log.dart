@@ -77,6 +77,9 @@ class WorkoutLogScreen extends StatefulWidget {
 
 class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
   late final _title = TextEditingController(text: widget.log?.title ?? '');
+
+  /// 새 일지를 열자마자 커서를 올리고, 제목에서 `다음` 을 받는다
+  final FocusNode _titleFocus = FocusNode();
   late DateTime _at = widget.log?.performedOn ?? DateTime.now();
   late final _trainer = TextEditingController(
     text: widget.log?.trainerFeedback ?? '',
@@ -116,6 +119,14 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
     _title.addListener(_onEdit);
     _pen = PenMode.on.value;
     PenMode.on.addListener(_onPen);
+    // 새로 쓰는 자리면 바로 적을 수 있게 커서를 올려 둔다 — 열자마자 제목 칸을
+    // 한 번 눌러야 하는 것이 매번 걸린다. **펜 모드에서는 안 올린다** (자판이
+    // 올라오면 필기할 자리가 반으로 준다)
+    if (widget.log == null && widget.editable && !_pen) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _titleFocus.requestFocus();
+      });
+    }
   }
 
   void _onPen() {
@@ -126,6 +137,7 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
   void dispose() {
     PenMode.on.removeListener(_onPen);
     _title.dispose();
+    _titleFocus.dispose();
     _trainer.dispose();
     for (final row in _weights) {
       row.dispose();
@@ -183,9 +195,59 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
     if (picked != null && mounted) setState(() => _at = picked);
   }
 
-  void _addWeight() => setState(() => _weights.add(_WeightEditor(null)));
+  /// 웨이트 한 줄 더 — **앞 줄 부위와 세트를 물려준다**
+  ///
+  /// 한 수업에서 같은 부위를 여러 개 하는 것이 보통이고(가슴 날이면 다 가슴),
+  /// 세트도 3세트로 쭉 가는 일이 많다. 줄마다 다시 고르게 하면 그만큼 팝업을
+  /// 여닫고 스테퍼를 눌러야 한다 — **다르면 그때 고치는 쪽이 빠르다.**
+  ///
+  /// [focus] 를 켜면 새 줄의 운동명으로 커서가 간다 — 자판이 내려갔다 올라오지
+  /// 않게 **다음 프레임**에 옮긴다 (그 전에는 아직 칸이 안 그려져 있다).
+  void _addWeight({bool focus = false}) {
+    final last = _weights.isEmpty ? null : _weights.last;
+    final row = _WeightEditor(null);
+    if (last != null) {
+      row.part.text = last.part.text;
+      row.sets.text = last.sets.text;
+    }
+    setState(() => _weights.add(row));
+    if (focus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) row.nameFocus.requestFocus();
+      });
+    }
+  }
 
-  void _addCardio() => setState(() => _cardio.add(_CardioEditor(null)));
+  void _addCardio({bool focus = false}) {
+    final row = _CardioEditor(null);
+    setState(() => _cardio.add(row));
+    if (focus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) row.nameFocus.requestFocus();
+      });
+    }
+  }
+
+  /// 무게 칸에서 `다음` 을 눌렀다 — 아래 줄로 내려가고, 마지막이면 한 줄 만든다
+  ///
+  /// **빈 줄이 남아 있으면 안 만든다.** 엔터를 두 번 치면 빈 줄이 쌓인다.
+  void _nextWeight(int index) {
+    if (index < _weights.length - 1) {
+      _weights[index + 1].nameFocus.requestFocus();
+      return;
+    }
+    if (_weights.last.isBlank) return;
+    _addWeight(focus: true);
+  }
+
+  void _nextCardio(int index) {
+    if (index < _cardio.length - 1) {
+      _cardio[index + 1].nameFocus.requestFocus();
+      return;
+    }
+    if (_cardio.last.isBlank) return;
+    _addCardio(focus: true);
+  }
 
   /// 마지막 한 줄은 지우는 대신 비운다 — 표가 통째로 사라지면 다시 만들 곳이 없다
   void _removeWeight(int index) => setState(() {
@@ -240,19 +302,22 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
     }
     setState(() => _busy = true);
     final title = _title.text.trim();
+    // **적은 줄만 보낸다.** 부위·세트는 새 줄에 물려받으므로, 그것만 차 있는
+    // 마지막 줄은 손도 안 대본 빈 줄이다 (`isBlank`)
     final weights = [
       for (final row in _weights)
-        if (!row.toRow().isEmpty) row.toRow(),
+        if (!row.isBlank) row.toRow(),
     ];
     final cardio = [
       for (final row in _cardio)
-        if (!row.toRow().isEmpty) row.toRow(),
+        if (!row.isBlank) row.toRow(),
     ];
     final media = [
       for (final group in _groups)
         if (!group.isEmpty) group.toGroup(),
     ];
-    final feedback = _isPt ? null : _trainer.text.trim();
+    // PT 도 피드백을 쓴다 (2026-09-05) — 예전에는 개인 운동만 보냈다
+    final feedback = _trainer.text.trim();
 
     try {
       final old = widget.log;
@@ -321,10 +386,17 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
       _Box(
         child: TextField(
           controller: _title,
+          focusNode: _titleFocus,
           enabled: editable,
           style: AppTextStyles.body1,
           cursorColor: AppColors.primary,
           maxLength: 100,
+          // 제목을 적고 `다음` 을 누르면 첫 운동으로 내려간다 — 날짜는 오늘이
+          // 그대로 맞는 날이 대부분이라 가운데서 멈추게 하지 않는다
+          textInputAction: TextInputAction.next,
+          onSubmitted: (_) {
+            if (_weights.isNotEmpty) _weights.first.nameFocus.requestFocus();
+          },
           decoration: InputDecoration(
             hintText: '예) 가슴, 삼두',
             hintStyle: AppTextStyles.body1.copyWith(color: AppColors.gray400),
@@ -363,7 +435,7 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
 
       const SizedBox(height: 22),
       _label('웨이트 운동'),
-      if (editable) _hint('부위를 누르고 · 운동명과 무게·세트를 적어요'),
+      if (editable) _hint('부위를 누르고 · 운동명과 무게·횟수·세트를 적어요'),
       const SizedBox(height: 8),
       Container(
         padding: const EdgeInsets.all(10),
@@ -375,11 +447,15 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
               // 펜 모드는 더 벌린다 — 손바닥이 옆 줄을 안 건드리게
               if (i > 0) SizedBox(height: _rowGap(context) + 2),
               _WeightRowFields(
+                // 줄을 지우면 뒤 줄이 앞으로 당겨진다 — 자리로 짝지으면 남의
+                // 칸을 듣고 있게 되므로 **줄 자체**를 열쇠로 쓴다
+                key: ObjectKey(_weights[i]),
                 row: _weights[i],
                 number: i + 1,
                 editable: editable,
-                // 보기를 첫 줄에만 둔다 — 줄마다 '가슴'이 뜼면 적어 넣은 것처럼 보인다
+                // 보기를 첫 줄에만 둔다 — 줄마다 '가슴'이 뜨면 적어 넣은 것처럼 보인다
                 showHint: i == 0,
+                onNext: () => _nextWeight(i),
                 onRemove: () => _removeWeight(i),
               ),
             ],
@@ -404,9 +480,11 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
             for (var i = 0; i < _cardio.length; i++) ...[
               if (i > 0) SizedBox(height: _rowGap(context)),
               _CardioRowFields(
+                key: ObjectKey(_cardio[i]),
                 row: _cardio[i],
                 editable: editable,
                 showHint: i == 0,
+                onNext: () => _nextCardio(i),
                 onRemove: () => _removeCardio(i),
               ),
             ],
@@ -418,14 +496,41 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
         _AddRow(label: '유산소 추가', onTap: _addCardio),
       ],
 
+      // 피드백이 사진보다 앞이다 (2026-09-05 요청 — 노션 서식과 같은 차례).
+      // **PT 도 쓴다.** 예전에는 개인 운동에만 뒀는데, 그러면 사진을 안 올린
+      // 회차는 피드백을 남길 자리가 아예 없었다 (묶음 피드백뿐이었다).
       const SizedBox(height: 22),
-      _label(_isPt ? '영상 / 사진' : '참고 자료'),
+      _label('피드백'),
+      if (editable) _hint('한 줄에 하나씩 적으면 회원 화면에 항목으로 보여요'),
+      const SizedBox(height: 8),
+      _Box(
+        multiline: true,
+        child: TextField(
+          controller: _trainer,
+          enabled: editable,
+          style: AppTextStyles.body1,
+          cursorColor: AppColors.primary,
+          maxLines: 8,
+          minLines: 3,
+          maxLength: 2000,
+          decoration: InputDecoration(
+            hintText: editable ? '오늘 수업에서 느낀 점 · 다음에 볼 것' : '아직 피드백이 없어요',
+            hintStyle: AppTextStyles.body1.copyWith(color: AppColors.gray400),
+            border: InputBorder.none,
+            isCollapsed: true,
+            counterText: '',
+          ),
+        ),
+      ),
+
+      const SizedBox(height: 22),
+      _label(_isPt ? '사진 or 영상' : '참고 자료'),
       const SizedBox(height: 4),
       Padding(
         padding: const EdgeInsets.only(left: 4, bottom: 8),
         child: Text(
           _isPt
-              ? '한 번에 올린 것끼리 묶여요 · 묶음마다 피드백을 남길 수 있어요'
+              ? '한 번에 올린 것끼리 묶여요 · 묶음마다 따로 적을 수도 있어요'
               : '자세를 찍어 두면 트레이너가 보고 피드백을 남겨요',
           style: AppTextStyles.caption.copyWith(color: AppColors.textTertiary),
         ),
@@ -444,31 +549,6 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
           label: _busy ? '올리는 중…' : '사진 · 영상 추가',
           icon: Icons.add_photo_alternate_outlined,
           onTap: _addMedia,
-        ),
-      ],
-
-      if (!_isPt) ...[
-        const SizedBox(height: 22),
-        _label('트레이너 피드백'),
-        const SizedBox(height: 8),
-        _Box(
-          multiline: true,
-          child: TextField(
-            controller: _trainer,
-            enabled: editable,
-            style: AppTextStyles.body1,
-            cursorColor: AppColors.primary,
-            maxLines: 6,
-            minLines: 3,
-            maxLength: 4000,
-            decoration: InputDecoration(
-              hintText: editable ? '이 운동에 대한 총평' : '아직 피드백이 없어요',
-              hintStyle: AppTextStyles.body1.copyWith(color: AppColors.gray400),
-              border: InputBorder.none,
-              isCollapsed: true,
-              counterText: '',
-            ),
-          ),
         ),
       ],
     ];
@@ -667,10 +747,6 @@ const _gap = 6.0;
 /// 고를 수 있는 운동 부위 — 트레이너가 실제로 쓰는 말만 둔다
 const _parts = ['가슴', '등', '어깨', '하체', '팔', '복근', '전신'];
 
-/// 웨이트 한 줄을 들고 있는 상자
-///
-/// **무게와 횟수를 한 칸에 적는다.** 맨몸·밴드처럼 무게가 없는 운동이 많아
-/// 숫자 칸을 따로 두면 절반이 빈 채로 남는다.
 /// 펜 모드인가 — 표 칸을 키워 **펜으로 쓸 자리**를 만든다 (2026-09-02 대표 요청)
 ///
 /// 트레이너가 수업하면서 적는데, 폰은 자판이고 **패드는 펜이 편하다.**
@@ -705,59 +781,158 @@ TextStyle _cellStyle(BuildContext context) =>
 /// 줄 사이 — 펜 모드면 손바닥이 옆 줄을 안 건드리게 벌린다
 double _rowGap(BuildContext context) => _Pen.of(context) ? 12 : 8;
 
+/// `60kg 12회` 를 무게와 횟수로 가른다 — **못 가르면 null**
+///
+/// 예전에는 한 칸에 자유롭게 적었다. `20kg x 12`·`맨몸`처럼 우리 서식이 아닌
+/// 줄이 이미 저장돼 있으므로, 못 알아보면 그 줄만 예전처럼 한 칸으로 보여
+/// 준다. 있는 글을 우리 마음대로 바꿔 쓰지 않는다.
+({String weight, String reps})? splitLoad(String raw) {
+  final text = raw.trim();
+  if (text.isEmpty) return (weight: '', reps: '');
+  final both = RegExp(r'^(\d+(?:\.\d+)?)kg\s*(\d+)회$').firstMatch(text);
+  if (both != null) {
+    return (weight: both.group(1)!, reps: both.group(2)!);
+  }
+  final only = RegExp(r'^(\d+(?:\.\d+)?)kg$').firstMatch(text);
+  if (only != null) return (weight: only.group(1)!, reps: '');
+  final reps = RegExp(r'^(\d+)회$').firstMatch(text);
+  if (reps != null) return (weight: '', reps: reps.group(1)!);
+  return null;
+}
+
+/// 두 칸을 다시 한 줄로 — 한쪽이 비면 그쪽 단위도 안 붙인다
+String joinLoad(String weight, String reps) {
+  final w = weight.trim();
+  final r = reps.trim();
+  if (w.isEmpty && r.isEmpty) return '';
+  if (w.isEmpty) return '$r회';
+  if (r.isEmpty) return '${w}kg';
+  return '${w}kg $r회';
+}
+
+/// `20분` 에서 숫자만 — 못 가르면 null (예전 자유 입력 줄)
+String? splitMinutes(String raw) {
+  final text = raw.trim();
+  if (text.isEmpty) return '';
+  final match = RegExp(r'^(\d+)분$').firstMatch(text);
+  return match?.group(1);
+}
+
 class _WeightEditor {
   _WeightEditor(WeightRow? row)
     : part = TextEditingController(text: row?.part ?? ''),
       name = TextEditingController(text: row?.name ?? ''),
-      load = TextEditingController(text: row?.load ?? ''),
-      sets = TextEditingController(text: row?.sets ?? '');
+      sets = TextEditingController(text: row?.sets ?? '') {
+    final split = splitLoad(row?.load ?? '');
+    if (split == null) {
+      free = TextEditingController(text: row?.load ?? '');
+    } else {
+      weight = TextEditingController(text: split.weight);
+      reps = TextEditingController(text: split.reps);
+    }
+  }
 
   final TextEditingController part;
   final TextEditingController name;
-  final TextEditingController load;
   final TextEditingController sets;
+
+  /// 무게(kg)·횟수 — **예전 서식으로 저장된 줄에서는 둘 다 없다**
+  TextEditingController? weight;
+  TextEditingController? reps;
+
+  /// 예전 자유 입력 칸 — 위 둘이 없을 때만 있다
+  TextEditingController? free;
+
+  /// 자판의 `다음` 으로 옮겨 다니려고 칸마다 초점을 든다
+  ///
+  /// 세트는 스테퍼라 자판이 안 뜬다 — 초점도 안 둔다.
+  final FocusNode nameFocus = FocusNode();
+  final FocusNode loadFocus = FocusNode();
+  final FocusNode repsFocus = FocusNode();
+
+  String get load =>
+      free != null ? free!.text.trim() : joinLoad(weight!.text, reps!.text);
+
+  /// 트레이너가 **아무것도 안 적은** 줄인가
+  ///
+  /// 부위와 세트는 앞 줄에서 물려받은 **기본값**이라 적은 것으로 안 친다 —
+  /// 안 그러면 손도 안 대본 마지막 줄이 `가슴 / 3세트` 만 담긴 채 저장된다.
+  bool get isBlank => name.text.trim().isEmpty && load.isEmpty;
 
   WeightRow toRow() => WeightRow(
     part: part.text.trim(),
     name: name.text.trim(),
-    load: load.text.trim(),
+    load: load,
     sets: sets.text.trim(),
   );
 
   void clear() {
     part.clear();
     name.clear();
-    load.clear();
     sets.clear();
+    weight?.clear();
+    reps?.clear();
+    free?.clear();
   }
 
   void dispose() {
     part.dispose();
     name.dispose();
-    load.dispose();
     sets.dispose();
+    weight?.dispose();
+    reps?.dispose();
+    free?.dispose();
+    nameFocus.dispose();
+    loadFocus.dispose();
+    repsFocus.dispose();
   }
 }
 
 class _CardioEditor {
   _CardioEditor(CardioRow? row)
-    : name = TextEditingController(text: row?.name ?? ''),
-      duration = TextEditingController(text: row?.duration ?? '');
+    : name = TextEditingController(text: row?.name ?? '') {
+    final minutes = splitMinutes(row?.duration ?? '');
+    if (minutes == null) {
+      free = TextEditingController(text: row?.duration ?? '');
+    } else {
+      time = TextEditingController(text: minutes);
+    }
+  }
 
   final TextEditingController name;
-  final TextEditingController duration;
+
+  /// 몇 분 — 숫자만 담는다 (`분` 은 칸에 붙박이로 적혀 있다)
+  TextEditingController? time;
+
+  /// 예전 자유 입력 칸 — `20분` 서식이 아닌 줄만 여기로 온다
+  TextEditingController? free;
+
+  final FocusNode nameFocus = FocusNode();
+  final FocusNode durationFocus = FocusNode();
+
+  String get duration {
+    if (free != null) return free!.text.trim();
+    final text = time!.text.trim();
+    return text.isEmpty ? '' : '$text분';
+  }
+
+  bool get isBlank => name.text.trim().isEmpty && duration.isEmpty;
 
   CardioRow toRow() =>
-      CardioRow(name: name.text.trim(), duration: duration.text.trim());
+      CardioRow(name: name.text.trim(), duration: duration);
 
   void clear() {
     name.clear();
-    duration.clear();
+    time?.clear();
+    free?.clear();
   }
 
   void dispose() {
     name.dispose();
-    duration.dispose();
+    time?.dispose();
+    free?.dispose();
+    nameFocus.dispose();
+    durationFocus.dispose();
   }
 }
 
@@ -766,13 +941,20 @@ class _CardioEditor {
 /// 네 칸을 한 줄에 밀어 넣으면 폰에서 무게 칸이 40픽셀도 안 남아 `60kg…` 로
 /// 잘린다. 줄을 나누면 칸마다 손가락이 들어가고, 무엇을 적는 자리인지도
 /// 보기글로 알 수 있다.
+///
+/// 아랫줄은 **숫자만 치는 칸 셋**이다 (2026-09-06 요청). 예전에는 `60kg 12회`
+/// 를 통째로 쳤는데, 단위까지 손으로 적느라 줄마다 글자 예닐곱 자를 더 쳤고
+/// 자판도 한글에서 숫자로 오갔다. 이제 `kg`·`회`·`세트` 는 칸에 붙박이로
+/// 적혀 있고 숫자판만 뜬다.
 class _WeightRowFields extends StatelessWidget {
   const _WeightRowFields({
+    super.key,
     required this.row,
     required this.number,
     required this.editable,
     required this.showHint,
     required this.onRemove,
+    this.onNext,
   });
 
   final _WeightEditor row;
@@ -786,6 +968,9 @@ class _WeightRowFields extends StatelessWidget {
   final bool showHint;
 
   final VoidCallback onRemove;
+
+  /// 마지막 숫자 칸에서 `다음` 을 눌렀을 때 — 아래 줄로 내려간다
+  final VoidCallback? onNext;
 
   @override
   Widget build(BuildContext context) => Row(
@@ -808,6 +993,10 @@ class _WeightRowFields extends StatelessWidget {
                 Expanded(
                   child: _Input(
                     controller: row.name,
+                    focusNode: row.nameFocus,
+                    onSubmitted: editable
+                        ? () => row.loadFocus.requestFocus()
+                        : null,
                     hint: showHint ? '벤치프레스' : '운동명',
                     editable: editable,
                     align: TextAlign.left,
@@ -817,36 +1006,70 @@ class _WeightRowFields extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 6),
-            Row(
-              children: [
-                Expanded(
-                  child: _Input(
-                    controller: row.load,
-                    hint: showHint ? '60kg 12회' : '무게 · 횟수',
-                    editable: editable,
-                    align: TextAlign.left,
-                  ),
-                ),
-                const SizedBox(width: _gap),
-                if (editable) ...[
-                  _SetsStepper(controller: row.sets),
-                  const SizedBox(width: _trailWidth),
-                ] else
-                  SizedBox(
-                    width: _setsWidth,
-                    child: _Input(
-                      controller: row.sets,
-                      hint: '세트',
-                      suffix: '세트',
-                      editable: false,
-                    ),
-                  ),
-              ],
-            ),
+            Row(children: [..._numbers(), if (editable) _trailingGap()]),
           ],
         ),
       ),
     ],
+  );
+
+  /// 오른쪽 지우기 버튼만큼 비워 둔다 — 윗줄과 칸 끝이 어긋나면 표로 안 보인다
+  Widget _trailingGap() => const SizedBox(width: _trailWidth);
+
+  /// 무게 · 횟수 · 세트 — 예전 서식 줄은 한 칸 그대로다
+  List<Widget> _numbers() {
+    if (row.free case final free?) {
+      return [
+        Expanded(
+          child: _Input(
+            controller: free,
+            focusNode: row.loadFocus,
+            onSubmitted: editable ? onNext : null,
+            hint: '무게 · 횟수',
+            editable: editable,
+            align: TextAlign.left,
+          ),
+        ),
+        const SizedBox(width: _gap),
+        _setsCell(),
+      ];
+    }
+    return [
+      Expanded(
+        child: _NumField(
+          controller: row.weight!,
+          focusNode: row.loadFocus,
+          unit: 'kg',
+          editable: editable,
+          decimal: true,
+          onSubmitted: editable ? () => row.repsFocus.requestFocus() : null,
+        ),
+      ),
+      const SizedBox(width: _gap),
+      Expanded(
+        child: _NumField(
+          controller: row.reps!,
+          focusNode: row.repsFocus,
+          unit: '회',
+          editable: editable,
+          onSubmitted: editable ? onNext : null,
+        ),
+      ),
+      const SizedBox(width: _gap),
+      _setsCell(),
+    ];
+  }
+
+  Widget _setsCell() => SizedBox(
+    width: _setsWidth,
+    child: editable
+        ? _SetsStepper(controller: row.sets)
+        : _Input(
+            controller: row.sets,
+            hint: '세트',
+            suffix: '세트',
+            editable: false,
+          ),
   );
 }
 
@@ -941,12 +1164,17 @@ class _StepButton extends StatelessWidget {
   );
 }
 
+/// 유산소 한 줄 — 운동명 / 몇 분
+///
+/// 시간도 `분` 을 손으로 안 적는다 — 숫자만 치고 단위는 칸에 붙어 있다.
 class _CardioRowFields extends StatelessWidget {
   const _CardioRowFields({
+    super.key,
     required this.row,
     required this.editable,
     required this.showHint,
     required this.onRemove,
+    this.onNext,
   });
 
   final _CardioEditor row;
@@ -954,29 +1182,147 @@ class _CardioRowFields extends StatelessWidget {
   final bool showHint;
   final VoidCallback onRemove;
 
+  /// 시간 칸에서 `다음` 을 눌렀을 때 — 아래 줄로 내려간다
+  final VoidCallback? onNext;
+
   @override
   Widget build(BuildContext context) => Row(
     children: [
       Expanded(
         child: _Input(
           controller: row.name,
+          focusNode: row.nameFocus,
+          onSubmitted: editable ? () => row.durationFocus.requestFocus() : null,
           hint: showHint ? '트레드밀' : '운동명',
           editable: editable,
           align: TextAlign.left,
         ),
       ),
       const SizedBox(width: _gap),
-      SizedBox(
-        width: _timeWidth,
-        child: _Input(
-          controller: row.duration,
-          hint: showHint ? '20분' : '시간',
-          editable: editable,
-        ),
-      ),
+      SizedBox(width: _timeWidth, child: _time()),
       if (editable) _RemoveButton(onTap: onRemove),
     ],
   );
+
+  /// 몇 분 — 예전 서식(`가볍게 20분`)으로 저장된 줄은 한 칸 그대로다
+  Widget _time() {
+    if (row.free case final free?) {
+      return _Input(
+        controller: free,
+        focusNode: row.durationFocus,
+        onSubmitted: editable ? onNext : null,
+        hint: '시간',
+        editable: editable,
+      );
+    }
+    return _NumField(
+      controller: row.time!,
+      focusNode: row.durationFocus,
+      unit: '분',
+      editable: editable,
+      onSubmitted: editable ? onNext : null,
+    );
+  }
+}
+
+/// 숫자만 치는 칸 — **단위는 칸에 붙박이로 적혀 있다**
+///
+/// `60kg 12회` 를 통째로 치던 것을 갈랐다 (2026-09-06). 단위를 손으로 안 적으니
+/// 자판이 숫자판으로 고정되고, 한글↔숫자를 오갈 일이 없다. 값이 비어 있어도
+/// 단위는 옅게 남겨 둔다 — 여기가 무슨 자리인지가 그것으로 드러난다.
+class _NumField extends StatelessWidget {
+  const _NumField({
+    required this.controller,
+    required this.unit,
+    required this.editable,
+    this.focusNode,
+    this.onSubmitted,
+    this.decimal = false,
+  });
+
+  final TextEditingController controller;
+
+  /// 칸 오른쪽에 붙박이로 적히는 말 — `kg` · `회` · `분`
+  final String unit;
+
+  final bool editable;
+  final FocusNode? focusNode;
+  final VoidCallback? onSubmitted;
+
+  /// 소수점을 받는가 — 무게는 `2.5kg` 를 쓴다
+  final bool decimal;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = controller.text.trim();
+    return Container(
+      height: _rowHeight(context),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: editable
+                ? TextField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    textAlign: TextAlign.right,
+                    keyboardType: TextInputType.numberWithOptions(
+                      decimal: decimal,
+                    ),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(
+                        decimal ? RegExp(r'[0-9.]') : RegExp(r'[0-9]'),
+                      ),
+                      LengthLimitingTextInputFormatter(decimal ? 6 : 4),
+                    ],
+                    textInputAction: onSubmitted == null
+                        ? TextInputAction.done
+                        : TextInputAction.next,
+                    onSubmitted: onSubmitted == null
+                        ? null
+                        : (_) => onSubmitted!(),
+                    style: _cellStyle(
+                      context,
+                    ).copyWith(fontWeight: FontWeight.w700),
+                    cursorColor: AppColors.primary,
+                    decoration: InputDecoration(
+                      hintText: '0',
+                      hintStyle: _cellStyle(
+                        context,
+                      ).copyWith(color: AppColors.gray300),
+                      border: InputBorder.none,
+                      isCollapsed: true,
+                    ),
+                  )
+                : Text(
+                    text.isEmpty ? '-' : text,
+                    textAlign: TextAlign.right,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: _cellStyle(context).copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: text.isEmpty
+                          ? AppColors.gray400
+                          : AppColors.textPrimary,
+                    ),
+                  ),
+          ),
+          const SizedBox(width: 3),
+          Text(
+            unit,
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.textTertiary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// 운동 부위 칸 — **눌러서 고른다**
@@ -1185,6 +1531,8 @@ class _Input extends StatelessWidget {
     required this.editable,
     this.suffix,
     this.align = TextAlign.center,
+    this.focusNode,
+    this.onSubmitted,
   });
 
   final TextEditingController controller;
@@ -1195,6 +1543,12 @@ class _Input extends StatelessWidget {
   final String? suffix;
 
   final TextAlign align;
+
+  /// 자판의 `다음` 으로 이 칸을 짚어 올 수 있게 한다
+  final FocusNode? focusNode;
+
+  /// `다음` 을 눌렀을 때 — 주면 자판에 `완료` 대신 `다음` 이 선다
+  final VoidCallback? onSubmitted;
 
   @override
   Widget build(BuildContext context) {
@@ -1212,7 +1566,13 @@ class _Input extends StatelessWidget {
       child: editable
           ? TextField(
               controller: controller,
+              focusNode: focusNode,
               textAlign: align,
+              // 적다 말고 다음 칸으로 — 자판을 내렸다 올리지 않는다
+              textInputAction: onSubmitted == null
+                  ? TextInputAction.done
+                  : TextInputAction.next,
+              onSubmitted: onSubmitted == null ? null : (_) => onSubmitted!(),
               style: _cellStyle(context).copyWith(fontWeight: FontWeight.w600),
               cursorColor: AppColors.primary,
               decoration: InputDecoration(

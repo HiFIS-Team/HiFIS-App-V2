@@ -1,6 +1,6 @@
 import '../client/api_client.dart';
 
-export '../client/period.dart' show periodKey;
+export '../client/period.dart' show periodKey, periodMonth;
 
 /// 동료 평가 항목 다섯 가지 — 서버 키와 화면 이름
 enum PeerCategory {

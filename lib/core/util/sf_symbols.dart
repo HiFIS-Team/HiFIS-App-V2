@@ -16,6 +16,9 @@ bool get isApple =>
 const _icons = <String, IconData>{
   // 헤더·화면 버튼
   'arrow.up.left.and.arrow.down.right': Icons.open_in_full_rounded,
+  // 다시 받기 — PT 만족도처럼 **밖에서 값이 들어오는** 화면이 쓴다.
+  // 회원이 방금 낸 답을 보려면 화면을 닫았다 여는 수밖에 없었다
+  'arrow.clockwise': Icons.refresh_rounded,
   'barcode.viewfinder': Icons.qr_code_scanner_rounded,
   'bell': Icons.notifications_none_rounded,
   'building.2': Icons.apartment_rounded,
@@ -69,6 +72,9 @@ const _icons = <String, IconData>{
   // 속을 안 채운 것을 골랐다 — 헤더 왼쪽에 서면 옆 버튼들이 다 외곽선이라
   // 채운 심볼은 **혼자 새까맣게 뜬다** (실제로 그렇게 보였다)
   'film': Icons.movie_outlined,
+  // PT 만족도 폼 — 수업 개수 헤더에서 사람·일지 옆에 선다.
+  // 옆 줄이 다 외곽선이라 여기도 속을 안 채운다 (`film`·`doc.text` 와 같은 이유)
+  'star.bubble': Icons.reviews_outlined,
 };
 
 IconData iconForSymbol(String symbol) =>

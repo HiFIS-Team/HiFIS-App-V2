@@ -23,6 +23,10 @@ enum NotificationKind {
   /// 서버가 `MY_TASK` 에서 갈라 보낸다. 같은 `MY_TASK` 에 수정·삭제 결재와
   /// **승인 알림**이 같이 섞여 있어서, 종류째 빨갛게 하면 승인도 경고로 보인다.
   myTaskMissing('MY_TASK_MISSING'),
+
+  /// PT 만족도 폼에 답이 왔다 — 결과를 볼 수 있는 사람만 받는다
+  /// (담당 트레이너 본인은 목록도 알림도 안 본다)
+  ptSurvey('PT_SURVEY'),
   other('');
 
   const NotificationKind(this.wire);

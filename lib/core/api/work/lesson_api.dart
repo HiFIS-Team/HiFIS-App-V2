@@ -191,6 +191,8 @@ class SessionSign {
     required this.sessionNo,
     required this.signatureUrl,
     required this.signedAt,
+    this.signatureSkipped = false,
+    this.signatureSkippedByName,
     this.memberName,
     this.totalSessions,
     this.registrationType,
@@ -202,8 +204,10 @@ class SessionSign {
     memberId: json['memberId'] as String,
     performedByTrainerId: json['performedByTrainerId'] as String,
     sessionNo: json['sessionNo'] as int,
-    signatureUrl: json['signatureUrl'] as String,
+    signatureUrl: json['signatureUrl'] as String?,
     signedAt: DateTime.parse(json['signedAt'] as String).toLocal(),
+    signatureSkipped: json['signatureSkipped'] as bool? ?? false,
+    signatureSkippedByName: json['signatureSkippedByName'] as String?,
     memberName: json['memberName'] as String?,
     totalSessions: json['totalSessions'] as int?,
     registrationType: json['registrationType'] == null
@@ -221,6 +225,12 @@ class SessionSign {
   /// 몇 회차인지 (1부터)
   final int sessionNo;
 
+  /// 회원 싸인 없이 채운 회차인가 — 그러면 [signatureUrl] 이 비어 있다
+  final bool signatureSkipped;
+
+  /// 싸인을 생략하고 올린 사람 — 누가 했는지 되짚는 자리다
+  final String? signatureSkippedByName;
+
   /// 서버가 조인해 준 표시용 값 — 예전 기록이면 비어 있을 수 있다
   final String? memberName;
   final int? totalSessions;
@@ -230,12 +240,15 @@ class SessionSign {
   ///
   /// 서명(HMAC)이 곧 인증이라 헤더 없이 `<img>` 로 바로 뜬다.
   /// 대신 **7일이 지나면 403** 이라, 목록을 다시 받아 새 URL을 얻어야 한다.
-  final String signatureUrl;
+  ///
+  /// **싸인을 생략한 기록이면 비어 있다** ([signatureSkipped]).
+  final String? signatureUrl;
 
   final DateTime signedAt;
 
-  /// 화면에 띄울 전체 주소
-  String get signatureFullUrl => fileUrl(signatureUrl);
+  /// 화면에 띄울 전체 주소 — 생략한 기록이면 null 이다
+  String? get signatureFullUrl =>
+      signatureUrl == null ? null : fileUrl(signatureUrl!);
 }
 
 /// 싸인 저장 결과 — 갱신된 등록권이 같이 온다 (usedSessions 가 올라간 상태)
@@ -485,17 +498,23 @@ class SessionSignApi {
   ///
   /// [signatureBase64] 는 PNG 를 base64 로 만든 것. 서버가 파일로 떨군다.
   /// [performedByTrainerId] 를 안 주면 요청한 사람이 수행자가 된다 (대타는 지정).
+  ///
+  /// [skipSignature] 를 켜면 **싸인 없이 회차만** 올린다 — 회원이 먼저 가
+  /// 버렸거나 서명을 받을 수 없는 자리가 있어서다. 그때는 [signatureBase64]
+  /// 를 안 보낸다. 누가 올렸는지는 서버가 남긴다.
   static Future<SessionSignResult> create({
     required String registrationId,
-    required String signatureBase64,
+    String? signatureBase64,
     String? performedByTrainerId,
+    bool skipSignature = false,
   }) async {
     final data = await ApiClient.instance.post(
       '/session-signs',
       body: {
         'registrationId': registrationId,
-        'signatureBase64': signatureBase64,
+        'signatureBase64': ?signatureBase64,
         'performedByTrainerId': ?performedByTrainerId,
+        if (skipSignature) 'skipSignature': true,
       },
     );
     // 급여 화면의 PT 커미션이 이 신호를 듣고 바로 다시 받는다.

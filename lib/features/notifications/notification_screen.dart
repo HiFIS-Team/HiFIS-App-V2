@@ -12,6 +12,7 @@ import '../../core/widgets/feedback/empty_card.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/glass/top_frost.dart';
 import '../project/project_screen.dart' show requestedProjectId;
+import '../work/work_screen.dart' show requestedWorkTab, workLessonTab;
 import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/feedback/failed_card.dart';
@@ -326,6 +327,11 @@ bool goToNotificationLink(String? link) {
   if (target == NotificationTarget.chat) {
     requestedRoomId.value = _roomIdOf(link);
   }
+  // PT 만족도는 업무 안 '수업 개수' 칸에 있다 — 탭까지만 옮기면 첫 칸이
+  // 열려서 볼 자리를 다시 찾아야 한다. **화면 요청보다 먼저** 넣는다
+  if (link == '/work/pt-surveys') {
+    requestedWorkTab.value = workLessonTab;
+  }
   requestedScreen.value = target;
   return true;
 }
@@ -409,6 +415,7 @@ IconData _iconOf(NotificationKind kind) => switch (kind) {
   NotificationKind.staff => Icons.badge_rounded,
   // 누락은 종이 아니라 경고 삼각형이다 — 색만 바꾸면 목록에서 종이 빨간 것으로만 보인다
   NotificationKind.myTaskMissing => Icons.warning_amber_rounded,
+  NotificationKind.ptSurvey => Icons.rate_review_rounded,
   NotificationKind.other => Icons.notifications_rounded,
 };
 
@@ -426,7 +433,9 @@ Color _colorOf(NotificationKind kind) => switch (kind) {
   NotificationKind.leave ||
   NotificationKind.project ||
   NotificationKind.ranking => AppColors.warning,
-  NotificationKind.approval || NotificationKind.payroll => AppColors.success,
+  NotificationKind.approval ||
+  NotificationKind.payroll ||
+  NotificationKind.ptSurvey => AppColors.success,
   NotificationKind.myTaskMissing => AppColors.error,
   NotificationKind.other => AppColors.gray400,
 };

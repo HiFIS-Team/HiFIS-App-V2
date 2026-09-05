@@ -49,7 +49,9 @@ class _SignCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(13),
                     border: Border.all(color: AppColors.gray100),
                   ),
-                  child: _SignImage(url: sign.signatureFullUrl),
+                  child: sign.signatureFullUrl == null
+                      ? _NoSignature()
+                      : _SignImage(url: sign.signatureFullUrl!),
                 ),
                 SizedBox(width: 12),
                 Expanded(
@@ -70,6 +72,10 @@ class _SignCard extends StatelessWidget {
                           ),
                           SizedBox(width: 6),
                           _MemberBadge(isNew: sign.isNewRegistration),
+                          if (sign.signatureSkipped) ...[
+                            SizedBox(width: 4),
+                            _SkippedBadge(),
+                          ],
                         ],
                       ),
                       SizedBox(height: 2),
@@ -147,7 +153,9 @@ class _SignRow extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: AppColors.gray100),
             ),
-            child: _SignImage(url: sign.signatureFullUrl),
+            child: sign.signatureFullUrl == null
+                ? _NoSignature()
+                : _SignImage(url: sign.signatureFullUrl!),
           ),
           SizedBox(width: 12),
           Expanded(
@@ -156,14 +164,23 @@ class _SignRow extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(
-                      sign.displayName,
-                      style: AppTextStyles.body2.copyWith(
-                        fontWeight: FontWeight.w700,
+                    // 이름이 길면 줄이는 자리다 — 안 감싸면 배지가 둘이 될 때 넘친다
+                    Flexible(
+                      child: Text(
+                        sign.displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.body2.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                     SizedBox(width: 6),
                     _MemberBadge(isNew: sign.isNewRegistration),
+                    if (sign.signatureSkipped) ...[
+                      SizedBox(width: 4),
+                      _SkippedBadge(),
+                    ],
                   ],
                 ),
                 SizedBox(height: 2),

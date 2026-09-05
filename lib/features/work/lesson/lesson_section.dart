@@ -325,6 +325,55 @@ class _ActionButton extends StatelessWidget {
   }
 }
 
+/// 회원 싸인 없이 채운 회차 배지 (2026-09-05)
+///
+/// **폰·PC·크게 보기가 다 이걸 쓴다.** 한 군데만 빠지면 그 화면을 보는 사람은
+/// 증거가 없다는 걸 모른다 — 정작 챙기는 대표·관리자가 PC 를 쓴다.
+class _SkippedBadge extends StatelessWidget {
+  _SkippedBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        '싸인 생략',
+        style: AppTextStyles.caption.copyWith(
+          fontSize: 10,
+          color: AppColors.warning,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+/// 서명 자리가 비었을 때 대신 그리는 칸
+///
+/// 빈 흰 상자를 두면 이미지가 안 뜨는 것처럼 보인다 — 일부러 생략한
+/// 것과 네트워크가 안 된 것을 가를 수 있어야 한다.
+class _NoSignature extends StatelessWidget {
+  _NoSignature({this.size = 16});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => ColoredBox(
+    color: AppColors.gray50,
+    child: Center(
+      child: Icon(
+        Icons.edit_off_rounded,
+        size: size,
+        color: AppColors.gray300,
+      ),
+    ),
+  );
+}
+
 /// 신규/재등록 배지
 class _MemberBadge extends StatelessWidget {
   _MemberBadge({required this.isNew});

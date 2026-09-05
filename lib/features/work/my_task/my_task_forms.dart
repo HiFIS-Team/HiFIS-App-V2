@@ -40,7 +40,17 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
   ///
   /// 근무 설정을 아직 안 한 사람은 이레 다 돈다 — 그 사람은 서버도 전부
   /// 근무일로 보므로(`_is_workday`) 어느 요일이든 비면 누락이다.
-  static final _stepDays = () {
+  ///
+  /// **`static` 이면 안 된다** (2026-09-05 고침). `static final` 은 앱이 켜진
+  /// 뒤 **처음 연 사람의 근무일로 굳어** 다음 사람에게도 그대로 갔다. 한
+  /// 기기를 여럿이 쓰는 자리에서 로그아웃하고 다른 사람이 들어와도 안 바뀐다.
+  ///
+  /// 그러면 **추가가 안 되는 것처럼 보인다.** 토·일 근무자가 앞사람(월~금)의
+  /// 요일로 담으면 저장은 되는데 그 요일이 본인 근무일이 아니라 하루 목록에
+  /// 영영 안 뜬다 (서버 `due_tasks` 가 요일로 거른다).
+  ///
+  /// 화면마다 새로 세면 그 자리에서 로그인한 사람 것이 된다.
+  late final List<int> _stepDays = () {
     final mine = currentUser?.workDays ?? const <int>[];
     return (mine.isEmpty ? [...everyWeekday] : [...mine])..sort();
   }();

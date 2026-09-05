@@ -35,6 +35,7 @@ import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/input/see_all_button.dart';
 import '../approval/approval_screen.dart';
+import '../member/member_screen.dart';
 import '../notice/notice_screen.dart';
 import '../notifications/notification_screen.dart';
 import '../project/project_screen.dart';
@@ -167,14 +168,15 @@ class _HomeScreenState extends State<HomeScreen>
   void _open(Widget screen) =>
       Navigator.push(context, CupertinoPageRoute(builder: (_) => screen));
 
-  /// 폰 홈 왼쪽 위 바로가기 — 일정 · 전자결재
+  /// 폰 홈 왼쪽 위 바로가기 — 일정 · 전자결재 · 회원
   ///
   /// **폰에는 이 둘의 탭이 없다** (`MainShell._go` 가 갈 데가 없어 그냥 돌아온다).
   /// 데스크톱은 사이드바에 메뉴가 있어서 안 그린다.
   /// 셸 헤더 버튼이 오른쪽 위를 쓰고 있어 왼쪽이 비어 있다.
   ///
-  /// **회원 관리는 여기 두지 않는다** (2026-08-31 대표 요청) — 운동일지가
-  /// 수업의 한 단계가 되면서 업무 탭 '수업 개수' 안으로 들어갔다.
+  /// **회원은 여기로 돌려놨다** (2026-09-06 요청) — 8월 31일에 업무 탭
+  /// '수업 개수' 안으로 넣었더니 홈에서 회원한테 닿는 길이 사라졌다.
+  /// 운동일지·개인 운동·영양제가 다 그 화면 안에 있어서 제일 자주 여는 곳이다.
   Widget _shortcuts() => SafeArea(
     bottom: false,
     child: Align(
@@ -191,6 +193,11 @@ class _HomeScreenState extends State<HomeScreen>
             GlassIconButton(
               symbol: 'checkmark.seal',
               onPressed: () => _open(ApprovalScreen()),
+            ),
+            SizedBox(width: 10),
+            GlassIconButton(
+              symbol: 'person.2',
+              onPressed: () => _open(MemberScreen()),
             ),
           ],
         ),
