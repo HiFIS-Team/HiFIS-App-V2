@@ -406,9 +406,10 @@ class _WorkScreenState extends State<WorkScreen>
   Future<void> _adjust(EnvItem item, int delta) async {
     try {
       if (delta > 0) {
-        // '기타'는 무슨 일을 했는지 먼저 받는다 — 안 적으면 남길 이유가 없다
+        // '기타'는 무슨 일을 했는지 먼저 받는다 — 안 적으면 남길 이유가 없다.
+        // 클레임해결도 같다 — 무슨 클레임을 끝냈는지가 그 기록의 전부다
         String? note;
-        if (_isWriteIn(item)) {
+        if (_isWriteIn(item) || _needsNote(item)) {
           note = await showAppDialog<String>(
             context,
             (_) => _WriteInCard(item: item),
@@ -482,7 +483,8 @@ class _WorkScreenState extends State<WorkScreen>
   /// 오늘 수행 내역 — 폰은 밀려 들어오는 화면, PC는 모달로 열린다
   ///
   /// [tabs]를 끄면 [all]로 지정한 쪽만 보여준다 (데스크톱 카드에서 열 때).
-  void _showHistory({bool all = false, bool tabs = true}) {
+  /// [item] 을 주면 그 항목만 추려서 열린다 (칩 가운데를 눌렀을 때).
+  void _showHistory({bool all = false, bool tabs = true, EnvItem? item}) {
     showFullPage<void>(
       context,
       (_) => _HistoryScreen(
@@ -493,6 +495,7 @@ class _WorkScreenState extends State<WorkScreen>
         // 날짜를 옮기면 그 화면이 직접 다시 받는다 — 어느 지점인지 넘겨준다
         branchId: _branch,
         initialAll: all,
+        initialItemName: item?.name,
         tabs: tabs,
       ),
     );
@@ -725,6 +728,8 @@ class _WorkScreenState extends State<WorkScreen>
                                         counts: _counts,
                                         onAdjust: _adjust,
                                         onShowHistory: _showHistory,
+                                        onOpenItem: (item) =>
+                                            _showHistory(item: item),
                                       ),
                                       if (isDesktop) SizedBox(height: 16),
                                     ],
@@ -788,7 +793,7 @@ class _WorkScreenState extends State<WorkScreen>
   }
 }
 
-/// '기타'에 적을 내용을 받는 팝업
+/// '기타'·'클레임해결' 에 적을 내용을 받는 팝업
 ///
 /// 비워 두면 완료할 수 없다. 적은 내용이 그대로 기록에 남는 자리라
 /// 빈 '기타' 는 남겨 봐야 나중에 아무 의미가 없다.
@@ -826,6 +831,7 @@ class _WriteInCardState extends State<_WriteInCard> {
 
   @override
   Widget build(BuildContext context) {
+    final claim = _needsNote(widget.item);
     return Container(
       width: dialogWidth(context, 320),
       padding: EdgeInsets.fromLTRB(24, 24, 24, 20),
@@ -837,10 +843,13 @@ class _WriteInCardState extends State<_WriteInCard> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('무엇을 했나요?', style: AppTextStyles.title3),
+          Text(claim ? '어떤 클레임을 해결했나요?' : '무엇을 했나요?',
+              style: AppTextStyles.title3),
           SizedBox(height: 6),
           Text(
-            '목록에 없는 일을 적어주세요. 적은 내용이 기록에 그대로 남아요.',
+            claim
+                ? '무슨 일이었고 어떻게 끝냈는지 적어주세요. 해결 목록에 그대로 남아요.'
+                : '목록에 없는 일을 적어주세요. 적은 내용이 기록에 그대로 남아요.',
             style: AppTextStyles.caption.copyWith(height: 1.5),
           ),
           SizedBox(height: 14),
@@ -858,7 +867,7 @@ class _WriteInCardState extends State<_WriteInCard> {
               cursorColor: AppColors.primary,
               onSubmitted: (_) => _submit(),
               decoration: InputDecoration(
-                hintText: '예) 창고 정리',
+                hintText: claim ? '예) 샤워실 온수 민원 — 보일러 교체' : '예) 창고 정리',
                 hintStyle: AppTextStyles.body1.copyWith(
                   color: AppColors.gray400,
                 ),
@@ -925,6 +934,13 @@ const _linkItems = {'블로그'};
 
 /// 대표가 가산점을 얹을 수 있는 항목 — **서버의 `AWARDABLE_ITEMS` 와 같아야 한다**
 const _awardableItems = {'블로그'};
+
+/// 무슨 일이었는지를 반드시 받는 항목 — **서버의 `NOTE_REQUIRED_ITEMS` 와 같아야 한다**
+const _noteRequiredItems = {'클레임해결'};
+
+bool _needsNote(EnvItem item) => _noteRequiredItems
+    .map(_WorkScreenState._envKey)
+    .contains(_WorkScreenState._envKey(item.name));
 
 bool _takesLink(EnvItem item) => _linkItems
     .map(_WorkScreenState._envKey)
@@ -1250,9 +1266,64 @@ class _PhotoLogCardState extends State<_PhotoLogCard> {
 /// 위치 입력 길이 — 기록에 그대로 남는 값이라 서버 컬럼(100)과 맞춘다
 const _placeMaxLength = 30;
 
+/// 적어 둔 내용을 보는 창 — 클레임해결·기타처럼 글만 남는 기록
+///
+/// 목록에서는 한 줄로 잘리는데, 클레임은 두세 문장이 되는 일이 흔하다.
+/// 설문에서 자동으로 들어온 기록은 회원이 적은 보완점이 그대로 담겨 있다.
+class _NoteLogCard extends StatelessWidget {
+  _NoteLogCard({required this.log});
+
+  final EnvTaskLog log;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: dialogWidth(context, 320),
+    padding: EdgeInsets.fromLTRB(24, 24, 24, 20),
+    decoration: BoxDecoration(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(log.itemName, style: AppTextStyles.title3),
+        SizedBox(height: 6),
+        Text(
+          '${dayLabel(log.createdAt)} ${_LogRow.formatTime(log.createdAt)}'
+          ' · ${_logAuthor(log)} · +${log.totalPoints}점',
+          style: AppTextStyles.caption.copyWith(height: 1.5),
+        ),
+        SizedBox(height: 14),
+        Container(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: AppColors.gray50,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            (log.note ?? '').trim(),
+            style: AppTextStyles.body1.copyWith(height: 1.5),
+          ),
+        ),
+        SizedBox(height: 12),
+        AppButton(label: '닫기', onTap: () => Navigator.pop(context)),
+      ],
+    ),
+  );
+}
+
 /// 수행 기록을 누가 남겼는지 — 서버는 직원 id 만 준다
 String _logAuthor(EnvTaskLog log) =>
     StaffDirectory.instance.byId(log.employeeId)?.name ?? '알 수 없음';
+
+/// 이 기록이 어느 항목인가 — **괄호 앞까지만 본다**
+///
+/// '기타' 는 적은 내용이 이름에 접혀 `기타(창고정리)` 로 남는다. 그대로 견주면
+/// 적은 글마다 다른 항목이 돼서 항목 필터에 하나도 안 걸린다.
+String _logItemKey(EnvTaskLog log) =>
+    _WorkScreenState._envKey(log.itemName.split('(').first);
 
 /// 블로그를 누르면 뜨는 창 — 글 주소를 받는다 (2026-08-28 대표 요청)
 ///

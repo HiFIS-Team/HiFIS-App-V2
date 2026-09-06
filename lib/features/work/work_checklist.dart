@@ -12,6 +12,7 @@ class _ChecklistCard extends StatelessWidget {
     required this.counts,
     required this.onAdjust,
     required this.onShowHistory,
+    required this.onOpenItem,
   });
 
   final List<EnvItem> items;
@@ -24,6 +25,12 @@ class _ChecklistCard extends StatelessWidget {
 
   /// 오늘 내역 시트 열기 (폰 전용)
   final VoidCallback onShowHistory;
+
+  /// 칩 가운데를 눌렀다 — 그 항목만 추린 내역을 열어 준다
+  ///
+  /// 클레임해결처럼 **무슨 일이었는지가 중요한 항목**이 있는데, 지금까지는
+  /// 전체 내역을 열어 항목 필터를 다시 골라야 닿았다 (2026-09-06 요청).
+  final void Function(EnvItem item) onOpenItem;
 
   @override
   Widget build(BuildContext context) {
@@ -94,6 +101,7 @@ class _ChecklistCard extends StatelessWidget {
                                   fontSize: fontSize,
                                   onAdjust: (delta) =>
                                       onAdjust(items[i + col], delta),
+                                  onOpen: () => onOpenItem(items[i + col]),
                                 )
                               : SizedBox(),
                         ),
@@ -147,11 +155,15 @@ class _CountChip extends StatelessWidget {
     required this.count,
     required this.onAdjust,
     required this.fontSize,
+    required this.onOpen,
   });
 
   final String label;
   final int count;
   final ValueChanged<int> onAdjust;
+
+  /// 가운데 글자를 눌렀다 — 그 항목 내역을 연다
+  final VoidCallback onOpen;
 
   /// 모든 칩이 함께 쓰는 글자 크기 — 길이와 상관없이 같아 보이게 한다
   final double fontSize;
@@ -198,16 +210,31 @@ class _CountChip extends StatelessWidget {
           // 글자 크기는 [_chipFontSize]가 모든 칩에 같은 값을 주므로
           // 여기서 줄어들 일은 없다. 계산이 한 픽셀 모자랄 때를 대비한
           // 안전망으로만 둔다 — 잘라내는(…) 것보다는 줄이는 게 낫다.
+          //
+          // 글자를 누르면 그 항목만 모은 내역이 열린다 — −/+ 는 자기 자리가
+          // 따로 있어서 섞이지 않는다.
           Expanded(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                label,
-                maxLines: 1,
-                style: AppTextStyles.body2.copyWith(
-                  fontSize: fontSize,
-                  color: active ? AppColors.primary : AppColors.textPrimary,
-                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+            child: Pressable(
+              onTap: onOpen,
+              child: SizedBox(
+                height: double.infinity,
+                child: Center(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      style: AppTextStyles.body2.copyWith(
+                        fontSize: fontSize,
+                        color: active
+                            ? AppColors.primary
+                            : AppColors.textPrimary,
+                        fontWeight: active
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -301,13 +328,19 @@ class _LogRowState extends State<_LogRow> {
   /// 눌러서 볼 것이 있는지 — 블로그는 주소와 가산점이 창에 있다
   bool get _hasBlog => _isAwardable(_log);
 
+  /// 무슨 일이었는지 적어 둔 줄인가 — 클레임해결·기타
+  String? get _note {
+    final text = (_log.note ?? '').trim();
+    return text.isEmpty ? null : text;
+  }
+
   @override
   Widget build(BuildContext context) {
     final row = _row();
     // **줄 모양은 그대로 둔다.** 볼 것이 있는 줄만 눌리게 하고, 없는 줄은
     // 예전처럼 아무 반응이 없다 — 아이콘·썸네일을 붙이면 사진이 있는 줄과
     // 없는 줄이 다르게 생겨서 목록이 들쭉날쭉해진다.
-    if (!_hasPhoto && !_hasBlog) return row;
+    if (!_hasPhoto && !_hasBlog && _note == null) return row;
     return Pressable(
       onTap: () => showAppDialog<void>(
         context,
@@ -316,7 +349,9 @@ class _LogRowState extends State<_LogRow> {
                 log: _log,
                 onAwarded: (saved) => setState(() => _log = saved),
               )
-            : _PhotoLogCard(log: _log),
+            : _hasPhoto
+            ? _PhotoLogCard(log: _log)
+            : _NoteLogCard(log: _log),
       ),
       child: row,
     );
@@ -325,58 +360,113 @@ class _LogRowState extends State<_LogRow> {
   Widget _row() {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 13),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SizedBox(
-            width: 64,
-            child: Text(
-              _LogRow.formatTime(_log.createdAt),
-              style: AppTextStyles.caption,
-            ),
+          Row(
+            children: [
+              SizedBox(
+                width: 64,
+                child: Text(
+                  _LogRow.formatTime(_log.createdAt),
+                  style: AppTextStyles.caption,
+                ),
+              ),
+              SizedBox(width: 8),
+              if (widget.showName) ...[
+                Text(
+                  _logAuthor(_log),
+                  style: AppTextStyles.body2.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _log.itemName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.body2.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ] else
+                Expanded(
+                  child: Text(
+                    _log.itemName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.body2.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              // 추가 점수가 얹혀진 줄임을 여기서 알린다 — 예전에는 창을 열어야 보였다.
+              // 대표가 보긴 했는데 0 을 준 줄은 붙일 것이 없어 빼다
+              if (_log.bonusPoints != 0) ...[
+                _BonusTag(points: _log.bonusPoints),
+                SizedBox(width: 6),
+              ],
+              // 그때 받은 점수 — 항목 배점이 나중에 바뀌어도 이 값은 안 바뀐다
+              Text(
+                '+${_log.totalPoints}',
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              SizedBox(width: 6),
+              Icon(
+                CupertinoIcons.checkmark_circle_fill,
+                size: 16,
+                color: AppColors.success,
+              ),
+            ],
           ),
-          SizedBox(width: 8),
-          if (widget.showName) ...[
-            Text(
-              _logAuthor(_log),
-              style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w600),
-            ),
-            SizedBox(width: 8),
-            Expanded(
+          if (_note case final note?)
+            Padding(
+              // 시각 칸(64) + 사이(8) 만큼 들여써서 항목 이름 아래로 붙는다
+              padding: EdgeInsets.only(left: 72, top: 3, right: 22),
               child: Text(
-                _log.itemName,
+                note,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: AppTextStyles.body2.copyWith(
-                  color: AppColors.textSecondary,
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.textTertiary,
                 ),
               ),
             ),
-          ] else
-            Expanded(
-              child: Text(
-                _log.itemName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppTextStyles.body2.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          // 그때 받은 점수 — 항목 배점이 나중에 바뀌어도 이 값은 안 바뀐다
-          Text(
-            '+${_log.totalPoints}',
-            style: AppTextStyles.caption.copyWith(
-              color: AppColors.primary,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          SizedBox(width: 6),
-          Icon(
-            CupertinoIcons.checkmark_circle_fill,
-            size: 16,
-            color: AppColors.success,
-          ),
         ],
+      ),
+    );
+  }
+}
+
+/// `추가 +5` 꼬리표 — 대표가 얹은 점수가 붙은 줄이라는 표시
+class _BonusTag extends StatelessWidget {
+  _BonusTag({required this.points});
+
+  final int points;
+
+  @override
+  Widget build(BuildContext context) {
+    // 깎은 줄도 있다 — 빨간으로 가른다 (예: 글이 부족해 되돌린 경우)
+    final up = points > 0;
+    final color = up ? AppColors.warning : AppColors.error;
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        up ? '추가 +$points' : '조정 $points',
+        style: AppTextStyles.caption.copyWith(
+          fontSize: 11,
+          color: color,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }

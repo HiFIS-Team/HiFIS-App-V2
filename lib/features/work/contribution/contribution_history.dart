@@ -126,6 +126,11 @@ class _ContributionCard extends StatelessWidget {
                 ),
               ),
               SizedBox(width: 8),
+              // 사람이 손으로 얹어 준 점수라는 표시 — 자동으로 쌓인 것과 가른다
+              if (item.granted) ...[
+                _GrantedTag(),
+                SizedBox(width: 6),
+              ],
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                 decoration: BoxDecoration(
@@ -237,6 +242,10 @@ class _ContributionRow extends StatelessWidget {
             ),
           ),
           SizedBox(width: 10),
+          if (item.granted) ...[
+            _GrantedTag(),
+            SizedBox(width: 6),
+          ],
           Text(
             item.pointsLabel,
             style: AppTextStyles.body2.copyWith(
@@ -253,6 +262,31 @@ class _ContributionRow extends StatelessWidget {
       ),
     );
   }
+}
+
+/// `부여` 꼬리표 — 사람이 손으로 얹어 준 점수라는 표시
+///
+/// 근무 외 출근·매출처럼 저절로 들어오는 줄과 섮여 있어서, 줄만 보고는
+/// 누가 준 것인지 알 수 없었다 (2026-09-06 요청).
+class _GrantedTag extends StatelessWidget {
+  _GrantedTag();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+    decoration: BoxDecoration(
+      color: AppColors.warning.withValues(alpha: 0.14),
+      borderRadius: BorderRadius.circular(6),
+    ),
+    child: Text(
+      '부여',
+      style: AppTextStyles.caption.copyWith(
+        fontSize: 11,
+        color: AppColors.warning,
+        fontWeight: FontWeight.w700,
+      ),
+    ),
+  );
 }
 
 /// 기여 내역 전체 화면 — 이번 달 내 기록

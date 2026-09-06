@@ -143,6 +143,7 @@ class _HistoryScreen extends StatefulWidget {
     required this.branchId,
     this.items = const [],
     this.initialAll = false,
+    this.initialItemName,
     this.tabs = true,
   });
 
@@ -161,6 +162,9 @@ class _HistoryScreen extends StatefulWidget {
 
   /// 어느 쪽으로 열지 (데스크톱은 누른 카드에 맞춰 연다)
   final bool initialAll;
+
+  /// 열자마자 걸어 두는 항목 이름 — 칩 가운데를 눌렀을 때 채워진다
+  final String? initialItemName;
 
   /// 내 내역·전체 내역 전환 탭을 보여줄지
   final bool tabs;
@@ -293,7 +297,7 @@ class _HistoryScreenState extends State<_HistoryScreen>
     return [
       for (final log in rows)
         if (person == null || log.employeeId == person)
-          if (item == null || _WorkScreenState._envKey(log.itemName) == item)
+          if (item == null || _logItemKey(log) == item)
             if (key.isEmpty ||
                 _WorkScreenState._envKey(log.itemName).contains(key) ||
                 _WorkScreenState._envKey(_logAuthor(log)).contains(key) ||

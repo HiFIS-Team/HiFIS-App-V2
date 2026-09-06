@@ -21,6 +21,7 @@ import '../../../core/widgets/feedback/empty_card.dart';
 import '../../../core/widgets/glass/glass_bottom_button.dart';
 import '../../../core/widgets/glass/glass_icon_button.dart';
 import '../../../core/widgets/glass/glass_search_bar.dart';
+import '../../../core/widgets/nav/month_bar.dart';
 import '../../../core/widgets/nav/pick_filter_button.dart';
 import '../../../core/widgets/input/person_picker.dart';
 import '../../../core/widgets/input/pressable.dart';
@@ -61,6 +62,30 @@ class _ContributionSectionState extends State<ContributionSection>
   /// 깎인 점수 — 지각·업무 누락처럼 **볼 자리가 없던 것들** (2026-08-28)
   List<ScoreEvent> _penalties = const [];
 
+  /// 보고 있는 달 — 달마다 끝나는 점수라 지난달을 돌아볼 일이 있다
+  ///
+  /// 예전에는 이번 달로 박혀 있어서, 달이 바뀌는 순간 지난달에 받은 기여가
+  /// 통째로 안 보였다 (2026-09-06 요청).
+  DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
+
+  /// 달을 옆기는 중인가 — 건수가 깜빡이지 않게 넣어 둔다
+  bool _turning = false;
+
+  /// 다음 달로 갈 수 있는가 — 이번 달보다 앞으로는 안 간다
+  bool get _canGoNext {
+    final now = DateTime.now();
+    return _month.isBefore(DateTime(now.year, now.month));
+  }
+
+  Future<void> _goMonth(int delta) async {
+    setState(() {
+      _month = DateTime(_month.year, _month.month + delta);
+      _turning = true;
+    });
+    await _load();
+    if (mounted) setState(() => _turning = false);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -94,7 +119,7 @@ class _ContributionSectionState extends State<ContributionSection>
       setState(endLoad);
       return;
     }
-    final period = periodKey(DateTime.now());
+    final period = periodKey(_month);
     const noGrants = <ContributionGrant>[];
     try {
       // 셋 다 이번 달만. 안 쓰는 것은 아예 안 부른다.
@@ -176,6 +201,7 @@ class _ContributionSectionState extends State<ContributionSection>
           points: grant.points,
           date: grant.createdAt,
           person: StaffDirectory.instance.byId(grant.grantedById)?.name,
+          granted: true,
         ),
       for (final grant in given)
         _Contribution(
@@ -186,6 +212,7 @@ class _ContributionSectionState extends State<ContributionSection>
           // 준 목록에서는 상대가 **받은 사람**이다
           person: StaffDirectory.instance.byId(grant.employeeId)?.name,
           given: true,
+          granted: true,
         ),
       for (final event in events)
         if (event.automatic && (scope == null || event.branchId == scope))
@@ -298,6 +325,8 @@ class _ContributionSectionState extends State<ContributionSection>
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          _monthBar(),
+          SizedBox(height: 8),
           // 항목 넷 — 무엇으로 점수가 쌓였는지
           _KindGrid(items: _items),
           if (myRole.canGrant) ...[
@@ -326,7 +355,7 @@ class _ContributionSectionState extends State<ContributionSection>
           if (recent.isEmpty)
             EmptyCard(
               icon: Icons.workspace_premium_rounded,
-              text: '이번 달 기여 기록이 없어요',
+              text: '${_month.month}월 기여 기록이 없어요',
             )
           else
             for (var i = 0; i < recent.length; i++) ...[
@@ -342,6 +371,8 @@ class _ContributionSectionState extends State<ContributionSection>
 
     return Column(
       children: [
+        _monthBar(),
+        SizedBox(height: 8),
         // 항목 넷 — 무엇으로 점수가 쌓였는지
         _KindGrid(items: _items),
         if (myRole.canGrant) ...[
@@ -358,6 +389,15 @@ class _ContributionSectionState extends State<ContributionSection>
       ],
     );
   }
+
+  /// 달 이동 줄 — 환경정비 내역·동료 평가와 **같은 부품이다**
+  Widget _monthBar() => MonthBar(
+    month: _month,
+    count: _items.length,
+    loading: _turning,
+    onPrev: () => _goMonth(-1),
+    onNext: _canGoNext ? () => _goMonth(1) : null,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -398,6 +438,7 @@ class _Contribution {
     this.penalty,
     this.person,
     this.given = false,
+    this.granted = false,
   });
 
   /// 점수 원장 줄 id — **깎인 것만 채워진다** (되돌릴 때 이 값을 쓴다)
@@ -422,6 +463,10 @@ class _Contribution {
 
   /// 내가 준 것인가 — 점장은 준 것과 받은 것을 한 목록에서 본다
   final bool given;
+
+  /// **사람이 손으로 얹어 준 점수인가** — 근무 외 출근·매출처럼
+  /// 저절로 들어오는 것과 가른다 (2026-09-06 요청 — "추가 점수 부여된 거 체크").
+  final bool granted;
 
   /// 깎인 것인가 — 화면은 이걸로 색과 부호를 가른다
   bool get isPenalty => kind == null;
