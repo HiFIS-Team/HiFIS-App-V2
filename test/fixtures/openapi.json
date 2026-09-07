@@ -2062,6 +2062,9 @@
     "entryCount": {},
     "game": {},
     "period": {},
+    "posterUrl": {
+     "nullable": true
+    },
     "videoAt": {
      "nullable": true
     },
@@ -3480,11 +3483,13 @@
      "nullable": true
     },
     "registrationId": {},
-    "signatureBase64": {}
+    "signatureBase64": {
+     "nullable": true
+    },
+    "skipSignature": {}
    },
    "required": [
-    "registrationId",
-    "signatureBase64"
+    "registrationId"
    ]
   },
   "SessionSignOut": {
@@ -3500,7 +3505,16 @@
      "nullable": true
     },
     "sessionNo": {},
-    "signatureUrl": {},
+    "signatureSkipped": {},
+    "signatureSkippedById": {
+     "nullable": true
+    },
+    "signatureSkippedByName": {
+     "nullable": true
+    },
+    "signatureUrl": {
+     "nullable": true
+    },
     "signedAt": {},
     "totalSessions": {
      "nullable": true
@@ -3512,7 +3526,6 @@
     "memberId",
     "performedByTrainerId",
     "sessionNo",
-    "signatureUrl",
     "signedAt"
    ]
   },
@@ -3897,6 +3910,20 @@
    "required": [
     "memberName",
     "trainerName"
+   ]
+  },
+  "TrainingSupplementOut": {
+   "properties": {
+    "dose": {},
+    "id": {},
+    "name": {},
+    "note": {},
+    "reason": {},
+    "timing": {}
+   },
+   "required": [
+    "id",
+    "name"
    ]
   },
   "TvOut": {
