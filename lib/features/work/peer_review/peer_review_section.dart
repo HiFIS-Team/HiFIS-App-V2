@@ -260,14 +260,25 @@ class _PeerReviewSectionState extends State<PeerReviewSection>
   }
 
   /// 달 이동 줄 — 세 갈래 화면(현황·폰·PC)이 같은 것을 쓴다
-  Widget _monthBar(int count, {String unit = '건'}) => MonthBar(
-    month: _month ?? _thisMonth(),
-    count: count,
-    loading: _switching,
-    onPrev: () => _shiftMonth(-1),
-    onNext: _atLatest ? null : () => _shiftMonth(1),
-    unit: unit,
-  );
+  ///
+  /// [showCount] 를 끄면 오른쪽 `총 N건` 이 빠지고 줄이 왼쪽 끝으로 붙는다.
+  /// **폰 평가 화면만 그렇게 쓴다** (2026-09-07 요청) — 거기는 바로 아래
+  /// `평가 전 · 평가 완료` 탭이 같은 수를 이미 말하고 있다.
+  Widget _monthBar(int count, {String unit = '건', bool showCount = true}) =>
+      MonthBar(
+        month: _month ?? _thisMonth(),
+        count: count,
+        loading: _switching,
+        onPrev: () => _shiftMonth(-1),
+        onNext: _atLatest ? null : () => _shiftMonth(1),
+        unit: unit,
+        showCount: showCount,
+        // 건수를 안 그리면 왼쪽 16 을 둘 이유가 없다 — 화살표가 제 안에 8 을
+        // 갖고 있어 0 으로 둬야 아래 카드 왼쪽 선과 눈으로 맞는다
+        padding: showCount
+            ? const EdgeInsets.fromLTRB(16, 6, 24, 6)
+            : const EdgeInsets.fromLTRB(0, 6, 24, 6),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -307,14 +318,16 @@ class _PeerReviewSectionState extends State<PeerReviewSection>
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _monthBar(_mine.length, unit: '건'),
+          _monthBar(_mine.length, unit: '건', showCount: false),
           SizedBox(height: 8),
-          ..._notice(),
           _FilterTabs(
             selected: _filter,
             onSelect: (filter) => setState(() => _filter = filter),
           ),
           SizedBox(height: 16),
+          // 안내는 **탭 밑**이다 (2026-09-07 요청) — 왜 안 눌리는지를
+          // 명단을 보기 직전에 읽게 된다
+          ..._notice(),
           if (shown.isEmpty)
             EmptyCard(
               icon: Icons.group_rounded,
