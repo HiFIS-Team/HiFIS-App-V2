@@ -35,7 +35,6 @@ import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/input/see_all_button.dart';
 import '../approval/approval_screen.dart';
-import '../member/member_screen.dart';
 import '../notice/notice_screen.dart';
 import '../notifications/notification_screen.dart';
 import '../project/project_screen.dart';
@@ -168,15 +167,19 @@ class _HomeScreenState extends State<HomeScreen>
   void _open(Widget screen) =>
       Navigator.push(context, CupertinoPageRoute(builder: (_) => screen));
 
-  /// 폰 홈 왼쪽 위 바로가기 — 일정 · 전자결재 · 회원
+  /// 폰 홈 왼쪽 위 바로가기 — 일정 · 전자결재
   ///
   /// **폰에는 이 둘의 탭이 없다** (`MainShell._go` 가 갈 데가 없어 그냥 돌아온다).
   /// 데스크톱은 사이드바에 메뉴가 있어서 안 그린다.
   /// 셸 헤더 버튼이 오른쪽 위를 쓰고 있어 왼쪽이 비어 있다.
   ///
-  /// **회원은 여기로 돌려놨다** (2026-09-06 요청) — 8월 31일에 업무 탭
-  /// '수업 개수' 안으로 넣었더니 홈에서 회원한테 닿는 길이 사라졌다.
-  /// 운동일지·개인 운동·영양제가 다 그 화면 안에 있어서 제일 자주 여는 곳이다.
+  /// **회원은 여기서 다시 뺐다** (2026-09-07 요청). 하루 전에 넣었다가 되돌린
+  /// 것이라 이력을 남긴다 — 8월 31일에 업무 탭 '수업 개수' 안으로 옮겼고,
+  /// 9월 6일에 "홈에서 닿는 길이 없다"고 해서 여기 돌려놨는데,
+  /// **운동일지는 수업 개수에서만 보이는 게 맞다**고 정해져서 도로 걷었다.
+  ///
+  /// 회원·운동일지로 가는 길은 업무 탭에 그대로 있다 — 헤더 아이콘
+  /// (`_openWorkouts`, 전원) 과 수업 개수 칸의 `운동 일지` 버튼(수행자만) 둘이다.
   Widget _shortcuts() => SafeArea(
     bottom: false,
     child: Align(
@@ -193,11 +196,6 @@ class _HomeScreenState extends State<HomeScreen>
             GlassIconButton(
               symbol: 'checkmark.seal',
               onPressed: () => _open(ApprovalScreen()),
-            ),
-            SizedBox(width: 10),
-            GlassIconButton(
-              symbol: 'person.2',
-              onPressed: () => _open(MemberScreen()),
             ),
           ],
         ),
