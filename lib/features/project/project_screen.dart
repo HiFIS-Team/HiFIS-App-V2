@@ -19,6 +19,7 @@ import '../../core/util/platform.dart';
 import '../../core/widgets/editor/post_actions.dart';
 import '../../core/widgets/display/avatar.dart';
 import '../../core/widgets/display/scroll_box.dart';
+import '../../core/widgets/display/section_header.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/feedback/empty_card.dart';
@@ -177,8 +178,14 @@ class _ProjectScreenState extends State<ProjectScreen>
   }
 
   List<_Project> get _visible {
-    final list = _projects.where((p) => p.phase == _phase).toList()
-      ..sort((a, b) => a.due.compareTo(b.due));
+    final list = _projects.where((p) => p.phase == _phase).toList();
+    // 완료 탭은 최근에 끝낸 것부터 — 달로 묶어 보여주니 안에서도 최신순이어야
+    // 한다 (마감일순이면 늦게 완료됐는데 마감이 일러서 아래로 밀린다)
+    if (_phase == _Phase.done) {
+      list.sort((a, b) => b.completedAt!.compareTo(a.completedAt!));
+    } else {
+      list.sort((a, b) => a.due.compareTo(b.due));
+    }
     return list;
   }
 
@@ -362,14 +369,17 @@ class _ProjectList extends StatelessWidget {
                           ),
                   ),
                 )
-              : ListView.separated(
+              : ListView(
                   padding: EdgeInsets.fromLTRB(12, 0, 12, 24),
-                  itemCount: projects.length,
-                  separatorBuilder: (_, _) => SizedBox(height: 4),
-                  itemBuilder: (context, i) => _ProjectTile(
-                    project: projects[i],
-                    selected: projects[i] == selected,
-                    onTap: () => onSelect(projects[i]),
+                  children: _projectRows(
+                    projects,
+                    phase,
+                    gap: 4,
+                    card: (p) => _ProjectTile(
+                      project: p,
+                      selected: p == selected,
+                      onTap: () => onSelect(p),
+                    ),
                   ),
                 ),
         ),

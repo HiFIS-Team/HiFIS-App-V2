@@ -56,19 +56,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   /// 달력이 보고 있는 달
   late DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
 
-  /// 주 달력이 보고 있는 주의 **일요일** — 폰 대표 화면에서만 쓴다
-  late DateTime _week = _sundayOf(DateTime.now());
-
-  /// 폰에서 대표·관리자는 달 대신 주로 본다
-  ///
-  /// 대표 칸은 그날 누가 어땠는지를 이름으로 담아서 칸이 상태 줄만큼 자란다.
-  /// 한 달을 세우면 폰에서 화면이 한참 길어져 훑기가 어렵다.
-  bool get _weekly => !isDesktop && _isBoss;
-
-  /// 그 주의 일요일 — 달력이 일요일 시작이라 거기에 맞춘다
-  static DateTime _sundayOf(DateTime date) =>
-      DateTime(date.year, date.month, date.day - date.weekday % 7);
-
   /// 탭에 다시 들어오거나 앱이 다시 앞으로 나왔을 때 조용히 다시 받는다
   @override
   Future<void> onScreenRefresh() => _load();
@@ -105,13 +92,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
   Future<void> _load() async {
     await _reload();
-    // 이번 주가 지난달에 걸쳐 있으면 그 달 기록도 받아야 한다.
-    // 첫 로딩은 이번 달만 받아 두어서(`_loadAttendance`) 안 받으면
-    // 지난달에 걸친 날들이 기록 없는 날처럼 빈칸으로 뜬다.
-    if (_weekly) {
-      final end = DateTime(_week.year, _week.month, _week.day + 6);
-      await _fetchMonths([_week, end]);
-    }
     if (mounted) setState(endLoad);
   }
 
@@ -135,18 +115,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     setState(() => _month = month);
     // 대표 달력은 전사 기록이라 달마다 따로 받아야 한다
     await _fetchMonths([month]);
-  }
-
-  Future<void> _moveWeek(int delta) async {
-    final week = DateTime(_week.year, _week.month, _week.day + delta * 7);
-    setState(() {
-      _week = week;
-      // 요약 카드는 달 기준이라 주가 넘어가면 같이 옮긴다
-      _month = DateTime(week.year, week.month);
-    });
-    // 한 주가 달을 걸칠 수 있다 — 첫날과 마지막 날의 달을 둘 다 받는다
-    final end = DateTime(week.year, week.month, week.day + 6);
-    await _fetchMonths([week, end]);
   }
 
   /// 그 달들의 기록을 받아 둔다 (이미 받은 달은 그냥 지나간다)
@@ -322,15 +290,18 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       );
     }
 
-    final calendar = _weekly
-        ? _WeekCalendar(start: _week, onMove: _moveWeek, onPick: _openDay)
-        : _MonthCalendar(
-            month: _month,
-            days: _days,
-            leaves: _leaves,
-            onMove: _moveMonth,
-            onPick: _openDay,
-          );
+    // **어느 화면이든 한 달 달력이다** (2026-09-07 요청). 예전에는 폰에서
+    // 대표·관리자만 주 단위로 접어서 봤다 — 칸에 `이름 외 N명 출근` 이 들어가
+    // 한 달이면 화면이 길어진다는 이유였는데, 한 주씩 넘겨 보느라 **이번 달을
+    // 한눈에 못 봤다.** 칸 높이는 그 달에서 제일 바쁜 날에 맞춰 자란다
+    // (`_bossCellHeight`) — 길어지더라도 달이 통째로 보이는 쪽을 골랐다.
+    final calendar = _MonthCalendar(
+      month: _month,
+      days: _days,
+      leaves: _leaves,
+      onMove: _moveMonth,
+      onPick: _openDay,
+    );
 
     if (!isDesktop) {
       return PhoneListScaffold(

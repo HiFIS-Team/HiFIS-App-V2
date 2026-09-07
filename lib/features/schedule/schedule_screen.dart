@@ -34,14 +34,19 @@ part 'schedule_data.dart';
 
 /// 일정 화면
 ///
-/// PC 는 화면을 꽉 채우는 월 달력 한 장, **폰은 한 주를 세로 일곱 줄**로 본다
-/// ([_SchedulePhone]). 날짜를 누르면 그 날 일정이 열리고, 거기서 추가·수정·삭제한다.
+/// **PC 도 폰도 한 달 달력 한 장이다** (2026-09-07 요청). 날짜를 누르면 그 날
+/// 일정이 열리고, 거기서 추가·수정·삭제한다.
+///
+/// 폰은 예전에 한 주를 세로 일곱 줄로 폈다 — 칸이 좁아 제목이 몇 글자밖에
+/// 안 들어간다는 이유였다. 그런데 **이번 달이 어떻게 돌아가는지를 못 봤다.**
+/// 칸에는 칩이 들어가는 만큼만 세우고 나머지는 `+N` 으로 접는다 ([_DayCell]) —
+/// 그 날을 누르면 제목·시각·장소가 다 있는 목록이 뜬다 ([_DayDialog]).
 ///
 /// **폰은 탭이 없어 홈 왼쪽 위 바로가기로 들어온다.**
 ///
 /// 일정은 **보고 있는 달만** 받는다. 한 번 받은 달은 다시 안 받으므로
-/// 달을 오가도 요청이 늘지 않는다. 폰도 달 단위로 받는다 — 주가 달을 걸쳐도
-/// [_loadMonth] 가 앞뒤로 한 주씩 넓혀 받아서 빈 날이 안 생긴다.
+/// 달을 오가도 요청이 늘지 않는다. 달력이 앞뒤 달 며칠을 같이 그려서
+/// [_loadMonth] 가 앞뒤로 한 주씩 넓혀 받는다 — 그 칸이 비지 않는다.
 class ScheduleScreen extends StatefulWidget {
   ScheduleScreen({super.key});
 
@@ -51,20 +56,10 @@ class ScheduleScreen extends StatefulWidget {
 
 class _ScheduleScreenState extends State<ScheduleScreen>
     with ScreenRefresh<ScheduleScreen>, SkeletonDelay<ScheduleScreen> {
-  /// 보고 있는 달 (1일로 맞춰 둔다) — PC 달력이 쓴다
+  /// 보고 있는 달 (1일로 맞춰 둔다) — PC·폰이 같이 쓴다
   late DateTime _month = _monthOf(DateTime.now());
 
-  /// 보고 있는 주의 일요일 — 폰 달력이 쓴다
-  late DateTime _week = _sundayOf(DateTime.now());
-
   static DateTime _monthOf(DateTime time) => DateTime(time.year, time.month);
-
-  /// 그 날이 낀 주의 일요일 — 달력이 일요일 시작이라 여기에 맞춘다
-  static DateTime _sundayOf(DateTime time) =>
-      DateTime(time.year, time.month, time.day - time.weekday % 7);
-
-  /// 받아야 하는 달 — 폰은 보고 있는 주가 낀 달이다
-  DateTime get _visibleMonth => isDesktop ? _month : _monthOf(_week);
 
   /// 탭에 다시 들어오거나 앱이 다시 앞으로 나왔을 때 조용히 다시 받는다
   @override
@@ -86,7 +81,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   /// 여기만 따로 놀면 안 된다 (예전에는 `bool _loading` 을 직접 들고 있었다).
   Future<void> _load() async {
     try {
-      await _loadMonth(_visibleMonth);
+      await _loadMonth(_month);
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
     }
@@ -98,19 +93,8 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     _load();
   }
 
-  void _moveWeek(int delta) {
-    setState(
-      () => _week = DateTime(_week.year, _week.month, _week.day + delta * 7),
-    );
-    _load();
-  }
-
   void _goToday() {
-    final now = DateTime.now();
-    setState(() {
-      _month = _monthOf(now);
-      _week = _sundayOf(now);
-    });
+    setState(() => _month = _monthOf(DateTime.now()));
     _load();
   }
 
@@ -153,6 +137,15 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     _load();
   }
 
+  /// 보고 있는 달에 걸치는 일정 수 — 머리말 옆에 뜬다.
+  /// 걸치는 일정은 지난달에 시작했어도 이 달에 보이므로 겹치면 센다
+  int get _monthCount {
+    final last = DateTime(_month.year, _month.month + 1, 0);
+    return events
+        .where((e) => !e.date.isAfter(last) && !e.until.isBefore(_month))
+        .length;
+  }
+
   /// 지금 보고 있는 사람 이름 — 개인 칸의 이름 버튼에 뜬다
   String get _personLabel =>
       StaffDirectory.instance.byId(personalOwnerId ?? '')?.name ?? '내 일정';
@@ -171,11 +164,10 @@ class _ScheduleScreenState extends State<ScheduleScreen>
       return;
     }
     final now = DateTime.now();
-    // 오늘이 보이는 자리면 오늘, 아니면 보고 있는 달·주의 첫날을 기본값으로
-    final start = isDesktop ? _month : _week;
-    final base = (isDesktop ? _monthOf(now) : _sundayOf(now)) == start
+    // 오늘이 보이는 달이면 오늘, 아니면 보고 있는 달의 1일을 기본값으로
+    final base = _monthOf(now) == _month
         ? DateTime(now.year, now.month, now.day)
-        : start;
+        : _month;
     final draft = await showEventDialog(context, date: base);
     if (draft == null || !mounted) return;
     try {
@@ -192,9 +184,10 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   Widget build(BuildContext context) {
     if (!isDesktop) {
       return _SchedulePhone(
-        week: _week,
+        month: _month,
+        count: _monthCount,
         loading: showSkeleton,
-        onMove: _moveWeek,
+        onMove: _move,
         onToday: _goToday,
         onAdd: _add,
         onPick: _openDay,
@@ -204,14 +197,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
       );
     }
 
-    // 그 달 1일이 낀 주의 일요일부터 채운다
-    final first = _month.subtract(Duration(days: _month.weekday % 7));
-    final last = DateTime(_month.year, _month.month + 1, 0);
-    final weeks = ((last.difference(first).inDays + 1) / 7).ceil();
-    // 걸치는 일정은 지난달에 시작했어도 이 달에 보이므로 겹치면 센다
-    final monthCount = events
-        .where((e) => !e.date.isAfter(last) && !e.until.isBefore(_month))
-        .length;
+    final monthCount = _monthCount;
 
     // 배경은 다른 화면과 같은 회색, 달력은 그 위에 얹힌 흰 카드로 둔다
     final page = Scaffold(
@@ -295,60 +281,16 @@ class _ScheduleScreenState extends State<ScheduleScreen>
           // 요일 머리
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 28),
-            child: Row(
-              children: [
-                for (var i = 0; i < 7; i++)
-                  Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.only(bottom: 8),
-                      child: Center(
-                        child: Text(
-                          _weekdays[i],
-                          style: AppTextStyles.caption.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: i == 0
-                                ? AppColors.error
-                                : AppColors.textSecondary,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+            child: _WeekdayHeader(),
           ),
           Expanded(
             child: Padding(
               padding: EdgeInsets.fromLTRB(28, 0, 28, 24),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.gray100),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Column(
-                  children: [
-                    for (var w = 0; w < weeks; w++)
-                      Expanded(
-                        child: Row(
-                          children: [
-                            for (var d = 0; d < 7; d++)
-                              Expanded(
-                                child: _DayCell(
-                                  date: first.add(Duration(days: w * 7 + d)),
-                                  month: _month.month,
-                                  lastWeek: w == weeks - 1,
-                                  lastColumn: d == 6,
-                                  onTap: _openDay,
-                                  skeleton: showSkeleton,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
+              // 남는 높이를 다 쓴다 (rowHeight 를 안 준다)
+              child: _MonthGrid(
+                month: _month,
+                onPick: _openDay,
+                skeleton: showSkeleton,
               ),
             ),
           ),
@@ -359,6 +301,99 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     // 뼈대가 뜰 때만 감싼다 — [SkeletonGroup] 은 반짝임을 늘 굴리는 컨트롤러라
     // 평소에도 두면 안 받아오는 동안 화면이 매 프레임 다시 그려진다
     return showSkeleton ? SkeletonGroup(child: page) : page;
+  }
+}
+
+/// 요일 머리 한 줄 — `일 월 화 수 목 금 토`
+///
+/// PC 와 폰이 **같은 것**을 쓴다. 따로 그리면 일요일 빨강 같은 것이 한쪽만
+/// 고쳐진다.
+class _WeekdayHeader extends StatelessWidget {
+  const _WeekdayHeader();
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      for (var i = 0; i < 7; i++)
+        Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(bottom: 8),
+            child: Center(
+              child: Text(
+                _weekdays[i],
+                style: AppTextStyles.caption.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: i == 0 ? AppColors.error : AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ),
+        ),
+    ],
+  );
+}
+
+/// 한 달 격자 — 일곱 칸씩 넉넉잡아 여섯 줄
+///
+/// **PC 와 폰이 같은 것을 쓴다** (2026-09-07). 달이 걸치는 앞뒤 며칠도 같이
+/// 그리고([_DayCell] 이 흐리게 칠한다), 그 칸의 일정은 [_loadMonth] 가 앞뒤로
+/// 한 주씩 넓혀 받아 둔 것이다.
+///
+/// [rowHeight] 가 null 이면 남는 높이를 줄 수만큼 나눠 쓴다 (PC — 화면을 꽉
+/// 채운다). 폰은 스크롤 안이라 높이가 무한이어서 **반드시 값을 준다.**
+class _MonthGrid extends StatelessWidget {
+  const _MonthGrid({
+    required this.month,
+    required this.onPick,
+    required this.skeleton,
+    this.rowHeight,
+  });
+
+  final DateTime month;
+  final ValueChanged<DateTime> onPick;
+  final bool skeleton;
+  final double? rowHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    // 그 달 1일이 낀 주의 일요일부터 채운다
+    final first = month.subtract(Duration(days: month.weekday % 7));
+    final last = DateTime(month.year, month.month + 1, 0);
+    final weeks = ((last.difference(first).inDays + 1) / 7).ceil();
+
+    Widget row(int w) => Row(
+      children: [
+        for (var d = 0; d < 7; d++)
+          Expanded(
+            child: _DayCell(
+              date: first.add(Duration(days: w * 7 + d)),
+              month: month.month,
+              lastWeek: w == weeks - 1,
+              lastColumn: d == 6,
+              onTap: onPick,
+              skeleton: skeleton,
+            ),
+          ),
+      ],
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.gray100),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          for (var w = 0; w < weeks; w++)
+            if (rowHeight case final height?)
+              SizedBox(height: height, child: row(w))
+            else
+              Expanded(child: row(w)),
+        ],
+      ),
+    );
   }
 }
 
@@ -687,42 +722,35 @@ class _DayCellState extends State<_DayCell> {
 ///
 /// 안 맞추면 다 받았을 때 칩이 밀려서 그것도 깜빡임이다.
 class _SkeletonChip extends StatelessWidget {
-  _SkeletonChip({this.big = false});
-
-  final bool big;
+  _SkeletonChip();
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: EdgeInsets.only(bottom: big ? 5 : 2),
+    padding: EdgeInsets.only(bottom: 2),
     child: SizedBox(
       width: double.infinity,
-      child: Skeleton(height: big ? 34 : 19, radius: 6),
+      child: Skeleton(height: 19, radius: 6),
     ),
   );
 }
 
 /// 달력 칸 안의 일정 한 줄
+///
+/// 크기는 한 가지다 — 칸에 몇 개 들어가는지 재는 [_DayCell] 의 21 이 이
+/// 높이(19 + 아래 여백 2)를 본다. 폰 주 달력이 쓰던 큰 칩은 걷어냈다
+/// (2026-09-07 — 폰도 달 격자를 쓴다).
 class _Chip extends StatelessWidget {
-  _Chip({required this.event, this.big = false});
+  _Chip({required this.event});
 
   final Event event;
-
-  /// 폰 주 달력용 — 줄이 가로로 길어서 칩도 크게 잡는다.
-  ///
-  /// **한 번 더 키웠다** (2026-08-28 대표 요청). 한 주는 늘 일곱 줄이라
-  /// 데이터가 아무리 많아도 화면 아래가 남는다 — 줄을 키워서 채운다.
-  ///
-  /// PC 달 격자는 칸이 좁아 예전 크기 그대로다
-  /// (칸에 몇 개 들어가는지 재는 `_DayCell` 의 21 이 그 크기를 본다).
-  final bool big;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: big ? 34 : 19,
+      height: 19,
       width: double.infinity,
-      margin: EdgeInsets.only(bottom: big ? 5 : 2),
-      padding: EdgeInsets.symmetric(horizontal: big ? 12 : 6),
+      margin: EdgeInsets.only(bottom: 2),
+      padding: EdgeInsets.symmetric(horizontal: 6),
       alignment: Alignment.centerLeft,
       decoration: BoxDecoration(
         // 대기 중인 것은 옅게 깔고 테두리로 가른다 — 아직 확정이 아니다
@@ -737,7 +765,7 @@ class _Chip extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: AppTextStyles.caption.copyWith(
-          fontSize: big ? 14 : 11,
+          fontSize: 11,
           color: event.kind.color.withValues(alpha: event.pending ? 0.6 : 1),
           fontWeight: FontWeight.w600,
         ),

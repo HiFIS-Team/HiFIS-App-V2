@@ -120,12 +120,19 @@ class _NotificationScreenState extends State<NotificationScreen>
   }
 
   /// 눌렀을 때 — 읽음으로 바꾸고, 갈 곳이 있으면 그 화면으로 보낸다
+  ///
+  /// **닫는 것이 먼저다** (2026-09-07). 사내톡·결재처럼 탭이 아니라 화면을
+  /// 밀어 올리는 종류가 있는데, 보내 놓고 나서 닫으면 **방금 연 그 화면이
+  /// 닫힌다** — 결재 알림을 눌러도 홈으로 돌아와서 "눌러도 아무 일도 안
+  /// 일어난다"로 보였다 (에뮬레이터에서 실제로 겪었다).
   void _open(AppNotification item) {
     _read(item);
 
-    if (!goToNotificationLink(item.link)) return;
+    // 갈 데가 없으면 읽음 처리만 하고 알림함은 그대로 둔다
+    if (_targetOf(item.link) == null) return;
     // 폰은 알림이 화면으로 밀려 올라와 있어서, 닫아야 목적지가 보인다
     if (!widget.embedded) Navigator.pop(context);
+    goToNotificationLink(item.link);
   }
 
   /// 읽음 — 화면을 먼저 바꾸고 서버에 보낸다.
@@ -308,6 +315,10 @@ enum NotificationTarget {
 /// 이 값을 집어 그 방을 밀어 올린다.
 final requestedRoomId = ValueNotifier<String?>(null);
 
+/// 알림에서 열어달라고 요청한 결재 문서 id — 프로젝트와 같은 방식이다.
+/// 전자결재 화면이 뜨면서 이 값을 집어 그 문서를 연다.
+final requestedApprovalId = ValueNotifier<String?>(null);
+
 /// 알림에서 열어달라고 요청한 화면 — `MainShell` 이 보고 탭을 옮긴다
 final requestedScreen = ValueNotifier<NotificationTarget?>(null);
 
@@ -327,6 +338,10 @@ bool goToNotificationLink(String? link) {
   if (target == NotificationTarget.chat) {
     requestedRoomId.value = _roomIdOf(link);
   }
+  // 결재도 링크에 id 가 실려 온다 (`/approvals/{id}`) — 그 문서를 연다.
+  if (target == NotificationTarget.approval) {
+    requestedApprovalId.value = _idOf(link);
+  }
   // PT 만족도는 업무 안 '수업 개수' 칸에 있다 — 탭까지만 옮기면 첫 칸이
   // 열려서 볼 자리를 다시 찾아야 한다. **화면 요청보다 먼저** 넣는다
   if (link == '/work/pt-surveys') {
@@ -338,9 +353,11 @@ bool goToNotificationLink(String? link) {
 
 /// 서버 링크 → 갈 화면. 갈 데가 없으면 null (읽음 처리만 한다)
 ///
-/// **아직 안 잇는 것들이 있다.**
-/// - `/approvals/{id}` — 데스크톱에만 있는 화면이라 폰에서 갈 데가 없다
-/// - `/schedule` — 일정도 데스크톱 전용이라 폰에서는 읽음 처리만 된다
+/// **아직 안 잇는 것이 있다.**
+/// - `/schedule` — 일정은 데스크톱 전용이라 폰에서는 읽음 처리만 된다
+///
+/// 전자결재(`/approvals/{id}`)는 폰에 **탭**이 없을 뿐 화면은 있어서
+/// (2026-09-07) `MainShell` 이 밀려 들어오는 화면으로 연다.
 /// 링크 뒤에 붙은 id — `/projects/abc-123` → `abc-123` (없으면 null)
 String? _idOf(String? link) {
   if (link == null) return null;
@@ -369,6 +386,7 @@ NotificationTarget? _targetOf(String? link) {
     'ranking' => NotificationTarget.ranking,
     'schedule' => NotificationTarget.schedule,
     'meetings' => NotificationTarget.meeting,
+    'approvals' => NotificationTarget.approval,
     // `/chat/rooms/{id}` — 그 방까지 연다 (2026-08-19)
     'chat' => NotificationTarget.chat,
     // 조직도는 데스크톱에만 있다 — 폰에서는 읽음 처리만 된다

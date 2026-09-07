@@ -2,34 +2,68 @@ part of 'chat_screen.dart';
 
 /// 말풍선 아래에 서는 리액션 알약 줄 — 이모지 종류마다 하나씩.
 ///
-/// 탭하면 **누가 눌렀는지** 시트가 열린다. 공지·회의록·프로젝트가 쓰던
-/// [showReactionPeople] 을 그대로 부르므로 모양도 같다.
+/// **누르면 내 공감이 붙었다 뗀다** (인스타 DM 과 같다, 2026-09-07 요청).
+/// 예전에는 누르면 '누가 눌렀나' 시트만 열려서, 잘못 단 것을 빼려면 말풍선을
+/// 길게 눌러 피커에서 같은 이모지를 다시 골라야 했다 — 뺄 길이 숨어 있었다.
+/// 누가 눌렀는지는 **꾹 누르면** 나온다 (공지·회의록과 같은 시트다).
 ///
 /// **[Row] 가 아니라 [Wrap] 이다.** PC 사내톡 도크는 폭이 380 뿐이라, 이모지가
 /// 여러 종 붙으면 한 줄에 안 들어가 노란 빗금이 뜬다. 넘치면 아랫줄로 내린다.
-class _ReactionPills extends StatelessWidget {
-  _ReactionPills({required this.reactions, required this.mine});
+class ChatReactionPills extends StatelessWidget {
+  ChatReactionPills({
+    super.key,
+    required this.reactions,
+    required this.mine,
+    required this.onToggle,
+    required this.onWho,
+  });
 
   final List<ReactionAgg> reactions;
 
   /// 내 말풍선이면 오른쪽부터 채운다 (두 줄로 넘어갔을 때 갈린다)
   final bool mine;
 
+  /// 알약을 눌렀다 — 그 이모지로 내 공감을 붙이거나 뗀다
+  final ValueChanged<String> onToggle;
+
+  /// 알약을 꾹 눌렀다 — 누가 눌렀는지 본다
+  final ValueChanged<String> onWho;
+
+  /// 세우는 차례 — **많이 눌린 것부터, 같으면 이모지 순**
+  ///
+  /// 서버가 주는 차례는 행이 쌓인 순서라 다시 받을 때마다 달라질 수 있다.
+  /// 그대로 두면 새로고침마다 알약이 자리를 바꿔서 **눌러 둔 것을 다시 찾아야**
+  /// 한다 (여러 사람이 여러 이모지를 단 말풍선에서 실제로 흔들렸다).
+  List<ReactionAgg> get _ordered {
+    final rows = [...reactions];
+    rows.sort((a, b) {
+      final byCount = b.count.compareTo(a.count);
+      return byCount != 0 ? byCount : a.emoji.compareTo(b.emoji);
+    });
+    return rows;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final myId = currentUser?.id;
     return Wrap(
       spacing: 4,
       runSpacing: 4,
       alignment: mine ? WrapAlignment.end : WrapAlignment.start,
       children: [
-        for (final reaction in reactions)
-          _ReactionPill(
+        for (final reaction in _ordered)
+          ChatReactionPill(
             key: ValueKey(reaction.emoji),
             emoji: reaction.emoji,
             count: reaction.count,
+            pressed: reaction.minePressed(myId),
             onTap: () {
               HapticFeedback.selectionClick();
-              showReactionPeople(context, reactions, emoji: reaction.emoji);
+              onToggle(reaction.emoji);
+            },
+            onLongPress: () {
+              HapticFeedback.selectionClick();
+              onWho(reaction.emoji);
             },
           ),
       ],
@@ -39,12 +73,14 @@ class _ReactionPills extends StatelessWidget {
 
 /// 알약 하나 — 이모지와 누른 사람 수.
 /// key가 이모지 값이라, 리액션이 새로 달리거나 바뀔 때마다 팝 애니메이션이 재생된다.
-class _ReactionPill extends StatelessWidget {
-  _ReactionPill({
+class ChatReactionPill extends StatelessWidget {
+  ChatReactionPill({
     super.key,
     required this.emoji,
     required this.count,
+    required this.pressed,
     required this.onTap,
+    required this.onLongPress,
   });
 
   final String emoji;
@@ -52,7 +88,12 @@ class _ReactionPill extends StatelessWidget {
   /// 누른 사람 수 — 1명이면 굳이 안 적는다 (알약이 길어지기만 한다)
   final int count;
 
+  /// **내가 누른 것** — 파랗게 물들여 뺄 수 있다는 걸 알린다.
+  /// 이 표시가 없으면 어느 것이 내 것인지 알 수 없어 지울 엄두를 못 낸다.
+  final bool pressed;
+
   final VoidCallback onTap;
+  final VoidCallback onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -67,14 +108,26 @@ class _ReactionPill extends StatelessWidget {
       // [Pressable] 이라야 PC 에서 손가락 커서가 뜬다 — 눌러서 볼 것이 있는 자리다
       child: Pressable(
         onTap: onTap,
+        onLongPress: onLongPress,
         child: Container(
-          height: 24,
-          padding: EdgeInsets.symmetric(horizontal: 8),
-          alignment: Alignment.center,
+          // 높이 26 · 이모지 12 — **글리프가 테두리에 닿지 않게** 잡은 값이다
+          // (2026-09-07 대표 지적: "이모지를 감싸는 테두리가 안 맞는다").
+          // 이모지는 글자와 달리 제 네모(em)보다 크게 그려지고, 그 정도가
+          // 이모지마다 다르다 — ❤️ 는 작고 😂 는 꽉 찬다. 제일 큰 것에 맞춰
+          // 위아래 5px 쯤 남긴다.
+          height: 26,
+          padding: EdgeInsets.symmetric(horizontal: 9),
+          // **[alignment] 를 주면 안 된다.** 값이 있으면 [Container] 가 부모가
+          // 준 폭을 **꽉 채우고** 그 안에 아이를 놓는다 — 알약이 화면 폭만큼
+          // 늘어나 이모지 하나가 가운데 떠 있었다 (2026-09-07 대표 지적).
+          // 빼면 아이(가로 최소인 [Row]) 크기로 줄어든다. 세로 가운데 정렬은
+          // 높이 24 안에서 [Row] 가 알아서 한다.
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: pressed ? AppColors.primaryLight : AppColors.surface,
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: AppColors.gray100),
+            border: Border.all(
+              color: pressed ? AppColors.primary : AppColors.gray100,
+            ),
             boxShadow: [
               BoxShadow(
                 color: Color(0x14101828),
@@ -86,15 +139,27 @@ class _ReactionPill extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _EmojiText(emoji, size: 13),
+              // **이모지 자리를 고정한다.** 글리프 폭이 글꼴마다 달라서 안 잡으면
+              // 알약 폭이 이모지마다 몇 px 씩 달라 줄이 들쭉날쭉해 보인다.
+              // 뜻밖에 넓은 이모지(다른 클라이언트가 보낸 것)는 줄여서 담는다 —
+              // 잘리면 반쪽짜리 그림이 남는다.
+              SizedBox(
+                width: 16,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: _EmojiText(emoji, size: 12),
+                ),
+              ),
               if (count > 1) ...[
-                SizedBox(width: 5),
+                SizedBox(width: 4),
                 Text(
                   '$count',
                   style: AppTextStyles.caption.copyWith(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textSecondary,
+                    color: pressed
+                        ? AppColors.primary
+                        : AppColors.textSecondary,
                   ),
                 ),
               ],

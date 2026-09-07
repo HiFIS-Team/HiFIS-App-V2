@@ -64,13 +64,12 @@ class _ProjectPhone extends StatelessWidget {
               text: '${phase.label} 프로젝트가 없어요',
             )
         else
-          for (var i = 0; i < projects.length; i++) ...[
-            if (i > 0) SizedBox(height: 12),
-            _ProjectCard(
-              project: projects[i],
-              onTap: () => _open(context, projects[i]),
-            ),
-          ],
+          ..._projectRows(
+            projects,
+            phase,
+            gap: 12,
+            card: (p) => _ProjectCard(project: p, onTap: () => _open(context, p)),
+          ),
       ],
     );
   }

@@ -2,19 +2,24 @@ part of 'schedule_screen.dart';
 
 // ── 폰 화면 ──
 
-/// 폰: 한 주를 세로 일곱 줄로 본다. 날짜를 누르면 그날 일정이 열린다.
+/// 폰: **한 달 달력 한 장** (2026-09-07 요청). 날짜를 누르면 그날 일정이 열린다.
 ///
-/// 달 격자를 폰에 그리면 칸 하나가 폭의 7분의 1(약 45)이라 일정 칩에 제목이
-/// 두어 글자밖에 안 들어가고, 나머지는 `+N` 으로 접혀서 **뭐가 있는지 알 수 없다.**
-/// 하루가 가로로 긴 줄이 되면 제목이 그대로 보인다.
-/// **PC 는 폭이 남아 달 그대로**다 (근태 달력과 같은 갈래다).
+/// 예전에는 한 주를 세로 일곱 줄로 폈다 — 칸이 폭의 7분의 1(약 50)이라 칩에
+/// 제목이 몇 글자밖에 안 들어간다는 이유였다. 그런데 한 주씩 넘겨 보느라
+/// **이번 달이 어떻게 돌아가는지를 못 봤다.**
+///
+/// 칸에는 들어가는 만큼만 칩을 세우고 나머지는 `+N` 으로 접는다 ([_DayCell] 이
+/// 제 높이를 보고 정한다). 무엇이 있는지는 **날짜를 눌러서** 본다 —
+/// 제목·시각·장소·참석자가 다 있는 목록이 뜬다 ([_DayDialog]). PC 달력도 같은
+/// 방식이라 두 화면이 같은 결이다.
 ///
 /// **폰에는 일정 탭이 없다** — 홈 왼쪽 위 바로가기로만 들어온다. 그래서
 /// 뒤로가기가 있어야 해서 [PhoneDetailScaffold] 를 쓴다
 /// (왼쪽 `<` · 가운데 제목 · 오른쪽 `+` — 알림 화면과 같은 머리 모양).
 class _SchedulePhone extends StatelessWidget {
   _SchedulePhone({
-    required this.week,
+    required this.month,
+    required this.count,
     required this.loading,
     required this.onMove,
     required this.onToday,
@@ -25,11 +30,14 @@ class _SchedulePhone extends StatelessWidget {
     required this.personLabel,
   });
 
-  /// 보고 있는 주의 일요일
-  final DateTime week;
+  /// 보고 있는 달 (1일)
+  final DateTime month;
+
+  /// 그 달에 걸치는 일정 수 — 머리말 옆에 뜬다
+  final int count;
   final bool loading;
 
-  /// -1 이면 지난 주, 1 이면 다음 주
+  /// -1 이면 지난 달, 1 이면 다음 달
   final ValueChanged<int> onMove;
   final VoidCallback onToday;
   final VoidCallback onAdd;
@@ -42,19 +50,14 @@ class _SchedulePhone extends StatelessWidget {
   final VoidCallback onPerson;
   final String personLabel;
 
-  /// 그 주에 걸치는 날짜 일곱 개
-  List<DateTime> get _dates => [
-    for (var i = 0; i < 7; i++) DateTime(week.year, week.month, week.day + i),
-  ];
+  /// 폰 칸 높이 — 날짜 동그라미(22)와 칩 두 장(21×2)이 들어가는 값.
+  ///
+  /// 여섯 줄이면 약 480 이라 스크롤 한 번에 달이 다 보인다. 더 키우면 아래
+  /// 몇 줄이 화면 밖으로 나가고, 줄이면 칩이 한 장도 못 들어가 `+N` 만 남는다.
+  static const _rowHeight = 78.0;
 
   @override
   Widget build(BuildContext context) {
-    final dates = _dates;
-    // 걸치는 일정은 지난주에 시작했어도 이 주에 보이므로 겹치면 센다
-    final count = events
-        .where((e) => !e.date.isAfter(dates.last) && !e.until.isBefore(week))
-        .length;
-
     final page = PhoneDetailScaffold(
       title: '일정',
       actions: [GlassIconButton(symbol: 'plus', onPressed: onAdd)],
@@ -73,10 +76,8 @@ class _SchedulePhone extends StatelessWidget {
                 onTap: () => onMove(-1),
               ),
               SizedBox(width: 6),
-              // 달을 넘어가는 주도 있어서 양끝을 다 적는다
               Text(
-                '${dates.first.month}.${dates.first.day}'
-                ' ~ ${dates.last.month}.${dates.last.day}',
+                '${month.year}년 ${month.month}월',
                 style: AppTextStyles.title3,
               ),
               SizedBox(width: 6),
@@ -110,20 +111,13 @@ class _SchedulePhone extends StatelessWidget {
             personLabel: personLabel,
           ),
           SizedBox(height: 14),
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.gray100),
-            ),
-            child: Column(
-              children: [
-                // 일정이 없는 날도 줄은 세운다 — 주말이 어디인지가 보여야 한다
-                for (final date in dates)
-                  _DayRow(date: date, onTap: onPick, skeleton: loading),
-              ],
-            ),
+          _WeekdayHeader(),
+          // 스크롤 안이라 높이가 무한이다 — 줄 높이를 정해 줘야 한다
+          _MonthGrid(
+            month: month,
+            onPick: onPick,
+            skeleton: loading,
+            rowHeight: _rowHeight,
           ),
         ],
       ),
@@ -131,106 +125,5 @@ class _SchedulePhone extends StatelessWidget {
 
     // 뼈대가 뜰 때만 감싼다 (PC 달력과 같은 사정 — 반짝임 컨트롤러를 늘 굴리지 않는다)
     return loading ? SkeletonGroup(child: page) : page;
-  }
-}
-
-/// 주 달력의 하루 — 날짜 + 그날 일정 칩
-class _DayRow extends StatelessWidget {
-  _DayRow({required this.date, required this.onTap, this.skeleton = false});
-
-  final DateTime date;
-  final ValueChanged<DateTime> onTap;
-
-  /// 아직 받아오는 중 — 일정 자리에 회색 칩을 깐다 (날짜·요일은 그대로 둔다)
-  final bool skeleton;
-
-  @override
-  Widget build(BuildContext context) {
-    final list = skeleton ? const <Event>[] : eventsOn(date);
-    final chips = skeleton ? _skeletonChips(date) : 0;
-    final today = _isSameDay(date, DateTime.now());
-    final sunday = date.weekday == DateTime.sunday;
-
-    return Pressable(
-      onTap: () => onTap(date),
-      child: Padding(
-        // 위아래를 늘린다 — 한 주는 늘 일곱 줄이라 줄이 낮으면 화면 아래가
-        // 통째로 빈다 (2026-08-28 대표 요청)
-        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 오늘은 달 달력 칸과 같은 파란 동그라미
-            Container(
-              width: 34,
-              height: 34,
-              alignment: Alignment.center,
-              decoration: today
-                  ? BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                    )
-                  : null,
-              child: Text(
-                '${date.day}',
-                style: AppTextStyles.body2.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: today
-                      ? Colors.white
-                      : sunday
-                      ? AppColors.error
-                      : AppColors.textPrimary,
-                ),
-              ),
-            ),
-            SizedBox(width: 6),
-            SizedBox(
-              width: 20,
-              child: Padding(
-                padding: EdgeInsets.only(top: 8),
-                child: Text(
-                  _weekdays[date.weekday % 7],
-                  style: AppTextStyles.caption.copyWith(
-                    fontSize: 12,
-                    color: sunday ? AppColors.error : AppColors.textTertiary,
-                  ),
-                ),
-              ),
-            ),
-            SizedBox(width: 8),
-            Expanded(
-              child: Padding(
-                // 첫 칩 가운데를 날짜 동그라미 가운데에 맞춘다 (0 + 34/2 = 34/2)
-                padding: EdgeInsets.only(
-                  top: (skeleton ? chips == 0 : list.isEmpty) ? 7 : 0,
-                ),
-                child: skeleton
-                    // 빈 날은 뼈대도 비운다 — 칸마다 깔면 '매일 일정이 있다'가 된다
-                    ? Column(
-                        children: [
-                          for (var i = 0; i < chips; i++)
-                            _SkeletonChip(big: true),
-                        ],
-                      )
-                    : list.isEmpty
-                    ? Text(
-                        '—',
-                        style: AppTextStyles.body2.copyWith(
-                          color: AppColors.gray300,
-                        ),
-                      )
-                    // 줄이 가로로 길어서 접을 것이 없다 — 그날 것을 다 세운다
-                    : Column(
-                        children: [
-                          for (final event in list)
-                            _Chip(event: event, big: true),
-                        ],
-                      ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

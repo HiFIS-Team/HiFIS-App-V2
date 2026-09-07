@@ -20,6 +20,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/photo_cache.dart';
 import '../../core/util/platform.dart';
+import '../../core/util/sf_symbols.dart' show isApple;
 import '../../core/util/when.dart';
 import '../../core/widgets/editor/reaction_row.dart';
 import '../../core/widgets/feedback/app_toast.dart';
@@ -38,8 +39,15 @@ part 'chat_reactions.dart';
 /// 리액션으로 고를 수 있는 이모지 목록
 const _reactionEmojis = ['❤️', '😂', '👍', '😮', '😢', '🔥'];
 
-/// 이모지 텍스트 — 애플 이모지 글리프가 자기 폭 안에서 왼쪽으로 치우쳐
-/// 그려지므로(시뮬레이터 픽셀 측정 결과 폰트 크기의 약 10%) 오른쪽으로 보정한다.
+/// 이모지 텍스트 — **애플에서만** 오른쪽으로 조금 민다.
+///
+/// 애플 이모지 글리프는 자기 폭 안에서 왼쪽으로 치우쳐 그려진다 (시뮬레이터
+/// 픽셀 측정 결과 폰트 크기의 약 10%). 그래서 그만큼 되민다.
+///
+/// **안드로이드·윈도우에서는 밀면 안 된다** (2026-09-07 대표 지적). 노토
+/// 이모지는 제 폭 가운데에 그려져서, 같이 밀면 공감 알약 안에서 이모지가
+/// 오른쪽으로 쏠려 **테두리와 안 맞아 보인다.** 옮기는 것은 그리기만 바꾸고
+/// 자리(레이아웃)는 그대로라 여백이 한쪽만 좁아진다.
 class _EmojiText extends StatelessWidget {
   _EmojiText(this.emoji, {required this.size});
 
@@ -48,14 +56,13 @@ class _EmojiText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Transform.translate(
-      offset: Offset(size * 0.10, 0),
-      child: Text(
-        emoji,
-        textAlign: TextAlign.center,
-        style: TextStyle(fontSize: size, height: 1),
-      ),
+    final text = Text(
+      emoji,
+      textAlign: TextAlign.center,
+      style: TextStyle(fontSize: size, height: 1),
     );
+    if (!isApple) return text;
+    return Transform.translate(offset: Offset(size * 0.10, 0), child: text);
   }
 }
 
@@ -762,9 +769,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         alignment: mine
                             ? Alignment.centerRight
                             : Alignment.centerLeft,
-                        child: _ReactionPills(
+                        child: ChatReactionPills(
                           reactions: message.reactions,
                           mine: mine,
+                          // 누르면 붙었다 뗀다 (인스타 DM 과 같다),
+                          // 꾹 누르면 누가 눌렀는지 나온다
+                          onToggle: (emoji) => _react(message, emoji),
+                          onWho: (emoji) => showReactionPeople(
+                            context,
+                            message.reactions,
+                            emoji: emoji,
+                          ),
                         ),
                       ),
                     ),

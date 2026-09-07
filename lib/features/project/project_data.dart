@@ -504,6 +504,67 @@ String? _idOfMember(_Project project, String? name) {
   return StaffDirectory.instance.byName(name)?.id;
 }
 
+// ── 완료 탭: 달로 묶어 보여주기 ──
+
+/// 목록을 화면 위젯 줄로 편다.
+///
+/// **완료 탭만 달로 묶는다** — 진행 중·누락은 몇 건 안 돼서 그냥 죽 나열해도
+/// 되지만, 완료는 지날수록 쌓이기만 해서 훑어보기 어려워진다 (2026-09-07
+/// 요청). [projects] 는 이미 [_ProjectScreenState._visible] 이 완료 탭이면
+/// 최신 완료순으로 정렬해 준다 — 여기서는 그 순서를 그대로 달마다 자른다.
+///
+/// [card] 로 프로젝트 한 장을 그린다 (폰 카드·데스크톱 타일이 서로 다르다).
+/// [gap] 은 카드 사이 간격 — 폰 12 · 데스크톱 4 (예전 `ListView.separated` 값).
+List<Widget> _projectRows(
+  List<_Project> projects,
+  _Phase phase, {
+  required Widget Function(_Project) card,
+  required double gap,
+}) {
+  if (phase != _Phase.done) {
+    return [
+      for (var i = 0; i < projects.length; i++) ...[
+        if (i > 0) SizedBox(height: gap),
+        card(projects[i]),
+      ],
+    ];
+  }
+
+  DateTime? month;
+  final rows = <Widget>[];
+  for (final project in projects) {
+    final done = project.completedAt ?? project.due;
+    final thisMonth = DateTime(done.year, done.month);
+    if (month != thisMonth) {
+      // 조직도 팀 머리말과 같은 간격(다음 구획 앞 20, 머리말 다음 12)
+      rows.add(SizedBox(height: month == null ? 0 : 20));
+      final count = projects
+          .where((p) {
+            final t = p.completedAt ?? p.due;
+            return t.year == thisMonth.year && t.month == thisMonth.month;
+          })
+          .length;
+      month = thisMonth;
+      rows.add(
+        SectionHeader(
+          title: '${thisMonth.year}년 ${thisMonth.month}월',
+          info: Text(
+            '$count건',
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.textTertiary,
+            ),
+          ),
+        ),
+      );
+      rows.add(SizedBox(height: 12));
+    } else {
+      rows.add(SizedBox(height: gap));
+    }
+    rows.add(card(project));
+  }
+  return rows;
+}
+
 // ── 표시용 계산 ──
 
 /// 마감까지 남은 일수 (오늘 기준, 지났으면 음수)

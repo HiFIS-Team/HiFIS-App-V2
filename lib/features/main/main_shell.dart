@@ -185,10 +185,17 @@ class _MainShellState extends State<MainShell> {
       return;
     }
 
-    // 폰에는 전자결재·일정·조직도 탭이 없다 — 갈 데가 없으면 아무 일도 안 한다
-    if (target == NotificationTarget.approval ||
-        target == NotificationTarget.schedule ||
+    // 폰에는 일정·조직도 탭이 없다 — 갈 데가 없으면 아무 일도 안 한다
+    if (target == NotificationTarget.schedule ||
         target == NotificationTarget.staff) {
+      return;
+    }
+
+    // 전자결재는 폰에 **탭**이 없을 뿐 화면은 있다 — 사내톡처럼 밀어 올려 연다.
+    // 예전에는 여기서도 그냥 돌아와서, 결재 알림을 눌러도 아무 일도 안
+    // 일어났다 (2026-09-07 — "안드로이드에서 결재 알림을 눌러도 안 열린다").
+    if (target == NotificationTarget.approval) {
+      _goApproval();
       return;
     }
 
@@ -258,6 +265,14 @@ class _MainShellState extends State<MainShell> {
         builder: (_) => isDesktop ? DesktopChatScreen() : MessageScreen(),
       ),
     );
+  }
+
+  /// 전자결재 열기 — 폰에는 탭이 없어 사내톡처럼 밀려 들어오는 화면으로 연다.
+  /// 화면이 뜨면서 `requestedApprovalId` 를 집어 그 문서까지 연다.
+  void _goApproval() {
+    final navigator = Navigator.of(context);
+    navigator.popUntil((r) => r.isFirst);
+    navigator.push(CupertinoPageRoute(builder: (_) => ApprovalScreen()));
   }
 
   List<Widget> get _subPages => [

@@ -33,6 +33,7 @@ import '../../core/util/when.dart';
 import '../../core/widgets/feedback/skeleton.dart';
 import '../../core/util/screen_refresh.dart';
 import '../../core/util/skeleton_delay.dart';
+import '../notifications/notification_screen.dart' show requestedApprovalId;
 part 'approval_list.dart';
 part 'approval_detail.dart';
 part 'approval_phone.dart';
@@ -80,7 +81,47 @@ class _ApprovalScreenState extends State<ApprovalScreen>
     super.initState();
     // 받아 둔 목록이 있으면 뼈대 없이 시작한다 (다시 열 때 안 깜빡인다)
     if (_docsLoaded) skipFirstSkeleton();
+    // 결재 알림에서 넘어온 문서 id — 목록을 받은 뒤에 연다 (프로젝트와 같은 방식)
+    requestedApprovalId.addListener(_onRequestId);
+    _pendingId = requestedApprovalId.value;
+    requestedApprovalId.value = null;
     _load();
+  }
+
+  @override
+  void dispose() {
+    requestedApprovalId.removeListener(_onRequestId);
+    super.dispose();
+  }
+
+  /// 알림에서 넘어온 결재 id — 목록을 받은 뒤에 실제 문서로 바꿔 연다
+  String? _pendingId;
+
+  void _onRequestId() {
+    final id = requestedApprovalId.value;
+    if (id == null) return;
+    requestedApprovalId.value = null;
+    _pendingId = id;
+    _openPending();
+  }
+
+  /// 대기 중인 id 를 실제 문서로 바꿔 연다.
+  /// **목록을 받기 전에는 아무것도 안 한다** — [_load] 가 받은 뒤 다시 부른다.
+  void _openPending() {
+    final id = _pendingId;
+    if (id == null || loading || !mounted) return;
+    _pendingId = null;
+    final found = _docs.where((d) => d.id == id).firstOrNull;
+    // 못 찾으면 목록만 보여준다 — 지워졌거나 내가 못 보는 결재다
+    if (found == null) return;
+    setState(() {
+      _filter = found.state == _State.withdrawn
+          ? _State.rejected
+          : found.state;
+      _selectedId = found.id;
+    });
+    // 폰은 2단이 아니라서 선택만으로는 안 보인다 — 상세를 밀어 올린다
+    if (!isDesktop) _openDoc(found);
   }
 
   /// 못 받았다 — **목록이 비어 있을 때만** 실패 카드를 낸다 (2026-08-21)
@@ -99,6 +140,7 @@ class _ApprovalScreenState extends State<ApprovalScreen>
       if (mounted) AppToast.show(context, messageOf(error));
     }
     if (mounted) setState(endLoad);
+    _openPending();
   }
 
   /// 다시 시도 — **여기서는 뼈대를 바로 띄운다** (claude.md 의 `_retry()` 예외)

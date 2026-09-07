@@ -17,7 +17,12 @@ const _rosterChrome = 33.0;
 /// **한 사람이라도 미출근·결근이면 안 접는다** (2026-08-19 대표 지적).
 /// 예전에는 아직 안 온 사람이 서버 명단에서 통째로 빠져서, 남은 사람만 보고
 /// `전원 출근` 으로 접혔다 — 전원이 온 게 아닌데 그렇게 떴다.
-List<(String, Color)> _rosterLines(DateTime date) {
+///
+/// [compact] 면 이름 대신 **인원수**를 적는다 — `결근 2` (2026-09-07).
+/// 폰 달 격자는 칸이 폭의 7분의 1(약 53)이라 `테스트 점장 외 1명 결근` 이
+/// `테…` 로 잘려서 **무슨 일이 있었는지 알 수가 없었다.** 이름은 그 날을
+/// 눌러서 본다 ([_DayDialog]). 줄 수는 그대로라 칸 높이 계산도 그대로다.
+List<(String, Color)> _rosterLines(DateTime date, {bool compact = false}) {
   final groups = _rosterOf(date);
   if (groups.isEmpty) return const [];
 
@@ -27,7 +32,13 @@ List<(String, Color)> _rosterLines(DateTime date) {
     final names = groups[status];
     if (names == null || names.isEmpty) continue;
     if (!plain) onlyPlain = false;
-    lines.add(('${_whoIn(names)} $label', color));
+    lines.add((
+      compact
+          // 한 사람이면 수를 안 적는다 — `결근` 이 `결근 1` 보다 잘 읽힌다
+          ? (names.length == 1 ? label : '$label ${names.length}')
+          : '${_whoIn(names)} $label',
+      color,
+    ));
   }
   if (lines.isEmpty) return const [];
   if (!onlyPlain) return lines;
@@ -343,11 +354,12 @@ class _DayCellState extends State<_DayCell> {
     );
   }
 
-  /// 대표 칸 — 상태마다 `이름 외 N명 상태` 한 줄
+  /// 대표 칸 — 상태마다 한 줄. PC 는 `이름 외 N명 상태`, **폰은 `결근 2`**.
   ///
   /// 줄을 세는 건 [_rosterLines] 가 한다 — 칸 높이도 그걸 보고 잡는다.
+  /// 폰에서 이름을 적으면 칸이 좁아 `테…` 로 잘린다 (2026-09-07).
   Widget _roster(DateTime date) {
-    final lines = _rosterLines(date);
+    final lines = _rosterLines(date, compact: !isDesktop);
     if (lines.isEmpty) return SizedBox();
 
     return Column(
@@ -359,15 +371,12 @@ class _DayCellState extends State<_DayCell> {
   }
 
   /// 상태 한 줄 — 옅은 바탕에 같은 색 글씨 (앱의 알약과 같은 방식)
-  Widget _line(String text, Color color) => Container(
-    width: double.infinity,
-    margin: EdgeInsets.only(top: 2),
-    padding: EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-    decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.12),
-      borderRadius: BorderRadius.circular(5),
-    ),
-    child: Text(
+  ///
+  /// **폰은 잘라내지 않고 줄여 담는다** (2026-09-07). 칸이 폭의 7분의 1이라
+  /// `결근 2` 도 넘칠 수 있는데, 자르면 `결…` 이 되어 무슨 상태인지 사라진다.
+  /// PC 는 이름이 들어가 길므로 예전처럼 말줄임이다 (줄이면 글자가 깨알이 된다).
+  Widget _line(String text, Color color) {
+    final label = Text(
       text,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
@@ -377,8 +386,25 @@ class _DayCellState extends State<_DayCell> {
         color: color,
         fontWeight: FontWeight.w700,
       ),
-    ),
-  );
+    );
+
+    return Container(
+      width: double.infinity,
+      margin: EdgeInsets.only(top: 2),
+      padding: EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: isDesktop
+          ? label
+          : FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: label,
+            ),
+    );
+  }
 
   Widget _hours(_Day day) => Row(
     children: [
@@ -430,191 +456,6 @@ class _DayCellState extends State<_DayCell> {
       ),
     ),
   );
-}
-
-/// 대표·관리자 **폰** 달력 — 한 주를 세로 일곱 줄로 본다
-///
-/// 대표 칸에는 그날 누가 어땠는지가 이름으로 들어가서, 한 칸이 폰 폭의 7분의 1
-/// (약 53)이면 `김트레이너 외 3명 출근` 이 들어갈 자리가 없다. 게다가 칸이
-/// 상태 줄만큼 자라서([_bossCellHeight]) 한 달을 세우면 화면이 한참 길어진다.
-/// 그래서 폰에서만 주 단위로 접고, **PC 는 폭이 남아 달 그대로**다.
-///
-/// 하루가 가로로 긴 줄 하나라 지금 칸에 들어가던 이름 줄을 그대로 쓴다.
-class _WeekCalendar extends StatelessWidget {
-  _WeekCalendar({
-    required this.start,
-    required this.onMove,
-    required this.onPick,
-  });
-
-  /// 그 주의 일요일 — 달력이 일요일 시작이라 여기에 맞춘다
-  final DateTime start;
-
-  /// -1 이면 지난 주, 1 이면 다음 주
-  final ValueChanged<int> onMove;
-  final ValueChanged<DateTime> onPick;
-
-  /// 그 주에 걸치는 날짜 일곱 개
-  List<DateTime> get _dates => [
-    for (var i = 0; i < 7; i++)
-      DateTime(start.year, start.month, start.day + i),
-  ];
-
-  /// `8.3(일) ~ 8.9(토)` — 달을 넘어가도 어느 주인지 바로 보인다
-  String get _title {
-    final end = _dates.last;
-    return '${start.month}.${start.day}(${_weekday(start)})'
-        ' ~ ${end.month}.${end.day}(${_weekday(end)})';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final dates = _dates;
-
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.fromLTRB(14, 18, 14, 8),
-      decoration: AppDecorations.card(),
-      child: Column(
-        children: [
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 6),
-            child: Row(
-              children: [
-                _arrow(CupertinoIcons.chevron_left, () => onMove(-1)),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Center(
-                    child: Text(_title, style: AppTextStyles.title3),
-                  ),
-                ),
-                SizedBox(width: 10),
-                _arrow(CupertinoIcons.chevron_right, () => onMove(1)),
-              ],
-            ),
-          ),
-          SizedBox(height: 8),
-          // 기록이 없는 날도 줄은 세운다 — 주말이 어디인지가 보여야 한다
-          for (final date in dates)
-            _WeekRow(
-              date: date,
-              today: _sameDay(date, now),
-              onTap: () => onPick(date),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _arrow(IconData icon, VoidCallback onTap) => Pressable(
-    onTap: onTap,
-    child: Container(
-      width: 30,
-      height: 30,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: AppColors.gray50,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Icon(icon, size: 13, color: AppColors.textSecondary),
-    ),
-  );
-}
-
-/// 주 달력의 하루 — 날짜 + 그날 상태 줄들
-class _WeekRow extends StatelessWidget {
-  _WeekRow({required this.date, required this.today, required this.onTap});
-
-  final DateTime date;
-  final bool today;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final lines = _rosterLines(date);
-    final sunday = date.weekday % 7 == 0;
-
-    return Pressable(
-      onTap: onTap,
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 9),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 날짜 칸 — 오늘은 달력 칸과 같은 파란 동그라미
-            Container(
-              width: 30,
-              height: 30,
-              alignment: Alignment.center,
-              decoration: today
-                  ? BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                    )
-                  : null,
-              child: Text(
-                '${date.day}',
-                style: AppTextStyles.body2.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: today
-                      ? Colors.white
-                      : sunday
-                      ? AppColors.error
-                      : AppColors.textPrimary,
-                ),
-              ),
-            ),
-            SizedBox(width: 6),
-            SizedBox(
-              width: 20,
-              child: Padding(
-                padding: EdgeInsets.only(top: 6),
-                child: Text(
-                  _weekday(date),
-                  style: AppTextStyles.caption.copyWith(
-                    fontSize: 11,
-                    color: sunday ? AppColors.error : AppColors.textTertiary,
-                  ),
-                ),
-              ),
-            ),
-            SizedBox(width: 8),
-            Expanded(
-              child: Padding(
-                padding: EdgeInsets.only(top: 5),
-                child: lines.isEmpty
-                    ? Text(
-                        '—',
-                        style: AppTextStyles.body2.copyWith(
-                          color: AppColors.gray300,
-                        ),
-                      )
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          for (var i = 0; i < lines.length; i++) ...[
-                            if (i > 0) SizedBox(height: 3),
-                            Text(
-                              lines[i].$1,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppTextStyles.caption.copyWith(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: lines[i].$2,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 /// 받아오는 동안의 뼈대 — 요약 · 월차 잔여 · 달력 순서를 그대로 잡아 둔다
