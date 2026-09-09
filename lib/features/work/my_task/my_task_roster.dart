@@ -431,15 +431,40 @@ class _ReadOnlyRow extends StatelessWidget {
           _CheckMark(checked: checked),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              task.content,
-              style: AppTextStyles.body2.copyWith(
-                color: checked ? AppColors.textTertiary : AppColors.textPrimary,
-                fontWeight: FontWeight.w500,
-                decoration: checked ? TextDecoration.lineThrough : null,
-                decorationColor: AppColors.textTertiary,
-                decorationThickness: 1.6,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  task.content,
+                  style: AppTextStyles.body2.copyWith(
+                    color: checked
+                        ? AppColors.textTertiary
+                        : AppColors.textPrimary,
+                    fontWeight: FontWeight.w500,
+                    decoration: checked ? TextDecoration.lineThrough : null,
+                    decorationColor: AppColors.textTertiary,
+                    decorationThickness: 1.6,
+                  ),
+                ),
+                // **적어 낸 값** — `신규 3 · 재등록 5` (2026-09-09 대표 요청)
+                //
+                // 본인 화면(`my_task_section.dart`)에는 진작 붙어 있었는데
+                // **여기만 빠져 있었다.** 점장이 매주 올리는 신규·재등록 수를
+                // 정작 대표가 못 보는 자리였다 — 값을 받는 이유가 그것이다.
+                //
+                // 모양·색을 본인 화면과 똑같이 둔다. 두 화면이 갈리면 같은
+                // 값이 어디서 보느냐에 따라 달라 보인다
+                if (task.valueLabel.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    task.valueLabel,
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         ],
