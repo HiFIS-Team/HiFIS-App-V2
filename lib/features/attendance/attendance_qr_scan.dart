@@ -128,12 +128,20 @@ class _QrScanScreenState extends State<_QrScanScreen> {
           ),
           // 찍히면 카메라를 덮는다 — 결과를 보는 자리에서 다음 QR 이 또
           // 물리면 방금 뭘 했는지 못 읽는다
-          if (_done != null)
-            _result()
-          else if (_noCamera)
-            _cameraOff()
-          else
-            _guide(),
+          //
+          // **`Positioned.fill` 이 있어야 한다** (2026-09-09). `Stack` 은 자리를
+          // 안 정해 준 자식에게 **헐거운 제약**을 주고 **왼쪽 위에 붙인다.**
+          // `_guide()` 는 `Column` 이라 가로로 제 폭만큼만 차지하는데, 그 폭이
+          // 안내 문구 너비(약 265)라 **조준 규격(240)이 통째로 왼쪽으로 밀렸다.**
+          // 채워 주면 화면 한가운데다 (`_result`·`_cameraOff` 는 안쪽이 `Center`
+          // 라 원래 폈지만, 셋을 갈라 두면 다음에 또 같은 자리가 난다).
+          Positioned.fill(
+            child: _done != null
+                ? _result()
+                : _noCamera
+                ? _cameraOff()
+                : _guide(),
+          ),
           Positioned(
             top: 0,
             left: 0,
