@@ -282,11 +282,29 @@ class _PeerReviewSectionState extends State<PeerReviewSection>
     return const [];
   }
 
-  /// 달 이동 줄 — 세 갈래 화면(현황·폰·PC)이 같은 것을 쓴다
+  /// 머리말·목록바에 **얹는** 작은 달 이동 (2026-09-09 요청)
+  ///
+  /// 달 이동에 한 줄을 통째로 내주기가 아까워서 옆으로 붙였다.
+  ///
+  /// | 자리 | |
+  /// |---|---|
+  /// | PC 평가 | `평가 작성` 머리말 오른쪽 끝 |
+  /// | PC 현황 | `제출 현황` 머리말 오른쪽 끝 |
+  ///
+  /// **폰은 안 쓴다** — 얹을 머리말이 없어서 한 줄짜리([_monthBar])를 그대로
+  /// 쓰되 자리만 목록바 아래로 내렸다. 목록바 오른쪽에 붙여 봤는데
+  /// 더 나빴다 (2026-09-09).
+  Widget _monthNav() => MonthBar.compact(
+    month: _month ?? _thisMonth(),
+    onPrev: () => _shiftMonth(-1),
+    onNext: _atLatest ? null : () => _shiftMonth(1),
+  );
+
+  /// 한 줄을 다 쓰는 달 이동 — **폰 화면 둘이 쓴다**
   ///
   /// [showCount] 를 끄면 오른쪽 `총 N건` 이 빠지고 줄이 왼쪽 끝으로 붙는다.
-  /// **폰 평가 화면만 그렇게 쓴다** (2026-09-07 요청) — 거기는 바로 아래
-  /// `평가 전 · 평가 완료` 탭이 같은 수를 이미 말하고 있다.
+  /// **평가 화면만 그렇게 쓴다** — 거기는 바로 위 `평가 전 · 평가 완료` 탭이
+  /// 같은 수를 이미 말하고 있다.
   Widget _monthBar(int count, {String unit = '건', bool showCount = true}) =>
       MonthBar(
         month: _month ?? _thisMonth(),
@@ -312,12 +330,17 @@ class _PeerReviewSectionState extends State<PeerReviewSection>
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _monthBar(_all.length, unit: '건'),
-          SizedBox(height: 8),
+          // 폰은 얹힐 자리가 없다 — 카드만 세우는 화면이라 목록바도
+          // 머리말도 없어서 달 이동 줄을 그대로 둔다
+          if (!isDesktop) ...[
+            _monthBar(_all.length, unit: '건'),
+            SizedBox(height: 8),
+          ],
           _SubmissionCard(
             reviews: _all,
             period: _period,
             branchId: widget.branchId,
+            monthNav: isDesktop ? _monthNav() : null,
           ),
         ],
       );
@@ -341,13 +364,15 @@ class _PeerReviewSectionState extends State<PeerReviewSection>
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _monthBar(_mine.length, unit: '건', showCount: false),
-          SizedBox(height: 8),
           _FilterTabs(
             selected: _filter,
             onSelect: (filter) => setState(() => _filter = filter),
           ),
-          SizedBox(height: 16),
+          SizedBox(height: 8),
+          // 달 이동은 **목록바 밑**이다 (2026-09-09 요청). 위에 두면 판을 열
+          // 때 제일 먼저 읽히는 것이 달인데, 용건은 `평가 전` 이 몇 명인지다.
+          _monthBar(_mine.length, unit: '건', showCount: false),
+          SizedBox(height: 8),
           // 안내는 **탭 밑**이다 (2026-09-07 요청) — 왜 안 눌리는지를
           // 명단을 보기 직전에 읽게 된다
           ..._notice(),
@@ -379,8 +404,6 @@ class _PeerReviewSectionState extends State<PeerReviewSection>
       // 사람이 적으면 통째로 가운데로 밀린다 — 조직도에서 겪었다)
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _monthBar(_mine.length, unit: '건'),
-        SizedBox(height: 8),
         ..._notice(),
         _ReviewProgress(done: done.length, total: _targets.length),
         SizedBox(height: 16),
@@ -396,6 +419,7 @@ class _PeerReviewSectionState extends State<PeerReviewSection>
               color: pending.isEmpty ? AppColors.success : AppColors.primary,
             ),
           ),
+          trailing: _monthNav(),
         ),
         SizedBox(height: 16),
         if (ordered.isEmpty)

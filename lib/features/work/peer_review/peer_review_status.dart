@@ -89,10 +89,19 @@ List<_Submission> _submissionsOf(List<PeerReview> reviews, {String? branchId}) {
 /// 예전에는 여기 안에 지점 탭이 따로 있었는데, 다섯 항목이 다 지점별로 봐야
 /// 하는 데이터라 화면마다 고르개를 두지 않고 한 자리로 모았다.
 class _SubmissionCard extends StatelessWidget {
-  _SubmissionCard({required this.reviews, required this.period, this.branchId});
+  _SubmissionCard({
+    required this.reviews,
+    required this.period,
+    this.branchId,
+    this.monthNav,
+  });
 
   final List<PeerReview> reviews;
   final String period;
+
+  /// 머리말 오른쪽 끝에 세울 달 이동 — **PC 만 준다.**
+  /// 폰은 머리말이 없어서 판이 제 위에 달 이동 줄을 따로 그린다.
+  final Widget? monthNav;
 
   /// 볼 지점 — null 이면 전 지점을 한 목록에 세운다
   final String? branchId;
@@ -136,6 +145,7 @@ class _SubmissionCard extends StatelessWidget {
         SectionHeader(
           title: '제출 현황',
           info: Text('${rows.length}명', style: AppTextStyles.caption),
+          trailing: monthNav,
         ),
         SizedBox(height: 16),
         if (rows.isEmpty)

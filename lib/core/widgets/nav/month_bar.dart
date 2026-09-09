@@ -21,13 +21,37 @@ class MonthBar extends StatelessWidget {
     this.unit = '건',
     this.showCount = true,
     this.padding = const EdgeInsets.fromLTRB(16, 6, 24, 6),
-  });
+  }) : compact = false;
+
+  /// 머리말 줄에 얹는 작은 형태 — `‹ 2026년 9월 ›` 만 남기고 줄을 안 차지한다
+  ///
+  /// 판이 짧은 화면에서 달 이동에 한 줄을 통째로 내주기가 아깝다.
+  /// 동료평가가 이걸 쓴다 — 폰은 `평가 전 · 평가 완료` 목록바 오른쪽,
+  /// PC 는 `평가 작성` 머리말 오른쪽 끝이다 (2026-09-09 요청).
+  ///
+  /// **건수를 안 그린다.** 얹히는 자리마다 이미 건수를 말하고 있고,
+  /// `총 N건` 까지 붙으면 머리말이 두 겹으로 읽힌다.
+  const MonthBar.compact({
+    super.key,
+    required this.month,
+    required this.onPrev,
+    required this.onNext,
+  }) : count = 0,
+       loading = false,
+       unit = '건',
+       showCount = false,
+       padding = EdgeInsets.zero,
+       compact = true;
+
+  /// 머리말에 얹히는 작은 형태인가 — 글자를 머리말 제목과 같은 14 로 맞추고
+  /// 줄 폭을 안 차지한다 (기본형은 15 에 한 줄을 다 쓴다)
+  final bool compact;
 
   final DateTime month;
   final int count;
 
-  /// 오른쪽 끝 건수를 그릴지 — 동료평가 폰 화면만 끈다 (2026-09-07 요청).
-  /// 거기는 명단이 곧 건수라 `총 0건` 이 같은 말을 두 번 하는 자리다.
+  /// 오른쪽 끝 건수를 그릴지 — [MonthBar.compact] 가 끈다.
+  /// 얹히는 자리는 이미 건수를 말하고 있어서 `총 N건` 이 두 번이 된다.
   final bool showCount;
 
   /// 줄 바깥 여백 — **기본값을 바꾸지 않는다.** 이 줄을 쓰는 화면이 다섯인데
@@ -53,10 +77,11 @@ class MonthBar extends StatelessWidget {
     return Pressable(
       onTap: onTap ?? () {},
       child: Padding(
-        padding: const EdgeInsets.all(8),
+        // 작은 형태는 누를 자리를 조금 줄인다 — 머리말 줄 높이를 안 늘리려고
+        padding: EdgeInsets.all(compact ? 6 : 8),
         child: Icon(
           icon,
-          size: 15,
+          size: compact ? 13 : 15,
           color: enabled ? AppColors.textSecondary : AppColors.gray300,
         ),
       ),
@@ -69,11 +94,18 @@ class MonthBar extends StatelessWidget {
     // 끝이 24 로 아래 목록과 맞는다
     padding: padding,
     child: Row(
+      // 작은 형태는 얹히는 줄에서 제 폭만 쓴다
+      mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
       children: [
         _arrow(CupertinoIcons.chevron_left, onPrev),
         Text(
           '${month.year}년 ${month.month}월',
-          style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w700),
+          // 머리말 제목(`label` 14)과 같은 크기로 맞춘다 — 옆에 나란히 서는데
+          // 기본형(15)을 그대로 쓰면 달이 제목보다 커 보인다
+          style: (compact ? AppTextStyles.label : AppTextStyles.body2).copyWith(
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
         ),
         _arrow(CupertinoIcons.chevron_right, onNext),
         if (showCount) ...[
