@@ -186,6 +186,25 @@ class _PtSurveyScreenState extends State<PtSurveyScreen>
     ];
   }
 
+  /// 지금 보이는 답변 중 **연장하겠다고 답한 비율** (2026-09-09 대표 요청)
+  ///
+  /// **'고민 중이에요' 는 안 센다.** 반만 세는 식으로 섞으면 그 숫자가 무엇인지
+  /// 설명할 수 없어진다 — '연장할래요' 를 고른 사람의 비율 하나로 둔다.
+  ///
+  /// **화면에 보이는 줄로 센다** — 트레이너를 고르거나 검색해서 걸러 두면 그
+  /// 만큼만 센다. 옆의 `총 N건` 과 같은 목록을 말해야 둘이 안 어긋난다.
+  ///
+  /// 답이 하나도 없으면 null 이다 (0으로 나눌 수 없다).
+  int? _renewRate(List<PtSurvey> rows) {
+    final decided = [
+      for (final survey in rows)
+        if (survey.renew != null) survey,
+    ];
+    if (decided.isEmpty) return null;
+    final yes = decided.where((s) => s.renew == RenewIntent.yes).length;
+    return (yes * 100 / decided.length).round();
+  }
+
   /// 줄을 세우는 기준값 — 답변은 답한 때, 미응답은 열린 때다
   DateTime _sortKey(PtSurvey survey) => survey.answeredAt ?? survey.createdAt;
 
@@ -203,6 +222,8 @@ class _PtSurveyScreenState extends State<PtSurveyScreen>
     final query = _search.text.trim();
     final sorted = _shown..sort(_compare);
     final answered = _tab == 0;
+    // 미응답 탭에는 연장 답이 없다 — 셀 것이 없으므로 아예 안 그린다
+    final renewRate = answered ? _renewRate(sorted) : null;
 
     // 날짜가 바뀌는 지점마다 그룹 헤더를 끼워 넣는다 — 세션 기록·설문 응답과 같다
     final children = <Widget>[];
@@ -266,6 +287,21 @@ class _PtSurveyScreenState extends State<PtSurveyScreen>
                           style: AppTextStyles.caption,
                         ),
                       ),
+                      if (renewRate != null) ...[
+                        Text(
+                          '재등록 $renewRate%',
+                          style: AppTextStyles.caption.copyWith(
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          ' · ',
+                          style: AppTextStyles.caption.copyWith(
+                            color: AppColors.textTertiary,
+                          ),
+                        ),
+                      ],
                       Text(
                         '총 ${sorted.length}건',
                         style: AppTextStyles.caption.copyWith(
