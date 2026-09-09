@@ -59,7 +59,10 @@ enum InboxKind {
   taskMiss('TASK_MISS'),
 
   /// 컴플레인 **해결 완료** — 찍으면 클레임해결 점수가 붙어서 대표가 본다 (2026-08-31)
-  complaint('COMPLAINT');
+  complaint('COMPLAINT'),
+
+  /// 환경정비 **클레임해결** — 15점짜리라 칩을 눌러도 대표가 본다 (2026-09-09)
+  envClaim('ENV_CLAIM');
 
   const InboxKind(this.wire);
 

@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 
+import '../../data/data_signal.dart';
 import '../client/api_client.dart';
+import 'my_task_api.dart' show MyTaskRequestStatus;
 
 export '../client/period.dart' show dateKey, periodKey;
 
@@ -66,6 +68,8 @@ class EnvTaskLog {
     this.bonusReason,
     this.bonusById,
     this.bonusAt,
+    this.approvalStatus,
+    this.rejectReason,
   });
 
   factory EnvTaskLog.fromJson(Map<String, dynamic> json) => EnvTaskLog(
@@ -86,6 +90,12 @@ class EnvTaskLog {
     bonusAt: json['bonusAt'] == null
         ? null
         : DateTime.parse(json['bonusAt'] as String).toLocal(),
+    // **`parseOrNull` 이다** — null 이 '결재가 필요 없는 항목' 이라는 뜻이라,
+    // 대기로 떨구면 세탁·청소가 전부 승인 대기로 보인다
+    approvalStatus: MyTaskRequestStatus.parseOrNull(
+      json['approvalStatus'] as String?,
+    ),
+    rejectReason: json['rejectReason'] as String?,
   );
 
   final String id;
@@ -98,6 +108,22 @@ class EnvTaskLog {
 
   /// 수행 당시 배점 — **가산점은 안 들어 있다** ([totalPoints] 를 쓸 것)
   final int points;
+
+  /// 대표 결재 상태 — **`클레임해결` 만 값이 있다** (2026-09-09)
+  ///
+  /// | 값 | 뜻 |
+  /// |---|---|
+  /// | `null` | 결재가 필요 없는 항목 — 누르는 즉시 점수가 붙는다 |
+  /// | `pending` | **점수가 아직 없다** — 화면이 그렇게 알려줘야 한다 |
+  /// | `approved` | 승인됨 |
+  ///
+  /// `rejected` 는 서버가 목록에서 빼므로 여기 안 온다.
+  final MyTaskRequestStatus? approvalStatus;
+
+  final String? rejectReason;
+
+  /// 대표가 아직 안 본 기록 — 점수도 아직 없다
+  bool get awaiting => approvalStatus == MyTaskRequestStatus.pending;
 
   final DateTime createdAt;
   final String? note;
@@ -196,6 +222,27 @@ class EnvApi {
         'link': ?link,
       },
     );
+    final log = EnvTaskLog.fromJson(data!);
+    // **결재를 타는 항목만 신호를 쏜다** (`클레임해결`). 세탁·청소까지 쏘면
+    // 칩을 누를 때마다 탭 열둘이 다시 받는다 — 하루에 수십 번 눌리는 자리다.
+    if (log.awaiting) notifyApprovalChanged();
+    return log;
+  }
+
+  /// 클레임해결 승인 — **MASTER 만.** 이때 점수가 올린 사람에게 붙는다
+  static Future<EnvTaskLog> approve(String logId) async {
+    final data = await _client.post('/env-logs/$logId/approve');
+    notifyApprovalChanged();
+    return EnvTaskLog.fromJson(data!);
+  }
+
+  /// 클레임해결 반려 — **MASTER 만.** 행은 남고 내역에서만 빠진다
+  static Future<EnvTaskLog> reject(String logId, {String? reason}) async {
+    final data = await _client.post(
+      '/env-logs/$logId/reject',
+      query: {'reason': ?reason},
+    );
+    notifyApprovalChanged();
     return EnvTaskLog.fromJson(data!);
   }
 

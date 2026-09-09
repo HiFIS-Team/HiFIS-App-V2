@@ -41,6 +41,9 @@ void main() {
     r"/payslips/$id/reject",
     r"/projects/requests/$requestId/approve",
     r"/projects/requests/$requestId/reject",
+    // 환경정비 `클레임해결` — 15점짜리라 칩을 눌러도 대표가 본다 (2026-09-09)
+    r"/env-logs/$logId/approve",
+    r"/env-logs/$logId/reject",
     // 신청·취소 — 결재함에 줄이 서거나 빠진다
     "/approvals'",
     "/events'",

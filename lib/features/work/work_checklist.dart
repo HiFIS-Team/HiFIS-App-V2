@@ -229,9 +229,7 @@ class _CountChip extends StatelessWidget {
                         color: active
                             ? AppColors.primary
                             : AppColors.textPrimary,
-                        fontWeight: active
-                            ? FontWeight.w700
-                            : FontWeight.w500,
+                        fontWeight: active ? FontWeight.w700 : FontWeight.w500,
                       ),
                     ),
                   ),
@@ -408,11 +406,22 @@ class _LogRowState extends State<_LogRow> {
                 _BonusTag(points: _log.bonusPoints),
                 SizedBox(width: 6),
               ],
+              // **대표가 아직 안 본 줄** (2026-09-09) — `클레임해결` 만 여기 든다.
+              //
+              // 이게 없으면 올린 사람이 점수를 못 찾아서 **한 번 더 누른다.**
+              // 실제로 그래서 한 컴플레인에 세 줄이 생겼고, 지우려다 자기 것을
+              // 다 지워 0점이 됐다.
+              if (_log.awaiting) ...[_WaitTag(), SizedBox(width: 6)],
               // 그때 받은 점수 — 항목 배점이 나중에 바뀌어도 이 값은 안 바뀐다
+              //
+              // **대기 중이면 아직 안 들어간 값이라 흐리게 둔다.** 파랗게 두면
+              // 이미 받은 것으로 읽힌다
               Text(
                 '+${_log.totalPoints}',
                 style: AppTextStyles.caption.copyWith(
-                  color: AppColors.primary,
+                  color: _log.awaiting
+                      ? AppColors.textTertiary
+                      : AppColors.primary,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -444,6 +453,33 @@ class _LogRowState extends State<_LogRow> {
 }
 
 /// `추가 +5` 꼬리표 — 대표가 얹은 점수가 붙은 줄이라는 표시
+/// 대표 결재를 기다리는 줄 — **점수가 아직 안 들어갔다는 표시**
+///
+/// [_BonusTag] 와 같은 틀이다 (한 줄에 나란히 서므로 모양이 갈리면 안 된다).
+/// 색은 결재 대기를 뜻하는 주황 — 컴플레인 `완료 승인 대기` 알약과 같다.
+class _WaitTag extends StatelessWidget {
+  _WaitTag();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        '승인 대기',
+        style: AppTextStyles.caption.copyWith(
+          fontSize: 11,
+          color: AppColors.warning,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
 class _BonusTag extends StatelessWidget {
   _BonusTag({required this.points});
 
