@@ -519,6 +519,25 @@ class _InboxRow extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: AppTextStyles.caption,
               ),
+              // 적어 낸 사유 — **한 줄로 안 자른다** (2026-09-09 대표 요청).
+              //
+              // 사유서를 받아 놓고 결재하는 쪽이 못 읽고 있었다. 한 줄로
+              // 자르면 `몸 상태가 안 좋아서 제대로 하지…` 에서 끊겨서
+              // 승인·반려를 판단할 수가 없다.
+              //
+              // 세 줄까지 편다 — 운영에 쌓인 사유가 평균 32자·최대 42자라
+              // 대부분 두 줄 안에 든다. 그보다 길면 뒤를 자른다.
+              if (item.reason case final reason?) ...[
+                SizedBox(height: 4),
+                Text(
+                  reason,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
             ],
           ),
         ),

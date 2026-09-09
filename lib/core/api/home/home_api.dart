@@ -100,6 +100,7 @@ class InboxItem {
     required this.employeeId,
     required this.title,
     required this.detail,
+    this.reason,
     required this.createdAt,
   });
 
@@ -109,6 +110,7 @@ class InboxItem {
     employeeId: json['employeeId'] as String? ?? '',
     title: json['title'] as String? ?? '',
     detail: json['detail'] as String? ?? '',
+    reason: json['reason'] as String?,
     createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
   );
 
@@ -125,6 +127,12 @@ class InboxItem {
 
   /// `실수령 2,340,000원` · `8.12 ~ 8.14 · 3일`
   final String detail;
+
+  /// 올린 사람이 **적어 낸 글** — 지금은 업무 누락 사유서만 온다
+  ///
+  /// [detail] 과 다르다. 저기는 서버가 만든 한 줄이고 이건 사람이 쓴
+  /// 문장이라, 줄에서 **여러 줄로 펴서** 보여준다. 없으면 안 그린다.
+  final String? reason;
 
   final DateTime createdAt;
 }
