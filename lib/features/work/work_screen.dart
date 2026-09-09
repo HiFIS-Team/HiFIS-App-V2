@@ -130,8 +130,8 @@ class _WorkScreenState extends State<WorkScreen>
   /// | 칸 | 버튼 |
   /// |---|---|
   /// | 환경정비 | `+` 내 업무 추가 (직접 수행하는 사람만) |
-  /// | 회원 친절도 | 필름 — 이번 달 추첨 |
-  /// | 수업 개수 | 사람 둘 — 회원 정보 / 문서 — 운동일지 / 별 — PT 만족도 |
+  /// | 회원 친절도 | 필름 — 이번 달 추첨 / 별 — PT 만족도 |
+  /// | 수업 개수 | 사람 둘 — 회원 정보 / 문서 — 운동일지 |
   ///
   /// **회원 화면으로 가는 큰 길은 홈 왼쪽 위 버튼이다** (2026-09-06 되돌림).
   /// 여기 것은 수업 개수를 보다가 바로 넘어가는 곁길이라 그 칸에만 둔다.
@@ -148,6 +148,11 @@ class _WorkScreenState extends State<WorkScreen>
       // 인스타에 올리는 것까지가 목적이라 대표만 여는 자리가 아니다.
       // 지점은 서버가 가른다 (직원·점장은 자기 지점 것만 온다)
       if (item.draw) HeaderAction(symbol: 'film', onPressed: _openDraw),
+      // PT 만족도 — **전원에게 선다** (2026-09-09 대표 결정).
+      // 서버가 대표·관리자에게는 전부, 나머지에게는 **본인이 수업한 것만**
+      // 준다. 예전에는 트레이너가 403 이라 버튼을 감췄던 자리다.
+      if (item.ptSurvey)
+        HeaderAction(symbol: 'star.bubble', onPressed: _openPtSurveys),
       if (item.members) ...[
         // **`person` 을 쓰면 안 된다** — 헤더 오른쪽 프로필 버튼과 같은
         // 아이콘이라 한 줄에 똑같은 사람이 둘 선다. 여럿(`person.2`) 이
@@ -155,10 +160,6 @@ class _WorkScreenState extends State<WorkScreen>
         HeaderAction(symbol: 'person.2', onPressed: _openMembers),
         HeaderAction(symbol: 'doc.text', onPressed: _openWorkouts),
       ],
-      // PT 만족도 폼 — **볼 수 있는 사람에게만 세운다** (2026-09-05).
-      // 트레이너(MEMBER)는 서버가 403 을 주므로 눌러도 빈 화면만 뜬다
-      if (item.members && myRole != Role.member)
-        HeaderAction(symbol: 'star.bubble', onPressed: _openPtSurveys),
     ]);
   }
 
@@ -512,7 +513,7 @@ class _WorkScreenState extends State<WorkScreen>
   static const _items = [
     _WorkItem(label: '환경정비', checklist: true),
     _WorkItem(label: '동료 평가'),
-    _WorkItem(label: '회원 친절도', draw: true),
+    _WorkItem(label: '회원 친절도', draw: true, ptSurvey: true),
     _WorkItem(label: '수업 개수', members: true),
     _WorkItem(label: '센터 기여도'),
   ];
@@ -843,8 +844,10 @@ class _WriteInCardState extends State<_WriteInCard> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(claim ? '어떤 클레임을 해결했나요?' : '무엇을 했나요?',
-              style: AppTextStyles.title3),
+          Text(
+            claim ? '어떤 클레임을 해결했나요?' : '무엇을 했나요?',
+            style: AppTextStyles.title3,
+          ),
           SizedBox(height: 6),
           Text(
             claim

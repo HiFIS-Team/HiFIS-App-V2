@@ -7,6 +7,7 @@ class _WorkItem {
     this.checklist = false,
     this.members = false,
     this.draw = false,
+    this.ptSurvey = false,
   });
 
   final String label;
@@ -27,6 +28,14 @@ class _WorkItem {
   /// 추첨 대상이 그 탭에 서 있는 **설문 응답자**라 문맥이 같고, 지점 고르개도
   /// 여기 것을 그대로 쓴다. 자리를 [members] 와 같은 방식으로 표시한다.
   final bool draw;
+
+  /// 헤더 **왼쪽 끝**에 **PT 만족도 결과로 가는 별 버튼**을 세우는 항목인지
+  /// (회원 친절도만 — 2026-09-09 대표 요청)
+  ///
+  /// **수업 개수에 있던 것을 옮겼다.** 거기는 회차를 세는 자리고, 이건
+  /// 회원이 남긴 만족도라 **회원 친절도 옆이 맞다** — 매장 설문(칭찬·불편)과
+  /// PT 설문(수업 만족도)이 둘 다 회원이 답한 것이다.
+  final bool ptSurvey;
 }
 
 // 밑줄 탭 위젯(`_WorkTab`)은 [UnderlineTabs] 로 옮겼다 (2026-08-21).
