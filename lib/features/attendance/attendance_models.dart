@@ -23,7 +23,10 @@ enum _DayStatus {
   Color get color => switch (this) {
     _DayStatus.normal => AppColors.success,
     _DayStatus.late => AppColors.warning,
-    _DayStatus.early => AppColors.warning,
+    // **지각과 같은 주황이었다** (2026-09-09). 범례를 다 세우게 되면서
+    // 두 줄이 같은 색이 되어 어느 것이 어느 것인지 알 수 없었다.
+    // 대표 달력이 조기퇴근에 쓰던 하늘색을 그대로 가져온다
+    _DayStatus.early => AppColors.workEarly,
     _DayStatus.noCheckout => AppColors.workNoCheckout,
     _DayStatus.absent => AppColors.error,
     _DayStatus.leave => AppColors.primary,

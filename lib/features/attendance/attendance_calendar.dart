@@ -30,38 +30,28 @@ List<Color> _rosterDots(DateTime date) {
   ];
 }
 
-/// 범례에 세울 것 — **그 달에 실제로 나온 상태만** (2026-09-09)
+/// 범례 — **아홉 가지를 늘 다 세운다** (2026-09-09 대표 지적)
 ///
-/// 아홉 가지를 늘 다 세우면 한 줄이 두 줄이 되고, 그 달에 없던 야근·조퇴가
-/// 있었던 것처럼 읽힌다. 달을 넘길 때마다 다시 센다.
+/// 처음에는 그 달에 나온 상태만 세웠는데, **그러면 안 나온 색은 무슨 뜻인지
+/// 알 길이 없다.** 대표 달력에 미출근·결근·월차 셋만 뜬 달이면 범례도 셋이라,
+/// 다음 달에 보라색 점이 떠도 그게 야근인지 모른다.
 ///
-/// 차례는 [_workStatusOrder] 를 따른다 — 칸의 점과 범례가 같은 차례여야
-/// 눈이 왼쪽부터 짝지어 읽는다.
-List<(String, Color)> _bossLegend(DateTime month) {
-  final seen = <AttendanceStatus>{};
-  final last = DateTime(month.year, month.month + 1, 0).day;
-  for (var day = 1; day <= last; day++) {
-    seen.addAll(_rosterOf(DateTime(month.year, month.month, day)).keys);
-  }
-  return [
-    for (final (status, label, color) in _workStatusOrder)
-      if (seen.contains(status)) (label, color),
-  ];
-}
+/// 칸의 점과 같은 차례다 — 눈이 왼쪽부터 짝지어 읽는다.
+List<(String, Color)> get _bossLegend => [
+  for (final (_, label, color) in _workStatusOrder) (label, color),
+];
 
-/// 개인 달력의 범례 — 그 달에 나온 상태 + 잡아 둔 월차
-List<(String, Color)> _myLegend(List<_Day> days, List<_Leave> leaves) {
-  final seen = <_DayStatus>{};
-  for (final day in days) {
-    if (day.status != _DayStatus.off) seen.add(day.status);
-  }
-  // 아직 안 온 날의 월차도 칸에 점이 서므로 범례에 같이 세운다
-  if (leaves.any((l) => l.status.counted)) seen.add(_DayStatus.leave);
-  return [
-    for (final status in _DayStatus.values)
-      if (seen.contains(status)) (status.label, status.color),
-  ];
-}
+/// 개인 달력의 범례 — 이쪽도 **늘 다 세운다**
+///
+/// `휴무` 는 뺀다 — 점을 안 찍는 상태라 범례에 세우면 없는 색을 설명하는 셈이다.
+const _myLegend = <(String, Color)>[
+  ('정상', AppColors.success),
+  ('지각', AppColors.workLate),
+  ('조기 퇴근', AppColors.workEarly),
+  ('퇴근 누락', AppColors.workNoCheckout),
+  ('결근', AppColors.workAbsent),
+  ('월차', AppColors.workLeave),
+];
 
 /// 화면의 주인공 — 칸마다 그날의 근무나 월차가 바로 보인다
 class _MonthCalendar extends StatelessWidget {
@@ -106,7 +96,7 @@ class _MonthCalendar extends StatelessWidget {
     // 들어가서 그 달에서 제일 바쁜 날에 맞춰 칸이 자랐는데, 점은 여러 개가
     // 한 줄에 서므로 자랄 이유가 없다
     final cellHeight = isDesktop ? 84.0 : 62.0;
-    final legend = _isBoss ? _bossLegend(month) : _myLegend(days, leaves);
+    final legend = _isBoss ? _bossLegend : _myLegend;
 
     return Container(
       width: double.infinity,
@@ -205,7 +195,7 @@ class _MonthCalendar extends StatelessWidget {
               ],
             ),
           ),
-          // 그 달에 나온 상태만 — 점이 무슨 뜻인지 여기서만 알 수 있다
+          // 점이 무슨 뜻인지 알 수 있는 곳이 여기뿐이라 **다 세운다**
           if (legend.isNotEmpty) ...[
             SizedBox(height: 12),
             Wrap(
