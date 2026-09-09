@@ -68,7 +68,8 @@ class _ProjectPhone extends StatelessWidget {
             projects,
             phase,
             gap: 12,
-            card: (p) => _ProjectCard(project: p, onTap: () => _open(context, p)),
+            card: (p) =>
+                _ProjectCard(project: p, onTap: () => _open(context, p)),
           ),
       ],
     );
@@ -178,6 +179,11 @@ class _ProjectCard extends StatelessWidget {
                   ),
                   SizedBox(width: 8),
                 ],
+                // 대표가 매긴 점수 — 매긴 것에만 붙는다
+                if (project.awardedPoints case final points?) ...[
+                  _AwardBadge(points: points),
+                  SizedBox(width: 8),
+                ],
                 Text(
                   '할 일 ${project.doneCount}/${project.todoCount}',
                   style: AppTextStyles.caption.copyWith(fontSize: 12),
@@ -185,6 +191,43 @@ class _ProjectCard extends StatelessWidget {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 대표가 매긴 프로젝트 점수 — **목록에서 바로 보이는 배지** (2026-09-09 요청)
+///
+/// 완료하면 서버가 자동으로 붙이는 점수(담당 10 · 참여 5)는 **안 그린다.**
+/// 그것까지 그리면 완료된 프로젝트마다 다 붙어서, 이 배지가 뜻하는
+/// **"대표가 보고 판단했다"** 가 없어진다.
+///
+/// 음수면 붉게 — 완료라고 찍고 실제로 안 한 것에 대표가 깎을 수 있다.
+class _AwardBadge extends StatelessWidget {
+  const _AwardBadge({required this.points, this.compact = false});
+
+  final int points;
+
+  /// PC 타일은 자리가 좁아 글자를 한 눈금 줄인다
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = points < 0 ? AppColors.error : AppColors.success;
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(100),
+      ),
+      child: Text(
+        // 양수에 `+` 를 붙인다 — 음수와 한눈에 갈린다
+        '점수 ${points > 0 ? '+' : ''}$points',
+        style: AppTextStyles.caption.copyWith(
+          fontSize: compact ? 11 : 12,
+          color: color,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );

@@ -107,6 +107,7 @@ class _Project {
     this.request,
     List<ReactionAgg>? reactions,
     this.commentCount = 0,
+    this.awardedPoints,
   }) : reactions = reactions ?? [];
 
   /// 서버 uuid — null 이면 아직 안 올린 것
@@ -192,6 +193,13 @@ class _Project {
   /// 공지·회의록과 **같은 위젯**이라 같은 이름으로 든다
   List<ReactionAgg> reactions;
   int commentCount;
+
+  /// **대표가 매긴 점수** — null 이면 아직 안 매겼다 (2026-09-09 요청)
+  ///
+  /// 완료 자동 점수(담당 10 · 참여 5)는 안 담긴다. 목록 카드가 이 값이 있을
+  /// 때만 배지를 그린다 — 자동 점수까지 그리면 완료된 것마다 다 붙어서
+  /// **대표가 봤다는 표시**라는 뜻이 없어진다.
+  int? awardedPoints;
 
   bool get isDone => completedAt != null;
 
@@ -282,6 +290,7 @@ _Project _merged(_Project? held, Project row, ProjectRequest? request) {
     ..serverDoneCount = fresh.serverDoneCount
     ..completedAt = fresh.completedAt
     ..commentCount = fresh.commentCount
+    ..awardedPoints = fresh.awardedPoints
     ..request = fresh.request;
   held.reactions
     ..clear()
@@ -325,6 +334,7 @@ _Project _fromServer(Project row, ProjectRequest? request) {
     completedAt: row.completedAt,
     reactions: row.reactions,
     commentCount: row.commentCount,
+    awardedPoints: row.awardedPoints,
     request: request == null
         ? null
         : _Extension(
@@ -538,12 +548,10 @@ List<Widget> _projectRows(
     if (month != thisMonth) {
       // 조직도 팀 머리말과 같은 간격(다음 구획 앞 20, 머리말 다음 12)
       rows.add(SizedBox(height: month == null ? 0 : 20));
-      final count = projects
-          .where((p) {
-            final t = p.completedAt ?? p.due;
-            return t.year == thisMonth.year && t.month == thisMonth.month;
-          })
-          .length;
+      final count = projects.where((p) {
+        final t = p.completedAt ?? p.due;
+        return t.year == thisMonth.year && t.month == thisMonth.month;
+      }).length;
       month = thisMonth;
       rows.add(
         SectionHeader(

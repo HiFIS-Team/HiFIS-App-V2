@@ -120,6 +120,7 @@ class Project {
     this.completedAt,
     this.reactions = const [],
     this.commentCount = 0,
+    this.awardedPoints,
   });
 
   factory Project.fromJson(Map<String, dynamic> json) => Project(
@@ -143,6 +144,7 @@ class Project {
     completedAt: _time(json['completedAt']),
     reactions: reactionsFromJson(json['reactions']),
     commentCount: json['commentCount'] as int? ?? 0,
+    awardedPoints: json['awardedPoints'] as int?,
     createdById: json['createdById'] as String,
     createdAt: _time(json['createdAt'])!,
   );
@@ -192,6 +194,12 @@ class Project {
   /// 공지·회의록과 **같은 위젯**이라 같은 이름으로 받는다
   final List<ReactionAgg> reactions;
   final int commentCount;
+
+  /// **대표가 매긴 점수** — null 이면 아직 안 매겼다 (2026-09-09 요청)
+  ///
+  /// 완료하면 서버가 담당자 10점·참여자 5점을 자동으로 붙이는데 그건 여기
+  /// 안 담긴다. 이 값이 있으면 **대표가 보고 판단한 값**이라는 뜻이다.
+  final int? awardedPoints;
 
   final String createdById;
   final DateTime createdAt;

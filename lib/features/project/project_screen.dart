@@ -488,6 +488,11 @@ class _ProjectTileState extends State<_ProjectTile> {
                 children: [
                   AvatarStack(names: project.members, size: 20),
                   Spacer(),
+                  // 대표가 매긴 점수 — 매긴 것에만 붙는다
+                  if (project.awardedPoints case final points?) ...[
+                    _AwardBadge(points: points, compact: true),
+                    SizedBox(width: 6),
+                  ],
                   Text(
                     '할 일 ${project.doneCount}/${project.todoCount}',
                     style: AppTextStyles.caption.copyWith(fontSize: 11),
