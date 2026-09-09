@@ -144,7 +144,7 @@ class _DayDialog extends StatelessWidget {
   Widget _roster() {
     final groups = _rosterOf(date);
     final rows = <Widget>[];
-    for (final (status, label, color, _) in _workStatusOrder) {
+    for (final (status, label, color) in _workStatusOrder) {
       final names = groups[status];
       if (names == null || names.isEmpty) continue;
       rows.add(

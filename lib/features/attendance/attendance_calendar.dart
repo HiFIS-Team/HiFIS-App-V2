@@ -11,32 +11,23 @@ part of 'attendance_screen.dart';
 const _dotSize = 5.0;
 const _dotGap = 3.0;
 
-/// 그날 칸에 찍을 점 — 상태마다 하나씩, [_workStatusOrder] 차례대로
+/// 그날 칸에 찍을 점 — **상태마다 하나씩**, [_workStatusOrder] 차례대로
 ///
-/// **다들 제때 오고 갔으면 둘로 접는다** — 초록(출근) + 진회색(퇴근).
-/// 아홉 사람이 다 정상이어도 점이 아홉 개 서면 읽을 것이 없다.
+/// 여기서 세는 무리가 곧 그날을 눌렀을 때 서는 줄이다 ([_DayDialog]).
+/// **없는 상태를 지어내지 않는다** — 예전에는 다들 제때 오고 간 날을
+/// `전원 출근` + `전원 퇴근` 두 줄로 늘렸는데, 서버가 준 무리는 `퇴근`
+/// 하나뿐이라 **달력에는 점이 둘인데 눌러 보면 줄이 하나**였다
+/// (2026-09-09 대표 지적). 글자였을 때는 문장으로 읽혀 티가 안 났다.
 ///
-/// **한 사람이라도 미출근·결근이면 안 접는다** (2026-08-19 대표 지적).
-/// 예전에는 아직 안 온 사람이 서버 명단에서 통째로 빠져서, 남은 사람만 보고
-/// `전원 출근` 으로 접혔다 — 전원이 온 게 아닌데 그렇게 떴다.
+/// 그래서 지금은 이렇게 뜬다 — 다 가고 없으면 진회색 하나,
+/// 아직 일하는 사람이 있으면 초록 + 진회색 둘.
 List<Color> _rosterDots(DateTime date) {
   final groups = _rosterOf(date);
   if (groups.isEmpty) return const [];
-
-  final dots = <Color>[];
-  var onlyPlain = true;
-  for (final (status, _, color, plain) in _workStatusOrder) {
-    final names = groups[status];
-    if (names == null || names.isEmpty) continue;
-    if (!plain) onlyPlain = false;
-    dots.add(color);
-  }
-  if (dots.isEmpty || !onlyPlain) return dots;
-
-  // 아직 센터에 있는 사람이 하나도 없어야 `전원 퇴근` 점까지 붙는다 —
-  // 다 왔지만 아직 일하는 중이면 초록 하나다
-  final working = groups[AttendanceStatus.inProgress] ?? const <String>[];
-  return [AppColors.workIn, if (working.isEmpty) AppColors.workOut];
+  return [
+    for (final (status, _, color) in _workStatusOrder)
+      if (groups[status]?.isNotEmpty ?? false) color,
+  ];
 }
 
 /// 범례에 세울 것 — **그 달에 실제로 나온 상태만** (2026-09-09)
@@ -53,7 +44,7 @@ List<(String, Color)> _bossLegend(DateTime month) {
     seen.addAll(_rosterOf(DateTime(month.year, month.month, day)).keys);
   }
   return [
-    for (final (status, label, color, _) in _workStatusOrder)
+    for (final (status, label, color) in _workStatusOrder)
       if (seen.contains(status)) (label, color),
   ];
 }

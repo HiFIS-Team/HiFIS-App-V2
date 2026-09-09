@@ -127,20 +127,23 @@ class _MonthSummary extends StatelessWidget {
 
 /// 대표 화면이 쓰는 상태 차례와 색 — 달력 칸·날짜 상세가 같이 쓴다
 ///
-/// 출근·퇴근 먼저, 챙길 것 나중. 마지막 값은 '평범한 하루인가' —
-/// 이것만 있는 날은 달력 칸에서 `전원 출근` 한 줄로 줄인다.
-const _workStatusOrder = <(AttendanceStatus, String, Color, bool)>[
-  (AttendanceStatus.inProgress, '출근', AppColors.workIn, true),
-  (AttendanceStatus.normal, '퇴근', AppColors.workOut, true),
-  (AttendanceStatus.overtime, '야근', AppColors.workOvertime, false),
-  (AttendanceStatus.earlyLeave, '조기퇴근', AppColors.workEarly, false),
-  (AttendanceStatus.lateAndEarly, '지각·조퇴', AppColors.workLateEarly, false),
-  (AttendanceStatus.late, '지각', AppColors.workLate, false),
+/// 출근·퇴근 먼저, 챙길 것 나중.
+///
+/// 예전에는 '평범한 하루인가' 칸이 하나 더 있었다. 그것만 있는 날을 달력에서
+/// `전원 출근` 으로 줄이는 데 썼는데, 그 줄이기가 **달력과 날짜 상세를
+/// 어긋나게 만들어서** 걷어냈다 (2026-09-09 — `_rosterDots` 참고).
+const _workStatusOrder = <(AttendanceStatus, String, Color)>[
+  (AttendanceStatus.inProgress, '출근', AppColors.workIn),
+  (AttendanceStatus.normal, '퇴근', AppColors.workOut),
+  (AttendanceStatus.overtime, '야근', AppColors.workOvertime),
+  (AttendanceStatus.earlyLeave, '조기퇴근', AppColors.workEarly),
+  (AttendanceStatus.lateAndEarly, '지각·조퇴', AppColors.workLateEarly),
+  (AttendanceStatus.late, '지각', AppColors.workLate),
   // 퇴근 스캔이 없는 날도 여기로 온다 — 서버가 새벽 5시를 넘기면 미출근으로
   // 넘겨준다 (예전에는 `퇴근누락` 알약이 따로 섰다)
-  (AttendanceStatus.notIn, '미출근', AppColors.workNone, false),
-  (AttendanceStatus.absent, '결근', AppColors.workAbsent, false),
-  (AttendanceStatus.onLeave, '월차', AppColors.workLeave, false),
+  (AttendanceStatus.notIn, '미출근', AppColors.workNone),
+  (AttendanceStatus.absent, '결근', AppColors.workAbsent),
+  (AttendanceStatus.onLeave, '월차', AppColors.workLeave),
 ];
 
 /// 대표가 보는 오늘 근무 — 숫자 대신 **누가** 그런지를 띄운다
