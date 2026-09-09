@@ -464,6 +464,139 @@ class _InboxTabs extends StatelessWidget {
   }
 }
 
+/// 결재 대기 한 줄을 눌렀을 때 — **적어 낸 사유를 크게 본다** (2026-09-09)
+///
+/// 설문 원본 크게 보기(`_showSurveyDetail`)와 **같은 틀**이다. 화면마다 다른
+/// 창이 뜨면 같은 앱에서 다른 앱 두 개를 쓰는 것처럼 보인다.
+void _showInboxDetail(BuildContext context, InboxItem item, String name) {
+  showGeneralDialog(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: '결재 내용 크게 보기',
+    barrierColor: Colors.black.withValues(alpha: 0.45),
+    transitionDuration: Duration(milliseconds: 200),
+    pageBuilder: (context, animation, secondaryAnimation) => Center(
+      child: Material(
+        type: MaterialType.transparency,
+        child: _InboxDetailCard(item: item, name: name),
+      ),
+    ),
+    transitionBuilder: (context, animation, secondaryAnimation, child) {
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+      );
+      return FadeTransition(
+        opacity: curved,
+        child: ScaleTransition(
+          scale: Tween(begin: 0.92, end: 1.0).animate(curved),
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
+class _InboxDetailCard extends StatelessWidget {
+  _InboxDetailCard({required this.item, required this.name});
+
+  final InboxItem item;
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    // 좁은 화면에서는 화면 폭에 맞춘다 (설문 크게 보기와 같은 값)
+    final width = MediaQuery.sizeOf(context).width - 40;
+    return Container(
+      width: width < 320 ? width : 320,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.8,
+      ),
+      padding: EdgeInsets.fromLTRB(24, 24, 24, 20),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Avatar(name: name, size: 36),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: AppTextStyles.body2.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(item.title, style: AppTextStyles.caption),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 16),
+            Text(
+              item.detail,
+              style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w600),
+            ),
+            // **적어 낸 글** — 없는 갈래도 있어서 있을 때만 그린다
+            if (item.reason case final reason?) ...[
+              SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.gray50,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text(
+                  reason,
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.textSecondary,
+                    height: 1.6,
+                  ),
+                ),
+              ),
+            ],
+            SizedBox(height: 18),
+            // 승인·반려는 **목록 줄에 그대로 둔다** — 누르는 자리가 둘이면
+            // 매일 쓰는 사람이 어디를 눌러야 할지 매번 고른다
+            SizedBox(
+              width: double.infinity,
+              child: Pressable(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  height: 48,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppColors.gray50,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Text(
+                    '닫기',
+                    style: AppTextStyles.label.copyWith(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _InboxRow extends StatelessWidget {
   _InboxRow({
     required this.item,
@@ -486,64 +619,56 @@ class _InboxRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // **줄을 누르면 적어 낸 사유를 크게 본다** (2026-09-09 대표 요청).
+    //
+    // 예전에는 사유를 줄 밑에 세 줄까지 폈는데, 줄마다 높이가 달라져서
+    // 카드가 들쭉날쭉해졌다. 목록은 한 줄로 두고 내용은 눌러서 본다.
+    //
+    // **승인·반려 버튼은 이 안이 아니라 오른쪽에 그대로 둔다** — 누르는
+    // 자리가 바뀌면 매일 쓰는 사람이 헤맨다. `Pressable` 은 버튼을 안 덮는다
+    // (형제로 서 있어서 각자 제 몫만 받는다).
     return Row(
       children: [
         Avatar(name: _name, size: 34),
         SizedBox(width: 10),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      _name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.body2.copyWith(
-                        fontWeight: FontWeight.w600,
+          child: Pressable(
+            onTap: () => _showInboxDetail(context, item, _name),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        _name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.body2.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                  ),
-                  SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      item.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.caption,
+                    SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        item.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.caption,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 1),
-              Text(
-                item.detail,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppTextStyles.caption,
-              ),
-              // 적어 낸 사유 — **한 줄로 안 자른다** (2026-09-09 대표 요청).
-              //
-              // 사유서를 받아 놓고 결재하는 쪽이 못 읽고 있었다. 한 줄로
-              // 자르면 `몸 상태가 안 좋아서 제대로 하지…` 에서 끊겨서
-              // 승인·반려를 판단할 수가 없다.
-              //
-              // 세 줄까지 편다 — 운영에 쌓인 사유가 평균 32자·최대 42자라
-              // 대부분 두 줄 안에 든다. 그보다 길면 뒤를 자른다.
-              if (item.reason case final reason?) ...[
-                SizedBox(height: 4),
+                  ],
+                ),
+                SizedBox(height: 1),
                 Text(
-                  reason,
-                  maxLines: 3,
+                  item.detail,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.caption.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
+                  style: AppTextStyles.caption,
                 ),
               ],
-            ],
+            ),
           ),
         ),
         // 반려가 왼쪽 — 프로젝트·전자결재·급여와 같은 차례다

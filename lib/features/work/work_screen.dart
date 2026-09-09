@@ -451,9 +451,14 @@ class _WorkScreenState extends State<WorkScreen>
         );
         if (!mounted) return;
         setState(() => _logs = [log, ..._logs]);
+        // **결재를 타는 항목은 '완료' 가 아니라 '신청' 이다** (2026-09-09 요청).
+        // 점수가 아직 안 들어갔는데 `+15점` 이라고 하면 받은 줄 알고,
+        // 내역에서 못 찾으면 한 번 더 누른다 — 실제로 그래서 중복이 났다.
         AppToast.show(
           context,
-          note == null
+          log.awaiting
+              ? '${_withJosa(item.name)} 신청했습니다 · 승인되면 ${item.points}점이 들어가요'
+              : note == null
               ? '${_withJosa(item.name)} 완료했습니다 · +${item.points}점'
               : '"$note" 기록했습니다 · +${item.points}점',
         );
