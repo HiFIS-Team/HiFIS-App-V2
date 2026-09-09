@@ -78,7 +78,8 @@ class _InboxCard extends StatefulWidget {
   State<_InboxCard> createState() => _InboxCardState();
 }
 
-class _InboxCardState extends State<_InboxCard> with SkeletonDelay<_InboxCard> {
+class _InboxCardState extends State<_InboxCard>
+    with ScreenRefresh<_InboxCard>, SkeletonDelay<_InboxCard> {
   List<InboxItem> _items = const [];
 
   /// 보고 있는 칸 — **카드는 늘 `대기` 다.** 전체보기에서만 목록바로 바뀐다.
@@ -93,6 +94,25 @@ class _InboxCardState extends State<_InboxCard> with SkeletonDelay<_InboxCard> {
   /// 카드에 세우는 줄 수 — 데스크톱은 나란히 선 프로젝트 카드와 맞추고,
   /// 폰은 네 장을 같게 맞춘다. **전체보기 화면에서는 안 자른다.**
   int get _max => widget.full ? _items.length : (isDesktop ? 4 : phoneCardRows);
+
+  /// 홈 탭에 다시 들어오거나 다른 화면에서 결재가 바뀌었을 때 조용히 다시 받는다
+  ///
+  /// **없으면 이 카드는 앱을 켤 때 받은 것을 계속 보여준다.** 홈 화면도
+  /// `ScreenRefresh` 를 달고 있지만 그건 `_summary` 만 다시 받고, 카드는
+  /// `LazyIndexedStack` 안에서 State 가 살아 있어 `initState` 가 다시 안 돈다.
+  /// 그래서 결재가 새로 올라와도 카드는 `결재할 게 없어요` 인데, 전체보기는
+  /// 새 State 라 거기서만 보였다 (2026-09-09 대표 지적).
+  ///
+  /// [_load] 는 `beginLoad` 를 안 불러서 **뼈대가 다시 안 뜬다** — 탭을 옮길
+  /// 때마다 카드가 깜빡이면 안 된다 (`ScreenRefresh` 규약).
+  @override
+  Future<void> onScreenRefresh() => _load();
+
+  /// **여섯 갈래가 한 신호다** — 급여·월차·전자결재·일정·내 업무·컴플레인이
+  /// 다 이 카드 한 목록에 서므로 갈래를 나누지 않는다.
+  /// 간격(1분)을 안 따지고 바로 받는다.
+  @override
+  List<ValueNotifier<int>> get watchSignals => [approvalChanged];
 
   @override
   void initState() {

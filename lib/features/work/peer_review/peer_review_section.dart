@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/util/screen_refresh.dart';
 import '../../../core/util/skeleton_delay.dart';
 import 'package:flutter/services.dart';
 
@@ -68,7 +69,7 @@ enum _Filter {
 }
 
 class _PeerReviewSectionState extends State<PeerReviewSection>
-    with SkeletonDelay<PeerReviewSection> {
+    with ScreenRefresh<PeerReviewSection>, SkeletonDelay<PeerReviewSection> {
   /// 평가 대상 — 같은 지점 사람들, 본인이 맨 앞
   List<Employee> _targets = const [];
 
@@ -123,6 +124,28 @@ class _PeerReviewSectionState extends State<PeerReviewSection>
 
   /// 평가를 쓰는 사람인가 — 대표·관리자는 현황만 본다
   bool get _canReview => currentUser?.role.doesFieldWork ?? false;
+
+  /// 업무 탭에 다시 들어오거나 앱이 다시 앞으로 나왔을 때 조용히 다시 받는다
+  ///
+  /// **없으면 앱을 켤 때 받은 것을 계속 보여준다.** 업무 화면이 `ScreenRefresh`
+  /// 를 달고 있지만 그건 제 데이터만 받고, 이 판은 `LazyIndexedStack` 안에서
+  /// State 가 살아 있어 `initState` 가 다시 안 돈다.
+  ///
+  /// 여기서 낡으면 두 가지가 어긋난다.
+  ///
+  /// | 낡는 것 | 무슨 일이 나나 |
+  /// |---|---|
+  /// | `_window` | 앱을 켜 둔 채 말일이 되면 **창이 열렸는데 닫힌 줄 안다** |
+  /// | `_all` | 대표·관리자의 **제출 현황**이 그대로 멈춰 있다 |
+  ///
+  /// **신호는 안 건다** — 동료평가에는 갈래 신호가 없고(결재·출퇴근 둘뿐),
+  /// 내가 낸 것은 이미 [_submit] 이 다시 받는다. 남이 낸 것은 탭에 다시
+  /// 들어올 때 따라오면 충분하다.
+  ///
+  /// [_load] 는 `beginLoad` 를 안 불러서 **뼈대가 다시 안 뜬다.**
+  /// 보고 있던 달(`_month`)도 그대로 지킨다.
+  @override
+  Future<void> onScreenRefresh() => _load();
 
   @override
   void initState() {

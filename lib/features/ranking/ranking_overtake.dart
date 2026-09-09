@@ -26,12 +26,24 @@ class _OvertakeCard extends StatefulWidget {
   State<_OvertakeCard> createState() => _OvertakeCardState();
 }
 
-class _OvertakeCardState extends State<_OvertakeCard> {
+class _OvertakeCardState extends State<_OvertakeCard>
+    with ScreenRefresh<_OvertakeCard> {
   /// 카드에 몇 줄까지 — 옆 시상대와 높이가 비슷해지는 수다
   static const _rows = 4;
 
   List<RankOvertake> _all = const [];
   bool _loading = true;
+
+  /// 랭킹 탭에 다시 들어오거나 앱이 다시 앞으로 나왔을 때 조용히 다시 받는다
+  ///
+  /// **없으면 앱을 켤 때 받은 것을 계속 보여준다.** 랭킹 화면이 `ScreenRefresh`
+  /// 를 달고 있지만 그건 순위표만 받고, 이 카드는 `LazyIndexedStack` 안에서
+  /// State 가 살아 있어 `initState` 가 다시 안 돈다 — **서버는 5분마다 새로
+  /// 찍는데** 카드는 켤 때 것에 멈춰 있었다.
+  ///
+  /// [_load] 는 `_loading` 을 다시 켜지 않아서 **스피너가 다시 안 뜬다.**
+  @override
+  Future<void> onScreenRefresh() => _load();
 
   @override
   void initState() {
