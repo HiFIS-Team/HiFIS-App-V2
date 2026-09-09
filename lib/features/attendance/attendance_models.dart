@@ -445,10 +445,6 @@ String _duration(Duration value) {
   return '$hours시간 $minutes분';
 }
 
-/// 달력 칸에 들어갈 짧은 근무 시간 — '8:08'
-String _shortDuration(Duration value) =>
-    '${value.inHours}:${(value.inMinutes % 60).toString().padLeft(2, '0')}';
-
 /// '09:02' 형태
 String _clock(DateTime? time) => time == null
     ? '--:--'

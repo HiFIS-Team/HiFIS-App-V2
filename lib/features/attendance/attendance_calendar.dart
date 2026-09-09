@@ -2,59 +2,75 @@ part of 'attendance_screen.dart';
 
 // ── 달력 ──
 
-/// 상태 한 줄이 잡아먹는 높이 — 위 여백 2 + 안쪽 위아래 4 + 글자 13(10 × 1.3)
-const _rosterLineHeight = 19.0;
-
-/// 줄이 서기 전에 이미 나간 높이 — 칸 위아래 여백 11 + 날짜 동그라미 22
-const _rosterChrome = 33.0;
-
-/// 그날 칸에 설 상태 줄 — `이름 외 N명 상태`
+/// 칸에 찍히는 점 하나 — 지름과 사이 간격
 ///
-/// 다들 제때 오고 갔으면 줄을 늘어놓지 않고 `전원 출근`(+`전원 퇴근`)으로 접는다.
-/// **칸 높이를 재는 쪽과 그리는 쪽이 같은 걸 봐야** 해서 밖으로 빼 뒀다 —
-/// 따로 세면 한쪽이 틀려서 칸이 넘친다.
+/// **글자를 안 쓴다** (2026-09-09 대표 요청). 폰 칸이 폭의 7분의 1(약 44)이라
+/// `테스트 점장 외 1명 결근` 은 물론 `결근 2` 도 넘쳐서, 줄이거나 자르거나
+/// 둘 중 하나였다 — 줄이면 깨알이 되고 자르면 무슨 상태인지 사라진다.
+/// 색만 찍고 **누가 어땠는지는 그날을 눌러서** 본다 ([_DayDialog]).
+const _dotSize = 5.0;
+const _dotGap = 3.0;
+
+/// 그날 칸에 찍을 점 — 상태마다 하나씩, [_workStatusOrder] 차례대로
+///
+/// **다들 제때 오고 갔으면 둘로 접는다** — 초록(출근) + 진회색(퇴근).
+/// 아홉 사람이 다 정상이어도 점이 아홉 개 서면 읽을 것이 없다.
 ///
 /// **한 사람이라도 미출근·결근이면 안 접는다** (2026-08-19 대표 지적).
 /// 예전에는 아직 안 온 사람이 서버 명단에서 통째로 빠져서, 남은 사람만 보고
 /// `전원 출근` 으로 접혔다 — 전원이 온 게 아닌데 그렇게 떴다.
-///
-/// [compact] 면 이름 대신 **인원수**를 적는다 — `결근 2` (2026-09-07).
-/// 폰 달 격자는 칸이 폭의 7분의 1(약 53)이라 `테스트 점장 외 1명 결근` 이
-/// `테…` 로 잘려서 **무슨 일이 있었는지 알 수가 없었다.** 이름은 그 날을
-/// 눌러서 본다 ([_DayDialog]). 줄 수는 그대로라 칸 높이 계산도 그대로다.
-List<(String, Color)> _rosterLines(DateTime date, {bool compact = false}) {
+List<Color> _rosterDots(DateTime date) {
   final groups = _rosterOf(date);
   if (groups.isEmpty) return const [];
 
-  final lines = <(String, Color)>[];
+  final dots = <Color>[];
   var onlyPlain = true;
-  for (final (status, label, color, plain) in _workStatusOrder) {
+  for (final (status, _, color, plain) in _workStatusOrder) {
     final names = groups[status];
     if (names == null || names.isEmpty) continue;
     if (!plain) onlyPlain = false;
-    lines.add((
-      compact
-          // 한 사람이면 수를 안 적는다 — `결근` 이 `결근 1` 보다 잘 읽힌다
-          ? (names.length == 1 ? label : '$label ${names.length}')
-          : '${_whoIn(names)} $label',
-      color,
-    ));
+    dots.add(color);
   }
-  if (lines.isEmpty) return const [];
-  if (!onlyPlain) return lines;
+  if (dots.isEmpty || !onlyPlain) return dots;
 
-  // 아직 센터에 있는 사람이 하나도 없어야 `전원 퇴근` 까지 붙는다 —
-  // 다 왔지만 아직 일하는 중이면 `전원 출근` 한 줄이다
+  // 아직 센터에 있는 사람이 하나도 없어야 `전원 퇴근` 점까지 붙는다 —
+  // 다 왔지만 아직 일하는 중이면 초록 하나다
   final working = groups[AttendanceStatus.inProgress] ?? const <String>[];
+  return [AppColors.workIn, if (working.isEmpty) AppColors.workOut];
+}
+
+/// 범례에 세울 것 — **그 달에 실제로 나온 상태만** (2026-09-09)
+///
+/// 아홉 가지를 늘 다 세우면 한 줄이 두 줄이 되고, 그 달에 없던 야근·조퇴가
+/// 있었던 것처럼 읽힌다. 달을 넘길 때마다 다시 센다.
+///
+/// 차례는 [_workStatusOrder] 를 따른다 — 칸의 점과 범례가 같은 차례여야
+/// 눈이 왼쪽부터 짝지어 읽는다.
+List<(String, Color)> _bossLegend(DateTime month) {
+  final seen = <AttendanceStatus>{};
+  final last = DateTime(month.year, month.month + 1, 0).day;
+  for (var day = 1; day <= last; day++) {
+    seen.addAll(_rosterOf(DateTime(month.year, month.month, day)).keys);
+  }
   return [
-    ('전원 출근', AppColors.workIn),
-    if (working.isEmpty) ('전원 퇴근', AppColors.workOut),
+    for (final (status, label, color, _) in _workStatusOrder)
+      if (seen.contains(status)) (label, color),
   ];
 }
 
-/// `김트레이너` · `김트레이너 외 3명`
-String _whoIn(List<String> names) =>
-    names.length == 1 ? names.first : '${names.first} 외 ${names.length - 1}명';
+/// 개인 달력의 범례 — 그 달에 나온 상태 + 잡아 둔 월차
+List<(String, Color)> _myLegend(List<_Day> days, List<_Leave> leaves) {
+  final seen = <_DayStatus>{};
+  for (final day in days) {
+    if (day.status != _DayStatus.off) seen.add(day.status);
+  }
+  // 아직 안 온 날의 월차도 칸에 점이 서므로 범례에 같이 세운다
+  if (leaves.any((l) => l.status.counted)) seen.add(_DayStatus.leave);
+  return [
+    for (final status in _DayStatus.values)
+      if (seen.contains(status)) (status.label, status.color),
+  ];
+}
 
 /// 화면의 주인공 — 칸마다 그날의 근무나 월차가 바로 보인다
 class _MonthCalendar extends StatelessWidget {
@@ -95,11 +111,11 @@ class _MonthCalendar extends StatelessWidget {
     // 1일이 무슨 요일인지에 따라 앞을 비운다 (일요일 시작)
     final lead = month.weekday % 7;
     final rows = ((lead + lastDay) / 7).ceil();
-    // 칸 안에 근무 시간까지 들어가야 해서 넉넉히 잡는다.
-    // 대표 칸은 상태마다 한 줄씩 들어가서 더 높다
-    final cellHeight = _isBoss
-        ? _bossCellHeight(month, lastDay)
-        : (isDesktop ? 84.0 : 62.0);
+    // **대표 칸도 같은 높이다** (2026-09-09). 예전에는 상태마다 글자 한 줄이
+    // 들어가서 그 달에서 제일 바쁜 날에 맞춰 칸이 자랐는데, 점은 여러 개가
+    // 한 줄에 서므로 자랄 이유가 없다
+    final cellHeight = isDesktop ? 84.0 : 62.0;
+    final legend = _isBoss ? _bossLegend(month) : _myLegend(days, leaves);
 
     return Container(
       width: double.infinity,
@@ -119,15 +135,8 @@ class _MonthCalendar extends StatelessWidget {
                 ),
                 SizedBox(width: 10),
                 _arrow(CupertinoIcons.chevron_right, () => onMove(1)),
-                Spacer(),
-                // 폰은 자리가 좁아 범례를 뺀다
-                if (isDesktop)
-                  for (final status in [
-                    _DayStatus.normal,
-                    _DayStatus.late,
-                    _DayStatus.absent,
-                    _DayStatus.leave,
-                  ]) ...[_legend(status), SizedBox(width: 9)],
+                // 범례는 달력 **아래** 한 줄이다 — 여기 두면 상태가 넷을
+                // 넘길 때 달 이름을 밀어낸다 (아홉 가지까지 난다)
               ],
             ),
           ),
@@ -152,60 +161,73 @@ class _MonthCalendar extends StatelessWidget {
             ],
           ),
           SizedBox(height: 8),
-          for (var row = 0; row < rows; row++)
-            // 칸이 스스로 높이를 정하므로 stretch를 쓰면 안 된다
-            // (세로가 무한대인 스크롤 안에서는 높이를 못 정해 터진다)
-            Row(
+          // **일정 달력과 같은 격자다** (2026-09-09 대표 요청). 예전에는 칸마다
+          // 여백을 두고 둥글렸는데, 한 화면 안에서 달력이 두 모양이면 안 된다
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.gray100),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
               children: [
-                for (var col = 0; col < 7; col++)
-                  Expanded(
-                    child: Builder(
-                      builder: (context) {
-                        final dayNumber = row * 7 + col - lead + 1;
-                        if (dayNumber < 1 || dayNumber > lastDay) {
-                          return SizedBox(height: cellHeight);
-                        }
-                        final date = DateTime(
-                          month.year,
-                          month.month,
-                          dayNumber,
-                        );
-                        return _DayCell(
-                          date: date,
-                          day: _dayOf(date),
-                          leave: _leaveOf(date),
-                          today: _sameDay(date, now),
-                          height: cellHeight,
-                          onTap: () => onPick(date),
-                        );
-                      },
-                    ),
+                for (var row = 0; row < rows; row++)
+                  // 칸이 스스로 높이를 정하므로 stretch를 쓰면 안 된다
+                  // (세로가 무한대인 스크롤 안에서는 높이를 못 정해 터진다)
+                  Row(
+                    children: [
+                      for (var col = 0; col < 7; col++)
+                        Expanded(
+                          child: Builder(
+                            builder: (context) {
+                              final dayNumber = row * 7 + col - lead + 1;
+                              final last = row == rows - 1;
+                              if (dayNumber < 1 || dayNumber > lastDay) {
+                                // 빈 칸도 선은 그린다 — 안 그리면 달 끝에서
+                                // 격자가 이 빠진 것처럼 보인다
+                                return _EmptyCell(
+                                  height: cellHeight,
+                                  lastRow: last,
+                                  lastColumn: col == 6,
+                                );
+                              }
+                              final date = DateTime(
+                                month.year,
+                                month.month,
+                                dayNumber,
+                              );
+                              return _DayCell(
+                                date: date,
+                                day: _dayOf(date),
+                                leave: _leaveOf(date),
+                                today: _sameDay(date, now),
+                                height: cellHeight,
+                                lastRow: last,
+                                lastColumn: col == 6,
+                                onTap: () => onPick(date),
+                              );
+                            },
+                          ),
+                        ),
+                    ],
                   ),
               ],
             ),
+          ),
+          // 그 달에 나온 상태만 — 점이 무슨 뜻인지 여기서만 알 수 있다
+          if (legend.isNotEmpty) ...[
+            SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 6,
+              children: [
+                for (final (label, color) in legend) _legend(label, color),
+              ],
+            ),
+          ],
         ],
       ),
     );
-  }
-
-  /// 대표 칸 높이 — **그 달에서 제일 바쁜 날**에 맞춘다
-  ///
-  /// 상태가 여러 가지 나온 날은 줄이 그만큼 늘어나는데 칸이 고정이면 넘친다
-  /// (폰은 4줄부터 5px, PC 는 6줄부터 15px — 실제로 났다).
-  ///
-  /// 줄을 잘라서 맞추지 않는다. 이 화면은 **그날 누가 어땠는지**를 보는 자리라
-  /// 잘린 상태는 아예 없던 일처럼 보인다. 칸이 자라는 쪽이 낫다.
-  ///
-  /// 조용한 달은 지금까지의 높이 그대로다 — 폰 3줄·PC 5줄까지는 안 자란다.
-  double _bossCellHeight(DateTime month, int lastDay) {
-    var most = 0;
-    for (var day = 1; day <= lastDay; day++) {
-      final count = _rosterLines(DateTime(month.year, month.month, day)).length;
-      if (count > most) most = count;
-    }
-    final base = isDesktop ? 132.0 : 104.0;
-    final needed = _rosterChrome + most * _rosterLineHeight;
-    return needed > base ? needed : base;
   }
 
   Widget _arrow(IconData icon, VoidCallback onTap) => Pressable(
@@ -222,21 +244,61 @@ class _MonthCalendar extends StatelessWidget {
     ),
   );
 
-  Widget _legend(_DayStatus status) => Row(
+  /// 범례 한 칸 — 칸에 찍히는 점과 **같은 크기·같은 색**이다
+  Widget _legend(String label, Color color) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
       Container(
-        width: 6,
-        height: 6,
-        decoration: BoxDecoration(color: status.color, shape: BoxShape.circle),
+        width: _dotSize,
+        height: _dotSize,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       ),
-      SizedBox(width: 3),
-      Text(status.label, style: AppTextStyles.caption.copyWith(fontSize: 10)),
+      SizedBox(width: 4),
+      Text(label, style: AppTextStyles.caption.copyWith(fontSize: 10)),
     ],
   );
 }
 
-/// 달력 칸 하나 — 날짜 + 그날의 한 줄 요약
+/// 격자에서 빈 자리 — 앞뒤 달 날짜가 놓일 칸
+///
+/// **선은 그린다.** 아예 비우면 달 첫 주·끝 주에서 격자가 이 빠져 보인다.
+class _EmptyCell extends StatelessWidget {
+  const _EmptyCell({
+    required this.height,
+    required this.lastRow,
+    required this.lastColumn,
+  });
+
+  final double height;
+  final bool lastRow;
+  final bool lastColumn;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    height: height,
+    decoration: _cellBorder(lastRow: lastRow, lastColumn: lastColumn),
+  );
+}
+
+/// 칸을 가르는 선 — 마지막 줄·마지막 칸은 바깥 테두리가 대신한다
+BoxDecoration _cellBorder({
+  required bool lastRow,
+  required bool lastColumn,
+  Color? color,
+}) => BoxDecoration(
+  color: color,
+  border: Border(
+    right: BorderSide(
+      color: lastColumn ? Colors.transparent : AppColors.gray100,
+    ),
+    bottom: BorderSide(color: lastRow ? Colors.transparent : AppColors.gray100),
+  ),
+);
+
+/// 달력 칸 하나 — 날짜 + 그날 상태를 나타내는 점
+///
+/// **글자를 안 쓴다** (2026-09-09 대표 요청). 무슨 상태인지는 달력 아래
+/// 범례가 알려주고, 누가 어땠는지는 그날을 누르면 나온다 ([_DayDialog]).
 class _DayCell extends StatefulWidget {
   _DayCell({
     required this.date,
@@ -244,6 +306,8 @@ class _DayCell extends StatefulWidget {
     required this.leave,
     required this.today,
     required this.height,
+    required this.lastRow,
+    required this.lastColumn,
     required this.onTap,
   });
 
@@ -252,6 +316,8 @@ class _DayCell extends StatefulWidget {
   final _Leave? leave;
   final bool today;
   final double height;
+  final bool lastRow;
+  final bool lastColumn;
   final VoidCallback onTap;
 
   @override
@@ -278,16 +344,16 @@ class _DayCellState extends State<_DayCell> {
         onTap: widget.onTap,
         child: Container(
           height: widget.height,
-          margin: EdgeInsets.all(2),
           padding: EdgeInsets.fromLTRB(6, 6, 6, 5),
-          decoration: BoxDecoration(
+          decoration: _cellBorder(
+            lastRow: widget.lastRow,
+            lastColumn: widget.lastColumn,
             // 잡아둔 월차는 칸 전체를 옅게 물들여 앞으로의 일정이 눈에 띈다
             color: leave != null
                 ? AppColors.primary.withValues(alpha: 0.08)
                 : _hover
                 ? AppColors.gray50
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
+                : null,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -317,36 +383,11 @@ class _DayCellState extends State<_DayCell> {
                   ),
                 ),
               ),
-              if (_isBoss)
-                // 대표는 자기 기록이 아니라 그날 전 직원이 어땠는지를 본다
-                Expanded(child: _roster(date))
-              else ...[
-                Spacer(),
-                if (leave != null)
-                  _tag(
-                    // 갈래마다 제 이름으로 — 병가·기타가 `반차` 로 뜨면 안 된다.
-                    // **신청 화면의 칩과 같은 글자를 쓴다** — 여기에 따로 적어
-                    // 두면 갈래가 늘 때마다 두 곳을 고쳐야 한다 (실제로
-                    // 휴가가 생기면서 `기타` 가 '휴가' 로 떠 있었다)
-                    leave.kind.label,
-                    AppColors.primary,
-                    faded: leave.status == _LeaveStatus.pending,
-                  )
-                else if (day != null)
-                  switch (day.status) {
-                    // 정상 근무는 배지 대신 근무 시간만 담백하게 보여준다
-                    _DayStatus.normal => _hours(day),
-                    _DayStatus.late => _tag('지각', AppColors.warning),
-                    _DayStatus.early => _tag('조퇴', AppColors.warning),
-                    _DayStatus.noCheckout => _tag(
-                      '퇴근누락',
-                      AppColors.workNoCheckout,
-                    ),
-                    _DayStatus.absent => _tag('결근', AppColors.error),
-                    _DayStatus.leave => _tag('월차', AppColors.primary),
-                    _DayStatus.off => SizedBox(),
-                  },
-              ],
+              SizedBox(height: 4),
+              // 대표는 자기 기록이 아니라 그날 전 직원이 어땠는지를 본다
+              Expanded(
+                child: _isBoss ? _rosterDotRow(date) : _myDot(day, leave),
+              ),
             ],
           ),
         ),
@@ -354,106 +395,42 @@ class _DayCellState extends State<_DayCell> {
     );
   }
 
-  /// 대표 칸 — 상태마다 한 줄. PC 는 `이름 외 N명 상태`, **폰은 `결근 2`**.
+  /// 대표 칸 — 그날 나온 상태마다 점 하나
   ///
-  /// 줄을 세는 건 [_rosterLines] 가 한다 — 칸 높이도 그걸 보고 잡는다.
-  /// 폰에서 이름을 적으면 칸이 좁아 `테…` 로 잘린다 (2026-09-07).
-  Widget _roster(DateTime date) {
-    final lines = _rosterLines(date, compact: !isDesktop);
-    if (lines.isEmpty) return SizedBox();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      // 줄이 하나든 넷이든 칸 가운데에 모인다 — 위나 아래로 붙으면 날짜와 떨어져 보인다
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [for (final (text, color) in lines) _line(text, color)],
+  /// **`Wrap` 이라 넘치면 다음 줄로 간다.** 폰 칸이 좁아서 한 줄에 서너 개고,
+  /// 아홉 가지가 다 나온 날은 세 줄이 된다 — 칸 높이(62) 안에 든다.
+  Widget _rosterDotRow(DateTime date) {
+    final dots = _rosterDots(date);
+    if (dots.isEmpty) return SizedBox();
+    return Wrap(
+      spacing: _dotGap,
+      runSpacing: _dotGap,
+      children: [for (final color in dots) _dot(color)],
     );
   }
 
-  /// 상태 한 줄 — 옅은 바탕에 같은 색 글씨 (앱의 알약과 같은 방식)
+  /// 개인 칸 — 그날 상태는 하나뿐이라 점도 하나다
   ///
-  /// **폰은 잘라내지 않고 줄여 담는다** (2026-09-07). 칸이 폭의 7분의 1이라
-  /// `결근 2` 도 넘칠 수 있는데, 자르면 `결…` 이 되어 무슨 상태인지 사라진다.
-  /// PC 는 이름이 들어가 길므로 예전처럼 말줄임이다 (줄이면 글자가 깨알이 된다).
-  Widget _line(String text, Color color) {
-    final label = Text(
-      text,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: AppTextStyles.caption.copyWith(
-        fontSize: 10,
-        height: 1.3,
-        color: color,
-        fontWeight: FontWeight.w700,
-      ),
-    );
-
-    return Container(
-      width: double.infinity,
-      margin: EdgeInsets.only(top: 2),
-      padding: EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(5),
-      ),
-      child: isDesktop
-          ? label
-          : FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: label,
-            ),
-    );
+  /// **아직 결재 안 난 월차는 속을 비운다** — 예전 알약이 테두리만 둘러
+  /// '예정' 임을 알리던 것과 같은 뜻이다.
+  Widget _myDot(_Day? day, _Leave? leave) {
+    if (leave != null) {
+      return _dot(
+        AppColors.primary,
+        hollow: leave.status == _LeaveStatus.pending,
+      );
+    }
+    if (day == null || day.status == _DayStatus.off) return SizedBox();
+    return _dot(day.status.color);
   }
 
-  Widget _hours(_Day day) => Row(
-    children: [
-      Container(
-        width: 5,
-        height: 5,
-        margin: EdgeInsets.only(right: 4),
-        decoration: BoxDecoration(
-          color: AppColors.success,
-          shape: BoxShape.circle,
-        ),
-      ),
-      Flexible(
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Text(
-            _shortDuration(day.worked),
-            style: AppTextStyles.caption.copyWith(
-              fontSize: 11,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ),
-      ),
-    ],
-  );
-
-  /// 지각·결근·월차처럼 눈에 띄어야 하는 것만 알약으로
-  Widget _tag(String label, Color color, {bool faded = false}) => Container(
-    width: double.infinity,
-    padding: EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+  Widget _dot(Color color, {bool hollow = false}) => Container(
+    width: _dotSize,
+    height: _dotSize,
     decoration: BoxDecoration(
-      color: color.withValues(alpha: faded ? 0.1 : 0.16),
-      borderRadius: BorderRadius.circular(6),
-      // 아직 결재 전인 월차는 테두리만 둘러 예정임을 알린다
-      border: faded ? Border.all(color: color.withValues(alpha: 0.4)) : null,
-    ),
-    child: FittedBox(
-      fit: BoxFit.scaleDown,
-      alignment: Alignment.centerLeft,
-      child: Text(
-        label,
-        style: AppTextStyles.caption.copyWith(
-          fontSize: 10,
-          color: color,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
+      color: hollow ? Colors.transparent : color,
+      shape: BoxShape.circle,
+      border: hollow ? Border.all(color: color, width: 1.2) : null,
     ),
   );
 }
