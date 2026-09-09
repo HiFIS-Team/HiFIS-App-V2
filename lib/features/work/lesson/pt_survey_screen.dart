@@ -11,6 +11,7 @@ import '../../../core/util/skeleton_delay.dart';
 import '../../../core/widgets/feedback/app_toast.dart';
 import '../../../core/widgets/feedback/delayed_spinner.dart';
 import '../../../core/widgets/glass/glass_icon_button.dart';
+import '../../../core/widgets/glass/glass_menu.dart';
 import '../../../core/widgets/glass/glass_search_bar.dart';
 import '../../../core/widgets/input/mode_switch.dart';
 import '../../../core/widgets/input/pressable.dart';
@@ -46,6 +47,9 @@ class PtSurveyScreen extends StatefulWidget {
   State<PtSurveyScreen> createState() => _PtSurveyScreenState();
 }
 
+/// 고르개의 '전체' — null 은 '안 골랐다' 와 구분이 안 돼서 따로 값을 준다
+const _allTrainers = '__all__';
+
 class _PtSurveyScreenState extends State<PtSurveyScreen>
     with SkeletonDelay<PtSurveyScreen> {
   final _search = TextEditingController();
@@ -61,6 +65,31 @@ class _PtSurveyScreenState extends State<PtSurveyScreen>
   /// 다시 받는 중 — 버튼을 잠가 두 번 누르는 걸 막는다
   bool _refreshing = false;
 
+  /// 고른 트레이너 — null 이면 전체 (2026-09-09 대표 요청)
+  ///
+  /// **대표·관리자에게만 있다.** 나머지는 서버가 본인 것만 주므로 고를 것이 없다.
+  String? _trainerId;
+
+  /// 메뉴를 버튼 아래에 띄우려면 버튼 자리를 알아야 한다
+  final _filterKey = GlobalKey();
+
+  /// 트레이너를 고를 수 있는가 — 대표·관리자만
+  bool get _canFilter => myRole.boss;
+
+  /// 고르개에 세울 사람 — **받아 온 줄에서 뽑는다**
+  ///
+  /// 명단(`StaffDirectory`) 전체를 세우면 설문이 하나도 없는 사람이 잔뜩
+  /// 서는데, 골라 봐야 빈 화면이다. 여기 있는 사람이 곧 볼 것이 있는 사람이다.
+  List<({String id, String name})> get _trainers {
+    final seen = <String, String>{};
+    for (final survey in _rows) {
+      seen[survey.trainerId] = survey.displayTrainer;
+    }
+    final rows = [for (final e in seen.entries) (id: e.key, name: e.value)];
+    rows.sort((a, b) => a.name.compareTo(b.name));
+    return rows;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -73,6 +102,34 @@ class _PtSurveyScreenState extends State<PtSurveyScreen>
     setState(() => _refreshing = true);
     await _load();
     if (mounted) setState(() => _refreshing = false);
+  }
+
+  /// 트레이너 고르개 — 지점 고르개(`BranchScopeButton`)와 같은 부품이다
+  Future<void> _pickTrainer() async {
+    final rows = _trainers;
+    final picked = await showGlassMenu<String>(
+      context: context,
+      anchorKey: _filterKey,
+      width: 230,
+      items: [
+        // null 은 '안 골랐다' 와 구분이 안 돼서 전체에 따로 값을 준다
+        GlassMenuItem(
+          value: _allTrainers,
+          label: '전체 트레이너',
+          icon: Icons.groups_rounded,
+          selected: _trainerId == null,
+        ),
+        for (final t in rows)
+          GlassMenuItem(
+            value: t.id,
+            label: t.name,
+            icon: Icons.person_rounded,
+            selected: _trainerId == t.id,
+          ),
+      ],
+    );
+    if (!mounted || picked == null) return;
+    setState(() => _trainerId = picked == _allTrainers ? null : picked);
   }
 
   @override
@@ -124,7 +181,8 @@ class _PtSurveyScreenState extends State<PtSurveyScreen>
     return [
       for (final survey in _rows)
         if (survey.answered == wantAnswered)
-          if (_matches(survey, query)) survey,
+          if (_trainerId == null || survey.trainerId == _trainerId)
+            if (_matches(survey, query)) survey,
     ];
   }
 
@@ -263,7 +321,7 @@ class _PtSurveyScreenState extends State<PtSurveyScreen>
               ),
             ),
           ),
-          // 좌측 상단 고정 뒤로가기 · 우측 다시 받기 (글래스 버튼)
+          // 좌측 상단 고정 뒤로가기 · 우측 고르개/다시 받기 (글래스 버튼)
           SafeArea(
             bottom: false,
             child: Padding(
@@ -275,12 +333,28 @@ class _PtSurveyScreenState extends State<PtSurveyScreen>
                     onPressed: () => Navigator.pop(context),
                   ),
                   Spacer(),
-                  // **밖에서 들어오는 값**이라 다시 받는 길이 있어야 한다 —
-                  // 주소를 보내 놓고 답이 왔나 보는 자리다
-                  GlassIconButton(
-                    symbol: 'arrow.clockwise',
-                    onPressed: _refreshing ? null : _refresh,
-                  ),
+                  // **대표·관리자는 트레이너 고르개** (2026-09-09 요청).
+                  // 전사가 한 목록에 서면 누구 것을 보는 중인지가 흐려진다.
+                  //
+                  // 나머지는 본인 것만 오므로 고를 것이 없다 — 그 자리에
+                  // 예전처럼 다시 받기를 둔다. **밖에서 들어오는 값**이라
+                  // 다시 받는 길이 있어야 한다 (주소를 보내 놓고 답이 왔나
+                  // 보는 자리다).
+                  if (_canFilter)
+                    GlassIconButton(
+                      key: _filterKey,
+                      // 심볼이 바뀌어도 네이티브 버튼을 새로 만들지 않게 한다
+                      stableId: 'pt-trainer',
+                      symbol: _trainerId == null
+                          ? 'line.3.horizontal.decrease'
+                          : 'line.3.horizontal.decrease.circle.fill',
+                      onPressed: _pickTrainer,
+                    )
+                  else
+                    GlassIconButton(
+                      symbol: 'arrow.clockwise',
+                      onPressed: _refreshing ? null : _refresh,
+                    ),
                 ],
               ),
             ),
@@ -525,10 +599,7 @@ class _PtSurveyDetailCard extends StatelessWidget {
                     ? ''
                     : '${survey.satisfaction} / 5',
               ),
-              _PtField(
-                label: '앞으로 트레이너에게 바라는 점',
-                value: survey.request ?? '',
-              ),
+              _PtField(label: '앞으로 트레이너에게 바라는 점', value: survey.request ?? ''),
               _PtField(
                 label: '연장 여부',
                 value: survey.renew?.label ?? '',
