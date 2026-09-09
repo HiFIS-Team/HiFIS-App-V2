@@ -157,9 +157,9 @@ class _DrawScreenState extends State<DrawScreen>
     return _draws.where((d) => d.branchId == id).toList();
   }
 
-  /// 볼 수 있는 지점들 — **화순 · 첨단 · 동광주** 차례
+  /// 볼 수 있는 지점들 — **화순 · 첨단** 차례
   ///
-  /// 서버는 이름 가나다순(동광주·첨단·화순)으로 주는데, 앱에는 지점 차례가
+  /// 서버는 이름 가나다순(첨단·화순)으로 주는데, 앱에는 지점 차례가
   /// 따로 있다 ([StaffDirectory.branchRank]). 화면마다 다른 차례로 세우면
   /// 눈이 자리를 못 외운다 — 조직도·랭킹·업무 필터가 다 그 차례다.
   ///
