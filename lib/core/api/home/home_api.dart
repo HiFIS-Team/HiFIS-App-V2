@@ -104,6 +104,7 @@ class InboxItem {
     required this.title,
     required this.detail,
     this.reason,
+    this.preview,
     required this.createdAt,
   });
 
@@ -114,6 +115,7 @@ class InboxItem {
     title: json['title'] as String? ?? '',
     detail: json['detail'] as String? ?? '',
     reason: json['reason'] as String?,
+    preview: json['preview'] as String?,
     createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
   );
 
@@ -136,6 +138,15 @@ class InboxItem {
   /// [detail] 과 다르다. 저기는 서버가 만든 한 줄이고 이건 사람이 쓴
   /// 문장이라, 줄에서 **여러 줄로 펴서** 보여준다. 없으면 안 그린다.
   final String? reason;
+
+  /// **매장 TV 에 이렇게 걸린다** — 승인하면 벽에 나갈 문장 (2026-09-09)
+  ///
+  /// 컴플레인·클레임해결만 온다. 신청할 때 서버가 한 번 다듬어 박아 둔 값이라
+  /// **결재함을 다시 열어도 같은 문장**이다.
+  ///
+  /// 누르기 전에 보라고 있는 값이다 — 예전에는 승인 뒤에 만들어져서
+  /// 이상하게 다듬어져도 지우는 것 말고는 손쓸 수 없었다.
+  final String? preview;
 
   final DateTime createdAt;
 }

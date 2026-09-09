@@ -566,6 +566,46 @@ class _InboxDetailCard extends StatelessWidget {
                 ),
               ),
             ],
+            // **승인하면 벽에 이렇게 걸린다** (2026-09-09 요청).
+            //
+            // 예전에는 승인한 **뒤에** 다듬어져서, 이상하게 나와도 지우는 것
+            // 말고는 손쓸 수 없었다. 이제 누르기 전에 보고 판단한다.
+            if (item.preview case final preview?) ...[
+              SizedBox(height: 14),
+              Row(
+                children: [
+                  Icon(
+                    CupertinoIcons.tv,
+                    size: 13,
+                    color: AppColors.textTertiary,
+                  ),
+                  SizedBox(width: 5),
+                  Text(
+                    '매장 TV 에 이렇게 걸려요',
+                    style: AppTextStyles.caption.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text(
+                  preview,
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
+                    height: 1.5,
+                  ),
+                ),
+              ),
+            ],
             SizedBox(height: 18),
             // 승인·반려는 **목록 줄에 그대로 둔다** — 누르는 자리가 둘이면
             // 매일 쓰는 사람이 어디를 눌러야 할지 매번 고른다
