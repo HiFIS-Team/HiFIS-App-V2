@@ -124,16 +124,30 @@ class _GlassMenuRoute<T> extends PopupRoute<T> {
   /// 화면 가장자리에서 이만큼은 띄운다
   static const _margin = 8.0;
 
+  /// 판이 이보다 길어지면 **안에서 스크롤한다** (여덟 줄 남짓)
+  ///
+  /// 예전에는 상한이 없어서 줄 수만큼 그대로 자랐다. 환경정비 항목 필터가
+  /// 스물셋이라 폰에서 **위에서 아래까지 꽉 차고 아래쪽이 화면 밖으로 나갔다**
+  /// — 마지막 항목을 아예 못 골랐다 (안드로이드에서 실제로 겪었다).
+  /// 아이폰만 멀쩡했던 것은 거기가 OS 메뉴(`CNPopupMenuButton`)라 그렇다.
+  static const _maxHeight = 360.0;
+
   @override
   Widget buildPage(
     BuildContext context,
     Animation<double> a,
     Animation<double> b,
   ) {
-    final height = _estimateHeight();
-    final below = anchor.bottom + _gap;
-    final flip = below + height > bounds.height - _margin;
-    final top = flip ? anchor.top - _gap - height : below;
+    // 자연 높이가 아래에 안 들어가고 위가 더 넓으면 뒤집는다.
+    // **둘 다 모자라도 넓은 쪽에 붙인다** — 어느 쪽이든 스크롤로 다 볼 수 있다
+    final natural = _estimateHeight();
+    final roomBelow = bounds.height - anchor.bottom - _gap - _margin;
+    final roomAbove = anchor.top - _gap - _margin;
+    final flip = natural > roomBelow && roomAbove > roomBelow;
+
+    final room = (flip ? roomAbove : roomBelow).clamp(0.0, _maxHeight);
+    final height = natural.clamp(0.0, room);
+    final top = flip ? anchor.top - _gap - height : anchor.bottom + _gap;
 
     final left = alignRight ? anchor.right - width : anchor.left;
     final clamped = left.clamp(_margin, bounds.width - width - _margin);
@@ -143,7 +157,10 @@ class _GlassMenuRoute<T> extends PopupRoute<T> {
       children: [
         Positioned(
           left: clamped,
-          top: top.clamp(_margin, bounds.height - _margin),
+          top: top.clamp(
+            _margin,
+            (bounds.height - height - _margin).clamp(_margin, double.infinity),
+          ),
           width: width,
           child: FadeTransition(
             opacity: curve,
@@ -151,7 +168,7 @@ class _GlassMenuRoute<T> extends PopupRoute<T> {
               scale: Tween(begin: 0.94, end: 1.0).animate(curve),
               // 누른 모서리에서 커진다 — 버튼에서 자라 나온 것처럼 보인다
               alignment: Alignment(alignRight ? 1.0 : -1.0, flip ? 1.0 : -1.0),
-              child: _GlassMenuBody<T>(items: items),
+              child: _GlassMenuBody<T>(items: items, maxHeight: room),
             ),
           ),
         ),
@@ -174,9 +191,12 @@ class _GlassMenuRoute<T> extends PopupRoute<T> {
 }
 
 class _GlassMenuBody<T> extends StatelessWidget {
-  _GlassMenuBody({required this.items});
+  _GlassMenuBody({required this.items, required this.maxHeight});
 
   final List<GlassMenuEntry<T>> items;
+
+  /// 이보다 길면 안에서 스크롤한다 — 짧으면 줄 수만큼만 자란다
+  final double maxHeight;
 
   /// 유리판 모서리 — 카드(20)보다 조금 작게 잡아 떠 있는 판으로 읽히게 한다
   static const _radius = 18.0;
@@ -245,30 +265,33 @@ class _GlassMenuBody<T> extends StatelessWidget {
                     stops: const [0, 0.45],
                   ),
                 ),
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 6),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      for (final item in items)
-                        switch (item) {
-                          GlassMenuItem<T>() => _GlassMenuRow<T>(item: item),
-                          GlassMenuHeader<T>() => Padding(
-                            padding: EdgeInsets.fromLTRB(14, 7, 14, 5),
-                            child: Text(
-                              item.label,
-                              style: AppTextStyles.caption.copyWith(
-                                fontSize: 12,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: maxHeight),
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.symmetric(vertical: 6),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (final item in items)
+                          switch (item) {
+                            GlassMenuItem<T>() => _GlassMenuRow<T>(item: item),
+                            GlassMenuHeader<T>() => Padding(
+                              padding: EdgeInsets.fromLTRB(14, 7, 14, 5),
+                              child: Text(
+                                item.label,
+                                style: AppTextStyles.caption.copyWith(
+                                  fontSize: 12,
+                                ),
                               ),
                             ),
-                          ),
-                          GlassMenuDivider<T>() => Padding(
-                            padding: EdgeInsets.symmetric(vertical: 4),
-                            child: Divider(height: 1),
-                          ),
-                        },
-                    ],
+                            GlassMenuDivider<T>() => Padding(
+                              padding: EdgeInsets.symmetric(vertical: 4),
+                              child: Divider(height: 1),
+                            ),
+                          },
+                      ],
+                    ),
                   ),
                 ),
               ),
