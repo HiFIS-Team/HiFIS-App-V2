@@ -543,6 +543,9 @@
     "createdAt": {},
     "id": {},
     "name": {},
+    "smsSender": {
+     "nullable": true
+    },
     "type": {}
    },
    "required": [
@@ -555,6 +558,9 @@
   "BranchUpdate": {
    "properties": {
     "name": {
+     "nullable": true
+    },
+    "smsSender": {
      "nullable": true
     },
     "type": {
@@ -1205,6 +1211,9 @@
   },
   "EnvTaskLogOut": {
    "properties": {
+    "approvalStatus": {
+     "nullable": true
+    },
     "bonusAt": {
      "nullable": true
     },
@@ -1234,6 +1243,12 @@
      "nullable": true
     },
     "points": {},
+    "rejectReason": {
+     "nullable": true
+    },
+    "summary": {
+     "nullable": true
+    },
     "totalPoints": {}
    },
    "required": [
@@ -1530,6 +1545,12 @@
     "employeeId": {},
     "id": {},
     "kind": {},
+    "preview": {
+     "nullable": true
+    },
+    "reason": {
+     "nullable": true
+    },
     "title": {}
    },
    "required": [
@@ -3359,13 +3380,17 @@
   "ResolvedOut": {
    "properties": {
     "id": {},
+    "name": {},
+    "phone": {},
     "resolvedAt": {},
     "text": {}
    },
    "required": [
     "id",
     "text",
-    "resolvedAt"
+    "resolvedAt",
+    "name",
+    "phone"
    ]
   },
   "Role": {
@@ -4159,5 +4184,5 @@
    ]
   }
  },
- "version": "0.28.0"
+ "version": "0.29.0"
 }
