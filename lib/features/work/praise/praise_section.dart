@@ -29,6 +29,14 @@ part 'praise_data.dart';
 part 'praise_feedback.dart';
 part 'praise_survey.dart';
 
+/// 컴플레인 알림에서 '컴플레인 세그먼트로 바로 열어달라' 요청
+///
+/// **[requestedWorkTab] 보다 먼저 넣는다.** 집어 가는 길이 **둘**이다 —
+/// 다른 칸에 있었으면 이 화면이 새로 만들어지며 `initState` 가 집고,
+/// 이미 회원 친절도 칸을 보고 있었으면 (`State` 가 살아 있어 `initState` 가
+/// 안 온다) 리스너가 집는다. 한쪽만 두면 보고 있던 쪽이 조용히 안 움직인다.
+final requestedPraiseComplaint = ValueNotifier<bool?>(null);
+
 /// 회원 친절도 탭 콘텐츠
 ///
 /// 회원들이 남긴 칭찬과 컴플레인을 세그먼트로 나눠 본다.
@@ -58,7 +66,29 @@ class _PraiseSectionState extends State<PraiseSection>
   @override
   void initState() {
     super.initState();
+    // 다른 칸에 있다가 컴플레인 알림으로 들어왔다 — 이 화면이 그때 새로 만들어진다
+    if (requestedPraiseComplaint.value ?? false) _tab = 1;
+    requestedPraiseComplaint.value = null;
+    // **이미 회원 친절도 칸을 보고 있을 때가 따로 있다.** 그때는 업무 화면이
+    // 같은 자리에 같은 위젯을 다시 그려서 `initState` 가 아니라
+    // `didUpdateWidget` 이 오고, 위 줄은 영영 안 읽힌다 — 칭찬을 보던 중에
+    // 컴플레인 알림을 누르면 아무 일도 안 일어났다. 들을 귀를 따로 둔다
+    requestedPraiseComplaint.addListener(_onRequestedComplaint);
     _load();
+  }
+
+  @override
+  void dispose() {
+    requestedPraiseComplaint.removeListener(_onRequestedComplaint);
+    super.dispose();
+  }
+
+  /// 컴플레인 알림이 '그 세그먼트를 열어달라' 고 했다 — **꺼내면서 비운다**
+  void _onRequestedComplaint() {
+    if (!mounted) return;
+    if (requestedPraiseComplaint.value != true) return;
+    requestedPraiseComplaint.value = null;
+    setState(() => _tab = 1);
   }
 
   @override

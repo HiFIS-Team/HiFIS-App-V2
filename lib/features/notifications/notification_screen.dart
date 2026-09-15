@@ -12,7 +12,9 @@ import '../../core/widgets/feedback/empty_card.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/glass/top_frost.dart';
 import '../project/project_screen.dart' show requestedProjectId;
-import '../work/work_screen.dart' show requestedWorkTab, workLessonTab;
+import '../work/work_screen.dart'
+    show requestedWorkTab, workKindnessTab, requestedOpenPtSurveys;
+import '../work/praise/praise_section.dart' show requestedPraiseComplaint;
 import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/feedback/failed_card.dart';
@@ -342,10 +344,19 @@ bool goToNotificationLink(String? link) {
   if (target == NotificationTarget.approval) {
     requestedApprovalId.value = _idOf(link);
   }
-  // PT 만족도는 업무 안 '수업 개수' 칸에 있다 — 탭까지만 옮기면 첫 칸이
-  // 열려서 볼 자리를 다시 찾아야 한다. **화면 요청보다 먼저** 넣는다
+  // 컴플레인 — 회원 친절도 탭 안의 컴플레인 세그먼트까지 바로 연다.
+  // 그냥 `/work` 로 두면 첫 칸(환경정비)이 열려서 눌러도 안 움직이는
+  // 것처럼 보였다 (2026-09-15). **탭 요청보다 먼저** 넣는다
+  if (link == '/work/kindness-complaints') {
+    requestedPraiseComplaint.value = true;
+    requestedWorkTab.value = workKindnessTab;
+  }
+  // PT 만족도는 회원 친절도 탭 머리의 별 버튼으로 연다 (2026-09-09 수업
+  // 개수에서 옮겨 왔다) — 탭까지만 옮기면 볼 자리를 다시 찾아야 한다.
+  // **화면 요청보다 먼저** 넣는다
   if (link == '/work/pt-surveys') {
-    requestedWorkTab.value = workLessonTab;
+    requestedOpenPtSurveys.value = true;
+    requestedWorkTab.value = workKindnessTab;
   }
   requestedScreen.value = target;
   return true;

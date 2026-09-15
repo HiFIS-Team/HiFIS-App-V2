@@ -73,11 +73,12 @@ const _writeInMaxLength = 80;
 /// 딴 탭이 열린다. 이름을 붙여 한 자리에 둔다.
 const workPeerReviewTab = 1;
 
-/// 업무 화면의 **수업 개수** 탭 번호 — `_items` 순서와 같아야 한다
+/// 업무 화면의 **회원 친절도** 탭 번호 — `_items` 순서와 같아야 한다
 ///
-/// PT 만족도 폼 알림이 이리로 보낸다 — 그 화면으로 가는 버튼이 이 탭 머리에
-/// 있어서, 탭까지 안 열어 주면 첫 칸(환경정비)이 떴다.
-const workLessonTab = 3;
+/// 컴플레인·PT 만족도 폼 알림이 이리로 보낸다 — PT 만족도로 가는 별 버튼이
+/// 이 탭 머리에 있어서(2026-09-09 수업 개수에서 옮겨 왔다), 탭까지 안 열어
+/// 주면 첫 칸(환경정비)이 떴다.
+const workKindnessTab = 2;
 
 /// 업무 화면을 **어느 탭으로** 열지 — 넣고 나서 화면을 요청한다
 ///
@@ -104,6 +105,13 @@ final requestedWorkTab = ValueNotifier<int?>(null);
 /// 할 목록을 한 번 더 찾아야 한다. **[requestedWorkTab] 보다 먼저 넣는다** —
 /// 화면은 저쪽 값이 바뀔 때 움직인다.
 final requestedWorkSubTab = ValueNotifier<int?>(null);
+
+/// PT 만족도 폼 알림에서 '결과 화면까지 바로 열어달라' 요청
+///
+/// 탭만 옮기면 회원 친절도 탭이 열릴 뿐이라, 눌러서 별 버튼을 한 번 더
+/// 찾아야 했다. **[requestedWorkTab] 보다 먼저 넣는다** — 탭이 열리는
+/// 프레임에 맞춰 화면을 밀어 올린다.
+final requestedOpenPtSurveys = ValueNotifier<bool?>(null);
 
 class WorkScreen extends StatefulWidget {
   WorkScreen({super.key});
@@ -277,10 +285,13 @@ class _WorkScreenState extends State<WorkScreen>
     // 못 부르므로(빌드 전이다) 값만 바로 넣는다
     if (_pickTab() case final tab?) _tab = tab;
     if (_pickSubTab() case final sub?) _envTab = sub;
+    final openPtSurveys = _pickOpenPtSurveys();
     _loadEnv();
     // 첫 화면이 환경정비라 여기서 한 번 맞춘다
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _syncHeaderAction();
+      if (!mounted) return;
+      _syncHeaderAction();
+      if (openPtSurveys) _openPtSurveys();
     });
   }
 
@@ -312,18 +323,27 @@ class _WorkScreenState extends State<WorkScreen>
     return sub >= 0 && sub < _envTabCount ? sub : null;
   }
 
-  /// 밖에서 '이 탭으로 열어 달라' 고 했다 (동료평가 재촉·업무 누락 모달)
+  /// 들어온 'PT 만족도 화면까지 열어달라' 요청 — **꺼내면서 비운다**
+  bool _pickOpenPtSurveys() {
+    final open = requestedOpenPtSurveys.value ?? false;
+    requestedOpenPtSurveys.value = null;
+    return open;
+  }
+
+  /// 밖에서 '이 탭으로 열어 달라' 고 했다 (동료평가 재촉·업무 누락 모달·알림)
   void _onRequestedTab() {
     // **mounted 를 먼저 본다** — `_pickTab` 이 꺼내면서 비우므로, 못 쓸 때
     // 부르면 요청이 그냥 사라진다
     if (!mounted) return;
     if (_pickTab() case final tab?) {
       final sub = _pickSubTab();
+      final openPtSurveys = _pickOpenPtSurveys();
       setState(() {
         _tab = tab;
         if (sub != null) _envTab = sub;
       });
       _syncHeaderAction();
+      if (openPtSurveys) _openPtSurveys();
     }
   }
 

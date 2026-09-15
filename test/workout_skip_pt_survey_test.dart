@@ -12,6 +12,7 @@ import 'package:hifis_app/core/data/staff_directory.dart';
 import 'package:hifis_app/features/notifications/notification_screen.dart';
 import 'package:hifis_app/features/work/lesson/pt_survey_screen.dart';
 import 'package:hifis_app/features/work/peer_review/peer_review_section.dart';
+import 'package:hifis_app/features/work/praise/praise_section.dart';
 import 'package:hifis_app/features/work/work_screen.dart';
 
 /// 2026-09-05 에 더한 것들 — 운동일지 스킵 · PT 만족도 화면 · 동료평가 월별
@@ -187,25 +188,49 @@ void main() {
 
   // ── 알림을 누르면 볼 자리로 가나 ──────────────────────────
   group('PT 만족도 알림 딥링크', () {
-    test('업무의 수업 개수 칸까지 열어 준다', () {
+    test('회원 친절도 칸을 열고 PT 만족도 화면까지 밀어 올린다', () {
       requestedWorkTab.value = null;
       requestedScreen.value = null;
+      requestedOpenPtSurveys.value = null;
 
       expect(goToNotificationLink('/work/pt-surveys'), isTrue);
-      // 탭까지 안 옮기면 첫 칸(환경정비)이 열려서 볼 자리를 다시 찾아야 한다
-      expect(requestedWorkTab.value, workLessonTab);
+      // **수업 개수가 아니다** — PT 만족도로 가는 별 버튼이 2026-09-09 에
+      // 회원 친절도로 옮겨 갔는데 알림만 옛 칸에 남아 딴 데가 열렸다
+      expect(requestedWorkTab.value, workKindnessTab);
+      // 탭까지만 옮기면 버튼을 한 번 더 찾아야 한다 — 화면까지 연다
+      expect(requestedOpenPtSurveys.value, isTrue);
       expect(requestedScreen.value, NotificationTarget.work);
 
       requestedWorkTab.value = null;
       requestedScreen.value = null;
+      requestedOpenPtSurveys.value = null;
+    });
+
+    test('컴플레인은 회원 친절도의 컴플레인 칸까지 연다', () {
+      requestedWorkTab.value = null;
+      requestedScreen.value = null;
+      requestedPraiseComplaint.value = null;
+
+      expect(goToNotificationLink('/work/kindness-complaints'), isTrue);
+      expect(requestedWorkTab.value, workKindnessTab);
+      expect(requestedPraiseComplaint.value, isTrue);
+      expect(requestedScreen.value, NotificationTarget.work);
+
+      requestedWorkTab.value = null;
+      requestedScreen.value = null;
+      requestedPraiseComplaint.value = null;
     });
 
     test('그냥 /work 는 탭을 안 건드린다 — 점수·칭찬 알림이 쓰는 길이다', () {
       requestedWorkTab.value = null;
       requestedScreen.value = null;
+      requestedOpenPtSurveys.value = null;
+      requestedPraiseComplaint.value = null;
 
       expect(goToNotificationLink('/work'), isTrue);
       expect(requestedWorkTab.value, isNull);
+      expect(requestedOpenPtSurveys.value, isNull);
+      expect(requestedPraiseComplaint.value, isNull);
       expect(requestedScreen.value, NotificationTarget.work);
 
       requestedScreen.value = null;
