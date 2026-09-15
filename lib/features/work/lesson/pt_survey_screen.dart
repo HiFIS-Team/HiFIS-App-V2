@@ -205,6 +205,58 @@ class _PtSurveyScreenState extends State<PtSurveyScreen>
     return (yes * 100 / decided.length).round();
   }
 
+  /// '연장할래요' 로 답한 건의 등록 금액 — **다음달 예상 PT 매출**의 재료다
+  /// (2026-09-15 대표 요청).
+  ///
+  /// '고민 중이에요'·미응답은 안 센다 — 아직 안 정해졌거나 안 온 것을 매출로
+  /// 잡으면 부풀려 보인다. **트레이너를 골랐으면 그 사람 것만** 잡는다(고르개와
+  /// 같은 범위). 검색어·응답/미응답 탭에는 영향받지 않는다 — 찾는 글자와
+  /// 상관없이 이번 지점(트레이너) 전망은 그대로여야 한다.
+  ///
+  /// **이번 달에 답한 것만 센다.** 서버는 설문을 기간 없이 다 주므로, 안 자르면
+  /// 반년 전에 '연장할래요' 라고 답한 건까지 계속 얹혀 **'다음달' 예상 매출이
+  /// 달마다 불어나기만 한다** — 이번 달에 연장하겠다고 한 사람이 다음 달에
+  /// 결제한다는 뜻이라 답한 달로 자른다.
+  List<PtSurvey> get _renewedRows {
+    final now = DateTime.now();
+    return [
+      for (final survey in _rows)
+        if (survey.renew == RenewIntent.yes)
+          if (survey.answeredAt case final at?)
+            if (at.year == now.year && at.month == now.month)
+              if (_trainerId == null || survey.trainerId == _trainerId) survey,
+    ];
+  }
+
+  int get _revenueTotal =>
+      _renewedRows.fold(0, (sum, s) => sum + (s.pricePaid ?? 0));
+
+  /// 트레이너별 합계 — 이름 오름차순
+  List<({String name, int amount})> get _revenueByTrainer {
+    final sums = <String, int>{};
+    for (final s in _renewedRows) {
+      sums[s.displayTrainer] = (sums[s.displayTrainer] ?? 0) + (s.pricePaid ?? 0);
+    }
+    final rows = [for (final e in sums.entries) (name: e.key, amount: e.value)];
+    rows.sort((a, b) => a.name.compareTo(b.name));
+    return rows;
+  }
+
+  /// 지점별 합계 — **트레이너를 안 골랐고 여러 지점이 섞여 있을 때만** 쓴다
+  /// (대표·관리자가 '전체 지점' 으로 볼 때). 지점이 하나뿐이면 트레이너별
+  /// 목록이 곧 그 지점 것이라 따로 안 보여준다.
+  List<({String name, int amount})> get _revenueByBranch {
+    final sums = <String, int>{};
+    for (final s in _renewedRows) {
+      final name = s.branchName?.trim();
+      if (name == null || name.isEmpty) continue;
+      sums[name] = (sums[name] ?? 0) + (s.pricePaid ?? 0);
+    }
+    final rows = [for (final e in sums.entries) (name: e.key, amount: e.value)];
+    rows.sort((a, b) => a.name.compareTo(b.name));
+    return rows;
+  }
+
   /// 줄을 세우는 기준값 — 답변은 답한 때, 미응답은 열린 때다
   DateTime _sortKey(PtSurvey survey) => survey.answeredAt ?? survey.createdAt;
 
@@ -275,6 +327,20 @@ class _PtSurveyScreenState extends State<PtSurveyScreen>
                     onSelect: (i) => setState(() => _tab = i),
                   ),
                 ),
+                if (_revenueTotal > 0)
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+                    child: _RevenueForecastCard(
+                      total: _revenueTotal,
+                      // 트레이너를 골랐으면 이미 한 사람 것만 보는 중이라 줄이 필요 없다.
+                      // 지점이 여럿 섞여 있으면(전체 지점) 지점별로, 하나면 트레이너별로 가른다
+                      rows: _trainerId != null
+                          ? const []
+                          : _revenueByBranch.length > 1
+                          ? _revenueByBranch
+                          : _revenueByTrainer,
+                    ),
+                  ),
                 Padding(
                   padding: EdgeInsets.fromLTRB(24, 0, 24, 12),
                   child: Row(
@@ -489,6 +555,85 @@ class _PtSurveyRow extends StatelessWidget {
     );
   }
 }
+
+/// 다음달 예상 PT 매출 — '연장할래요' 로 답한 등록권의 결제액을 합친 것
+/// (2026-09-15 대표 요청). [rows] 가 비어 있으면 합계만 보여준다.
+class _RevenueForecastCard extends StatelessWidget {
+  _RevenueForecastCard({required this.total, required this.rows});
+
+  final int total;
+  final List<({String name, int amount})> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        color: AppColors.success.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '다음달 예상 PT 매출',
+                    style: AppTextStyles.caption.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  // 무엇을 더한 숫자인지 안 적으면 읽는 사람이 범위를 못 짚는다
+                  Text(
+                    "이번 달 '연장할래요' 답변 기준",
+                    style: AppTextStyles.caption.copyWith(
+                      fontSize: 10,
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                ],
+              ),
+              Spacer(),
+              Text(
+                '${_comma(total)}원',
+                style: AppTextStyles.body1.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.success,
+                ),
+              ),
+            ],
+          ),
+          for (final row in rows) ...[
+            SizedBox(height: 6),
+            Row(
+              children: [
+                Text(row.name, style: AppTextStyles.caption),
+                Spacer(),
+                Text(
+                  '${_comma(row.amount)}원',
+                  style: AppTextStyles.caption.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// 1,000 단위 콤마 표기
+String _comma(int n) => n.toString().replaceAllMapped(
+  RegExp(r'(\d)(?=(\d{3})+$)'),
+  (m) => '${m[1]},',
+);
 
 /// 연장 의향 색 — **연장 안 한다는 답이 눈에 띄어야 한다** (붙잡을 시간이 남았다)
 Color _renewColor(RenewIntent renew) => switch (renew) {

@@ -34,6 +34,8 @@ class PtSurvey {
     required this.createdAt,
     this.memberName,
     this.trainerName,
+    this.pricePaid,
+    this.branchName,
     this.sentAt,
     this.answeredAt,
     this.satisfaction,
@@ -51,6 +53,8 @@ class PtSurvey {
     createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
     memberName: json['memberName'] as String?,
     trainerName: json['trainerName'] as String?,
+    pricePaid: json['pricePaid'] as int?,
+    branchName: json['branchName'] as String?,
     sentAt: _time(json['sentAt']),
     answeredAt: _time(json['answeredAt']),
     satisfaction: json['satisfaction'] as int?,
@@ -75,6 +79,13 @@ class PtSurvey {
   final DateTime createdAt;
   final String? memberName;
   final String? trainerName;
+
+  /// 그 등록권의 결제액(원) — '연장할래요' 로 답한 건을 다음달 예상 매출로
+  /// 합산할 때 쓴다
+  final int? pricePaid;
+
+  /// 회원 소속 지점 — 지점별 예상 매출을 가르는 자리
+  final String? branchName;
 
   /// 문자를 실제로 보낸 시각 — 발신번호가 정해지기 전에는 비어 있다
   final DateTime? sentAt;
