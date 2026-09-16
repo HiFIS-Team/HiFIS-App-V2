@@ -28,7 +28,16 @@ class _TodoCard extends StatelessWidget {
         children: [
           Text('할 일', style: AppTextStyles.label),
           SizedBox(height: 6),
-          if (todos.isEmpty)
+          // **아직 안 받았으면 빈 문구를 안 쓴다** (2026-09-16). 상세를 기다리지
+          // 않고 바로 열게 바꾸면서, 받아오는 동안 `등록된 할 일이 없어요` 가
+          // 떴다 사라지는 자리가 됐다 — 있는 것을 없다고 말하는 셈이다.
+          // `DelayedSpinner` 라 빨리 오면 아무것도 안 뜬다.
+          if (!project.detailLoaded)
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: 14),
+              child: Center(child: DelayedSpinner.bare()),
+            )
+          else if (todos.isEmpty)
             Padding(
               padding: EdgeInsets.symmetric(vertical: 14),
               child: Text(

@@ -29,22 +29,31 @@ class _ProjectPhone extends StatelessWidget {
   /// 상세를 열기 전에 체크리스트를 받아 온다
   final Future<void> Function(_Project) onOpen;
 
+  /// 지금 열리는 중인가 — **없으면 두 번 눌렀을 때 두 장이 밀려 들어온다**
+  ///
+  /// 예전에는 여기서 체크리스트를 **기다린 뒤에** 밀어 넣었다. 처음 여는
+  /// 프로젝트는 그동안 아무 표시가 없어서, 안 눌렸나 싶어 한 번 더 누르면
+  /// `_open` 이 두 번 돌아 **상세가 두 장 쌓였다** (2026-09-16 대표 보고).
+  static bool _opening = false;
+
   Future<void> _open(BuildContext context, _Project project) async {
-    // **받아 둔 것이 있으면 기다리지 않는다.** 들고 있는 줄을 그대로 띄우고,
-    // 새 값은 상세 화면이 받아서 오는 대로 갈아끼운다
-    // (`_ProjectDetailScreenState._load`). 기다리면 눌렀는데 화면이 잠깐
-    // 멈춘 것처럼 보인다 — 두 번째로 여는 것부터는 보여줄 것이 이미 있다
-    if (project.todos.isEmpty && project.events.isEmpty) {
-      await onOpen(project);
-      if (!context.mounted) return;
+    if (_opening) return;
+    _opening = true;
+    try {
+      // **기다리지 않고 바로 연다.** 상세 화면이 `initState` 에서 같은 것을
+      // 받으므로(`_ProjectDetailScreenState._load`) 여기서 미리 받는 것은
+      // 중복이었다 — 그 기다림이 곧 '늦게 열린다' 였다.
+      // 아직 안 받은 동안은 할 일 칸이 스피너다 (`_TodoCard`).
+      await Navigator.push(
+        context,
+        CupertinoPageRoute(
+          builder: (_) => _ProjectDetailScreen(project: project),
+        ),
+      );
+      onChanged();
+    } finally {
+      _opening = false;
     }
-    await Navigator.push(
-      context,
-      CupertinoPageRoute(
-        builder: (_) => _ProjectDetailScreen(project: project),
-      ),
-    );
-    onChanged();
   }
 
   @override
@@ -214,7 +223,10 @@ class _AwardBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = points < 0 ? AppColors.error : AppColors.success;
+    // 더한 점수는 **파랑**이다 (2026-09-16 대표 요청) — 진행률 막대·완료
+    // 배지가 이미 초록이라, 같은 카드에서 초록이 둘이면 무엇이 무엇인지
+    // 안 갈린다. 깎은 것만 빨강으로 둔다.
+    final color = points < 0 ? AppColors.error : AppColors.primary;
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
