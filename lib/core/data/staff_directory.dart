@@ -52,6 +52,15 @@ class StaffDirectory {
   /// 지점 이름 — 못 찾으면 빈 문자열 (화면이 빈 값은 빼고 그린다)
   String branchName(String? id) => branchOf(id)?.name ?? '';
 
+  /// 이름 → 지점 id — [branchName] 의 짝. 서버가 이름만 실어 주는 자리
+  /// (PT 만족도의 `branchName`)에서 차례를 매기려면 id 가 필요하다.
+  String? branchIdOf(String name) {
+    for (final branch in branches) {
+      if (branch.name == name) return branch.id;
+    }
+    return null;
+  }
+
   /// 지점 표시 순서 — 작을수록 앞
   ///
   /// HQ 는 지점이 아니라 전사라서 맨 앞이다 (서버가 `전체` 라고 부른다).

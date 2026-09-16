@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../core/api/client/api_exception.dart';
 import '../../../core/api/work/pt_survey_api.dart';
 import '../../../core/data/staff.dart';
+import '../../../core/data/staff_directory.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/util/when.dart';
@@ -212,15 +213,42 @@ class _PtSurveyScreenState extends State<PtSurveyScreen>
   /// 지점별 합계 — **트레이너를 안 골랐고 여러 지점이 섞여 있을 때만** 쓴다
   /// (대표·관리자가 '전체 지점' 으로 볼 때). 지점이 하나뿐이면 트레이너별
   /// 목록이 곧 그 지점 것이라 따로 안 보여준다.
+  ///
+  /// **지점은 0원이어도 다 세운다** (2026-09-16 대표 결정). 매출이 있는 곳만
+  /// 세우면 그 달에 연장 답변이 없던 지점이 통째로 사라져서, 읽는 쪽이
+  /// **'빠진 건지 없는 건지'** 를 못 가른다. 늘 같은 자리에 서 있어야 한다.
+  ///
+  /// **HQ(전 지점)는 매출이 있을 때만 세운다** — 소속이 대표·관리자·마케터라
+  /// 수업을 안 해서 늘 0원인 줄이 하나 붙는 꼴이 된다.
+  /// 실제로 매출이 잡힌 지점이 몇 곳인가 — **0원으로 깔아 둔 줄은 안 센다.**
+  /// [_revenueByBranch] 는 지점을 다 세우므로 그 길이로는 이걸 못 판단한다.
+  int get _branchesWithRevenue => {
+    for (final s in _renewedRows)
+      if ((s.branchName ?? '').trim().isNotEmpty && (s.pricePaid ?? 0) > 0)
+        s.branchName!.trim(),
+  }.length;
+
   List<({String name, int amount})> get _revenueByBranch {
     final sums = <String, int>{};
+    // 먼저 지점을 0원으로 깔아 둔다 — 명단을 못 받았으면(로그인 전·서버 꺼짐)
+    // 아래 합산에 나온 곳만 선다
+    final directory = StaffDirectory.instance;
+    for (final branch in directory.branches) {
+      if (!branch.isHq) sums[branch.name] = 0;
+    }
     for (final s in _renewedRows) {
       final name = s.branchName?.trim();
       if (name == null || name.isEmpty) continue;
       sums[name] = (sums[name] ?? 0) + (s.pricePaid ?? 0);
     }
     final rows = [for (final e in sums.entries) (name: e.key, amount: e.value)];
-    rows.sort((a, b) => a.name.compareTo(b.name));
+    // 지점 차례는 조직도·랭킹과 같은 규칙을 쓴다 (화순 → 첨단)
+    rows.sort((a, b) {
+      final rank = directory
+          .branchRank(directory.branchIdOf(a.name))
+          .compareTo(directory.branchRank(directory.branchIdOf(b.name)));
+      return rank != 0 ? rank : a.name.compareTo(b.name);
+    });
     return rows;
   }
 
@@ -303,7 +331,7 @@ class _PtSurveyScreenState extends State<PtSurveyScreen>
                       // 지점이 여럿 섞여 있으면(전체 지점) 지점별로, 하나면 트레이너별로 가른다
                       rows: _trainerId != null
                           ? const []
-                          : _revenueByBranch.length > 1
+                          : _branchesWithRevenue > 1
                           ? _revenueByBranch
                           : _revenueByTrainer,
                     ),
