@@ -18,7 +18,8 @@ class _AttendanceEditSheet extends StatefulWidget {
   State<_AttendanceEditSheet> createState() => _AttendanceEditSheetState();
 }
 
-class _AttendanceEditSheetState extends State<_AttendanceEditSheet> {
+class _AttendanceEditSheetState extends State<_AttendanceEditSheet>
+    with SkeletonDelay<_AttendanceEditSheet> {
   /// 고를 수 있는 사람 — **대표·관리자는 뺀다.** 근태를 안 남기는 쪽이라
   /// (`Role.boss`) 목록에 두면 고칠 수 없는 사람이 절반이다
   late final List<Employee> _people = [
@@ -31,13 +32,13 @@ class _AttendanceEditSheetState extends State<_AttendanceEditSheet> {
   TimeOfDay? _in;
   TimeOfDay? _out;
 
-  /// 그날 기록을 받아오는 중 — 받아야 무엇을 고치는지 보인다
-  bool _loading = false;
   bool _saving = false;
 
   @override
   void initState() {
     super.initState();
+    // 들어오면 아직 고른 사람이 없어 받을 것이 없다 — 뼈대 없이 시작한다
+    skipFirstSkeleton();
     if (_people.length == 1) {
       _who = _people.first;
       _load();
@@ -51,7 +52,7 @@ class _AttendanceEditSheetState extends State<_AttendanceEditSheet> {
   Future<void> _load() async {
     final who = _who;
     if (who == null) return;
-    setState(() => _loading = true);
+    setState(beginLoad);
     try {
       final rows = await AttendanceApi.list(
         employeeId: who.id,
@@ -66,11 +67,11 @@ class _AttendanceEditSheetState extends State<_AttendanceEditSheet> {
         _out = hit?.checkOut == null
             ? null
             : TimeOfDay.fromDateTime(hit!.checkOut!);
-        _loading = false;
+        endLoad();
       });
     } catch (error) {
       if (!mounted) return;
-      setState(() => _loading = false);
+      setState(endLoad);
       AppToast.show(context, messageOf(error));
     }
   }
@@ -87,7 +88,7 @@ class _AttendanceEditSheetState extends State<_AttendanceEditSheet> {
       context,
       (context) => _PersonPicker(people: _people, selected: _who),
     );
-    if (picked == null || !mounted) return;
+    if (picked == null || !mounted || picked.id == _who?.id) return;
     setState(() => _who = picked);
     await _load();
   }
@@ -102,7 +103,10 @@ class _AttendanceEditSheetState extends State<_AttendanceEditSheet> {
       last: DateTime.now(),
       title: '근무일',
     );
-    if (picked == null || !mounted) return;
+    // **같은 날이면 아무것도 안 한다.** 아이폰 시트는 닫는 것이 곧 고르는
+    // 것이라, 안 고르고 내려도 값이 돌아온다 — 그대로 다시 받으면 뼈대가
+    // 깔렸다 지워져 **아래가 통째로 깜빡인다** (2026-09-16 대표 보고)
+    if (picked == null || !mounted || _sameDay(picked, _date)) return;
     setState(() => _date = picked);
     await _load();
   }
@@ -171,7 +175,7 @@ class _AttendanceEditSheetState extends State<_AttendanceEditSheet> {
   @override
   Widget build(BuildContext context) {
     final who = _who;
-    final ready = who != null && !_loading;
+    final ready = who != null && !showSkeleton;
     return PhoneDetailScaffold(
       title: '근태 수정',
       // 일정 폼과 같은 틀 — 흰 배경에 카드 없이 앉히고 주 동작은 하단 글래스
@@ -218,7 +222,7 @@ class _AttendanceEditSheetState extends State<_AttendanceEditSheet> {
               ],
             ),
             SizedBox(height: 8),
-            if (_loading)
+            if (showSkeleton)
               _TimeSkeleton()
             else ...[
               _PickRow(
