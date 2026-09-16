@@ -101,7 +101,7 @@ String _requestLabel(ProjectRequestType type) => switch (type) {
 ///
 /// | 누구 | 언제 |
 /// |---|---|
-/// | MASTER | **늘** — 남의 것도, 완료된 것도 |
+/// | MASTER | 남의 것도 — 단 **완료된 것은 못 고친다** |
 /// | ADMIN | **참여 중일 때** (담당자거나 참여 멤버) |
 /// | MANAGER · MEMBER | 참여 중 + **할 일이 하나도 체크 안 됐을 때** |
 ///
@@ -109,13 +109,26 @@ String _requestLabel(ProjectRequestType type) => switch (type) {
 /// 지운다 — 오타 하나에 대표를 부르지 않는다. 한 칸이라도 체크된 뒤부터는
 /// 남이 한 일이 걸려 있어서 [_canRequestEdit] 쪽(결재)으로 간다.
 ///
-/// 서버 `_ensure_can_edit` 과 같은 기준이다.
+/// **완료된 프로젝트는 MASTER 도 못 고친다 (2026-09-16 대표 결정).** 그 전에는
+/// 대표만 예외라 완료된 프로젝트에도 `수정`·`인원 추가` 가 그대로 떴다 —
+/// 끝난 일에 사람이 늘면 점수받는 사람이 늘고, 기한이 바뀌면 지킨 것인지가
+/// 바뀐다. 돌아가는 길은 리셋 하나뿐이다 ([_canResetProject]).
+///
+/// 서버 `_ensure_open` · `_ensure_can_edit` 과 같은 기준이다.
 bool _canEditNow(_Project project) {
+  if (project.isDone) return false;
   if (myRole == Role.master) return true;
-  if (!_isMember(project) || project.isDone) return false;
+  if (!_isMember(project)) return false;
   if (myRole == Role.admin) return true;
   return !project.anyTodoDone;
 }
+
+/// 완료를 **처음으로 되돌릴** 수 있는가 — **MASTER 만** (2026-09-16 대표 결정)
+///
+/// 조용한 되돌리기는 없앴다. 이 버튼 하나가 기한·체크를 처음으로 돌리고
+/// 자동 점수를 걷는다 — 거기에 감점을 얹을 수 있다.
+bool _canResetProject(_Project project) =>
+    project.isDone && myRole == Role.master;
 
 /// 수정·삭제·인원 추가를 **결재로 올릴 수 있는가** (서버 `NOT_PROJECT_MEMBER`)
 ///
@@ -719,6 +732,16 @@ class _ProjectDetail extends StatelessWidget {
     if (_canTouchProject(project)) ...[
       SizedBox(width: 4),
       _headButton('수정', () => _requestEdit(context)),
+    ],
+    // **완료된 프로젝트에는 이것만 남는다** (2026-09-16) — 수정·인원 추가는
+    // 완료되면 아무에게도 안 뜬다. 빨갛게 두는 이유는 되돌릴 수 없어서다
+    if (_canResetProject(project)) ...[
+      SizedBox(width: 4),
+      _headButton(
+        '되돌리기',
+        () => _resetProject(context, project, onChanged),
+        danger: true,
+      ),
     ],
   ];
 

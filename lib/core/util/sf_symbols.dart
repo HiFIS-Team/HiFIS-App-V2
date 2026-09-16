@@ -72,6 +72,9 @@ const _icons = <String, IconData>{
   // 속을 안 채운 것을 골랐다 — 헤더 왼쪽에 서면 옆 버튼들이 다 외곽선이라
   // 채운 심볼은 **혼자 새까맣게 뜬다** (실제로 그렇게 보였다)
   'film': Icons.movie_outlined,
+  // 완료된 프로젝트를 처음으로 되돌리는 자리 (MASTER 전용).
+  // 새로고침이 아니라 **되감기**라 시계 반대 방향을 쓴다
+  'arrow.counterclockwise': Icons.refresh,
   // 매장 TV 를 앱에서 보는 자리 — 추첨 영상과 한 메뉴에 선다.
   // `film` 과 같은 이유로 속을 안 채운다
   'tv': Icons.tv_outlined,

@@ -291,6 +291,14 @@ class _ProjectDetailScreenState extends State<_ProjectDetailScreen> {
       // 수정·인원 추가는 **담당자·참여 멤버와 대표**에게만 뜬다 (2026-08-19) —
       // PC 머리말의 글자 버튼과 같은 조건이라 어느 쪽에서 봐도 같다
       actions: [
+        // **완료된 프로젝트에는 이 자리가 리셋 하나다** (2026-09-16).
+        // 수정·인원 추가는 완료되면 아무에게도 안 뜬다 (`_canEditNow`)
+        if (_canResetProject(widget.project))
+          GlassIconButton(
+            symbol: 'arrow.counterclockwise',
+            onPressed: () =>
+                _resetProject(context, widget.project, () => setState(() {})),
+          ),
         if (_canTouchProject(widget.project)) ...[
           GlassIconButton(
             symbol: 'square.and.pencil',

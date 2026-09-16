@@ -489,9 +489,25 @@ class ProjectApi {
     return Project.fromJson(data!);
   }
 
-  /// 완료를 되돌린다 — **MASTER 만**. 자동으로 준 점수는 회수된다
-  static Future<Project> reopen(String id) async {
-    final data = await _client.post('/projects/$id/reopen');
+  /// 완료를 **처음으로 되돌린다** — MASTER 만 (2026-09-16)
+  ///
+  /// 한 번에 넷을 한다 — 완료 해제 · 할 일 전부 체크 해제 · 기한을 오늘부터
+  /// 원래 길이만큼 다시 · 자동으로 준 점수 회수.
+  ///
+  /// [penalty] 는 **참여자 기준**이고 PM 은 5점을 더 문다. 0이면 안 깎는다 —
+  /// 실수로 완료한 것을 치우는 경우다.
+  ///
+  /// 조용한 되돌리기(`/reopen`)는 없앴다. 길이 둘이면 어느 쪽을 눌러야
+  /// 하는지를 매번 정해야 하고, 가벼운 쪽으로 기울면 벌점이 빈다.
+  static Future<Project> reset(
+    String id, {
+    int penalty = 0,
+    String? reason,
+  }) async {
+    final data = await _client.post(
+      '/projects/$id/reset',
+      body: {'penalty': penalty, 'reason': ?reason},
+    );
     return Project.fromJson(data!);
   }
 

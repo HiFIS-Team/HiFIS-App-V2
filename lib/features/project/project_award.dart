@@ -5,11 +5,14 @@ part of 'project_screen.dart';
 /// 기한 연장 결재가 있던 자리를 그대로 쓴다. 완료된 뒤에는 결재할 연장이 없고,
 /// 대신 여기서 점수를 매긴다.
 ///
-/// **참여자 전원에게 같은 점수가 간다.** 여기서 매기는 것은 대표의 평가라
-/// 사람마다 나누지 않는다 — 매긴 값이 **최종 점수**다 (더해지지 않는다).
+/// **적는 값은 참여자 기준이고 PM 은 5점을 더 받는다** (2026-09-16).
+/// 완료 기본 점수가 PM 10 · 참여자 5 로 5 차이라, 그 차이를 그대로 잇는다.
+/// 매긴 값이 **최종 점수**다 (더해지지 않는다).
 ///
-/// 완료하면 서버가 **담당자(PM) 10점 · 참여 멤버 5점**을 먼저 붙이고,
-/// 그 위에서 대표가 판단해 올리거나 깎는다.
+/// **깎지는 못한다.** 예전에는 -100 까지 줄 수 있었는데, 점수만 깎고
+/// 프로젝트는 완료로 둔 채 넘어가면 **못 한 일이 끝난 일로 남는다.**
+/// 깎는 것은 리셋(`_askReset`)으로 옮겼다 — 거기는 기한과 체크를 처음으로
+/// 되돌리고 다시 시키는 자리다.
 class _AwardCard extends StatefulWidget {
   _AwardCard({required this.project});
 
@@ -223,7 +226,11 @@ class _AwardCardState extends State<_AwardCard> {
 /// 참여 멤버는 완료 때 5점(`PROJECT_MEMBER_POINTS`)이 붙지만, 여기서 매기는
 /// 것은 **전원 같은 값**이라 둘 중 하나를 골라야 한다. 대표가 손대는 자리는
 /// 보통 "더 줄까"라서 높은 쪽을 놓는다.
-const _autoPoints = 10;
+/// 완료하면 저절로 붙는 점수 — **참여자 기준이다** (PM 은 5점 더)
+const _autoPoints = 5;
+
+/// PM 이 참여자보다 더 받는 몫 — 서버 `PM_POINT_GAP` 과 같은 값이다
+const _pmGap = 5;
 
 /// 점수와 사유를 받는다 — 취소하면 null
 Future<(int, String)?> _askAward(
@@ -255,7 +262,8 @@ Future<(int, String)?> _askAward(
           Text('프로젝트 점수', style: AppTextStyles.title3),
           SizedBox(height: 4),
           Text(
-            '참여자 ${project.members.length}명에게 같이 들어가요. -100 ~ 100',
+            '참여자 ${project.members.length}명에게 같이 들어가요 · '
+            'PM 은 +$_pmGap점 (0 ~ 100)',
             style: AppTextStyles.caption.copyWith(
               color: AppColors.textTertiary,
             ),
@@ -293,8 +301,8 @@ Future<(int, String)?> _askAward(
               Pressable(
                 onTap: () {
                   final value = int.tryParse(points.text.trim());
-                  if (value == null || value < -100 || value > 100) {
-                    AppToast.show(context, '-100 부터 100 까지 적어주세요');
+                  if (value == null || value < 0 || value > 100) {
+                    AppToast.show(context, '0 부터 100 까지 적어주세요');
                     pointsFocus.requestFocus();
                     return;
                   }
@@ -371,5 +379,144 @@ class _AwardField extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// 완료를 **처음으로 되돌리기 전에** 한 번 묻는다 — MASTER 만 (2026-09-16)
+///
+/// 되돌릴 수 없는 일이 한 번에 넷이라 반드시 묻는다. 무엇이 사라지는지를
+/// 적어 주고, **감점은 그 자리에서 같이 받는다** — 창을 두 번 띄우면
+/// 되돌리기만 하고 점수를 안 깎는 일이 생긴다.
+///
+/// 돌려주는 값은 `(감점, 사유)` 다. 감점은 **참여자 기준**이고 PM 은
+/// [_pmGap] 만큼 더 문다. 비워 두면 0 — 실수로 완료한 것을 치우는 경우다.
+Future<(int, String?)?> _askReset(BuildContext context, _Project project) {
+  final points = TextEditingController();
+  final reason = TextEditingController();
+  final pointsFocus = FocusNode();
+
+  return showAppDialog<(int, String?)>(
+    context,
+    (context) => Container(
+      width: dialogWidth(context, 320),
+      padding: EdgeInsets.fromLTRB(20, 20, 20, 16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('처음으로 되돌릴까요?', style: AppTextStyles.title3),
+          SizedBox(height: 8),
+          // **무엇이 사라지는지 적어 준다** — 되돌릴 수 없는 일이다
+          Text(
+            '· 할 일 체크가 전부 풀려요\n'
+            '· 기한이 오늘부터 다시 세어져요\n'
+            '· 완료로 받은 점수를 도로 걷어요',
+            style: AppTextStyles.body2.copyWith(
+              color: AppColors.textSecondary,
+              height: 1.6,
+            ),
+          ),
+          SizedBox(height: 16),
+          Text(
+            '더 깎을 점수 (안 적으면 안 깎아요)',
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.textTertiary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          SizedBox(height: 6),
+          _AwardField(
+            controller: points,
+            focusNode: pointsFocus,
+            hint: '0',
+            number: true,
+          ),
+          SizedBox(height: 6),
+          Text(
+            '참여자 ${project.members.length}명에게 같이 들어가요 · '
+            'PM 은 -$_pmGap점 (0 ~ 100)',
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.textTertiary,
+            ),
+          ),
+          SizedBox(height: 10),
+          _AwardField(controller: reason, hint: '사유 (선택)'),
+          SizedBox(height: 16),
+          Row(
+            children: [
+              Spacer(),
+              Pressable(
+                onTap: () => Navigator.pop(context),
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                child: Text(
+                  '취소',
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              SizedBox(width: 6),
+              Pressable(
+                onTap: () {
+                  final text = points.text.trim();
+                  // **비우면 0이다** — 실수로 완료한 것을 치우는 경우가 있다
+                  final value = text.isEmpty ? 0 : int.tryParse(text);
+                  if (value == null || value < 0 || value > 100) {
+                    AppToast.show(context, '0 부터 100 까지 적어주세요');
+                    pointsFocus.requestFocus();
+                    return;
+                  }
+                  final note = reason.text.trim();
+                  Navigator.pop(context, (value, note.isEmpty ? null : note));
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+                  decoration: BoxDecoration(
+                    color: AppColors.error,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '되돌리기',
+                    style: AppTextStyles.body2.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// 창을 띄우고 실제로 되돌린다 — 폰 헤더와 PC 머리말이 같이 쓴다
+Future<void> _resetProject(
+  BuildContext context,
+  _Project project,
+  VoidCallback onChanged,
+) async {
+  final id = project.id;
+  if (id == null) return;
+  final result = await _askReset(context, project);
+  if (result == null || !context.mounted) return;
+  try {
+    await ProjectApi.reset(id, penalty: result.$1, reason: result.$2);
+    onChanged();
+    if (context.mounted) {
+      AppToast.show(
+        context,
+        result.$1 == 0 ? '처음으로 되돌렸어요' : '되돌리고 ${result.$1}점 깎았어요',
+      );
+    }
+  } catch (error) {
+    if (context.mounted) AppToast.show(context, messageOf(error));
   }
 }

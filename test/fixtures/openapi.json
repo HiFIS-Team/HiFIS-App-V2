@@ -261,8 +261,7 @@
    "required": [
     "kind",
     "title",
-    "content",
-    "approverIds"
+    "content"
    ]
   },
   "ApprovalOut": {
@@ -2996,6 +2995,15 @@
   },
   "ProjectRequestType": {
    "properties": {},
+   "required": []
+  },
+  "ProjectReset": {
+   "properties": {
+    "penalty": {},
+    "reason": {
+     "nullable": true
+    }
+   },
    "required": []
   },
   "ProjectStatus": {
