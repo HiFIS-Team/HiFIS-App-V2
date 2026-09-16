@@ -1,3 +1,4 @@
+import '../work_screen.dart' show requestedOpenSessionHistory;
 import '../../../core/util/native_picker.dart';
 import '../../../core/widgets/display/avatar.dart';
 import 'dart:async';
@@ -95,6 +96,34 @@ class _LessonSectionState extends State<LessonSection>
   void initState() {
     super.initState();
     _load();
+    // 세션 싸인 알림이 **세션 기록까지** 열어 달라고 한다 (2026-09-16).
+    // 집어 가는 길을 **둘** 둔다 — 다른 탭에 있었으면 여기가, 이미 이 탭을
+    // 보고 있었으면(`LazyIndexedStack` 이라 `initState` 가 안 온다) 리스너가
+    // 집는다. 한쪽만 두면 보던 쪽이 조용히 안 움직인다
+    requestedOpenSessionHistory.addListener(_onHistoryRequested);
+    if (_pickHistoryRequest()) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openHistory();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    requestedOpenSessionHistory.removeListener(_onHistoryRequested);
+    super.dispose();
+  }
+
+  /// 들어온 요청을 꺼내 온다 — **꺼내면서 비운다** (한 번만 듣는다)
+  bool _pickHistoryRequest() {
+    final open = requestedOpenSessionHistory.value ?? false;
+    requestedOpenSessionHistory.value = null;
+    return open;
+  }
+
+  void _onHistoryRequested() {
+    if (!mounted) return;
+    if (_pickHistoryRequest()) _openHistory();
   }
 
   @override

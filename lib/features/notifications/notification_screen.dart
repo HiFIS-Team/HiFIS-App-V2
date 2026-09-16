@@ -13,7 +13,12 @@ import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/glass/top_frost.dart';
 import '../project/project_screen.dart' show requestedProjectId;
 import '../work/work_screen.dart'
-    show requestedWorkTab, workKindnessTab, requestedOpenPtSurveys;
+    show
+        requestedWorkTab,
+        workKindnessTab,
+        workLessonTab,
+        requestedOpenPtSurveys,
+        requestedOpenSessionHistory;
 import '../work/praise/praise_section.dart' show requestedPraiseComplaint;
 import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/input/pressable.dart';
@@ -309,6 +314,9 @@ enum NotificationTarget {
 
   /// 사내톡 — 어느 방인지는 [requestedRoomId] 가 따로 들고 간다 (2026-08-19)
   chat,
+
+  /// 회원 정보 — 등록 알림이 여기로 온다 (2026-09-16)
+  members,
 }
 
 /// 알림에서 열어달라고 요청한 사내톡 방 — [requestedScreen] 보다 **먼저** 세운다
@@ -358,6 +366,12 @@ bool goToNotificationLink(String? link) {
     requestedOpenPtSurveys.value = true;
     requestedWorkTab.value = workKindnessTab;
   }
+  // 세션 싸인 — 수업 개수 탭의 **세션 기록**까지 연다. 탭까지만 옮기면
+  // 첫 칸(환경정비)이 열려서 볼 자리를 다시 찾아야 한다
+  if (link == '/work/session-signs') {
+    requestedOpenSessionHistory.value = true;
+    requestedWorkTab.value = workLessonTab;
+  }
   requestedScreen.value = target;
   return true;
 }
@@ -406,6 +420,8 @@ NotificationTarget? _targetOf(String? link) {
     // **예전부터 서버가 `/work` 를 보내고 있었는데 여기 자리가 없어서**
     // 가산점·점수 되돌림 알림이 눌러도 안 움직였다 (2026-08-31)
     'work' => NotificationTarget.work,
+    // 회원 등록 알림 — 회원 정보 화면을 연다 (2026-09-16)
+    'members' => NotificationTarget.members,
     _ => null,
   };
 }
@@ -445,6 +461,8 @@ IconData _iconOf(NotificationKind kind) => switch (kind) {
   // 누락은 종이 아니라 경고 삼각형이다 — 색만 바꾸면 목록에서 종이 빨간 것으로만 보인다
   NotificationKind.myTaskMissing => Icons.warning_amber_rounded,
   NotificationKind.ptSurvey => Icons.rate_review_rounded,
+  NotificationKind.sessionSign => Icons.draw_rounded,
+  NotificationKind.memberRegister => Icons.person_add_alt_1_rounded,
   NotificationKind.other => Icons.notifications_rounded,
 };
 
@@ -464,7 +482,10 @@ Color _colorOf(NotificationKind kind) => switch (kind) {
   NotificationKind.ranking => AppColors.warning,
   NotificationKind.approval ||
   NotificationKind.payroll ||
-  NotificationKind.ptSurvey => AppColors.success,
+  NotificationKind.ptSurvey ||
+  // 싸인·등록은 **돈이 되는 일**이라 급여·결재와 같은 초록이다
+  NotificationKind.sessionSign ||
+  NotificationKind.memberRegister => AppColors.success,
   NotificationKind.myTaskMissing => AppColors.error,
   NotificationKind.other => AppColors.gray400,
 };

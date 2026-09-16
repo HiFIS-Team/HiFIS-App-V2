@@ -25,6 +25,7 @@ import '../attendance/attendance_screen.dart';
 import '../documents/document_screen.dart';
 import '../home/home_screen.dart';
 import '../meeting/meeting_screen.dart';
+import '../member/member_info.dart';
 import '../member/member_screen.dart';
 import '../messages/chat_store.dart';
 import '../messages/desktop_chat_screen.dart';
@@ -165,6 +166,12 @@ class _MainShellState extends State<MainShell> {
       _goChat();
       return;
     }
+    // 회원 정보는 어디에도 탭이 없다 — 전자결재처럼 밀어 올려 연다.
+    // 회원 등록 알림이 여기로 온다 (2026-09-16)
+    if (target == NotificationTarget.members) {
+      _goMembers();
+      return;
+    }
     if (isDesktop) {
       // 슬라이드인 화면이 열려 있으면 덮고 있어서 먼저 닫는다
       _paneNavKey.currentState?.popUntil((r) => r.isFirst);
@@ -181,6 +188,7 @@ class _MainShellState extends State<MainShell> {
         NotificationTarget.staff => 8,
         // 위에서 이미 처리했다
         NotificationTarget.chat => _paneIndex.value,
+        NotificationTarget.members => _paneIndex.value,
       };
       return;
     }
@@ -213,6 +221,7 @@ class _MainShellState extends State<MainShell> {
           NotificationTarget.schedule => _androidTab,
           NotificationTarget.staff => _androidTab,
           NotificationTarget.chat => _androidTab, // 위에서 이미 처리했다
+          NotificationTarget.members => _androidTab,
         },
       );
       return;
@@ -245,6 +254,7 @@ class _MainShellState extends State<MainShell> {
         case NotificationTarget.schedule:
         case NotificationTarget.staff:
         case NotificationTarget.chat:
+        case NotificationTarget.members:
           break; // 위에서 걸러진다
       }
     });
@@ -269,6 +279,15 @@ class _MainShellState extends State<MainShell> {
 
   /// 전자결재 열기 — 폰에는 탭이 없어 사내톡처럼 밀려 들어오는 화면으로 연다.
   /// 화면이 뜨면서 `requestedApprovalId` 를 집어 그 문서까지 연다.
+  /// 회원 정보를 밀어 올린다 — 회원 등록 알림이 쓴다 (2026-09-16)
+  void _goMembers() {
+    final navigator = isDesktop
+        ? (_paneNavKey.currentState ?? Navigator.of(context))
+        : Navigator.of(context);
+    navigator.popUntil((r) => r.isFirst);
+    navigator.push(CupertinoPageRoute(builder: (_) => MemberInfoScreen()));
+  }
+
   void _goApproval() {
     final navigator = Navigator.of(context);
     navigator.popUntil((r) => r.isFirst);

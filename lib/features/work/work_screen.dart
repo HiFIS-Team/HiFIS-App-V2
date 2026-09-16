@@ -80,6 +80,11 @@ const workPeerReviewTab = 1;
 /// 주면 첫 칸(환경정비)이 떴다.
 const workKindnessTab = 2;
 
+/// 업무 화면의 **수업 개수** 탭 번호 — `_items` 순서와 같아야 한다
+///
+/// 세션 싸인 알림이 이리로 보낸다 — 세션 기록이 이 탭 안에 있다.
+const workLessonTab = 3;
+
 /// 업무 화면을 **어느 탭으로** 열지 — 넣고 나서 화면을 요청한다
 ///
 /// ```dart
@@ -112,6 +117,12 @@ final requestedWorkSubTab = ValueNotifier<int?>(null);
 /// 찾아야 했다. **[requestedWorkTab] 보다 먼저 넣는다** — 탭이 열리는
 /// 프레임에 맞춰 화면을 밀어 올린다.
 final requestedOpenPtSurveys = ValueNotifier<bool?>(null);
+
+/// 세션 기록 화면까지 열어 달라 — 세션 싸인 알림이 쓴다 (2026-09-16)
+///
+/// [requestedOpenPtSurveys] 와 같은 방식이다. 탭까지만 옮기면 수업 개수 칸이
+/// 열릴 뿐이라, 기록을 보려면 `전체보기` 를 한 번 더 눌러야 한다.
+final requestedOpenSessionHistory = ValueNotifier<bool?>(null);
 
 class WorkScreen extends StatefulWidget {
   WorkScreen({super.key});

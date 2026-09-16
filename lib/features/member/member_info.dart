@@ -122,7 +122,7 @@ class _MemberInfoScreenState extends State<MemberInfoScreen>
       setState(() {
         _rows = [
           for (final m in rows) _Row(source: m, registration: latest[m.id]),
-        ]..sort((a, b) => a.source.name.compareTo(b.source.name));
+        ]..sort(_byRecent);
         endLoad();
       });
     } catch (error) {
@@ -130,6 +130,26 @@ class _MemberInfoScreenState extends State<MemberInfoScreen>
       setState(endLoad);
       AppToast.show(context, messageOf(error));
     }
+  }
+
+  /// **최근 등록한 사람이 위다** (2026-09-16 대표 요청)
+  ///
+  /// 예전에는 이름순이었는데, 방금 등록한 회원을 이름으로 찾아 내려가야 했다.
+  /// 이 화면에 오는 일이 대개 **막 등록한 사람을 보려는 것**이다.
+  ///
+  /// 등록권이 없는 회원은 **맨 아래**로 — 날짜가 없어 줄 세울 자리가 없고,
+  /// 그 사람들끼리는 이름순이다.
+  static int _byRecent(_Row a, _Row b) {
+    final left = a.registration?.purchasedAt;
+    final right = b.registration?.purchasedAt;
+    if (left == null && right == null) {
+      return a.source.name.compareTo(b.source.name);
+    }
+    if (left == null) return 1;
+    if (right == null) return -1;
+    final byDate = right.compareTo(left);
+    // 같은 순간에 여럿 넣는 일이 있다 (한 번에 옮겨 담을 때) — 이름으로 가른다
+    return byDate != 0 ? byDate : a.source.name.compareTo(b.source.name);
   }
 
   List<_Row> get _visible => [

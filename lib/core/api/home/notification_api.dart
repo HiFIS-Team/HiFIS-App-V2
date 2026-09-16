@@ -27,6 +27,12 @@ enum NotificationKind {
   /// PT 만족도 폼에 답이 왔다 — 결과를 볼 수 있는 사람만 받는다
   /// (담당 트레이너 본인은 목록도 알림도 안 본다)
   ptSurvey('PT_SURVEY'),
+
+  /// 세션 싸인을 받았다 — 대표·관리자와 **그 트레이너 본인** (2026-09-16)
+  sessionSign('SESSION_SIGN'),
+
+  /// 회원이 등록·재등록했다 — 받는 사람은 세션 싸인과 같다 (2026-09-16)
+  memberRegister('MEMBER_REGISTER'),
   other('');
 
   const NotificationKind(this.wire);
