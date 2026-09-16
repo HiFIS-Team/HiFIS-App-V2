@@ -55,12 +55,13 @@ class ApprovalScreen extends StatefulWidget {
   State<ApprovalScreen> createState() => _ApprovalScreenState();
 }
 
-/// 결재를 올릴 수 있는 사람 — **MASTER·ADMIN 은 못 올린다**
+/// 결재를 올릴 수 있는 사람 — **전 권한이다** (2026-09-16 대표 결정)
 ///
-/// 결재는 대표가 판단해 주는 것이라, 판단하는 쪽이 올리면 자기가 올려
-/// 자기가 결재하는 자리가 된다. 서버도 같은 기준으로 막는다
-/// (`NOT_A_REQUESTER`) — 눌러도 403 날 버튼은 안 낸다.
-bool get _canWrite => myRole != Role.master && myRole != Role.admin;
+/// 예전에는 MASTER·ADMIN 이 못 올렸다. 판단하는 쪽이 올리면 자기가 올려
+/// 자기가 결재하는 자리가 되기 때문이었는데, 그래서 **대표가 쓴 돈은 아예
+/// 기록이 안 남았다.** 이제는 올리되 그 문서가 결재를 안 탄다
+/// ([_needsApproval]) — 남는 것과 거치는 것을 갈랐다.
+bool get _canWrite => true;
 
 class _ApprovalScreenState extends State<ApprovalScreen>
     with ScreenRefresh<ApprovalScreen>, SkeletonDelay<ApprovalScreen> {
@@ -169,8 +170,10 @@ class _ApprovalScreenState extends State<ApprovalScreen>
     final draft = await _showComposer(context);
     if (draft == null || !mounted) return;
 
-    final approver = _defaultApprover;
-    if (approver == null) {
+    // 문턱 아래거나 대표·관리자면 결재선이 없다 — 올리는 즉시 승인으로 선다
+    final needs = _needsApproval(draft.amount);
+    final approver = needs ? _defaultApprover : null;
+    if (needs && approver == null) {
       AppToast.show(context, '결재를 받을 대표를 찾지 못했어요');
       return;
     }
@@ -180,7 +183,7 @@ class _ApprovalScreenState extends State<ApprovalScreen>
           kind: draft.kind.label,
           title: draft.title,
           content: draft.body,
-          approverIds: [approver.id],
+          approverIds: [if (approver != null) approver.id],
           amount: draft.amount == 0 ? null : draft.amount,
           startDate: draft.startDate,
           endDate: draft.endDate,
@@ -190,10 +193,12 @@ class _ApprovalScreenState extends State<ApprovalScreen>
       if (!mounted) return;
       setState(() {
         _docs.add(created);
-        _filter = _State.pending;
+        // 결재를 안 탄 문서는 대기함에 없다 — 그 갈래로 옮겨야 방금 올린
+        // 것이 보인다 (안 그러면 빈 대기함이 떠서 실패한 것처럼 읽힌다)
+        _filter = created.state;
         _selectedId = created.id;
       });
-      AppToast.show(context, '결재를 올렸어요');
+      AppToast.show(context, needs ? '결재를 올렸어요' : '결재 없이 바로 등록했어요');
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
     }

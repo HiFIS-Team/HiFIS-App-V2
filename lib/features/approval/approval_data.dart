@@ -60,6 +60,27 @@ enum _State {
   };
 }
 
+/// 이 금액**부터** 대표 승인을 받는다 — 서버 `APPROVAL_LIMIT` 과 같은 값이다
+///
+/// 그 아래는 올리는 즉시 승인으로 선다. 소모품 사는 데까지 대표를 거치면
+/// 결재함이 잔건으로 차서 정작 봐야 할 것이 묻힌다 (2026-09-16 대표 결정).
+///
+/// **판정의 주인은 서버다.** 여기 값이 어긋나도 서버가 `NEED_APPROVER` 로
+/// 막으므로 결재가 조용히 건너뛰어지지는 않는다 — 다만 그때는 사용자가
+/// 영문 모를 오류를 보게 되니 두 값을 같이 고친다.
+const _approvalLimit = 100000;
+
+/// 대표 승인을 받아야 하나 — 서버 `_needs_approval` 과 같은 표다
+///
+/// | 누가 | 10만원 미만 | 10만원 이상 |
+/// |---|---|---|
+/// | MASTER · ADMIN | 그냥 | **그냥** |
+/// | MANAGER · MEMBER | 그냥 | 대표 승인 |
+///
+/// 판단하는 쪽이 올린 것을 자기가 승인하면 결재가 아니라 절차만 한 번 더
+/// 도는 것이라, 대표·관리자는 금액을 안 본다.
+bool _needsApproval(int amount) => !myRole.boss && amount >= _approvalLimit;
+
 /// 결재선 기본값 — 대표에게 올린다
 ///
 /// **결재는 대표 한 사람이 한다.** 서버도 승인·반려를 MASTER 로 못 박아서
@@ -235,6 +256,11 @@ String _decidedBy(_Doc doc) {
     return '${doc.writer} ${_rankOf(doc.writerId)}';
   }
   final step = doc.lastActed;
+  // 결재선이 아예 없는 문서 — 10만원 미만이라 올리는 즉시 승인으로 선 것이다.
+  // 빈 칸으로 두면 '승인됨' 옆이 비어서 누가 처리했는지 안 나온 것처럼 보인다
+  if (step == null && doc.steps.isEmpty && doc.state == _State.approved) {
+    return '결재 없이 바로 등록';
+  }
   if (step == null) return '';
   final who = '${_nameOf(step.approverId)} ${_rankOf(step.approverId)}'.trim();
   final when = step.actedAt;

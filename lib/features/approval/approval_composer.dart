@@ -55,6 +55,9 @@ class _ComposerState extends State<_Composer> {
     super.dispose();
   }
 
+  /// 지금 적힌 금액 — 결재자 줄이 이 값에 따라 갈린다
+  int get _amountValue => int.tryParse(_amount.text.replaceAll(',', '')) ?? 0;
+
   /// 날짜 고르기 — 일정 화면과 같은 달력을 쓴다
   Future<void> _pick({required bool start}) async {
     final base = start ? _start : _end;
@@ -150,6 +153,8 @@ class _ComposerState extends State<_Composer> {
           align: TextAlign.right,
           suffix: '원',
           digitsOnly: true,
+          // 아래 결재자 줄이 이 값으로 갈린다 — 한 글자마다 다시 그린다
+          onChanged: (_) => setState(() {}),
         ),
         // 외근·출장, 근무 변경은 언제 어디로 가는지가 결재의 핵심이다.
         // 나머지 종류에는 이 두 칸이 안 나온다.
@@ -199,11 +204,24 @@ class _ComposerState extends State<_Composer> {
         SizedBox(height: 14),
         // 결재선은 아직 못 고른다 — 대표 한 사람에게 올린다
         // (서버는 여러 명을 순서대로 세울 수 있다, backend-gap.md 48번)
+        //
+        // **금액에 따라 이 줄이 갈린다** (2026-09-16). 10만원 미만은 결재를
+        // 안 타는데 `결재자 김대표` 가 그대로 서 있으면 안 갈 곳을 적는 셈이다.
         Row(
           children: [
             Text('결재자', style: AppTextStyles.label),
             SizedBox(width: 10),
-            if (_defaultApprover case final approver?) ...[
+            if (!_needsApproval(_amountValue))
+              Expanded(
+                child: Text(
+                  myRole.boss ? '대표·관리자는 바로 등록돼요' : '10만원 미만은 바로 등록돼요',
+                  style: AppTextStyles.body2.copyWith(
+                    fontSize: 14,
+                    color: AppColors.textTertiary,
+                  ),
+                ),
+              )
+            else if (_defaultApprover case final approver?) ...[
               Avatar(name: approver.name, size: 24),
               SizedBox(width: 6),
               Text(

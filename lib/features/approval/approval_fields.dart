@@ -50,6 +50,7 @@ class _Field extends StatelessWidget {
     this.suffix,
     this.digitsOnly = false,
     this.onSubmitted,
+    this.onChanged,
   });
 
   final TextEditingController controller;
@@ -62,6 +63,9 @@ class _Field extends StatelessWidget {
   /// 금액처럼 숫자만 받고 천 단위로 끊어 보여줄지
   final bool digitsOnly;
   final VoidCallback? onSubmitted;
+
+  /// 한 글자마다 알려준다 — 금액 칸이 아래 결재자 줄을 가른다
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -86,6 +90,7 @@ class _Field extends StatelessWidget {
               textInputAction: lines > 1
                   ? TextInputAction.newline
                   : TextInputAction.done,
+              onChanged: onChanged,
               onSubmitted: (_) => onSubmitted?.call(),
               decoration: InputDecoration(
                 hintText: hint,
