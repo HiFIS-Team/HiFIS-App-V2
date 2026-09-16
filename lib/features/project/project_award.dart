@@ -76,6 +76,19 @@ class _AwardCardState extends State<_AwardCard> {
   Widget build(BuildContext context) {
     final given = _given;
     final people = widget.project.members.length;
+    // **목록이 이미 들고 있는 값으로 자리를 잡는다** (2026-09-16 대표 보고).
+    //
+    // 이 카드는 제 몫으로 한 번 더 받아오는데(`ProjectApi.awards`), 그동안
+    // 카드 모양이 달라서 **들어갈 때 글자가 움직였다 제자리로 왔다** —
+    // `불러오는 중` 이 실제 점수로 바뀌며 폭이 변하고, 매긴 날짜 줄이
+    // 뒤늦게 생기며 카드가 한 줄 자랐다.
+    //
+    // `awardedPoints` 는 **대표가 매긴 점수**라 여기 `_given` 과 같은 값이다
+    // (자동 점수는 안 담긴다 — `_Project.awardedPoints`). 점수·날짜 줄 유무·
+    // 버튼 글자를 받기 전에 다 알 수 있어서, 바뀌는 것은 사유 한 줄뿐이다.
+    final known = widget.project.awardedPoints;
+    final scored = _loading ? known != null : given != null;
+    final points = given?.points ?? known ?? _autoPoints;
 
     final info = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -94,12 +107,10 @@ class _AwardCardState extends State<_AwardCard> {
               ),
             ),
             Text(
-              _loading
-                  ? '불러오는 중'
-                  : '참여자 $people명 · ${given?.points ?? _autoPoints}점',
+              '참여자 $people명 · $points점',
               style: AppTextStyles.body2.copyWith(
                 fontWeight: FontWeight.w600,
-                color: (given?.points ?? 0) < 0
+                color: points < 0 && scored
                     ? AppColors.error
                     : AppColors.textPrimary,
               ),
@@ -107,15 +118,36 @@ class _AwardCardState extends State<_AwardCard> {
           ],
         ),
         SizedBox(height: 4),
-        Text(
-          given?.comment ?? '완료해서 붙은 기본 점수예요',
-          style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
-        ),
-        if (given != null) ...[
-          SizedBox(height: 4),
+        // 사유는 받기 전에는 알 수 없는 유일한 값이다. 매긴 것이 있는데
+        // `완료해서 붙은 기본 점수예요` 를 띄우면 **틀린 말이 잠깐 걸린다**
+        if (_loading && scored)
+          SizedBox(
+            height: 22,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Skeleton(width: 150, height: 14),
+            ),
+          )
+        else
           Text(
-            '${_relative(given.createdAt)} 매김',
-            style: AppTextStyles.caption.copyWith(fontSize: 11),
+            given?.comment ?? '완료해서 붙은 기본 점수예요',
+            style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
+          ),
+        // 매긴 날짜 — **줄 자체는 받기 전에도 세운다.** 뒤늦게 생기면
+        // 카드가 한 줄 자라면서 아래가 통째로 밀린다
+        if (scored) ...[
+          SizedBox(height: 4),
+          SizedBox(
+            height: 16,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: given == null
+                  ? Skeleton(width: 64, height: 11)
+                  : Text(
+                      '${_relative(given.createdAt)} 매김',
+                      style: AppTextStyles.caption.copyWith(fontSize: 11),
+                    ),
+            ),
           ),
         ],
       ],
@@ -131,7 +163,7 @@ class _AwardCardState extends State<_AwardCard> {
           borderRadius: BorderRadius.circular(10),
         ),
         child: Text(
-          given == null ? '점수 주기' : '다시 주기',
+          scored ? '다시 주기' : '점수 주기',
           style: AppTextStyles.body2.copyWith(
             fontSize: 14,
             color: Colors.white,
