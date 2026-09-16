@@ -77,10 +77,8 @@ class _ApprovalPhone extends StatelessWidget {
             // 목록과 나란히 서는 자리라 좌우를 목록에 맞춘다
             padding: EdgeInsets.fromLTRB(0, 0, 4, 10),
           ),
-          if (tally.hasAmount) ...[
-            _MonthStats(tally: tally),
-            SizedBox(height: 14),
-          ],
+          _MonthStats(tally: tally),
+          SizedBox(height: 14),
           _StateTabs(selected: filter, onSelect: onFilter),
           SizedBox(height: 16),
           if (docs.isEmpty)

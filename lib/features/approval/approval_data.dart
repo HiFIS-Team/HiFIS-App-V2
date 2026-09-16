@@ -338,7 +338,12 @@ class _MonthTally {
     return rows;
   }
 
-  /// 아무 금액도 없으면 카드를 아예 안 그린다 — 0원 줄만 늘어선 판은 뜻이 없다
-  bool get hasAmount =>
-      _byState.values.any((rows) => rows.any((d) => d.amount > 0));
+  /// **살아 있는 건수** — 회수를 뺀 그 달 결재 수
+  ///
+  /// 접힌 줄에 쓴다. 회수는 올린 사람이 스스로 물린 것이라 금액에서 빠지는데,
+  /// 건수만 포함하면 `12건 · 0원` 같은 줄이 나온다.
+  int get live => total - countOf(_State.withdrawn);
+
+  /// 회수를 뺀 그 달 총액 — 접힌 줄에 쓰는 한 숫자
+  int get liveAmount => _byKind.values.fold(0, (sum, v) => sum + v);
 }

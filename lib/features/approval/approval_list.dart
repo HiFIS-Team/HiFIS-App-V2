@@ -98,11 +98,10 @@ class _DocList extends StatelessWidget {
           onNext: onNext,
           padding: EdgeInsets.fromLTRB(16, 0, 24, 8),
         ),
-        if (tally.hasAmount)
-          Padding(
-            padding: EdgeInsets.fromLTRB(20, 4, 20, 12),
-            child: _MonthStats(tally: tally),
-          ),
+        Padding(
+          padding: EdgeInsets.fromLTRB(20, 4, 20, 12),
+          child: _MonthStats(tally: tally),
+        ),
         Padding(
           padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
           child: _StateTabs(selected: filter, onSelect: onFilter),
@@ -346,64 +345,128 @@ class _EmptyDetail extends StatelessWidget {
 
 /// 그 달 결재 통계 — 갈래별 금액과 건수, 그리고 종류별 금액 (2026-09-16 요청)
 ///
-/// **금액이 한 푼도 없는 달에는 안 그린다.** 외근·근무 변경만 오간 달은
-/// 0원 줄만 늘어서 자리를 먹는다.
+/// **접힌 채로 시작한다.** 펴 두면 목록 위를 예닐곱 줄이 차지해서, 정작
+/// 보러 들어온 결재 줄이 아래로 밀린다. 한 줄로 요약하고 누르면 펼친다.
 ///
-/// 회수한 문서는 종류별 합계에서 뺀다 — 스스로 물린 것이라 쓴 돈도 쓸 돈도
-/// 아니다. 다만 위쪽 `총 N건` 에는 들어간다 (목록에 서는 줄 수와 맞춘다).
-class _MonthStats extends StatelessWidget {
+/// **금액이 없어도 그린다 (2026-09-16).** 달이 시작될 때 카드가 없다가
+/// 어느 날 갑자기 생기면 **자리가 밀리고**, 0원이라는 것도 하나의 값이다 —
+/// 올리자마자 여기 숫자가 오르는 것이 이 카드의 쓸모다.
+class _MonthStats extends StatefulWidget {
   const _MonthStats({required this.tally});
 
   final _MonthTally tally;
 
   @override
+  State<_MonthStats> createState() => _MonthStatsState();
+}
+
+class _MonthStatsState extends State<_MonthStats> {
+  /// 펼쳤나 — **달을 넘겨도 유지된다.** 편 사람은 계속 보고 싶은 것이다
+  bool _open = false;
+
+  @override
   Widget build(BuildContext context) {
-    if (!tally.hasAmount) return SizedBox.shrink();
+    final tally = widget.tally;
     return Container(
-      padding: EdgeInsets.fromLTRB(16, 14, 16, 12),
       decoration: AppDecorations.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // **대기가 먼저다** — 아직 안 나간 돈이 판단할 거리라서
-          for (final state in _State.tabs)
-            if (tally.countOf(state) > 0)
-              _line(
-                label: state.label,
-                count: tally.countOf(state),
-                amount: tally.amountOf(state),
-                tone: state.color,
-              ),
-          if (tally.kinds.isNotEmpty) ...[
+          if (_open)
             Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Container(height: 1, color: AppColors.gray100),
-            ),
-            for (final row in tally.kinds)
-              Padding(
-                padding: EdgeInsets.symmetric(vertical: 3),
-                child: Row(
-                  children: [
-                    Icon(row.key.icon, size: 14, color: AppColors.textTertiary),
-                    SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        row.key.label,
-                        style: AppTextStyles.caption.copyWith(fontSize: 12),
-                      ),
+              padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // **대기가 먼저다** — 아직 안 나간 돈이 판단할 거리라서.
+                  // 0건이어도 줄을 남긴다 — 달이 갈 때 줄이 생겼다 없어지면
+                  // 아래 종류 줄이 계속 오르내린다
+                  for (final state in _State.tabs)
+                    _line(
+                      label: state.label,
+                      count: tally.countOf(state),
+                      amount: tally.amountOf(state),
+                      tone: state.color,
                     ),
-                    Text(
-                      _money(row.value),
-                      style: AppTextStyles.caption.copyWith(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w600,
-                      ),
+                  if (tally.kinds.isNotEmpty) ...[
+                    Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: Container(height: 1, color: AppColors.gray100),
                     ),
+                    for (final row in tally.kinds)
+                      Padding(
+                        padding: EdgeInsets.symmetric(vertical: 3),
+                        child: Row(
+                          children: [
+                            Icon(
+                              row.key.icon,
+                              size: 14,
+                              color: AppColors.textTertiary,
+                            ),
+                            SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                row.key.label,
+                                style: AppTextStyles.caption.copyWith(
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              _money(row.value),
+                              style: AppTextStyles.caption.copyWith(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                   ],
-                ),
+                  SizedBox(height: 8),
+                  Container(height: 1, color: AppColors.gray100),
+                ],
               ),
-          ],
+            ),
+          // **총액이 맨 아래다** (2026-09-16 요청) — 영수증처럼 갈래를 먼저
+          // 훑고 합계로 끝난다. 접으면 이 줄만 남는다
+          Pressable(
+            onTap: () => setState(() => _open = !_open),
+            padding: EdgeInsets.fromLTRB(16, 13, 14, 13),
+            child: Row(
+              children: [
+                Text(
+                  '결재 금액',
+                  style: AppTextStyles.body2.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${tally.live}건',
+                    style: AppTextStyles.caption.copyWith(fontSize: 12),
+                  ),
+                ),
+                Text(
+                  _money(tally.liveAmount),
+                  style: AppTextStyles.body2.copyWith(
+                    fontWeight: FontWeight.w700,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+                SizedBox(width: 4),
+                Icon(
+                  _open
+                      ? CupertinoIcons.chevron_up
+                      : CupertinoIcons.chevron_down,
+                  size: 14,
+                  color: AppColors.textTertiary,
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -421,12 +484,19 @@ class _MonthStats extends StatelessWidget {
         Container(
           width: 7,
           height: 7,
-          decoration: BoxDecoration(color: tone, shape: BoxShape.circle),
+          decoration: BoxDecoration(
+            // 없는 갈래는 점을 흐리게 — 있는 줄이 먼저 눈에 들어와야 한다
+            color: count == 0 ? AppColors.gray200 : tone,
+            shape: BoxShape.circle,
+          ),
         ),
         SizedBox(width: 8),
         Text(
           label,
-          style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w600),
+          style: AppTextStyles.body2.copyWith(
+            fontWeight: FontWeight.w600,
+            color: count == 0 ? AppColors.textTertiary : null,
+          ),
         ),
         SizedBox(width: 6),
         Expanded(
@@ -439,6 +509,7 @@ class _MonthStats extends StatelessWidget {
           _money(amount),
           style: AppTextStyles.body2.copyWith(
             fontWeight: FontWeight.w700,
+            color: count == 0 ? AppColors.textTertiary : null,
             // 금액이 줄마다 자리를 맞춰야 견줄 수 있다
             fontFeatures: const [FontFeature.tabularFigures()],
           ),

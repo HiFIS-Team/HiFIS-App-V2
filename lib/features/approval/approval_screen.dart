@@ -241,8 +241,20 @@ class _ApprovalScreenState extends State<ApprovalScreen>
         ),
       );
       if (!mounted) return;
+      // **지난 달을 보는 중에 올렸으면 이번 달로 옮긴다** (2026-09-16).
+      // 안 옮기면 방금 올린 9월 결재가 8월 목록에 끼고 8월 집계가 그만큼
+      // 부풀어 오른다 — 달을 넘겼다 오면 그때 사라져서 더 헷갈린다
+      if (!_isThisMonth) {
+        setState(() {
+          _month = _thisMonth();
+          beginLoad();
+        });
+        await _load();
+        if (!mounted) return;
+      }
       setState(() {
-        _docs.add(created);
+        // 이미 들어 있으면(달을 옮기며 다시 받았다) 두 번 넣지 않는다
+        if (_docs.every((d) => d.id != created.id)) _docs.add(created);
         // 결재를 안 탄 문서는 대기함에 없다 — 그 갈래로 옮겨야 방금 올린
         // 것이 보인다 (안 그러면 빈 대기함이 떠서 실패한 것처럼 읽힌다)
         _filter = created.state;
