@@ -143,7 +143,7 @@ class _ContributionCard extends StatelessWidget {
                   ),
                 ),
               ),
-              if (item.isPenalty && onRevert != null) ...[
+              if (item.canRevert && onRevert != null) ...[
                 SizedBox(width: 2),
                 _RevertButton(onTap: onRevert!),
               ],
@@ -248,7 +248,7 @@ class _ContributionRow extends StatelessWidget {
               color: item.isPenalty ? AppColors.error : AppColors.primary,
             ),
           ),
-          if (item.isPenalty && onRevert != null) ...[
+          if (item.canRevert && onRevert != null) ...[
             SizedBox(width: 2),
             _RevertButton(onTap: onRevert!),
           ],
@@ -352,17 +352,42 @@ class _ContributionHistoryScreenState
   static const _cutLabel = '차감';
 
   /// 그 줄이 무슨 항목인가 — **받은 것은 기여 항목, 깎인 것은 [_cutLabel]**
-  static String _kindLabelOf(_Contribution item) =>
-      item.kind?.label ?? _cutLabel;
+  static String _kindLabelOf(_Contribution item) {
+    if (item.kind != null) return item.kind!.label;
+    // **깎인 것은 갈래와 상관없이 한 칸이다.** 프로젝트 리셋 감점도 여기 선다 —
+    // 무엇 때문에 깎였는지보다 '깎인 것을 다 보고 싶다' 가 먼저다
+    if (item.isPenalty) return _cutLabel;
+    return switch (item.category) {
+      ScoreCategory.env => _Contribution.claimLabel,
+      ScoreCategory.project => _projectLabel,
+      // 셋을 한 칸에 묶는다 — 다 회원이 어디를 보고 왔나로 붙는 5점이라
+      // 따로 세우면 칸만 늘고 고를 때 셋을 다 눌러 봐야 한다
+      ScoreCategory.blog ||
+      ScoreCategory.instagram ||
+      ScoreCategory.otPt => _visitLabel,
+      _ => _operatorLabel,
+    };
+  }
 
-  /// 항목 필터 — **늘 다섯 칸이다** (기여 넷 + 차감)
+  static const _projectLabel = '프로젝트 달성';
+  static const _visitLabel = '회원 유입';
+  static const _operatorLabel = '운영자 부여';
+
+  /// 항목 필터 — **늘 아홉 칸이다** (기여 넷 + 기여로 치는 넷 + 차감)
   ///
   /// 이번 달에 있는 것만 세우면 **칸이 달마다 달라져서** 자리를 못 외운다.
   /// 골랐는데 비면 '조건에 맞는 기록이 없어요' 로 알린다 — 그게 없는 것보다
   /// 낫다 (2026-09-02 대표 요청).
   static final List<FilterOption> _kindOptions = [
     for (final type in ContribType.values) (id: type.label, name: type.label),
-    (id: _cutLabel, name: _cutLabel),
+    for (final name in [
+      _Contribution.claimLabel,
+      _projectLabel,
+      _visitLabel,
+      _operatorLabel,
+      _cutLabel,
+    ])
+      (id: name, name: name),
   ];
 
   /// 사람 필터를 띄우나 — **점장 이상** (2026-09-02 대표 결정)
@@ -422,9 +447,9 @@ class _ContributionHistoryScreenState
             if (key.isEmpty ||
                 item.title.contains(key) ||
                 _kindLabelOf(item).contains(key) ||
-                // 깎인 줄은 항목 이름이 '차감' 이라 사유가 따로 걸려야
-                // `지각`·`업무 누락` 으로 찾을 수 있다
-                (item.penalty?.label ?? '').contains(key) ||
+                // 기여 항목이 아닌 줄은 갈래 이름으로도 찾을 수 있어야 한다
+                // (`지각`·`업무 누락`·`프로젝트 달성`·`OT→PT 전환`)
+                (item.category?.label ?? '').contains(key) ||
                 (item.person ?? '').contains(key) ||
                 _dateKeys(item.date).contains(key))
               item,

@@ -57,10 +57,13 @@ class _ContributionSectionState extends State<ContributionSection>
   /// 받아 둔 원본 — 지점을 바꿀 때 다시 요청하지 않으려고 들고 있는다
   List<ContributionGrant> _received = const [];
   List<ContributionGrant> _given = const [];
-  List<ScoreEvent> _events = const [];
 
-  /// 깎인 점수 — 지각·업무 누락처럼 **볼 자리가 없던 것들** (2026-08-28)
-  List<ScoreEvent> _penalties = const [];
+  /// 원장에서 온 줄 — **기여로 치는 것만** 온다 (서버 `contribBoard`).
+  ///
+  /// 예전에는 둘로 나눠 받았다 (기여 갈래 + 음수 전부). 그러면 프로젝트 평가나
+  /// 방문 경로처럼 **더해지는데 기여 갈래가 아닌 것**이 어디에도 안 섰다.
+  /// 이제 한 번에 받고 부호는 줄마다 본다 (2026-09-16 요청).
+  List<ScoreEvent> _events = const [];
 
   /// 보고 있는 달 — 달마다 끝나는 점수라 지난달을 돌아볼 일이 있다
   ///
@@ -104,7 +107,7 @@ class _ContributionSectionState extends State<ContributionSection>
     if (mounted) setState(_rebuild);
   }
 
-  void _rebuild() => _items = _merge(_received, _given, _events, _penalties);
+  void _rebuild() => _items = _merge(_received, _given, _events);
 
   /// 받는 쪽이 아니라 **주는 쪽만** 보는 사람인가 — 대표·관리자
   ///
@@ -129,41 +132,31 @@ class _ContributionSectionState extends State<ContributionSection>
       final receivedRequest = _givenOnly
           ? Future.value(noGrants)
           : ContributionApi.list(employeeId: me.id, period: period);
-      // 자동으로 쌓인 점수 — **대표·관리자는 전 직원 것을 본다** (2026-08-13 결정).
+      // 점수 원장 — **대표·관리자는 전 직원 것을 본다** (2026-08-13 결정).
       //
       // 근무 외 출근 점수는 사람이 주는 게 아니라 스캔이 붙여서, 예전에는
       // "누가 받았는지"를 볼 자리가 아무 데도 없었다. 본인만 자기 것을 봤다.
       // [employeeId] 를 안 주면 서버가 볼 수 있는 만큼 다 준다 (그 둘은 전 지점).
       // 지점 고르개는 **앱이 건다** — 서버 스코프는 권한에서 나오는 값이라
       // 헤더에서 고른 지점과 다르다.
+      //
+      // **한 번만 부른다** (2026-09-16). 예전에는 기여 갈래와 음수를 따로
+      // 받았는데, 그러면 프로젝트 평가나 방문 경로처럼 **더해지는데 기여
+      // 갈래가 아닌 것**이 어디에도 안 섰다. 무엇이 기여인지는 서버가 가른다
+      // (`contribBoard`) — 환경정비·수업 싸인·회원 친절도는 안 온다.
       final eventRequest = ScoreApi.events(
         employeeId: _givenOnly ? null : me.id,
-        category: ScoreCategory.contrib,
         period: period,
-      );
-      // 깎인 점수 — **어디에도 안 보이던 것들이다** (2026-08-28 대표 요청).
-      //
-      // 지각(`LATE`)·업무 누락(`TASK_MISS`)은 랭킹 어느 탭에도 안 서고
-      // 종합 점수만 조용히 깎았다. 여기 `+` 옆에 같이 세운다.
-      //
-      // **카테고리로 안 부른다** — 그러면 요청이 종류만큼 늘고, 프로젝트
-      // 평가나 운영자 감점처럼 음수가 될 수 있는 나머지를 빠뜨린다.
-      // 서버가 부호로 잘라 준다 (`negativeOnly`).
-      final penaltyRequest = ScoreApi.events(
-        employeeId: _givenOnly ? null : me.id,
-        period: period,
-        negativeOnly: true,
+        contribBoard: true,
       );
       final given = await givenRequest;
       final received = await receivedRequest;
       final events = await eventRequest;
-      final penalties = await penaltyRequest;
       if (!mounted) return;
       setState(() {
         _received = received;
         _given = given;
         _events = events;
-        _penalties = penalties;
         _rebuild();
         endLoad();
       });
@@ -186,13 +179,32 @@ class _ContributionSectionState extends State<ContributionSection>
     List<ContributionGrant> received,
     List<ContributionGrant> given,
     List<ScoreEvent> events,
-    List<ScoreEvent> penalties,
   ) {
     // **남의 것이 섞여 올 때만 거른다.** 그 밖에는 원장이 이미 `employeeId=나` 라
     // 여기서 지점을 또 걸면 내가 다른 지점을 보는 동안 **내 자동 점수가 통째로
     // 사라진다** (점장이 지점을 고를 수 있게 되면서 걸린 자리 — 2026-08-14).
     final scope = _givenOnly ? branchScopeId : null;
     final me = currentUser?.id;
+
+    // 부여 줄 ↔ 원장 줄 짝짓기 — **되돌리려면 원장 줄 id 가 있어야 한다.**
+    //
+    // 기여 부여는 `/contributions` 와 원장 **둘 다**에 남는데, 화면에 그리는
+    // 것은 앞의 것이다 (항목 종류가 거기에만 있다). 뒤의 것을 안 찾아 두면
+    // 부여받은 줄에는 되돌리기 아이콘을 못 단다.
+    final ledgerOfGrant = {
+      for (final event in events)
+        if (event.sourceRefId != null) event.sourceRefId!: event.id,
+    };
+
+    /// 남의 것이 섞여 올 때만 지점으로 거른다 — 원장이 이미 `employeeId=나` 인
+    /// 화면에서 또 걸면 내가 다른 지점을 보는 동안 **내 점수가 통째로 사라진다**
+    bool inScope(ScoreEvent event) => scope == null || event.branchId == scope;
+
+    /// 내 것에는 이름을 안 붙인다 — 내 화면에서 내 이름을 부를 이유가 없다
+    String? whose(ScoreEvent event) => event.employeeId == me
+        ? null
+        : StaffDirectory.instance.byId(event.employeeId)?.name;
+
     return [
       for (final grant in received)
         _Contribution(
@@ -200,6 +212,8 @@ class _ContributionSectionState extends State<ContributionSection>
           title: grant.reason,
           points: grant.points,
           date: grant.createdAt,
+          eventId: ledgerOfGrant[grant.id],
+          grantId: grant.id,
           person: StaffDirectory.instance.byId(grant.grantedById)?.name,
           granted: true,
         ),
@@ -209,38 +223,36 @@ class _ContributionSectionState extends State<ContributionSection>
           title: grant.reason,
           points: grant.points,
           date: grant.createdAt,
-          // 준 목록에서는 상대가 **받은 사람**이다
+          eventId: ledgerOfGrant[grant.id],
+          grantId: grant.id,
           person: StaffDirectory.instance.byId(grant.employeeId)?.name,
           given: true,
           granted: true,
         ),
       for (final event in events)
-        if (event.automatic && (scope == null || event.branchId == scope))
-          _Contribution(
-            kind: _autoKindOf(event),
-            title: event.reason ?? _autoKindOf(event).label,
-            points: event.points,
-            date: event.createdAt,
-            // 내 것에는 이름을 안 붙인다 — 내 화면에서 내 이름을 부를 이유가 없다
-            person: event.employeeId == me
-                ? null
-                : StaffDirectory.instance.byId(event.employeeId)?.name,
-          ),
-      // 깎인 것 — `kind` 가 없다. 항목 네 칸(`_KindGrid`)에는 안 서고
-      // 내역 목록에만 선다 (기여 항목이 아니라 그 반대다)
-      for (final event in penalties)
-        if (scope == null || event.branchId == scope)
-          _Contribution(
-            kind: null,
-            eventId: event.id,
-            penalty: event.category,
-            title: event.reason ?? event.category.label,
-            points: event.points,
-            date: event.createdAt,
-            person: event.employeeId == me
-                ? null
-                : StaffDirectory.instance.byId(event.employeeId)?.name,
-          ),
+        if (inScope(event))
+          // 기여 부여는 **바로 위에서 이미 세웠다** — 원장 줄로 한 번 더
+          // 세우면 한 부여가 두 줄이 된다. 부여 줄이 없는 기여(근무 외 출근·
+          // 매출성과)만 여기서 선다
+          if (event.category != ScoreCategory.contrib)
+            _Contribution(
+              kind: null,
+              eventId: event.id,
+              category: event.category,
+              title: event.reason ?? event.category.label,
+              points: event.points,
+              date: event.createdAt,
+              person: whose(event),
+            )
+          else if (event.automatic)
+            _Contribution(
+              kind: _autoKindOf(event),
+              eventId: event.id,
+              title: event.reason ?? _autoKindOf(event).label,
+              points: event.points,
+              date: event.createdAt,
+              person: whose(event),
+            ),
     ]..sort((a, b) => b.date.compareTo(a.date));
   }
 
@@ -259,8 +271,8 @@ class _ContributionSectionState extends State<ContributionSection>
 
   /// 이 사람이 되돌릴 수 있는가 — **MASTER 만이다**
   ///
-  /// 깎은 것을 없던 일로 하는 자리라 프로젝트 점수 부여·사유서 승인과 같은
-  /// 종류다. `canGrant`(점장 이상)와 헷갈리면 안 된다 — 주는 것과 깎은 것을
+  /// 오간 점수를 없던 일로 하는 자리라 프로젝트 점수 부여·사유서 승인과 같은
+  /// 종류다. `canGrant`(점장 이상)와 헷갈리면 안 된다 — 주는 것과 준 것을
   /// 무르는 것은 다른 판단이다.
   static bool get _canRevert => myRole == Role.master;
 
@@ -272,14 +284,15 @@ class _ContributionSectionState extends State<ContributionSection>
     final id = item.eventId;
     if (id == null) return false;
     final who = item.person == null ? '' : '${item.person}님의 ';
+    // **부호에 따라 뒷말이 뒤집힌다.** 깎인 것은 다시 깎을 길이 없고, 더해진
+    // 것은 다시 줄 수는 있다 — 한 문장으로 같이 쓰면 한쪽이 거짓말이 된다
+    final tail = item.isPenalty ? '되돌리면 다시 깎을 수 없어요.' : '취소하면 그만큼 점수가 줄어요.';
     final ok = await showConfirmDialog(
       context,
       icon: Icons.restore_rounded,
-      title: '점수를 되돌릴까요?',
-      message:
-          '$who${item.label} ${item.points}점이 없던 일이 돼요.\n'
-          '되돌리면 다시 깎을 수 없어요.',
-      confirmLabel: '되돌리기',
+      title: item.isPenalty ? '점수를 되돌릴까요?' : '점수를 취소할까요?',
+      message: '$who${item.label} ${item.pointsLabel}점이 없던 일이 돼요.\n$tail',
+      confirmLabel: item.isPenalty ? '되돌리기' : '취소하기',
     );
     if (!ok || !mounted) return false;
     try {
@@ -288,13 +301,23 @@ class _ContributionSectionState extends State<ContributionSection>
       // 목록에서 바로 빼고 조용히 다시 받는다 — 지운 줄이 남아 있으면
       // 한 번 더 누르게 되고 그때는 404 다
       setState(() {
-        _penalties = [
-          for (final event in _penalties)
+        _events = [
+          for (final event in _events)
             if (event.id != id) event,
         ];
+        // 기여 부여는 **부여 줄도 서버가 같이 지운다** — 여기서도 빼야 목록에
+        // 안 남는다 (원장 줄만 빼면 부여 목록에서 온 줄이 그대로 선다)
+        bool kept(ContributionGrant grant) => grant.id != item.grantId;
+        _received = _received.where(kept).toList();
+        _given = _given.where(kept).toList();
         _rebuild();
       });
-      AppToast.show(context, '${item.points.abs()}점을 되돌렸어요');
+      AppToast.show(
+        context,
+        item.isPenalty
+            ? '${item.points.abs()}점을 되돌렸어요'
+            : '${item.points.abs()}점을 취소했어요',
+      );
       return true;
     } catch (error) {
       if (mounted) AppToast.show(context, messageOf(error));
@@ -435,20 +458,31 @@ class _Contribution {
     required this.points,
     required this.date,
     this.eventId,
-    this.penalty,
+    this.grantId,
+    this.category,
     this.person,
     this.given = false,
     this.granted = false,
   });
 
-  /// 점수 원장 줄 id — **깎인 것만 채워진다** (되돌릴 때 이 값을 쓴다)
+  /// 점수 원장 줄 id — **되돌릴 때 이 값을 쓴다**
+  ///
+  /// 예전에는 깎인 줄에만 채웠다. 이제 더해진 줄도 되돌릴 수 있어서 거의 다
+  /// 채워진다 — 비는 것은 원장에 안 쌓인 줄뿐이다 (대표·관리자에게 준 기여는
+  /// `accrue_score` 가 안 쌓는다).
   final String? eventId;
 
-  /// 어느 기여 항목인가 — **null 이면 깎인 것**이다 ([penalty] 를 본다)
+  /// 기여 부여 줄 id — 되돌리면 서버가 이 줄도 같이 지우므로 화면에서도 뺀다
+  final String? grantId;
+
+  /// 어느 기여 항목인가 — 네 칸짜리 항목 판(`_KindGrid`)에 서는 것만 채워진다
   final ContribType? kind;
 
-  /// 무엇 때문에 깎였나 — 지각·업무 누락 등 ([kind] 가 null 일 때만 채워진다)
-  final ScoreCategory? penalty;
+  /// 기여 항목이 아닌 줄은 어느 갈래인가 — 프로젝트 평가·방문 경로·차감 등
+  ///
+  /// **[kind] 와 둘 중 하나만 찬다.** 앞의 것은 항목 판에 서는 기여 넷이고,
+  /// 이건 내역 목록에만 서는 나머지다.
+  final ScoreCategory? category;
 
   /// 무엇으로 받았는지 (자동 항목은 집계 근거가 들어간다)
   final String title;
@@ -468,21 +502,62 @@ class _Contribution {
   /// 저절로 들어오는 것과 가른다 (2026-09-06 요청 — "추가 점수 부여된 거 체크").
   final bool granted;
 
-  /// 깎인 것인가 — 화면은 이걸로 색과 부호를 가른다
-  bool get isPenalty => kind == null;
+  /// 되돌릴 수 있는 줄인가 — **원장 줄이 있어야 한다**
+  ///
+  /// 서버가 센터 기여도 내역에 선 줄만 되돌려 주고(`NOT_ON_BOARD`), 이 목록은
+  /// 그 줄로만 만든다. 그래서 여기 있으면 되돌릴 수 있다 — 다만 원장에 안 쌓인
+  /// 줄이 하나 있다: **대표·관리자에게 준 기여**는 `accrue_score` 가 안 쌓아서
+  /// 부여 줄만 남는다. 그때는 아이콘을 안 그린다 (눌러도 지울 것이 없다).
+  bool get canRevert => eventId != null;
 
-  /// 카드에 그릴 아이콘 — 깎인 것은 종류마다 다르게 둔다
-  IconData get icon => switch ((kind, penalty)) {
+  /// 깎인 것인가 — 화면은 이걸로 색과 부호를 가른다
+  ///
+  /// **부호로 가른다** (2026-09-16). 예전에는 `kind == null` 로 갈랐는데,
+  /// 기여 항목이 아니면서 **더해지는** 줄(프로젝트 평가·방문 경로)이 들어오면서
+  /// 그 셈이 깨졌다 — `+30` 이 빨간 차감으로 보였다.
+  bool get isPenalty => points < 0;
+
+  /// 카드에 그릴 아이콘 — 기여 항목은 항목 아이콘, 나머지는 갈래마다
+  IconData get icon => switch ((kind, category)) {
     (final ContribType type?, _) => type.icon,
     (_, ScoreCategory.late) => CupertinoIcons.alarm_fill,
     (_, ScoreCategory.taskMiss) => CupertinoIcons.xmark_circle_fill,
-    _ => CupertinoIcons.minus_circle_fill,
+    (_, ScoreCategory.peerMiss) =>
+      CupertinoIcons.person_crop_circle_badge_xmark,
+    (_, ScoreCategory.project) => CupertinoIcons.folder_fill,
+    (_, ScoreCategory.blog) => CupertinoIcons.pencil_outline,
+    (_, ScoreCategory.instagram) => CupertinoIcons.camera_fill,
+    (_, ScoreCategory.otPt) => CupertinoIcons.arrow_right_circle_fill,
+    (_, ScoreCategory.env) => CupertinoIcons.exclamationmark_bubble_fill,
+    (_, ScoreCategory.operator) => CupertinoIcons.star_fill,
+    _ =>
+      isPenalty
+          ? CupertinoIcons.minus_circle_fill
+          : CupertinoIcons.plus_circle_fill,
   };
 
   /// 깎인 것은 **전부 빨강**이다 — 종류를 색으로 또 가르면 목록이 알록달록해진다
-  Color get color => kind?.color ?? AppColors.error;
+  Color get color =>
+      isPenalty ? AppColors.error : (kind?.color ?? AppColors.primary);
 
-  String get label => kind?.label ?? '${penalty?.label ?? '점수'} 차감';
+  /// 줄 제목 — 깎인 것에만 `차감` 을 붙인다
+  ///
+  /// 더해진 줄에 붙이면 `프로젝트 달성 차감 +30` 처럼 말이 뒤집힌다.
+  String get label => kind?.label ?? _categoryLabel;
+
+  String get _categoryLabel {
+    // **환경정비 갈래로 오는 것은 컴플레인 해결뿐이다.** 대표가 컴플레인을
+    // 승인하면 `클레임해결` 항목으로 15점이 붙는 구조라 갈래가 ENV 다
+    // (서버 `_contrib_board` 가 그 항목만 골라 보낸다). 갈래 이름을 그대로
+    // 쓰면 `환경정비` 로 떠서 세탁·청소와 한 덩어리로 보인다.
+    final name = category == ScoreCategory.env
+        ? claimLabel
+        : (category?.label ?? '점수');
+    return isPenalty ? '$name 차감' : name;
+  }
+
+  /// 컴플레인 해결 — 서버 `CLAIM_ITEM_NAME` 이 붙여 주는 항목 이름의 화면 표기
+  static const claimLabel = '컴플레인 해결';
 
   /// `+3` · `-20` — 부호를 붙여 준다
   String get pointsLabel => points < 0 ? '$points' : '+$points';

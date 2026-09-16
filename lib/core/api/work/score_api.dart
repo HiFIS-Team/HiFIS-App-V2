@@ -18,7 +18,14 @@ enum ScoreCategory {
   // 안 적어 두면 `parse` 가 운영자 부여로 떨어져 라벨이 틀리게 뜬다.
   late('LATE', '지각'),
   // 개인 업무 누락 차감 — 늘 음수다. 다음 근무일까지 안 하면 잡이 넣는다.
-  taskMiss('TASK_MISS', '업무 누락');
+  taskMiss('TASK_MISS', '업무 누락'),
+  // 동료평가 미제출 차감 — 늘 음수다. 평가 창(말일·1일)이 닫힌 뒤 잡이 넣는다.
+  peerMiss('PEER_MISS', '동료평가 미제출'),
+  // 아래 셋은 **회원 등록 방문 경로** — 담당 트레이너에게 5점씩 붙는다.
+  // 서버가 셋을 따로 두는 이유는 랭킹 내역에서 갈라 보여주기 위해서다.
+  blog('BLOG', '블로그 유입'),
+  instagram('INSTAGRAM', '인스타 유입'),
+  otPt('OT_PT', 'OT→PT 전환');
 
   const ScoreCategory(this.wire, this.label);
 
@@ -330,6 +337,7 @@ class ScoreApi {
     ScoreCategory? category,
     String? period,
     bool negativeOnly = false,
+    bool contribBoard = false,
   }) async {
     final rows = await _client.getList(
       '/scores',
@@ -340,6 +348,9 @@ class ScoreApi {
         // 깎인 것만 — 카테고리를 안 걸고 다 받으면 환경정비·수업까지 통째로
         // 온다 (대표는 전 직원치라 수천 줄이다)
         if (negativeOnly) 'negativeOnly': 'true',
+        // 센터 기여도 내역에 서는 줄만 — **어느 갈래인지는 서버가 정한다.**
+        // 앱이 갈래를 늘어놓으면 나중에 하나 늘 때 서버만 고쳐져서 조용히 빠진다
+        if (contribBoard) 'contribBoard': 'true',
       },
     );
     return [
@@ -348,11 +359,18 @@ class ScoreApi {
     ];
   }
 
-  /// 깎인 점수 되돌리기 — **MASTER 만, 음수 줄만** (2026-08-28)
+  /// 점수 한 줄 되돌리기 — **MASTER 만** (2026-08-28 · 2026-09-16 양수까지)
   ///
-  /// 상쇄로 `+20` 을 한 줄 넣는 게 아니라 **그 줄을 지운다.** 원장 합은 같지만
-  /// 랭킹 내역에 `지각 -10` 과 `지각 +10` 이 나란히 서면 무슨 일인지 알 수
+  /// 상쇄로 반대 부호 한 줄을 넣는 게 아니라 **그 줄을 지운다.** 원장 합은
+  /// 같지만 내역에 `지각 -10` 과 `지각 +10` 이 나란히 서면 무슨 일인지 알 수
   /// 없다 (사유서 승인이 같은 이유로 그렇게 한다).
+  ///
+  /// **센터 기여도 내역에 선 줄만 된다** — 환경정비·수업 싸인·회원 친절도는
+  /// 서버가 `NOT_ON_BOARD` 로 막는다. 그래서 앱은 목록에 세운 줄에만 아이콘을
+  /// 그린다 (안 그러면 눌렀을 때만 막히는 걸 알게 된다).
+  ///
+  /// 기여 부여는 **부여 줄까지 서버가 같이 지운다** — 안 지우면 되돌렸는데
+  /// 목록에 그대로 남는다.
   ///
   /// 되돌렸다는 사실은 서버 활동 기록에 남는다.
   static Future<void> revert(String eventId) =>
