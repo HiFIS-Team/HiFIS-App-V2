@@ -207,25 +207,12 @@ class _ProjectComposerState extends State<_ProjectComposer> {
 
   Future<void> _pickDue() async {
     final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _due,
-      firstDate: DateTime(now.year - 1),
-      lastDate: DateTime(now.year + 3),
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme:
-              (AppColors.isDark
-                      ? ColorScheme.dark(surface: AppColors.surface)
-                      : ColorScheme.light(surface: AppColors.surface))
-                  .copyWith(
-                    primary: AppColors.primary,
-                    onPrimary: Colors.white,
-                    onSurface: AppColors.textPrimary,
-                  ),
-        ),
-        child: child!,
-      ),
+    final picked = await pickDate(
+      context,
+      initial: _due,
+      first: DateTime(now.year - 1),
+      last: DateTime(now.year + 3),
+      title: '마감일',
     );
     if (picked != null) setState(() => _due = picked);
   }

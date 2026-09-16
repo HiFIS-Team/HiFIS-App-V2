@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/util/native_picker.dart';
 import '../../core/api/client/api_exception.dart';
 import '../../core/api/staff/attendance_api.dart';
 import '../../core/data/current_user.dart';
@@ -57,14 +58,10 @@ class _ScheduleSetupScreenState extends State<ScheduleSetupScreen> {
       '${time.minute.toString().padLeft(2, '0')}';
 
   Future<void> _pick({required bool start}) async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: start ? _start : _end,
-      builder: (context, child) => MediaQuery(
-        // 24시간 표기로 고정 — 근무 시간은 오전/오후가 헷갈리면 안 된다
-        data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
-        child: child!,
-      ),
+    final picked = await pickTime(
+      context,
+      initial: start ? _start : _end,
+      title: start ? '출근' : '퇴근',
     );
     if (picked == null) return;
     setState(() => start ? _start = picked : _end = picked);

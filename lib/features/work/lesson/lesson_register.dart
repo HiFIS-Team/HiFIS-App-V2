@@ -114,11 +114,12 @@ class _RegisterScreenState extends State<_RegisterScreen> {
   /// 실제 결제일 — **앞날은 못 고른다** (지난 등록을 넣는 자리다)
   Future<void> _pickPurchasedAt() async {
     final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _purchasedAt ?? DateTime(now.year, now.month, now.day),
-      firstDate: DateTime(now.year - 10),
-      lastDate: DateTime(now.year, now.month, now.day),
+    final picked = await pickDate(
+      context,
+      initial: _purchasedAt ?? DateTime(now.year, now.month, now.day),
+      first: DateTime(now.year - 10),
+      last: DateTime(now.year, now.month, now.day),
+      title: '결제일',
     );
     if (picked != null && mounted) setState(() => _purchasedAt = picked);
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/app_colors.dart';
+import '../widgets/input/date_picker.dart';
 import 'sf_symbols.dart' show isApple;
 import 'platform.dart' show isDesktop;
 
@@ -106,14 +107,10 @@ Future<DateTime?> pickDate(
     }
   }
   if (!context.mounted) return null;
-  return showDatePicker(
-    context: context,
-    initialDate: initial,
-    firstDate: first,
-    lastDate: last,
-    builder: (context, child) =>
-        Theme(data: _pickerTheme(context), child: child!),
-  );
+  // **머티리얼 달력이 아니라 앱 톤 달력으로 떨어진다** — 그건 자기 색·글꼴·
+  // 모서리를 들고 와서 한 화면에서 이 칸만 다른 앱처럼 보인다
+  // ([date_picker.dart] 의 `pickAppDate`)
+  return pickAppDate(context, initial: initial, min: first, max: last);
 }
 
 /// `#RRGGBB` — 네이티브가 시트 강조색으로 쓴다

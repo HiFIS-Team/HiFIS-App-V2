@@ -92,28 +92,15 @@ class _EventDialogState extends State<_EventDialog> {
     super.dispose();
   }
 
-  ThemeData _pickerTheme(BuildContext context) => Theme.of(context).copyWith(
-    colorScheme:
-        (AppColors.isDark
-                ? ColorScheme.dark(surface: AppColors.surface)
-                : ColorScheme.light(surface: AppColors.surface))
-            .copyWith(
-              primary: AppColors.primary,
-              onPrimary: Colors.white,
-              onSurface: AppColors.textPrimary,
-            ),
-  );
-
   Future<void> _pickDate({required bool start}) async {
     final base = start ? _date : _until;
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: base,
+    final picked = await pickDate(
+      context,
+      initial: base,
       // 종료일은 시작일보다 앞을 못 고르게 막는다
-      firstDate: start ? DateTime(base.year - 2) : _date,
-      lastDate: DateTime(base.year + 3),
-      builder: (context, child) =>
-          Theme(data: _pickerTheme(context), child: child!),
+      first: start ? DateTime(base.year - 2) : _date,
+      last: DateTime(base.year + 3),
+      title: start ? '시작일' : '종료일',
     );
     if (picked == null) return;
     setState(() {
@@ -128,11 +115,10 @@ class _EventDialogState extends State<_EventDialog> {
   }
 
   Future<void> _pickTime({required bool start}) async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: start ? _start : _end,
-      builder: (context, child) =>
-          Theme(data: _pickerTheme(context), child: child!),
+    final picked = await pickTime(
+      context,
+      initial: start ? _start : _end,
+      title: start ? '시작 시각' : '종료 시각',
     );
     if (picked == null) return;
     setState(() {

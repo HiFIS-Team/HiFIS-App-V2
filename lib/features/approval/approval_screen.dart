@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import '../../core/util/native_picker.dart';
 import '../../core/data/data_signal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -115,9 +116,7 @@ class _ApprovalScreenState extends State<ApprovalScreen>
     // 못 찾으면 목록만 보여준다 — 지워졌거나 내가 못 보는 결재다
     if (found == null) return;
     setState(() {
-      _filter = found.state == _State.withdrawn
-          ? _State.rejected
-          : found.state;
+      _filter = found.state == _State.withdrawn ? _State.rejected : found.state;
       _selectedId = found.id;
     });
     // 폰은 2단이 아니라서 선택만으로는 안 보인다 — 상세를 밀어 올린다

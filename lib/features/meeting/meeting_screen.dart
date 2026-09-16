@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/util/native_picker.dart';
 import '../project/project_screen.dart';
 import '../../core/api/client/api_exception.dart';
 import '../../core/api/project/meeting_api.dart';
@@ -568,25 +569,12 @@ class _NoteViewState extends State<_NoteView> {
 
   Future<void> _pickDate() async {
     final note = widget.note;
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: note.date,
-      firstDate: DateTime(note.date.year - 2),
-      lastDate: DateTime(note.date.year + 2),
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme:
-              (AppColors.isDark
-                      ? ColorScheme.dark(surface: AppColors.surface)
-                      : ColorScheme.light(surface: AppColors.surface))
-                  .copyWith(
-                    primary: AppColors.primary,
-                    onPrimary: Colors.white,
-                    onSurface: AppColors.textPrimary,
-                  ),
-        ),
-        child: child!,
-      ),
+    final picked = await pickDate(
+      context,
+      initial: note.date,
+      first: DateTime(note.date.year - 2),
+      last: DateTime(note.date.year + 2),
+      title: '회의 날짜',
     );
     if (picked == null) return;
     setState(() => note.date = picked);

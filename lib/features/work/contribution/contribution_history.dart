@@ -127,10 +127,7 @@ class _ContributionCard extends StatelessWidget {
               ),
               SizedBox(width: 8),
               // 사람이 손으로 얹어 준 점수라는 표시 — 자동으로 쌓인 것과 가른다
-              if (item.granted) ...[
-                _GrantedTag(),
-                SizedBox(width: 6),
-              ],
+              if (item.granted) ...[_GrantedTag(), SizedBox(width: 6)],
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                 decoration: BoxDecoration(
@@ -242,10 +239,7 @@ class _ContributionRow extends StatelessWidget {
             ),
           ),
           SizedBox(width: 10),
-          if (item.granted) ...[
-            _GrantedTag(),
-            SizedBox(width: 6),
-          ],
+          if (item.granted) ...[_GrantedTag(), SizedBox(width: 6)],
           Text(
             item.pointsLabel,
             style: AppTextStyles.body2.copyWith(

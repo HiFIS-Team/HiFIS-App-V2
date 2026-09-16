@@ -1,3 +1,4 @@
+import '../../../core/util/native_picker.dart';
 import '../../../core/widgets/display/avatar.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -365,11 +366,7 @@ class _NoSignature extends StatelessWidget {
   Widget build(BuildContext context) => ColoredBox(
     color: AppColors.gray50,
     child: Center(
-      child: Icon(
-        Icons.edit_off_rounded,
-        size: size,
-        color: AppColors.gray300,
-      ),
+      child: Icon(Icons.edit_off_rounded, size: size, color: AppColors.gray300),
     ),
   );
 }

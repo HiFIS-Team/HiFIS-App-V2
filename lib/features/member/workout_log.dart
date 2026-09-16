@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/util/native_picker.dart';
 import '../../core/api/client/api_exception.dart';
 import '../../core/api/work/lesson_api.dart';
 import '../../core/api/work/workout_api.dart';
@@ -17,7 +18,6 @@ import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/glass/glass_bottom_button.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/input/app_button.dart';
-import '../../core/widgets/input/date_picker.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/nav/phone_scaffold.dart';
 import 'workout_media.dart';
@@ -185,12 +185,13 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
   /// 수업 날짜 고르기 — **머티리얼 달력을 안 쓴다** (앞뒤 화면과 생김새가 다르다)
   Future<void> _pickDate() async {
     final now = DateTime.now();
-    final picked = await pickAppDate(
+    final picked = await pickDate(
       context,
       initial: _at,
       // 밀린 일지를 몰아 쓰는 일이 흔하다 — 지난 날짜를 막지 않는다
-      min: DateTime(now.year - 3),
-      max: DateTime(now.year + 1, 12, 31),
+      first: DateTime(now.year - 3),
+      last: DateTime(now.year + 1, 12, 31),
+      title: '일지 날짜',
     );
     if (picked != null && mounted) setState(() => _at = picked);
   }
@@ -918,8 +919,7 @@ class _CardioEditor {
 
   bool get isBlank => name.text.trim().isEmpty && duration.isEmpty;
 
-  CardioRow toRow() =>
-      CardioRow(name: name.text.trim(), duration: duration);
+  CardioRow toRow() => CardioRow(name: name.text.trim(), duration: duration);
 
   void clear() {
     name.clear();

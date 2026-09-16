@@ -315,25 +315,12 @@ class _ExtensionDialogState extends State<_ExtensionDialog> {
   Future<void> _pickDue() async {
     // 연장이므로 기존 마감(또는 오늘) 다음 날부터 고를 수 있다
     final first = _later(widget.project.due).add(Duration(days: 1));
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _due,
-      firstDate: first,
-      lastDate: DateTime(first.year + 3),
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme:
-              (AppColors.isDark
-                      ? ColorScheme.dark(surface: AppColors.surface)
-                      : ColorScheme.light(surface: AppColors.surface))
-                  .copyWith(
-                    primary: AppColors.primary,
-                    onPrimary: Colors.white,
-                    onSurface: AppColors.textPrimary,
-                  ),
-        ),
-        child: child!,
-      ),
+    final picked = await pickDate(
+      context,
+      initial: _due,
+      first: first,
+      last: DateTime(first.year + 3),
+      title: '새 마감일',
     );
     if (picked != null) setState(() => _due = picked);
   }
