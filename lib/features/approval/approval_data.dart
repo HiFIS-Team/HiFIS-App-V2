@@ -195,9 +195,10 @@ void resetApprovalCache() {
 ///
 /// 그래서 이 목록은 '모든 결재'가 아니라 **내가 올렸거나 내가 결재하는 것**이다.
 /// 남의 결재는 애초에 열람 권한이 없다 (서버 `_require_participant`).
-Future<void> _loadDocs() async {
+Future<void> _loadDocs(DateTime month) async {
+  final key = periodKey(month);
   final boxes = await Future.wait([
-    for (final box in ApprovalBox.values) ApprovalApi.list(box),
+    for (final box in ApprovalBox.values) ApprovalApi.list(box, month: key),
   ]);
   // 함끼리 겹친다 — 내가 올리고 내가 결재하는 문서는 mine·inbox 둘 다에 있다
   final merged = <String, Approval>{};
@@ -295,4 +296,49 @@ String _comma(int value) {
     buffer.write(digits[i]);
   }
   return buffer.toString();
+}
+
+/// 그 달 결재 통계 — **올린 달 기준이다**
+///
+/// 8월 말에 올려 9월에 승인된 건은 8월에 선다. 금액이 잡히는 달과 결재가
+/// 도는 달이 갈리면 같은 돈이 두 번 세어진다.
+///
+/// **회수는 안 센다** — 올린 사람이 스스로 물린 것이라 쓴 돈도 쓸 돈도 아니다.
+class _MonthTally {
+  _MonthTally(List<_Doc> docs)
+    : total = docs.length,
+      _byState = {
+        for (final state in _State.values)
+          state: docs.where((d) => d.state == state).toList(),
+      },
+      _byKind = {
+        for (final kind in _Kind.values)
+          kind: docs
+              .where((d) => d.kind == kind && d.state != _State.withdrawn)
+              .fold(0, (sum, d) => sum + d.amount),
+      };
+
+  /// 회수까지 포함한 그 달 건수 — 목록에 서는 줄 수와 같아야 한다
+  final int total;
+
+  final Map<_State, List<_Doc>> _byState;
+  final Map<_Kind, int> _byKind;
+
+  int countOf(_State state) => _byState[state]?.length ?? 0;
+
+  int amountOf(_State state) =>
+      (_byState[state] ?? const []).fold(0, (sum, d) => sum + d.amount);
+
+  /// 금액이 있는 종류만 — 큰 것부터. 외근·근무 변경은 보통 0원이라 안 선다
+  List<MapEntry<_Kind, int>> get kinds {
+    final rows = [
+      for (final entry in _byKind.entries)
+        if (entry.value > 0) entry,
+    ]..sort((a, b) => b.value.compareTo(a.value));
+    return rows;
+  }
+
+  /// 아무 금액도 없으면 카드를 아예 안 그린다 — 0원 줄만 늘어선 판은 뜻이 없다
+  bool get hasAmount =>
+      _byState.values.any((rows) => rows.any((d) => d.amount > 0));
 }

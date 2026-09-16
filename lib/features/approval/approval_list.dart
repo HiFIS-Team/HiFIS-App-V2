@@ -5,6 +5,11 @@ part of 'approval_screen.dart';
 class _DocList extends StatelessWidget {
   _DocList({
     required this.docs,
+    required this.month,
+    required this.tally,
+    required this.loading,
+    required this.onPrev,
+    required this.onNext,
     required this.selected,
     required this.filter,
     required this.onFilter,
@@ -14,6 +19,19 @@ class _DocList extends StatelessWidget {
   });
 
   final List<_Doc> docs;
+
+  /// 보고 있는 달 — **올린 달** 기준이다
+  final DateTime month;
+
+  /// 그 달 통계 — 갈래 탭과 상관없이 **그 달 전부**를 센다
+  final _MonthTally tally;
+
+  final bool loading;
+  final VoidCallback onPrev;
+
+  /// null 이면 다음 달 화살표를 잠근다 (아직 오지 않은 달)
+  final VoidCallback? onNext;
+
   final _Doc? selected;
   final _State filter;
   final ValueChanged<_State> onFilter;
@@ -40,7 +58,7 @@ class _DocList extends StatelessWidget {
               SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  '${docs.length}',
+                  '${tally.total}',
                   style: AppTextStyles.title3.copyWith(
                     color: AppColors.textTertiary,
                   ),
@@ -72,6 +90,19 @@ class _DocList extends StatelessWidget {
             ],
           ),
         ),
+        MonthBar(
+          month: month,
+          count: tally.total,
+          loading: loading,
+          onPrev: onPrev,
+          onNext: onNext,
+          padding: EdgeInsets.fromLTRB(16, 0, 24, 8),
+        ),
+        if (tally.hasAmount)
+          Padding(
+            padding: EdgeInsets.fromLTRB(20, 4, 20, 12),
+            child: _MonthStats(tally: tally),
+          ),
         Padding(
           padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
           child: _StateTabs(selected: filter, onSelect: onFilter),
@@ -311,4 +342,119 @@ class _EmptyDetail extends StatelessWidget {
     actionLabel: '결재 올리기',
     onAction: onCreate,
   );
+}
+
+/// 그 달 결재 통계 — 갈래별 금액과 건수, 그리고 종류별 금액 (2026-09-16 요청)
+///
+/// **금액이 한 푼도 없는 달에는 안 그린다.** 외근·근무 변경만 오간 달은
+/// 0원 줄만 늘어서 자리를 먹는다.
+///
+/// 회수한 문서는 종류별 합계에서 뺀다 — 스스로 물린 것이라 쓴 돈도 쓸 돈도
+/// 아니다. 다만 위쪽 `총 N건` 에는 들어간다 (목록에 서는 줄 수와 맞춘다).
+class _MonthStats extends StatelessWidget {
+  const _MonthStats({required this.tally});
+
+  final _MonthTally tally;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!tally.hasAmount) return SizedBox.shrink();
+    return Container(
+      padding: EdgeInsets.fromLTRB(16, 14, 16, 12),
+      decoration: AppDecorations.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // **대기가 먼저다** — 아직 안 나간 돈이 판단할 거리라서
+          for (final state in _State.tabs)
+            if (tally.countOf(state) > 0)
+              _line(
+                label: state.label,
+                count: tally.countOf(state),
+                amount: tally.amountOf(state),
+                tone: state.color,
+              ),
+          if (tally.kinds.isNotEmpty) ...[
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Container(height: 1, color: AppColors.gray100),
+            ),
+            for (final row in tally.kinds)
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: 3),
+                child: Row(
+                  children: [
+                    Icon(row.key.icon, size: 14, color: AppColors.textTertiary),
+                    SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        row.key.label,
+                        style: AppTextStyles.caption.copyWith(fontSize: 12),
+                      ),
+                    ),
+                    Text(
+                      _money(row.value),
+                      style: AppTextStyles.caption.copyWith(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _line({
+    required String label,
+    required int count,
+    required int amount,
+    required Color tone,
+  }) => Padding(
+    padding: EdgeInsets.symmetric(vertical: 4),
+    child: Row(
+      children: [
+        Container(
+          width: 7,
+          height: 7,
+          decoration: BoxDecoration(color: tone, shape: BoxShape.circle),
+        ),
+        SizedBox(width: 8),
+        Text(
+          label,
+          style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w600),
+        ),
+        SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            '$count건',
+            style: AppTextStyles.caption.copyWith(fontSize: 12),
+          ),
+        ),
+        Text(
+          _money(amount),
+          style: AppTextStyles.body2.copyWith(
+            fontWeight: FontWeight.w700,
+            // 금액이 줄마다 자리를 맞춰야 견줄 수 있다
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+/// `1,240,000원` — 세 자리마다 끊는다
+String _money(int value) {
+  final digits = value.abs().toString();
+  final buffer = StringBuffer();
+  for (var i = 0; i < digits.length; i++) {
+    if (i > 0 && (digits.length - i) % 3 == 0) buffer.write(',');
+    buffer.write(digits[i]);
+  }
+  return '${value < 0 ? '-' : ''}$buffer원';
 }

@@ -222,12 +222,26 @@ class ApprovalApi {
   static final _client = ApiClient.instance;
 
   /// 함 하나를 받는다 — 최신순
-  static Future<List<Approval>> list(ApprovalBox box) async {
-    final rows = await _client.getList('/approvals', query: {'box': box.wire});
+  /// [month] 은 `2026-09` — **올린 달** 기준이다 (처리한 날이 아니다).
+  /// 안 주면 전부 온다.
+  static Future<List<Approval>> list(ApprovalBox box, {String? month}) async {
+    final rows = await _client.getList(
+      '/approvals',
+      query: {'box': box.wire, 'month': ?month},
+    );
     return [
       for (final row in rows)
         Approval.fromJson((row as Map).cast<String, dynamic>()),
     ];
+  }
+
+  /// 한 건만 — **알림에서 넘어왔을 때** 쓴다 (2026-09-16)
+  ///
+  /// 목록이 달로 갈리면서 필요해졌다. 지난달 결재 알림을 누르면 이번 달
+  /// 목록에 없어서 못 찾는데, 그렇다고 달을 하나씩 거슬러 받을 수는 없다.
+  static Future<Approval> one(String id) async {
+    final data = await _client.get('/approvals/$id');
+    return Approval.fromJson(data);
   }
 
   /// 결재 올리기 — [approverIds] 는 **순서가 곧 결재선**이고 최소 한 명이다

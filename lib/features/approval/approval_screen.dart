@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import '../../core/util/native_picker.dart';
 import '../../core/data/data_signal.dart';
@@ -5,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/api/client/api_exception.dart';
+import '../../core/api/client/period.dart';
 import '../../core/api/docs/approval_api.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
@@ -29,6 +32,7 @@ import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/input/decide_buttons.dart';
 import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/input/pressable.dart';
+import '../../core/widgets/nav/month_bar.dart';
 import '../../core/widgets/nav/phone_scaffold.dart';
 import '../../core/util/when.dart';
 import '../../core/widgets/feedback/skeleton.dart';
@@ -67,6 +71,28 @@ class _ApprovalScreenState extends State<ApprovalScreen>
     with ScreenRefresh<ApprovalScreen>, SkeletonDelay<ApprovalScreen> {
   _State _filter = _State.pending;
 
+  /// 보고 있는 달 — **올린 달** 기준이다 (세션 기록·업무 내역과 같은 결)
+  late DateTime _month = _thisMonth();
+
+  static DateTime _thisMonth() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month);
+  }
+
+  bool get _isThisMonth => _month == _thisMonth();
+
+  /// 달을 옮긴다 — **옛 목록을 둔 채로** 새 값을 받는다 (`SkeletonDelay`)
+  void _shiftMonth(int delta) {
+    final next = DateTime(_month.year, _month.month + delta);
+    if (next.isAfter(_thisMonth())) return;
+    setState(() {
+      _month = next;
+      _selectedId = null;
+      beginLoad();
+    });
+    _load();
+  }
+
   /// 고른 문서 — 목록이 갈릴 때마다 새 객체가 오므로 id 로 들고 있는다
   String? _selectedId;
 
@@ -104,24 +130,44 @@ class _ApprovalScreenState extends State<ApprovalScreen>
     if (id == null) return;
     requestedApprovalId.value = null;
     _pendingId = id;
-    _openPending();
+    unawaited(_openPending());
   }
 
   /// 대기 중인 id 를 실제 문서로 바꿔 연다.
   /// **목록을 받기 전에는 아무것도 안 한다** — [_load] 가 받은 뒤 다시 부른다.
-  void _openPending() {
+  Future<void> _openPending() async {
     final id = _pendingId;
     if (id == null || loading || !mounted) return;
     _pendingId = null;
-    final found = _docs.where((d) => d.id == id).firstOrNull;
-    // 못 찾으면 목록만 보여준다 — 지워졌거나 내가 못 보는 결재다
-    if (found == null) return;
+    var found = _docs.where((d) => d.id == id).firstOrNull;
+    if (found == null) {
+      // **지난달 결재일 수 있다** (2026-09-16). 목록이 달로 갈리면서 이번 달에
+      // 없는 문서가 생겼다 — 달을 하나씩 거슬러 받는 대신 한 건만 받아 온다.
+      // 못 받으면 목록만 보여준다 (지워졌거나 내가 못 보는 결재다)
+      try {
+        found = _fromServer(await ApprovalApi.one(id));
+      } catch (_) {
+        return;
+      }
+      if (!mounted) return;
+      // 그 문서가 있는 달로 옮기고 목록을 다시 받는다 — 상세를 닫았을 때
+      // 뒤에 엉뚱한 달이 서 있으면 어디서 왔는지 알 수 없다
+      final month = DateTime(found.date.year, found.date.month);
+      if (month != _month) {
+        _month = month;
+        setState(beginLoad);
+        await _loadDocs(_month);
+        if (!mounted) return;
+        setState(endLoad);
+      }
+    }
+    final doc = found;
     setState(() {
-      _filter = found.state == _State.withdrawn ? _State.rejected : found.state;
-      _selectedId = found.id;
+      _filter = doc.state == _State.withdrawn ? _State.rejected : doc.state;
+      _selectedId = doc.id;
     });
     // 폰은 2단이 아니라서 선택만으로는 안 보인다 — 상세를 밀어 올린다
-    if (!isDesktop) _openDoc(found);
+    if (!isDesktop) _openDoc(doc);
   }
 
   /// 못 받았다 — **목록이 비어 있을 때만** 실패 카드를 낸다 (2026-08-21)
@@ -133,14 +179,14 @@ class _ApprovalScreenState extends State<ApprovalScreen>
 
   Future<void> _load() async {
     try {
-      await _loadDocs();
+      await _loadDocs(_month);
       _failed = false;
     } catch (error) {
       _failed = true;
       if (mounted) AppToast.show(context, messageOf(error));
     }
     if (mounted) setState(endLoad);
-    _openPending();
+    unawaited(_openPending());
   }
 
   /// 다시 시도 — **여기서는 뼈대를 바로 띄운다** (claude.md 의 `_retry()` 예외)
@@ -148,6 +194,10 @@ class _ApprovalScreenState extends State<ApprovalScreen>
     setState(beginLoad);
     _load();
   }
+
+  /// 통계가 세는 것 — **갈래 탭과 상관없이 그 달 전부다.**
+  /// `대기` 탭을 보고 있다고 승인 금액이 사라지면 통계가 아니다
+  List<_Doc> get _monthDocs => _docs;
 
   List<_Doc> get _visible {
     // 회수는 흔치 않아 탭을 따로 두지 않고 반려 칸에 같이 보여준다
@@ -292,6 +342,12 @@ class _ApprovalScreenState extends State<ApprovalScreen>
     if (!isDesktop) {
       return _ApprovalPhone(
         docs: list,
+        month: _month,
+        tally: _MonthTally(_monthDocs),
+        loading: loading,
+        onPrev: () => _shiftMonth(-1),
+        // 아직 오지 않은 달은 볼 게 없으니 막는다
+        onNext: _isThisMonth ? null : () => _shiftMonth(1),
         filter: _filter,
         onFilter: (v) => setState(() => _filter = v),
         onCreate: _canWrite ? _create : null,
@@ -312,6 +368,11 @@ class _ApprovalScreenState extends State<ApprovalScreen>
               color: AppColors.surface,
               child: _DocList(
                 docs: list,
+                month: _month,
+                tally: _MonthTally(_monthDocs),
+                loading: loading,
+                onPrev: () => _shiftMonth(-1),
+                onNext: _isThisMonth ? null : () => _shiftMonth(1),
                 selected: selected,
                 filter: _filter,
                 onFilter: (v) => setState(() {

@@ -13,6 +13,11 @@ part of 'approval_screen.dart';
 class _ApprovalPhone extends StatelessWidget {
   _ApprovalPhone({
     required this.docs,
+    required this.month,
+    required this.tally,
+    required this.loading,
+    required this.onPrev,
+    required this.onNext,
     required this.filter,
     required this.onFilter,
     required this.onCreate,
@@ -21,6 +26,19 @@ class _ApprovalPhone extends StatelessWidget {
   });
 
   final List<_Doc> docs;
+
+  /// 보고 있는 달 — **올린 달** 기준이다
+  final DateTime month;
+
+  /// 그 달 통계 — 갈래 탭과 상관없이 **그 달 전부**를 센다
+  final _MonthTally tally;
+
+  final bool loading;
+  final VoidCallback onPrev;
+
+  /// null 이면 다음 달 화살표를 잠근다 (아직 오지 않은 달)
+  final VoidCallback? onNext;
+
   final _State filter;
   final ValueChanged<_State> onFilter;
 
@@ -50,6 +68,19 @@ class _ApprovalPhone extends StatelessWidget {
           bottomBarInset(context),
         ),
         children: [
+          MonthBar(
+            month: month,
+            count: tally.total,
+            loading: loading,
+            onPrev: onPrev,
+            onNext: onNext,
+            // 목록과 나란히 서는 자리라 좌우를 목록에 맞춘다
+            padding: EdgeInsets.fromLTRB(0, 0, 4, 10),
+          ),
+          if (tally.hasAmount) ...[
+            _MonthStats(tally: tally),
+            SizedBox(height: 14),
+          ],
           _StateTabs(selected: filter, onSelect: onFilter),
           SizedBox(height: 16),
           if (docs.isEmpty)
