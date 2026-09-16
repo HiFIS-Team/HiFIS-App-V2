@@ -20,6 +20,30 @@ enum RenewIntent {
   }
 }
 
+/// 회원이 고른 주제 하나 (서버 `PtTopicAnswer`)
+///
+/// **문구(`label`)를 서버가 붙여서 준다.** 앱이 주제표를 따로 들면
+/// 대표가 문구를 고칠 때 스토어를 거쳐야 한다
+/// (서버 `app/services/pt_topics.py`).
+class PtTopicAnswer {
+  const PtTopicAnswer({required this.topic, required this.label, this.note});
+
+  factory PtTopicAnswer.fromJson(Map<String, dynamic> json) => PtTopicAnswer(
+    topic: json['topic'] as String,
+    label: json['label'] as String? ?? json['topic'] as String,
+    note: json['note'] as String?,
+  );
+
+  /// 주제 코드 — 세는 자리에서 쓴다 (`DIET` · `POSTURE` …)
+  final String topic;
+
+  /// 화면에 뜨는 말 — 좋았던 점이면 칭찬형, 보완할 점이면 요청형이다
+  final String label;
+
+  /// 그 주제에 적은 상세 — **비어 있을 수 있다** (고르기만 해도 된다)
+  final String? note;
+}
+
 /// PT 만족도 폼 한 건 (서버 `PtSurveyOut`)
 ///
 /// 신규 등록권의 **7회차**에 열린다. 회원이 문자로 받은 주소에서 답한다.
@@ -40,6 +64,8 @@ class PtSurvey {
     this.answeredAt,
     this.satisfaction,
     this.request,
+    this.praise = const [],
+    this.improve = const [],
     this.renew,
   });
 
@@ -59,8 +85,15 @@ class PtSurvey {
     answeredAt: _time(json['answeredAt']),
     satisfaction: json['satisfaction'] as int?,
     request: json['request'] as String?,
+    praise: _answers(json['praise']),
+    improve: _answers(json['improve']),
     renew: RenewIntent.parse(json['renew'] as String?),
   );
+
+  static List<PtTopicAnswer> _answers(Object? value) => [
+    for (final row in (value as List? ?? const []))
+      PtTopicAnswer.fromJson(row as Map<String, dynamic>),
+  ];
 
   static DateTime? _time(Object? value) =>
       value == null ? null : DateTime.parse(value as String).toLocal();
@@ -96,10 +129,25 @@ class PtSurvey {
   /// 만족도 1~5
   final int? satisfaction;
 
-  /// 앞으로 트레이너에게 바라는 점 — 서술형이다
+  /// 앞으로 트레이너에게 바라는 점 — **2026-09-16 이전 설문의 서술형 답이다.**
+  ///
+  /// 그 뒤로는 객관식(`praise`·`improve`)으로 받는다. 옛 답이 22건 있어서
+  /// 화면이 둘 다 그릴 줄 알아야 한다.
   final String? request;
 
+  /// 좋았던 점 — 고른 주제들 (새 설문)
+  final List<PtTopicAnswer> praise;
+
+  /// 보완할 점 — 주제는 `praise` 와 같은 표에서 나오고 **문구만 요청형**이다
+  final List<PtTopicAnswer> improve;
+
   final RenewIntent? renew;
+
+  /// 적어 낸 글 전부 — 검색이 훑는 자리다 (주제 문구 + 상세)
+  String get allText => [
+    request ?? '',
+    for (final a in [...praise, ...improve]) ...[a.label, a.note ?? ''],
+  ].join(' ');
 
   bool get answered => answeredAt != null;
 

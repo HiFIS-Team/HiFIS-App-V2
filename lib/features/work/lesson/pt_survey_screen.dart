@@ -140,7 +140,9 @@ class _PtSurveyScreenState extends State<PtSurveyScreen>
     if (query.isEmpty) return true;
     return survey.displayMember.contains(query) ||
         survey.displayTrainer.contains(query) ||
-        (survey.request ?? '').contains(query);
+        // 주제 문구와 상세를 같이 훑는다 — `식단` 으로 찾으면 그 주제를 고른
+        // 답이 다 걸린다 (옛 서술형 답도 `allText` 에 들어 있다)
+        survey.allText.contains(query);
   }
 
   List<PtSurvey> get _shown {
@@ -750,7 +752,18 @@ class _PtSurveyDetailCard extends StatelessWidget {
                     ? ''
                     : '${survey.satisfaction} / 5',
               ),
-              _PtField(label: '앞으로 트레이너에게 바라는 점', value: survey.request ?? ''),
+              // **새 답은 객관식이고 옛 답은 서술형 한 칸이다** (2026-09-16).
+              // 둘 다 그릴 줄 알아야 한다 — 갈아타기 전에 받은 답이 22건 있다
+              if (survey.praise.isNotEmpty || survey.improve.isNotEmpty) ...[
+                if (survey.praise.isNotEmpty)
+                  _PtPicks(label: '좋았던 점', rows: survey.praise),
+                if (survey.improve.isNotEmpty)
+                  _PtPicks(label: '보완할 점', rows: survey.improve),
+              ] else
+                _PtField(
+                  label: '앞으로 트레이너에게 바라는 점',
+                  value: survey.request ?? '',
+                ),
               _PtField(
                 label: '연장 여부',
                 value: survey.renew?.label ?? '',
@@ -761,6 +774,72 @@ class _PtSurveyDetailCard extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// 객관식 답 한 묶음 — 고른 주제와 그 아래 적은 글
+///
+/// **좋았던 점·보완할 점이 같은 모양이다.** 색으로 가르지 않는다 —
+/// 포인트 컬러 하나 원칙이고, 어느 쪽인지는 머리말이 말해 준다.
+class _PtPicks extends StatelessWidget {
+  const _PtPicks({required this.label, required this.rows});
+
+  final String label;
+  final List<PtTopicAnswer> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: AppTextStyles.caption.copyWith(
+              fontSize: 11,
+              color: AppColors.textTertiary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          SizedBox(height: 6),
+          for (final row in rows)
+            Container(
+              width: double.infinity,
+              margin: EdgeInsets.only(bottom: 6),
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.gray50,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    row.label,
+                    style: AppTextStyles.body2.copyWith(
+                      fontWeight: FontWeight.w600,
+                      height: 1.4,
+                    ),
+                  ),
+                  // **글은 안 적어도 된다** — 주제만 고르고 넘어간 것이라
+                  // 빈 줄을 그리면 '안 적었어요' 가 주제 수만큼 늘어선다
+                  if ((row.note ?? '').trim().isNotEmpty) ...[
+                    SizedBox(height: 4),
+                    Text(
+                      row.note!.trim(),
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.textSecondary,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }

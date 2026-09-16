@@ -369,6 +369,22 @@
     "status"
    ]
   },
+  "AttendanceEdit": {
+   "properties": {
+    "checkIn": {
+     "nullable": true
+    },
+    "checkOut": {
+     "nullable": true
+    },
+    "date": {},
+    "employeeId": {}
+   },
+   "required": [
+    "employeeId",
+    "date"
+   ]
+  },
   "AttendanceOut": {
    "properties": {
     "checkIn": {
@@ -732,6 +748,7 @@
   },
   "ComplaintStatusUpdate": {
    "properties": {
+    "onWall": {},
     "status": {}
    },
    "required": [
@@ -1647,7 +1664,8 @@
     "resolvedById": {
      "nullable": true
     },
-    "submittedAt": {}
+    "submittedAt": {},
+    "tvHidden": {}
    },
    "required": [
     "id",
@@ -3076,10 +3094,18 @@
     "answeredAt": {
      "nullable": true
     },
+    "branchName": {
+     "nullable": true
+    },
     "createdAt": {},
     "id": {},
+    "improve": {},
     "memberId": {},
     "memberName": {
+     "nullable": true
+    },
+    "praise": {},
+    "pricePaid": {
      "nullable": true
     },
     "registrationId": {},
@@ -3117,6 +3143,7 @@
     "branchName": {},
     "memberName": {},
     "sessionNo": {},
+    "topics": {},
     "totalSessions": {},
     "trainerAvatarColor": {},
     "trainerName": {}
@@ -3133,6 +3160,8 @@
   },
   "PtSurveySubmit": {
    "properties": {
+    "improve": {},
+    "praise": {},
     "renew": {},
     "request": {
      "nullable": true
@@ -3142,6 +3171,32 @@
    "required": [
     "satisfaction",
     "renew"
+   ]
+  },
+  "PtTopicAnswer": {
+   "properties": {
+    "label": {
+     "nullable": true
+    },
+    "note": {
+     "nullable": true
+    },
+    "topic": {}
+   },
+   "required": [
+    "topic"
+   ]
+  },
+  "PtTopicOut": {
+   "properties": {
+    "code": {},
+    "improve": {},
+    "praise": {}
+   },
+   "required": [
+    "code",
+    "praise",
+    "improve"
    ]
   },
   "PushKeys": {
@@ -4187,5 +4242,5 @@
    ]
   }
  },
- "version": "0.30.0"
+ "version": "0.31.0"
 }
