@@ -14,6 +14,7 @@ import '../../../core/widgets/feedback/delayed_spinner.dart';
 import '../../../core/widgets/glass/glass_icon_button.dart';
 import '../../../core/widgets/glass/glass_search_bar.dart';
 import '../../../core/widgets/input/mode_switch.dart';
+import '../../../core/widgets/nav/phone_scaffold.dart';
 import '../../../core/widgets/nav/pick_filter_button.dart';
 import '../../../core/widgets/input/pressable.dart';
 
@@ -303,163 +304,120 @@ class _PtSurveyScreenState extends State<PtSurveyScreen>
       );
     }
 
-    return Scaffold(
-      backgroundColor: AppColors.surface,
-      body: Stack(
+    return PhoneDetailScaffold(
+      title: 'PT 만족도',
+      // **대표·관리자는 트레이너 고르개** (2026-09-09 요청).
+      // 전사가 한 목록에 서면 누구 것을 보는 중인지가 흐려진다.
+      //
+      // 나머지는 본인 것만 오므로 고를 것이 없다 — 그 자리에 예전처럼
+      // 다시 받기를 둔다. **밖에서 들어오는 값**이라 다시 받는 길이 있어야
+      // 한다 (주소를 보내 놓고 답이 왔나 보는 자리다).
+      actions: [
+        if (_canFilter)
+          PickFilterButton(
+            stableId: 'pt-trainer',
+            options: [for (final t in _trainers) (id: t.id, name: t.name)],
+            selected: _trainerId,
+            onSelect: (id) => setState(() => _trainerId = id),
+          )
+        else
+          GlassIconButton(
+            symbol: 'arrow.clockwise',
+            onPressed: _refreshing ? null : _refresh,
+          ),
+      ],
+      // 하단 고정: 플로팅 글래스 검색 바 (키보드와 함께 상승)
+      bottomBar: GlassSearchBar(controller: _search, hint: '회원·트레이너·내용 검색'),
+      // **탭·예상 매출까지 한 스크롤이다** (2026-09-16 대표 요청).
+      // 예전에는 머리를 고정해 두고 목록만 굴렀는데, 그러면 위 블러 뒤로
+      // 콘텐츠가 지나가는 결이 안 살고 회원 정보·조직도와 모양이 달랐다.
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          PhoneDetailScaffold.topPadding,
+          20,
+          // 하단 글래스 검색 바에 가리지 않도록 여유를 둔다
+          MediaQuery.paddingOf(context).bottom + 96,
+        ),
         children: [
-          SafeArea(
-            bottom: false,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          SegmentedTabs(
+            labels: ['답변', '미응답'],
+            selected: _tab,
+            onSelect: (i) => setState(() => _tab = i),
+          ),
+          SizedBox(height: 12),
+          if (_revenueTotal > 0) ...[
+            _RevenueForecastCard(
+              total: _revenueTotal,
+              // 트레이너를 골랐으면 이미 한 사람 것만 보는 중이라 줄이 필요 없다.
+              // 지점이 여럿 섞여 있으면(전체 지점) 지점별로, 하나면 트레이너별로 가른다
+              rows: _trainerId != null
+                  ? const []
+                  : _branchesWithRevenue > 1
+                  ? _revenueByBranch
+                  : _revenueByTrainer,
+            ),
+            SizedBox(height: 12),
+          ],
+          Padding(
+            padding: EdgeInsets.fromLTRB(4, 0, 4, 12),
+            child: Row(
               children: [
-                // 상단 고정 타이틀 영역만큼 비워둔다
-                SizedBox(height: 56),
-                Padding(
-                  padding: EdgeInsets.fromLTRB(20, 8, 20, 12),
-                  child: SegmentedTabs(
-                    labels: ['답변', '미응답'],
-                    selected: _tab,
-                    onSelect: (i) => setState(() => _tab = i),
+                Expanded(
+                  child: Text(
+                    answered
+                        ? '신규 회원 7회차에 받은 만족도'
+                        : '아직 답을 안 준 회원 · 주소를 복사해 보내요',
+                    style: AppTextStyles.caption,
                   ),
                 ),
-                if (_revenueTotal > 0)
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
-                    child: _RevenueForecastCard(
-                      total: _revenueTotal,
-                      // 트레이너를 골랐으면 이미 한 사람 것만 보는 중이라 줄이 필요 없다.
-                      // 지점이 여럿 섞여 있으면(전체 지점) 지점별로, 하나면 트레이너별로 가른다
-                      rows: _trainerId != null
-                          ? const []
-                          : _branchesWithRevenue > 1
-                          ? _revenueByBranch
-                          : _revenueByTrainer,
+                if (renewRate != null) ...[
+                  Text(
+                    '재등록 $renewRate%',
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                Padding(
-                  padding: EdgeInsets.fromLTRB(24, 0, 24, 12),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          answered
-                              ? '신규 회원 7회차에 받은 만족도'
-                              : '아직 답을 안 준 회원 · 주소를 복사해 보내요',
-                          style: AppTextStyles.caption,
-                        ),
-                      ),
-                      if (renewRate != null) ...[
-                        Text(
-                          '재등록 $renewRate%',
-                          style: AppTextStyles.caption.copyWith(
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Text(
-                          ' · ',
-                          style: AppTextStyles.caption.copyWith(
-                            color: AppColors.textTertiary,
-                          ),
-                        ),
-                      ],
-                      Text(
-                        '총 ${sorted.length}건',
-                        style: AppTextStyles.caption.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    ' · ',
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                ],
+                Text(
+                  '총 ${sorted.length}건',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                Container(height: 1, color: AppColors.gray100),
-                if (showSkeleton)
-                  Expanded(child: Center(child: DelayedSpinner.bare()))
-                else if (sorted.isEmpty)
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(24, 32, 24, 44),
-                    child: Text(
-                      query.isNotEmpty
-                          ? '검색 결과가 없어요'
-                          : answered
-                          ? '아직 들어온 답변이 없어요'
-                          : '기다리는 설문이 없어요',
-                      style: AppTextStyles.body2.copyWith(
-                        color: AppColors.textTertiary,
-                      ),
-                    ),
-                  )
-                else
-                  Expanded(
-                    child: ListView(
-                      padding: EdgeInsets.fromLTRB(
-                        20,
-                        8,
-                        20,
-                        // 하단 글래스 검색 바에 가리지 않도록 여유를 둔다
-                        MediaQuery.paddingOf(context).bottom + 96,
-                      ),
-                      children: children,
-                    ),
-                  ),
               ],
             ),
           ),
-          // 상단 중앙 고정 타이틀 (터치는 아래로 통과)
-          IgnorePointer(
-            child: SafeArea(
-              bottom: false,
-              child: SizedBox(
-                height: 56,
-                child: Center(
-                  child: Text('PT 만족도', style: AppTextStyles.title3),
+          Container(height: 1, color: AppColors.gray100),
+          if (showSkeleton)
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: 48),
+              child: Center(child: DelayedSpinner.bare()),
+            )
+          else if (sorted.isEmpty)
+            Padding(
+              padding: EdgeInsets.fromLTRB(4, 32, 4, 44),
+              child: Text(
+                query.isNotEmpty
+                    ? '검색 결과가 없어요'
+                    : answered
+                    ? '아직 들어온 답변이 없어요'
+                    : '기다리는 설문이 없어요',
+                style: AppTextStyles.body2.copyWith(
+                  color: AppColors.textTertiary,
                 ),
               ),
-            ),
-          ),
-          // 좌측 상단 고정 뒤로가기 · 우측 고르개/다시 받기 (글래스 버튼)
-          SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: EdgeInsets.only(top: 8, left: 16, right: 16),
-              child: Row(
-                children: [
-                  GlassIconButton(
-                    symbol: 'chevron.backward',
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  Spacer(),
-                  // **대표·관리자는 트레이너 고르개** (2026-09-09 요청).
-                  // 전사가 한 목록에 서면 누구 것을 보는 중인지가 흐려진다.
-                  //
-                  // 나머지는 본인 것만 오므로 고를 것이 없다 — 그 자리에
-                  // 예전처럼 다시 받기를 둔다. **밖에서 들어오는 값**이라
-                  // 다시 받는 길이 있어야 한다 (주소를 보내 놓고 답이 왔나
-                  // 보는 자리다).
-                  if (_canFilter)
-                    // **아이폰은 OS 가 그리는 메뉴여야 한다** — 직접
-                    // `showGlassMenu` 를 부르면 거기만 리퀴드 글래스가 아니다
-                    // (2026-09-16). 지점 고르개·세션 기록과 같은 부품이다.
-                    PickFilterButton(
-                      stableId: 'pt-trainer',
-                      options: [
-                        for (final t in _trainers) (id: t.id, name: t.name),
-                      ],
-                      selected: _trainerId,
-                      onSelect: (id) => setState(() => _trainerId = id),
-                    )
-                  else
-                    GlassIconButton(
-                      symbol: 'arrow.clockwise',
-                      onPressed: _refreshing ? null : _refresh,
-                    ),
-                ],
-              ),
-            ),
-          ),
-          // 하단 고정: 플로팅 글래스 검색 바 (키보드와 함께 상승)
-          GlassSearchBar(controller: _search, hint: '회원·트레이너·내용 검색'),
+            )
+          else
+            ...children,
         ],
       ),
     );
