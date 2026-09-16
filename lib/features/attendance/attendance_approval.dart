@@ -32,6 +32,13 @@ bool get _canDecideLeave => myRole.canApprove;
 /// MANAGER 는 본인도 현장 근무를 해서 예전 화면 그대로다.
 bool get _isBoss => myRole.boss;
 
+/// 남의 근태를 고칠 수 있는가 — **대표·관리자만** (2026-09-16)
+///
+/// `_isBoss` 와 지금은 같은 값인데 **이유가 다르다.** 저기는 '본인 기록이
+/// 없는 사람' 이라 화면이 달라지는 것이고, 여기는 '남의 기록을 만져도 되는
+/// 사람' 이다. 묶어 두면 나중에 한쪽만 열 때 둘이 같이 열린다.
+bool get _canEditAttendance => myRole.boss;
+
 /// 결재 대기 한 건 — 누가 · 언제 · 어떤 휴가 · 사유
 ///
 /// [_LeaveBalance] 카드 안에 들어간다. 여러 건이 밀려 있으면

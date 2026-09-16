@@ -267,6 +267,37 @@ class AttendanceApi {
     return AttendanceRecord.fromJson(data!);
   }
 
+  /// 출퇴근을 **손으로 고치거나 만든다** — 대표·관리자만 (2026-09-16 대표 요청)
+  ///
+  /// 바코드를 못 찍었거나 시각이 틀린 날이 매주 나오는데 앞에서 고칠 길이
+  /// 없어서, 그동안 사람이 서버 DB 를 직접 만졌다. 그러면 **자동 점수가
+  /// 조용히 빠진다** — 9월에 실제로 60점이 비어 있었다.
+  ///
+  /// **기록이 없는 날도 만든다** (결근으로 찍힌 날을 되살리는 길).
+  /// 서버가 지각 차감·조기출근·초과근무를 **그 날짜만 다시 맞춘다** —
+  /// 정시로 고치면 차감이 사라지고, 늦게 고치면 초과근무가 붙는다.
+  ///
+  /// 시각은 **`HH:MM`**(KST)이고, null 이면 그 칸을 지운다.
+  static Future<AttendanceRecord> edit({
+    required String employeeId,
+    required DateTime date,
+    String? checkIn,
+    String? checkOut,
+  }) async {
+    final data = await _client.put(
+      '/attendance',
+      body: {
+        'employeeId': employeeId,
+        'date': _dateOnly(date),
+        // **null 을 빼면 안 된다** — 빼면 '안 건드림' 이 되어 잘못 찍은
+        // 퇴근을 지울 수가 없다
+        'checkIn': checkIn,
+        'checkOut': checkOut,
+      },
+    );
+    return AttendanceRecord.fromJson(data!);
+  }
+
   /// 근태 기록 — [month]는 `2026-07` 꼴
   static Future<List<AttendanceRecord>> list({
     String? employeeId,

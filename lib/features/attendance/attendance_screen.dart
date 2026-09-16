@@ -20,6 +20,7 @@ import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/feedback/empty_card.dart';
 import '../../core/widgets/feedback/reject_reason_dialog.dart';
+import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/glass/glass_bottom_button.dart';
 import '../../core/widgets/input/decide_buttons.dart';
 import '../../core/widgets/input/mode_switch.dart';
@@ -39,6 +40,7 @@ part 'attendance_approval.dart';
 part 'attendance_summary.dart';
 part 'attendance_calendar.dart';
 part 'attendance_day.dart';
+part 'attendance_edit.dart';
 
 /// 근태·월차 화면 (목업)
 ///
@@ -170,11 +172,28 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     return null;
   }
 
+  /// 근태 고치기 — **대표·관리자만.** 바코드를 못 찍었거나 시각이 틀린 날을
+  /// 앞에서 고친다 (2026-09-16 대표 요청). 예전에는 서버 DB 를 직접 만졌다.
+  ///
+  /// [date] 를 주면 그날로 열린다 — 달력에서 들어온 길이다.
+  Future<void> _openEdit([DateTime? date]) async {
+    final saved = await showFullPage<bool>(
+      context,
+      (_) => _AttendanceEditSheet(date: date),
+    );
+    // 고쳤으면 달력·요약을 다시 받는다 — 판정과 점수가 같이 바뀐다
+    if (saved == true && mounted) await _reload();
+  }
+
   void _openDay(DateTime date) {
     showAppDialog<void>(
       context,
-      (context) =>
-          _DayDialog(date: date, day: _dayOf(date), leave: _leaveOf(date)),
+      (context) => _DayDialog(
+        date: date,
+        day: _dayOf(date),
+        leave: _leaveOf(date),
+        onEdit: _canEditAttendance ? _openEdit : null,
+      ),
     );
   }
 
@@ -306,6 +325,15 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     if (!isDesktop) {
       return PhoneListScaffold(
         title: '근태·월차',
+        // **왼쪽 아이콘으로 근태를 고친다** (2026-09-16 대표 요청).
+        // 대표·관리자만 뜬다 — 남의 근태를 만지는 자리다
+        leading: _canEditAttendance
+            ? GlassIconButton(
+                stableId: 'attendance-edit',
+                symbol: 'square.and.pencil',
+                onPressed: _openEdit,
+              )
+            : null,
         children: [
           _MonthSummary(days: _monthDays, month: _month),
           SizedBox(height: 12),
@@ -332,7 +360,18 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         child: ListView(
           padding: EdgeInsets.fromLTRB(24, 64, 24, 32),
           children: [
-            DesktopHeader(title: '근태·월차', subtitle: '이번 달 근무 기록과 월차를 관리해요'),
+            DesktopHeader(
+              title: '근태·월차',
+              subtitle: '이번 달 근무 기록과 월차를 관리해요',
+              // 폰의 왼쪽 아이콘과 같은 일 — PC 는 오른쪽 끝이 그 자리다
+              trailing: _canEditAttendance
+                  ? AppButton(
+                      label: '근태 고치기',
+                      shrinkWrap: true,
+                      onTap: _openEdit,
+                    )
+                  : null,
+            ),
             SizedBox(height: 22),
             IntrinsicHeight(
               child: Row(

@@ -7,7 +7,12 @@ part of 'attendance_screen.dart';
 /// 대표는 자기 기록이 아니라 **그날 누가 어땠는지**를 본다.
 /// 달력 칸은 한 명만 적고(`이름 외 N명`), 여기서는 세 명까지 편다.
 class _DayDialog extends StatelessWidget {
-  _DayDialog({required this.date, required this.day, required this.leave});
+  _DayDialog({
+    required this.date,
+    required this.day,
+    required this.leave,
+    this.onEdit,
+  });
 
   /// 이름을 몇 명까지 펴 놓을지 — 나머지는 `외 N명` 으로 접는다
   ///
@@ -17,6 +22,10 @@ class _DayDialog extends StatelessWidget {
   final DateTime date;
   final _Day? day;
   final _Leave? leave;
+
+  /// 이 날을 고치러 가는 길 — **대표·관리자에게만** 들어온다.
+  /// 달력에서 결근을 보고 바로 고치는 흐름이라 여기 두는 게 짧다
+  final ValueChanged<DateTime>? onEdit;
 
   /// `강태윤 · 권나연 · 김도현 외 5명`
   String _names(List<String> names) {
@@ -48,6 +57,23 @@ class _DayDialog extends StatelessWidget {
               // 대표 창은 전 직원 판이라 본인 알약을 달면 헷갈린다
               if (record != null && !_isBoss)
                 _StatusChip(status: record.status),
+              if (onEdit case final edit?) ...[
+                SizedBox(width: 8),
+                Pressable(
+                  onTap: () {
+                    Navigator.pop(context);
+                    edit(date);
+                  },
+                  child: Padding(
+                    padding: EdgeInsets.all(4),
+                    child: Icon(
+                      Icons.edit_rounded,
+                      size: 17,
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
           SizedBox(height: 18),

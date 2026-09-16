@@ -240,6 +240,12 @@ class ApiClient {
     return data is Map ? data.cast<String, dynamic>() : null;
   }
 
+  Future<Map<String, dynamic>?> put(String path, {Object? body}) async {
+    final response = await _send('PUT', path, body: body);
+    final data = response.data;
+    return data is Map ? data.cast<String, dynamic>() : null;
+  }
+
   Future<void> delete(String path) => _send('DELETE', path);
 
   /// 파일 통째로 받기 — 본문이 JSON 이 아니라 바이트다
