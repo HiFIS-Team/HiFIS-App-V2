@@ -11,9 +11,9 @@ import '../../../core/util/skeleton_delay.dart';
 import '../../../core/widgets/feedback/app_toast.dart';
 import '../../../core/widgets/feedback/delayed_spinner.dart';
 import '../../../core/widgets/glass/glass_icon_button.dart';
-import '../../../core/widgets/glass/glass_menu.dart';
 import '../../../core/widgets/glass/glass_search_bar.dart';
 import '../../../core/widgets/input/mode_switch.dart';
+import '../../../core/widgets/nav/pick_filter_button.dart';
 import '../../../core/widgets/input/pressable.dart';
 
 /// PT 만족도 폼 결과 화면 — **신규 회원 7회차에 열리는 설문을 보는 자리**
@@ -47,9 +47,6 @@ class PtSurveyScreen extends StatefulWidget {
   State<PtSurveyScreen> createState() => _PtSurveyScreenState();
 }
 
-/// 고르개의 '전체' — null 은 '안 골랐다' 와 구분이 안 돼서 따로 값을 준다
-const _allTrainers = '__all__';
-
 class _PtSurveyScreenState extends State<PtSurveyScreen>
     with SkeletonDelay<PtSurveyScreen> {
   final _search = TextEditingController();
@@ -69,9 +66,6 @@ class _PtSurveyScreenState extends State<PtSurveyScreen>
   ///
   /// **대표·관리자에게만 있다.** 나머지는 서버가 본인 것만 주므로 고를 것이 없다.
   String? _trainerId;
-
-  /// 메뉴를 버튼 아래에 띄우려면 버튼 자리를 알아야 한다
-  final _filterKey = GlobalKey();
 
   /// 트레이너를 고를 수 있는가 — 대표·관리자만
   bool get _canFilter => myRole.boss;
@@ -102,34 +96,6 @@ class _PtSurveyScreenState extends State<PtSurveyScreen>
     setState(() => _refreshing = true);
     await _load();
     if (mounted) setState(() => _refreshing = false);
-  }
-
-  /// 트레이너 고르개 — 지점 고르개(`BranchScopeButton`)와 같은 부품이다
-  Future<void> _pickTrainer() async {
-    final rows = _trainers;
-    final picked = await showGlassMenu<String>(
-      context: context,
-      anchorKey: _filterKey,
-      width: 230,
-      items: [
-        // null 은 '안 골랐다' 와 구분이 안 돼서 전체에 따로 값을 준다
-        GlassMenuItem(
-          value: _allTrainers,
-          label: '전체 트레이너',
-          icon: Icons.groups_rounded,
-          selected: _trainerId == null,
-        ),
-        for (final t in rows)
-          GlassMenuItem(
-            value: t.id,
-            label: t.name,
-            icon: Icons.person_rounded,
-            selected: _trainerId == t.id,
-          ),
-      ],
-    );
-    if (!mounted || picked == null) return;
-    setState(() => _trainerId = picked == _allTrainers ? null : picked);
   }
 
   @override
@@ -235,7 +201,8 @@ class _PtSurveyScreenState extends State<PtSurveyScreen>
   List<({String name, int amount})> get _revenueByTrainer {
     final sums = <String, int>{};
     for (final s in _renewedRows) {
-      sums[s.displayTrainer] = (sums[s.displayTrainer] ?? 0) + (s.pricePaid ?? 0);
+      sums[s.displayTrainer] =
+          (sums[s.displayTrainer] ?? 0) + (s.pricePaid ?? 0);
     }
     final rows = [for (final e in sums.entries) (name: e.key, amount: e.value)];
     rows.sort((a, b) => a.name.compareTo(b.name));
@@ -443,14 +410,16 @@ class _PtSurveyScreenState extends State<PtSurveyScreen>
                   // 다시 받는 길이 있어야 한다 (주소를 보내 놓고 답이 왔나
                   // 보는 자리다).
                   if (_canFilter)
-                    GlassIconButton(
-                      key: _filterKey,
-                      // 심볼이 바뀌어도 네이티브 버튼을 새로 만들지 않게 한다
+                    // **아이폰은 OS 가 그리는 메뉴여야 한다** — 직접
+                    // `showGlassMenu` 를 부르면 거기만 리퀴드 글래스가 아니다
+                    // (2026-09-16). 지점 고르개·세션 기록과 같은 부품이다.
+                    PickFilterButton(
                       stableId: 'pt-trainer',
-                      symbol: _trainerId == null
-                          ? 'line.3.horizontal.decrease'
-                          : 'line.3.horizontal.decrease.circle.fill',
-                      onPressed: _pickTrainer,
+                      options: [
+                        for (final t in _trainers) (id: t.id, name: t.name),
+                      ],
+                      selected: _trainerId,
+                      onSelect: (id) => setState(() => _trainerId = id),
                     )
                   else
                     GlassIconButton(
@@ -564,10 +533,14 @@ class _RevenueForecastCard extends StatelessWidget {
   final int total;
   final List<({String name, int amount})> rows;
 
+  /// 자릿수가 달라도 세로로 떨어지게 — `500,000` 과 `12,621,212` 가
+  /// 글자폭이 제각각이면 지점 줄의 오른쪽 끝이 들쭉날쭉해 보인다
+  static const _figures = [FontFeature.tabularFigures()];
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.fromLTRB(16, 14, 16, 14),
+      padding: EdgeInsets.fromLTRB(18, 16, 18, 16),
       decoration: BoxDecoration(
         color: AppColors.success.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
@@ -575,53 +548,64 @@ class _RevenueForecastCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          // **무엇 → 얼마 → 무슨 근거** 순으로 쌓는다. 예전에는 제목과 금액이
+          // 한 줄에서 자리를 다퉈서, 여덟 자리 금액이 제목을 밀어붙였다.
+          Text(
+            '다음달 예상 PT 매출',
+            style: AppTextStyles.label.copyWith(fontWeight: FontWeight.w700),
+          ),
+          SizedBox(height: 6),
+          Text(
+            '${_comma(total)}원',
+            style: AppTextStyles.title1.copyWith(
+              fontWeight: FontWeight.w800,
+              color: AppColors.success,
+              height: 1.15,
+              letterSpacing: -0.5,
+              fontFeatures: _figures,
+            ),
+          ),
+          SizedBox(height: 4),
+          // 무엇을 더한 숫자인지 안 적으면 읽는 사람이 범위를 못 짚는다
+          Text(
+            "이번 달 '연장할래요' 답변 기준",
+            style: AppTextStyles.caption.copyWith(fontSize: 11),
+          ),
+          // 합계와 지점 내역은 다른 값이라 가는 선으로 끊는다
+          if (rows.isNotEmpty) ...[
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Divider(
+                height: 1,
+                thickness: 1,
+                color: AppColors.success.withValues(alpha: 0.16),
+              ),
+            ),
+            for (var i = 0; i < rows.length; i++) ...[
+              if (i > 0) SizedBox(height: 8),
+              Row(
                 children: [
-                  Text(
-                    '다음달 예상 PT 매출',
-                    style: AppTextStyles.caption.copyWith(
-                      fontWeight: FontWeight.w700,
+                  Expanded(
+                    child: Text(
+                      rows[i].name,
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  SizedBox(height: 2),
-                  // 무엇을 더한 숫자인지 안 적으면 읽는 사람이 범위를 못 짚는다
+                  SizedBox(width: 12),
                   Text(
-                    "이번 달 '연장할래요' 답변 기준",
+                    '${_comma(rows[i].amount)}원',
                     style: AppTextStyles.caption.copyWith(
-                      fontSize: 10,
-                      color: AppColors.textTertiary,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                      fontFeatures: _figures,
                     ),
                   ),
                 ],
               ),
-              Spacer(),
-              Text(
-                '${_comma(total)}원',
-                style: AppTextStyles.body1.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.success,
-                ),
-              ),
             ],
-          ),
-          for (final row in rows) ...[
-            SizedBox(height: 6),
-            Row(
-              children: [
-                Text(row.name, style: AppTextStyles.caption),
-                Spacer(),
-                Text(
-                  '${_comma(row.amount)}원',
-                  style: AppTextStyles.caption.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
           ],
         ],
       ),
