@@ -77,10 +77,16 @@ enum NativePicker {
     )
 
     let controller = UIHostingController(rootView: sheet)
+    // **시트 바닥을 여기서 칠한다.** 비워 두면 그 자리가 구멍이라 뒤 화면으로
+    // 터치가 새고, SwiftUI 로 칠하면 모서리에서 어긋난다 — UIKit 이 칠하면
+    // 자르는 쪽과 칠하는 쪽이 같아서 모서리가 딱 맞는다
+    controller.view.backgroundColor = .systemBackground
     if let presentation = controller.sheetPresentationController {
       presentation.detents = detents(isTime: isTime)
       presentation.prefersGrabberVisible = true
-      presentation.preferredCornerRadius = 22
+      // **모서리 반경을 안 준다.** 22 를 박았더니 기기 화면 모서리(훨씬 크다)와
+      // 어긋나 **아래 양옆이 깎여** 보였다 (2026-09-16). 시스템 기본값이
+      // 화면 모서리와 짝이 맞게 돼 있다 — SwiftUI `.sheet` 도 안 건드린다
     }
     // 아래로 끌어 내려도·바깥을 눌러도 답을 준다 — 안 주면 Dart 가 영영 기다린다
     controller.presentationController?.delegate = DismissRelay.install(on: controller, onDismiss: reply)
@@ -226,9 +232,11 @@ private struct PickerSheet: View {
       // `.tint` 는 iOS 16 부터다 — 최소 배포가 14 라 옛 짝을 쓴다
       .accentColor(accent)
       .padding()
-      // **꽉 채운다** — 남는 자리가 있으면 그리로 터치가 샌다
+      // **꽉 채운다** — 남는 자리가 있으면 그리로 터치가 샌다.
+      // 배경은 여기서 안 칠한다 — SwiftUI 로 칠하고 `ignoresSafeArea` 로
+      // 밀면 시트 밖까지 나가서, 시트가 제 모서리 반경으로 잘라 **아래
+      // 양옆이 깎여 보인다** (2026-09-16). 칠하는 일은 호스팅 뷰가 맡는다.
       .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .background(Color(UIColor.systemBackground).ignoresSafeArea())
   }
 
   @ViewBuilder
