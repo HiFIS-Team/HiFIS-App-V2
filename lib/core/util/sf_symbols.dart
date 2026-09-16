@@ -72,6 +72,9 @@ const _icons = <String, IconData>{
   // 속을 안 채운 것을 골랐다 — 헤더 왼쪽에 서면 옆 버튼들이 다 외곽선이라
   // 채운 심볼은 **혼자 새까맣게 뜬다** (실제로 그렇게 보였다)
   'film': Icons.movie_outlined,
+  // 매장 TV 를 앱에서 보는 자리 — 추첨 영상과 한 메뉴에 선다.
+  // `film` 과 같은 이유로 속을 안 채운다
+  'tv': Icons.tv_outlined,
   // PT 만족도 폼 — 수업 개수 헤더에서 사람·일지 옆에 선다.
   // 옆 줄이 다 외곽선이라 여기도 속을 안 채운다 (`film`·`doc.text` 와 같은 이유)
   'star.bubble': Icons.reviews_outlined,

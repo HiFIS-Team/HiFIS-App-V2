@@ -1,26 +1,34 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:cupertino_native/cupertino_native.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../core/api/client/api_client.dart';
 import '../../../core/api/client/api_exception.dart';
+import '../../../core/api/staff/staff_api.dart';
 import '../../../core/api/work/draw_api.dart';
+import '../../../core/data/staff.dart';
 import '../../../core/data/staff_directory.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/util/platform.dart';
 import '../../../core/util/reels_share.dart';
+import '../../../core/util/sf_symbols.dart';
 import '../../../core/util/skeleton_delay.dart';
 import '../../../core/widgets/feedback/app_toast.dart';
 import '../../../core/widgets/feedback/delayed_spinner.dart';
 import '../../../core/widgets/feedback/empty_card.dart';
 import '../../../core/widgets/feedback/skeleton.dart';
 import '../../../core/widgets/glass/glass_bottom_button.dart';
+import '../../../core/widgets/glass/glass_icon_button.dart';
+import '../../../core/widgets/glass/glass_menu.dart';
 import '../../../core/widgets/input/app_button.dart';
 import '../../../core/widgets/input/mode_switch.dart';
 import '../../../core/widgets/input/pressable.dart';
@@ -40,6 +48,27 @@ import '../../../core/widgets/nav/phone_scaffold.dart';
 // **권한을 안 가린다** (2026-09-01 대표 결정). 직원이 각자 자기 인스타에
 // 올리는 것까지가 목적이라 대표만 여는 자리가 아니다. 지점은 서버가 가른다 —
 // 직원·점장은 자기 지점 것만 온다.
+
+/// 이 화면이 보여주는 두 가지 (2026-09-16 대표 요청)
+///
+/// **매장 TV 가 기본이다.** 대표·관리자는 매장에 없어서 벽에 지금 무엇이
+/// 걸려 있는지를 볼 길이 없었다 — 직원·점장은 매장에서 그냥 보면 된다.
+/// 추첨 영상은 한 달에 한 번 올리는 것이라 두 번째 자리가 맞다.
+enum _Mode {
+  tv('실시간 TV 화면', 'tv', CupertinoIcons.tv),
+  video('추첨 영상', 'film', CupertinoIcons.film);
+
+  const _Mode(this.label, this.symbol, this.icon);
+
+  final String label;
+
+  /// SF 심볼 이름 — **[sfSymbols] 매핑표에도 있어야 한다**
+  /// (안 넣으면 안드로이드·윈도우에서 빈 원이 된다)
+  final String symbol;
+
+  /// 애플이 아닐 때 메뉴 줄에 붙는 아이콘
+  final IconData icon;
+}
 
 /// 인스타그램 앱을 여는 주소 — 없으면 아무 일도 안 한다
 /// 이번 달 추첨 — 당첨자와 게임 영상
@@ -66,10 +95,71 @@ class _DrawScreenState extends State<DrawScreen>
   /// 그 지점 안에서 몇 번째 달 — 0 이 이번 달이다
   int _month = 0;
 
+  /// 지금 보고 있는 것 — **대표·관리자는 매장 TV 로 시작한다**
+  late _Mode _mode = _canSeeTv ? _Mode.tv : _Mode.video;
+
+  /// TV 모드에서 보고 있는 지점 — [_tvBranches] 의 몇 번째
+  int _tvBranch = 0;
+
+  /// 지점 id → 매장 TV 주소. **한 번 받으면 다시 안 받는다** — 지점을
+  /// 오가며 볼 때마다 부르면 같은 값을 계속 되묻는 셈이다
+  final _tvUrls = <String, String>{};
+
+  /// 주소를 못 받은 이유 — 받아 두면 화면이 빈 채로 멎지 않는다
+  String? _tvError;
+
+  /// **MASTER·ADMIN 만** (서버 `/tv-link` 도 같은 문이다).
+  ///
+  /// 직원·점장은 매장에서 벽을 그냥 보면 되고, 주소가 곧 그 지점 TV 의
+  /// 열쇠라 전 직원에게 열 이유가 없다.
+  bool get _canSeeTv => myRole.boss;
+
   @override
   void initState() {
     super.initState();
     _load();
+    if (_mode == _Mode.tv) _loadTv();
+  }
+
+  /// 볼 수 있는 지점 — **추첨이 없는 지점도 세운다.**
+  ///
+  /// [_branches] 는 추첨에서 뽑은 것이라 이번 달 추첨이 없는 지점이 빠지는데,
+  /// TV 는 추첨과 상관없이 늘 돌아간다.
+  List<Branch> get _tvBranches {
+    final directory = StaffDirectory.instance;
+    final all = [...directory.branches.where((b) => !b.isHq)]
+      ..sort(
+        (a, b) =>
+            directory.branchRank(a.id).compareTo(directory.branchRank(b.id)),
+      );
+    // 업무 헤더에서 지점을 골라 두었으면 그 하나만 — 두 자리에서 따로 고르면
+    // 어느 쪽이 이긴 건지 알 수 없다
+    final fixed = widget.branchId;
+    if (fixed == null) return all;
+    return all.where((b) => b.id == fixed).toList();
+  }
+
+  Branch? get _tvShown {
+    final rows = _tvBranches;
+    if (rows.isEmpty) return null;
+    return rows[_tvBranch.clamp(0, rows.length - 1)];
+  }
+
+  /// 지금 고른 지점의 TV 주소를 받아 둔다 — 이미 있으면 아무 일도 안 한다
+  Future<void> _loadTv() async {
+    final branch = _tvShown;
+    if (branch == null || _tvUrls.containsKey(branch.id)) return;
+    try {
+      final url = await BranchApi.tvLink(branch.id);
+      if (!mounted) return;
+      setState(() {
+        _tvUrls[branch.id] = url;
+        _tvError = null;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _tvError = e.message);
+    }
   }
 
   Future<void> _load() async {
@@ -178,12 +268,28 @@ class _DrawScreenState extends State<DrawScreen>
   String _branchName(String id) =>
       _draws.firstWhere((d) => d.branchId == id).branchName;
 
+  /// 헤더 오른쪽 고르개 — **볼 것이 하나뿐이면 안 세운다**
+  List<Widget> get _actions => _canSeeTv
+      ? [
+          _ModeButton(
+            selected: _mode,
+            onSelect: (mode) {
+              setState(() => _mode = mode);
+              if (mode == _Mode.tv) _loadTv();
+            },
+          ),
+        ]
+      : const [];
+
   @override
   Widget build(BuildContext context) {
+    if (_mode == _Mode.tv) return _tv(context);
+
     // PC 는 목록 그대로 — 인스타 앱이 없어서 파일 저장까지다
     if (isDesktop) {
       return PhoneDetailScaffold(
-        title: '추첨 영상',
+        title: _Mode.video.label,
+        actions: _actions,
         child: ListView(
           padding: EdgeInsets.fromLTRB(
             20,
@@ -202,7 +308,8 @@ class _DrawScreenState extends State<DrawScreen>
 
     final draw = _shown;
     return PhoneDetailScaffold(
-      title: '추첨 영상',
+      title: _Mode.video.label,
+      actions: _actions,
       // 리퀴드 글래스 하단 버튼 — 영상이 화면을 꽉 채우고 버튼이 그 위에 뜬다
       bottomBar: draw == null || !draw.hasVideo
           ? null
@@ -293,6 +400,65 @@ class _DrawScreenState extends State<DrawScreen>
           ),
       ],
     ];
+  }
+
+  /// 매장 TV 판 — **웹 화면을 그대로 띄운다** (2026-09-16 대표 요청)
+  ///
+  /// 네이티브로 다시 그리지 않는다. 그 화면은 물리 게임 일곱 개를 포함한
+  /// 3600줄짜리 React 라([HiFIS-Client-V2] `src/app/tv/[token]/`), 베끼면
+  /// **매장 벽과 앱이 서로 다른 것을 보여주기 시작한다.**
+  ///
+  /// TV 는 세로(9:16) 기준으로 짜여 있어서 폰 화면에 그대로 맞는다.
+  Widget _tv(BuildContext context) {
+    final branch = _tvShown;
+    final url = branch == null ? null : _tvUrls[branch.id];
+    final rows = _tvBranches;
+    return PhoneDetailScaffold(
+      title: _Mode.tv.label,
+      actions: _actions,
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          PhoneDetailScaffold.topPadding,
+          20,
+          MediaQuery.paddingOf(context).bottom + 32,
+        ),
+        children: [
+          // 업무 헤더에서 지점을 고르지 않았을 때만 — 골랐으면 하나뿐이다
+          if (rows.length > 1) ...[
+            SegmentedTabs(
+              labels: [for (final b in rows) b.name],
+              selected: _tvBranch.clamp(0, rows.length - 1),
+              onSelect: (i) {
+                setState(() => _tvBranch = i);
+                _loadTv();
+              },
+            ),
+            SizedBox(height: 16),
+          ],
+          if (branch == null)
+            EmptyCard(icon: Icons.tv_outlined, text: '볼 수 있는 지점이 없어요')
+          else if (_tvError != null)
+            EmptyCard(icon: Icons.tv_outlined, text: _tvError!)
+          else if (url == null)
+            // 주소 한 줄을 받는 것이라 금방 온다 — 뼈대가 아니라 스피너다
+            AspectRatio(
+              aspectRatio: 9 / 16,
+              child: Center(child: DelayedSpinner()),
+            )
+          else
+            _TvView(key: ValueKey(url), url: url),
+          SizedBox(height: 14),
+          Text(
+            // **지금 벽에 걸린 것과 같은 화면**이라는 걸 말해 준다 —
+            // 안 적으면 앱이 따로 만든 요약으로 읽힌다
+            isDesktop ? '매장에 걸려 있는 화면이에요' : '매장에 걸려 있는 화면 그대로예요',
+            textAlign: TextAlign.center,
+            style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _list() {
@@ -552,6 +718,168 @@ class _DrawCard extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// 매장 TV 를 그리는 자리 — **폰은 웹뷰, PC 는 브라우저로 넘긴다**
+///
+/// `webview_flutter` 는 안드로이드·iOS 구현만 있다. PC 에서 부르면 그 자리에서
+/// 죽으므로 아예 안 만든다 — 거기는 창이 크고 브라우저가 늘 있으니
+/// 주소를 넘기는 쪽이 낫다 (운동일지 영상이 같은 판단을 한다).
+class _TvView extends StatefulWidget {
+  _TvView({super.key, required this.url});
+
+  final String url;
+
+  @override
+  State<_TvView> createState() => _TvViewState();
+}
+
+class _TvViewState extends State<_TvView> {
+  WebViewController? _web;
+
+  @override
+  void initState() {
+    super.initState();
+    if (isDesktop) return;
+    _web = WebViewController()
+      // 게임이 도는 화면이라 자바스크립트가 없으면 아무것도 안 그려진다
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      // 웹 화면이 어두운 판을 직접 칠한다 — 그 뒤가 하얗게 비치면
+      // 불러오는 동안 한 번 번쩍인다
+      ..setBackgroundColor(const Color(0xFF101319))
+      ..loadRequest(Uri.parse(widget.url));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // TV 화면이 9:16 이라 폭에서 높이가 나온다 — 그래야 매장 벽과 같은 비율이다
+    return AspectRatio(
+      aspectRatio: 9 / 16,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: isDesktop
+            ? _openInBrowser(context)
+            : WebViewWidget(controller: _web!),
+      ),
+    );
+  }
+
+  Widget _openInBrowser(BuildContext context) => ColoredBox(
+    color: const Color(0xFF101319),
+    child: Center(
+      child: Padding(
+        padding: EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.tv_outlined, size: 40, color: AppColors.gray400),
+            SizedBox(height: 14),
+            Text(
+              'PC 에서는 브라우저로 열려요',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.body2.copyWith(color: AppColors.gray300),
+            ),
+            SizedBox(height: 18),
+            AppButton(
+              label: '매장 TV 화면 열기',
+              filled: true,
+              shrinkWrap: true,
+              onTap: () => launchUrl(
+                Uri.parse(widget.url),
+                mode: LaunchMode.externalApplication,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+/// 헤더 오른쪽의 모드 고르개 — **실시간 TV 화면 · 추첨 영상**
+///
+/// 지점 고르개·랭킹 직군 필터와 같은 부품이다 — 아이폰은 OS 가 그리는
+/// 네이티브 메뉴, 그 외는 [showGlassMenu]. **macOS 는 네이티브를 안 쓴다**
+/// (같은 패키지가 메뉴를 버튼 왼쪽에 고정해서 창 밖으로 새어 나간다).
+///
+/// **`전체` 줄이 없다.** 저쪽 둘은 거르개라 안 거르는 상태가 있는데,
+/// 여기는 둘 중 하나를 보는 자리다.
+class _ModeButton extends StatefulWidget {
+  _ModeButton({required this.selected, required this.onSelect});
+
+  final _Mode selected;
+  final ValueChanged<_Mode> onSelect;
+
+  @override
+  State<_ModeButton> createState() => _ModeButtonState();
+}
+
+class _ModeButtonState extends State<_ModeButton> {
+  /// 메뉴를 버튼 아래에 띄우려면 버튼 자리를 알아야 한다
+  final _key = GlobalKey();
+
+  /// 이미 떠 있는지 — 없으면 누를 때마다 하나씩 더 쌓인다
+  bool _open = false;
+
+  /// 버튼이 아이콘 하나라 **지금 무엇을 보고 있는지**를 아이콘으로 말한다.
+  /// 다른 고르개처럼 `.fill` 로 가르지 않는다 — 안 고른 상태가 없어서
+  /// 채운 아이콘이 늘 떠 있으면 뜻이 없다.
+  String get _symbol => widget.selected.symbol;
+
+  Future<void> _openMenu() async {
+    if (_open) return;
+    _open = true;
+    final picked = await showGlassMenu<int>(
+      context: context,
+      anchorKey: _key,
+      width: 200,
+      items: [
+        for (var i = 0; i < _Mode.values.length; i++)
+          GlassMenuItem(
+            value: i,
+            label: _Mode.values[i].label,
+            icon: _Mode.values[i].icon,
+            selected: widget.selected == _Mode.values[i],
+          ),
+      ],
+    );
+    _open = false;
+    if (!mounted || picked == null) return;
+    widget.onSelect(_Mode.values[picked]);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (isApple && !isDesktop) {
+      // 테마가 바뀌면 새로 만든다 (패키지의 setBrightness 가 아이콘을 유실).
+      // **고른 모드는 키에 안 넣는다** — 넣으면 고를 때마다 뷰를 새로 만든다
+      return CNPopupMenuButton.icon(
+        key: ValueKey('draw-mode-${AppColors.isDark}'),
+        buttonIcon: CNSymbol(_symbol, size: 16.8, color: AppColors.gray700),
+        size: 40,
+        items: [
+          // 네이티브 메뉴에는 체크마크를 못 단다 — 고른 줄은 **아이콘 자리**가
+          // 체크로 바뀐다
+          for (final mode in _Mode.values)
+            CNPopupMenuItem(
+              label: mode.label,
+              icon: CNSymbol(
+                widget.selected == mode ? 'checkmark' : mode.symbol,
+              ),
+            ),
+        ],
+        onSelected: (index) => widget.onSelect(_Mode.values[index]),
+      );
+    }
+
+    return GlassIconButton(
+      key: _key,
+      // 심볼이 바뀌어도 네이티브 버튼을 새로 만들지 않게 고정 식별자를 준다
+      stableId: 'draw-mode',
+      symbol: _symbol,
+      onPressed: _openMenu,
     );
   }
 }

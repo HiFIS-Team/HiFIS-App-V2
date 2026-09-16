@@ -36,6 +36,16 @@ class BranchApi {
         Branch.fromJson((row as Map).cast<String, dynamic>()),
     ];
   }
+
+  /// 매장 TV 주소 — **MASTER·ADMIN 만** (서버 `require_role(ADMIN)`)
+  ///
+  /// 토큰이 지점 id 와 따로라 이 길로만 알 수 있다. 없으면 서버가 그 자리에서
+  /// 하나 발급한다 — 부른다고 옛 주소가 바뀌지는 않는다
+  /// (갈아끼우는 것은 `/tv-link/reset` 이고 앱은 안 부른다).
+  static Future<String> tvLink(String branchId) async {
+    final row = await ApiClient.instance.get('/branches/$branchId/tv-link');
+    return row['url'] as String;
+  }
 }
 
 /// `/employees` — 전사 인원 디렉터리와 내 계정

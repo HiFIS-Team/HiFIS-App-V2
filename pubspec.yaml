@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.1+13
+version: 1.0.1+14
 
 environment:
   sdk: ^3.12.2
@@ -59,6 +59,12 @@ dependencies:
   # (PC 는 file_picker 로 파일만 저장한다). 윈도우가 이 코드에 닿지 않으므로
   # 윈도우 미지원이 걸림돌이 아니다 — `isDesktop` 으로 가른다.
   video_player: ^2.14.0
+  # 매장 TV 화면을 앱에서 그대로 보기 (lib/features/work/praise/praise_draw.dart)
+  # **폰에서만 쓴다** — 이 패키지는 안드로이드·iOS 구현만 있다.
+  # PC 는 `url_launcher` 로 브라우저를 연다 (거기는 창이 크고 브라우저가 있다).
+  # 네이티브로 다시 그리는 길은 없다 — TV 화면이 물리 게임 일곱 개를 포함한
+  # 3600줄짜리 React 라, 베끼는 순간 두 벌을 같이 고쳐야 한다.
+  webview_flutter: ^4.13.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
