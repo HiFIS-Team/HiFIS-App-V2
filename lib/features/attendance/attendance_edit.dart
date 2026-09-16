@@ -82,18 +82,6 @@ class _AttendanceEditSheetState extends State<_AttendanceEditSheet> {
 
   String _wire(TimeOfDay t) => '${_two(t.hour)}:${_two(t.minute)}';
 
-  ThemeData _pickerTheme(BuildContext context) => Theme.of(context).copyWith(
-    colorScheme:
-        (AppColors.isDark
-                ? ColorScheme.dark(surface: AppColors.surface)
-                : ColorScheme.light(surface: AppColors.surface))
-            .copyWith(
-              primary: AppColors.primary,
-              onPrimary: Colors.white,
-              onSurface: AppColors.textPrimary,
-            ),
-  );
-
   Future<void> _pickPerson() async {
     final picked = await showAppDialog<Employee>(
       context,
@@ -105,14 +93,14 @@ class _AttendanceEditSheetState extends State<_AttendanceEditSheet> {
   }
 
   Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _date,
-      firstDate: DateTime(_date.year - 2),
+    // 아이폰은 아래에서 올라오는 시트다 ([native_picker.dart])
+    final picked = await pickDate(
+      context,
+      initial: _date,
+      first: DateTime(_date.year - 2),
       // **앞날은 못 고른다** — 아직 오지 않은 날의 출퇴근을 적을 일이 없다
-      lastDate: DateTime.now(),
-      builder: (context, child) =>
-          Theme(data: _pickerTheme(context), child: child!),
+      last: DateTime.now(),
+      title: '근무일',
     );
     if (picked == null || !mounted) return;
     setState(() => _date = picked);
@@ -120,12 +108,15 @@ class _AttendanceEditSheetState extends State<_AttendanceEditSheet> {
   }
 
   Future<void> _pickTime({required bool start}) async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime:
-          (start ? _in : _out) ?? TimeOfDay(hour: start ? 9 : 18, minute: 0),
-      builder: (context, child) =>
-          Theme(data: _pickerTheme(context), child: child!),
+    final picked = await pickTime(
+      context,
+      // 안 찍힌 칸은 **본인 근무시간**에서 시작한다 — 09:00·18:00 을 박아 두면
+      // 야간 근무인 사람이 매번 한참을 굴려야 한다
+      initial:
+          (start ? _in : _out) ??
+          _shiftTime(start) ??
+          TimeOfDay(hour: start ? 9 : 18, minute: 0),
+      title: start ? '출근' : '퇴근',
     );
     if (picked == null) return;
     setState(() {
@@ -156,6 +147,18 @@ class _AttendanceEditSheetState extends State<_AttendanceEditSheet> {
       setState(() => _saving = false);
       AppToast.show(context, messageOf(error));
     }
+  }
+
+  /// 설정 근무시간의 시·분 — 안 찍힌 칸의 고르개가 여기서 시작한다
+  TimeOfDay? _shiftTime(bool start) {
+    final raw = start ? _who?.shiftStart : _who?.shiftEnd;
+    if (raw == null) return null;
+    final parts = raw.split(':');
+    if (parts.length < 2) return null;
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) return null;
+    return TimeOfDay(hour: hour, minute: minute);
   }
 
   /// 그 사람이 설정한 근무시간 — **무엇이 정상인지 알고 고쳐야 한다**

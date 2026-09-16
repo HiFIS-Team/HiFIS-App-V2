@@ -105,6 +105,8 @@ import UserNotifications
 
     wirePush(messenger: registrar.messenger())
     ReelsShare.wire(messenger: registrar.messenger())
+    // 날짜·시각 고르개를 아래에서 올라오는 시트로 ([NativePicker.swift])
+    NativePicker.wire(messenger: registrar.messenger())
 
     let center = NotificationCenter.default
     center.addObserver(
