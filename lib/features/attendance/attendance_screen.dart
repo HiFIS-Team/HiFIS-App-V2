@@ -366,7 +366,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               // 폰의 왼쪽 아이콘과 같은 일 — PC 는 오른쪽 끝이 그 자리다
               trailing: _canEditAttendance
                   ? AppButton(
-                      label: '근태 고치기',
+                      label: '근태 수정',
                       shrinkWrap: true,
                       onTap: _openEdit,
                     )

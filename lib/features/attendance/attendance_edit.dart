@@ -158,95 +158,204 @@ class _AttendanceEditSheetState extends State<_AttendanceEditSheet> {
     }
   }
 
+  /// 그 사람이 설정한 근무시간 — **무엇이 정상인지 알고 고쳐야 한다**
+  String? get _shiftLabel {
+    final who = _who;
+    if (who?.shiftStart == null || who?.shiftEnd == null) return null;
+    return '${who!.shiftStart} ~ ${who.shiftEnd}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final who = _who;
+    final ready = who != null && !_loading;
     return PhoneDetailScaffold(
-      title: '근태 고치기',
+      title: '근태 수정',
+      // 일정 폼과 같은 틀 — 흰 배경에 카드 없이 앉히고 주 동작은 하단 글래스
+      background: AppColors.surface,
+      bottomBar: ready
+          ? GlassBottomButton(label: '저장', onPressed: _save)
+          : null,
       child: ListView(
         padding: EdgeInsets.fromLTRB(
           20,
           PhoneDetailScaffold.topPadding,
           20,
-          40,
+          ready ? GlassBottomButton.inset(context) : 40,
         ),
         children: [
-          _EditRow(
-            label: '직원',
-            value: who?.name ?? '고르기',
-            dim: who == null,
-            onTap: _pickPerson,
-          ),
-          SizedBox(height: 10),
-          _EditRow(
-            label: '날짜',
-            value: '${_date.year}.${_date.month}.${_date.day}',
+          Text('누구의', style: AppTextStyles.label),
+          SizedBox(height: 8),
+          _PersonRow(person: who, onTap: _pickPerson),
+          SizedBox(height: 24),
+
+          Text('어느 날', style: AppTextStyles.label),
+          SizedBox(height: 8),
+          _PickRow(
+            icon: Icons.calendar_today_rounded,
+            value: _dateLabel,
             onTap: _pickDate,
           ),
-          SizedBox(height: 18),
+          SizedBox(height: 24),
+
           if (who == null)
-            _EditHint('먼저 직원을 골라 주세요')
-          else if (_loading)
-            Padding(
-              padding: EdgeInsets.symmetric(vertical: 28),
-              child: Center(
-                child: SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.4,
-                    color: AppColors.gray200,
-                  ),
-                ),
-              ),
-            )
+            _Hint('먼저 직원을 골라 주세요.')
           else ...[
-            _EditRow(
-              label: '출근',
-              value: _in == null ? '없음' : _wire(_in!),
-              dim: _in == null,
-              onTap: () => _pickTime(start: true),
-              onClear: _in == null ? null : () => setState(() => _in = null),
+            Row(
+              children: [
+                Text('출퇴근 시각', style: AppTextStyles.label),
+                if (_shiftLabel case final shift?) ...[
+                  Spacer(),
+                  // 설정값을 옆에 둔다 — 이게 없으면 몇 시가 정상인지 모른 채 고친다
+                  Text(
+                    '설정 $shift',
+                    style: AppTextStyles.caption.copyWith(fontSize: 11),
+                  ),
+                ],
+              ],
             ),
-            SizedBox(height: 10),
-            _EditRow(
-              label: '퇴근',
-              value: _out == null ? '없음' : _wire(_out!),
-              dim: _out == null,
-              onTap: () => _pickTime(start: false),
-              onClear: _out == null ? null : () => setState(() => _out = null),
-            ),
-            SizedBox(height: 14),
-            // **점수가 같이 움직인다는 것을 적는다.** 안 적으면 시각만 바뀌는
-            // 줄 알고, 나중에 점수가 달라진 것을 보고 놀란다
-            _EditHint('고치면 지각 차감·조기 출근·초과 근무 점수가 그 날짜만 다시 매겨져요.'),
-            SizedBox(height: 20),
-            AppButton(label: '저장', filled: true, busy: _saving, onTap: _save),
+            SizedBox(height: 8),
+            if (_loading)
+              _TimeSkeleton()
+            else ...[
+              _PickRow(
+                icon: Icons.login_rounded,
+                label: '출근',
+                value: _in == null ? '안 찍힘' : _wire(_in!),
+                dim: _in == null,
+                onTap: () => _pickTime(start: true),
+                onClear: _in == null ? null : () => setState(() => _in = null),
+              ),
+              SizedBox(height: 8),
+              _PickRow(
+                icon: Icons.logout_rounded,
+                label: '퇴근',
+                value: _out == null ? '안 찍힘' : _wire(_out!),
+                dim: _out == null,
+                onTap: () => _pickTime(start: false),
+                onClear: _out == null
+                    ? null
+                    : () => setState(() => _out = null),
+              ),
+              SizedBox(height: 14),
+              // **점수가 같이 움직인다는 것을 적는다.** 안 적으면 시각만 바뀌는
+              // 줄 알고, 나중에 점수가 달라진 것을 보고 놀란다
+              _Hint(
+                '고치면 지각 차감·조기 출근·초과 근무 점수가 그 날짜만 다시 매겨져요.\n'
+                '시각을 비우면 그 기록이 지워져요.',
+              ),
+            ],
           ],
         ],
       ),
     );
   }
+
+  String get _dateLabel {
+    const week = ['월', '화', '수', '목', '금', '토', '일'];
+    return '${_date.year}년 ${_date.month}월 ${_date.day}일 '
+        '(${week[_date.weekday - 1]})';
+  }
 }
 
-/// 라벨 + 값 한 줄 — 누르면 고르개가 뜬다
-class _EditRow extends StatelessWidget {
-  _EditRow({
-    required this.label,
+/// 고른 직원 — 아바타와 이름, 없으면 고르라고 말한다
+class _PersonRow extends StatelessWidget {
+  _PersonRow({required this.person, required this.onTap});
+
+  final Employee? person;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final who = person;
+    return Pressable(
+      onTap: onTap,
+      child: Container(
+        height: 60,
+        padding: EdgeInsets.fromLTRB(14, 0, 14, 0),
+        decoration: BoxDecoration(
+          color: AppColors.gray50,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            if (who == null)
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: AppColors.gray100,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.person_rounded,
+                  size: 18,
+                  color: AppColors.textTertiary,
+                ),
+              )
+            else
+              Avatar(name: who.name, size: 34),
+            SizedBox(width: 12),
+            Expanded(
+              child: who == null
+                  ? Text(
+                      '직원 고르기',
+                      style: AppTextStyles.body1.copyWith(
+                        color: AppColors.textTertiary,
+                      ),
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          who.name,
+                          style: AppTextStyles.body1.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        SizedBox(height: 1),
+                        Text(
+                          who.rank.label,
+                          style: AppTextStyles.caption.copyWith(fontSize: 11),
+                        ),
+                      ],
+                    ),
+            ),
+            Icon(
+              Icons.expand_more_rounded,
+              size: 20,
+              color: AppColors.textTertiary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 누르면 고르개가 뜨는 줄 — 날짜·시각이 같은 모양을 쓴다
+class _PickRow extends StatelessWidget {
+  _PickRow({
+    required this.icon,
     required this.value,
     required this.onTap,
+    this.label,
     this.dim = false,
     this.onClear,
   });
 
-  final String label;
+  final IconData icon;
+
+  /// 왼쪽에 붙는 이름 (`출근`·`퇴근`) — 날짜 줄은 안 쓴다
+  final String? label;
   final String value;
   final VoidCallback onTap;
 
-  /// 값이 비어 '고르기'·'없음' 일 때 — 흐리게 그린다
+  /// 값이 비었을 때 — 흐리게 그린다
   final bool dim;
 
-  /// 값을 지우는 길 — **퇴근을 잘못 찍은 날을 되돌리는 자리다**
+  /// 값을 지우는 길 — **잘못 찍은 퇴근을 되돌리는 자리다**
   final VoidCallback? onClear;
 
   @override
@@ -254,34 +363,45 @@ class _EditRow extends StatelessWidget {
     return Pressable(
       onTap: onTap,
       child: Container(
-        padding: EdgeInsets.fromLTRB(18, 16, 14, 16),
-        decoration: AppDecorations.card(),
+        height: 56,
+        padding: EdgeInsets.fromLTRB(16, 0, 10, 0),
+        decoration: BoxDecoration(
+          color: AppColors.gray50,
+          borderRadius: BorderRadius.circular(14),
+        ),
         child: Row(
           children: [
-            Text(label, style: AppTextStyles.label),
-            Spacer(),
-            Text(
-              value,
-              style: AppTextStyles.body1.copyWith(
-                fontWeight: FontWeight.w600,
-                color: dim ? AppColors.textTertiary : AppColors.textPrimary,
+            Icon(icon, size: 18, color: AppColors.textTertiary),
+            SizedBox(width: 10),
+            if (label case final name?) ...[
+              Text(name, style: AppTextStyles.label),
+              SizedBox(width: 12),
+            ],
+            Expanded(
+              child: Text(
+                value,
+                textAlign: label == null ? TextAlign.left : TextAlign.right,
+                style: AppTextStyles.body1.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: dim ? AppColors.textTertiary : AppColors.textPrimary,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
               ),
             ),
-            if (onClear case final clear?) ...[
-              SizedBox(width: 6),
+            if (onClear case final clear?)
               Pressable(
                 onTap: clear,
                 child: Padding(
-                  padding: EdgeInsets.all(4),
+                  padding: EdgeInsets.all(8),
                   child: Icon(
                     Icons.close_rounded,
                     size: 16,
                     color: AppColors.textTertiary,
                   ),
                 ),
-              ),
-            ] else
-              SizedBox(width: 6),
+              )
+            else
+              SizedBox(width: 8),
           ],
         ),
       ),
@@ -289,14 +409,30 @@ class _EditRow extends StatelessWidget {
   }
 }
 
-class _EditHint extends StatelessWidget {
-  _EditHint(this.text);
+/// 받아오는 동안 — **줄 높이를 그대로 잡는다** (오면 화면이 안 밀린다)
+class _TimeSkeleton extends StatelessWidget {
+  _TimeSkeleton();
+
+  @override
+  Widget build(BuildContext context) => SkeletonGroup(
+    child: Column(
+      children: [
+        Skeleton(height: 56, radius: 14),
+        SizedBox(height: 8),
+        Skeleton(height: 56, radius: 14),
+      ],
+    ),
+  );
+}
+
+class _Hint extends StatelessWidget {
+  _Hint(this.text);
 
   final String text;
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: EdgeInsets.symmetric(horizontal: 4),
+    padding: EdgeInsets.symmetric(horizontal: 2),
     child: Text(text, style: AppTextStyles.caption.copyWith(height: 1.6)),
   );
 }
