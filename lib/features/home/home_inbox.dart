@@ -175,7 +175,20 @@ class _InboxCardState extends State<_InboxCard>
       myRole == Role.master && _status == InboxStatus.pending && !loading;
 
   /// 종류마다 부르는 곳이 다르다 — id 는 그 테이블의 것이다
-  Future<void> _approve(InboxItem item) => _run(item, () async {
+  ///
+  /// **컴플레인만 한 번 더 묻는다** (2026-09-16 대표 요청) — 매장 TV 에 걸지다.
+  /// 어느 쪽을 골라도 승인은 되고, 닫으면 아무것도 안 한다.
+  Future<void> _approve(InboxItem item) async {
+    var onWall = true;
+    if (item.kind == InboxKind.complaint) {
+      final picked = await askPutOnWall(context);
+      if (picked == null || !mounted) return;
+      onWall = picked;
+    }
+    await _approveRun(item, onWall);
+  }
+
+  Future<void> _approveRun(InboxItem item, bool onWall) => _run(item, () async {
     switch (item.kind) {
       case InboxKind.payslip:
         await PayrollApi.approve(item.id);
@@ -192,7 +205,7 @@ class _InboxCardState extends State<_InboxCard>
       case InboxKind.project:
         await ProjectApi.approve(item.id);
       case InboxKind.complaint:
-        await KindnessApi.approve(item.id);
+        await KindnessApi.approve(item.id, onWall: onWall);
       case InboxKind.envClaim:
         await EnvApi.approve(item.id);
     }

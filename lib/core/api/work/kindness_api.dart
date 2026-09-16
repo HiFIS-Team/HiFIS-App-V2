@@ -43,6 +43,7 @@ class KindnessSurvey {
     this.improvement,
     this.resolvedAt,
     this.resolvedById,
+    this.tvHidden = false,
   });
 
   factory KindnessSurvey.fromJson(Map<String, dynamic> json) => KindnessSurvey(
@@ -63,6 +64,7 @@ class KindnessSurvey {
         ? null
         : DateTime.parse(json['resolvedAt'] as String).toLocal(),
     resolvedById: json['resolvedById'] as String?,
+    tvHidden: json['tvHidden'] as bool? ?? false,
   );
 
   final String id;
@@ -86,6 +88,9 @@ class KindnessSurvey {
   final DateTime submittedAt;
 
   final ComplaintStatus improvementStatus;
+
+  /// **매장 TV 에 안 걸린 것** — 승인할 때 대표가 골랐다
+  final bool tvHidden;
 
   /// 완료를 올린 사람 — 승인되면 이 사람에게 점수가 간다 (대기 중에만 채워진다)
   final String? doneRequestedById;
@@ -127,20 +132,31 @@ class KindnessApi {
   /// 컴플레인 처리 단계 바꾸기
   ///
   /// 개선 의견이 없는 설문에 부르면 400 `NOT_A_COMPLAINT` 다.
+  ///
+  /// [onWall] 은 **대표가 곧바로 해결 완료로 찍을 때만** 뜻이 있다 — 그때는
+  /// 승인 절차를 안 거치므로 여기서 묻는다. 나머지 단계에서는 서버가 안 본다.
   static Future<KindnessSurvey> setStatus(
     String id,
-    ComplaintStatus status,
-  ) async {
+    ComplaintStatus status, {
+    bool onWall = true,
+  }) async {
     final data = await _client.patch(
       '/kindness-surveys/$id/status',
-      body: {'status': status.wire},
+      body: {'status': status.wire, 'onWall': onWall},
     );
     return KindnessSurvey.fromJson(data!);
   }
 
   /// 해결 완료 승인 — **MASTER 만.** 점수는 올린 사람에게 간다
-  static Future<KindnessSurvey> approve(String id) async {
-    final data = await _client.post('/kindness-surveys/$id/approve');
+  ///
+  /// [onWall] 은 **매장 TV 에만 걸린다** (2026-09-16). 끄면 벽에서만 빠지고
+  /// 해결 완료·점수·회원 문자·앱 기록은 그대로 간다 — 사람이나 무리를
+  /// 지목하는 컴플레인이 있어서 둔 자리다 (`askPutOnWall` 이 물어본다).
+  static Future<KindnessSurvey> approve(String id, {bool onWall = true}) async {
+    final data = await _client.post(
+      '/kindness-surveys/$id/approve',
+      query: {'onWall': onWall.toString()},
+    );
     return KindnessSurvey.fromJson(data!);
   }
 

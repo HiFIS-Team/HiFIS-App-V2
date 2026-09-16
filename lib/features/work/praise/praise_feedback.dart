@@ -26,6 +26,9 @@ class _FeedbackDetailCardState extends State<_FeedbackDetailCard> {
     // **해결 완료는 대표 승인을 받는다** (2026-08-31 대표 요청).
     // 완료를 찍으면 찍은 사람에게 환경정비 '클레임해결' 점수가 붙어서,
     // 아무나 찍을 수 있으면 점수를 그냥 가져갈 수 있다.
+    // **대표는 결재를 안 거치므로 여기서 벽에 걸지를 묻는다** (2026-09-16).
+    // 결재를 거치는 길은 승인 버튼이 묻는다 (`_decide`)
+    bool onWall = true;
     if (status == _Status.done && myRole != Role.master) {
       final ok = await showConfirmDialog(
         context,
@@ -36,6 +39,10 @@ class _FeedbackDetailCardState extends State<_FeedbackDetailCard> {
         confirmLabel: '올리기',
       );
       if (!ok || !mounted) return;
+    } else if (status == _Status.done && feedback.status != _Status.done) {
+      final picked = await askPutOnWall(context);
+      if (picked == null || !mounted) return;
+      onWall = picked;
     }
 
     // 완료는 되돌리는 길이 없으므로 같은 버튼을 다시 눌러도 완료다
@@ -53,7 +60,9 @@ class _FeedbackDetailCardState extends State<_FeedbackDetailCard> {
     widget.onChanged?.call();
 
     final id = feedback.surveyId;
-    if (id != null) _push(id, feedback, shown, before, widget.onChanged);
+    if (id != null) {
+      _push(id, feedback, shown, before, widget.onChanged, onWall: onWall);
+    }
 
     AppToast.show(context, switch (shown) {
       _Status.pending => '미처리로 되돌렸어요',
@@ -70,7 +79,15 @@ class _FeedbackDetailCardState extends State<_FeedbackDetailCard> {
     if (id == null) return;
 
     String? reason;
-    if (!approve) {
+    // **승인은 벽에 걸지를 먼저 묻는다** (2026-09-16 대표 요청) — 어느 쪽을
+    // 골라도 승인은 되고, 빠지는 것은 매장 TV 하나뿐이다.
+    // 닫으면(null) 아무것도 안 한다
+    bool onWall = true;
+    if (approve) {
+      final picked = await askPutOnWall(context);
+      if (picked == null || !mounted) return;
+      onWall = picked;
+    } else {
       reason = await askRejectReason(context, hint: '예) 아직 샤워실이 그대로예요');
       if (reason == null || !mounted) return;
     }
@@ -86,7 +103,7 @@ class _FeedbackDetailCardState extends State<_FeedbackDetailCard> {
 
     try {
       if (approve) {
-        await KindnessApi.approve(id);
+        await KindnessApi.approve(id, onWall: onWall);
       } else {
         await KindnessApi.reject(id, reason: reason);
       }

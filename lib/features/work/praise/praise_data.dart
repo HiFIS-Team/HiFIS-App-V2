@@ -236,10 +236,13 @@ Future<void> _push(
   _Feedback feedback,
   _Status next,
   _Status before,
-  VoidCallback? onChanged,
-) async {
+  VoidCallback? onChanged, {
+
+  /// 매장 TV 에 걸지 — **대표가 곧바로 완료로 찍을 때만** 서버가 본다
+  bool onWall = true,
+}) async {
   try {
-    await KindnessApi.setStatus(id, next.wire);
+    await KindnessApi.setStatus(id, next.wire, onWall: onWall);
   } catch (_) {
     feedback.status = before;
     onChanged?.call();
