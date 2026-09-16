@@ -208,7 +208,13 @@ class _MyTaskHistoryScreenState extends State<_MyTaskHistoryScreen>
                         ),
                         itemCount: rows.length,
                         separatorBuilder: (_, _) => const SizedBox(height: 10),
-                        itemBuilder: (_, i) => _HistoryDayCard(row: rows[i]),
+                        itemBuilder: (context, i) => _HistoryDayCard(
+                          row: rows[i],
+                          onTap: () => showAppDialog<void>(
+                            context,
+                            (_) => _HistoryDayCard.detail(rows[i]),
+                          ),
+                        ),
                       ),
                     ),
                 ],
@@ -251,12 +257,36 @@ class _MyTaskHistoryScreenState extends State<_MyTaskHistoryScreen>
 }
 
 /// 하루 한 장 — 날짜 · 완료·누락 · 몇 개 중 몇 개, 그리고 이름들
+///
+/// **누르면 그날 기록이 열린다** (2026-09-16 요청). 카드에는 이름을 셋까지만
+/// 적는데, 그 뒤가 무엇인지 볼 길이 없으면 `등` 이 막다른 길이 된다.
 class _HistoryDayCard extends StatelessWidget {
-  const _HistoryDayCard({required this.row});
+  const _HistoryDayCard({required this.row, required this.onTap});
 
   final MyTaskHistoryDay row;
+  final VoidCallback onTap;
 
   static const _weekdays = ['월', '화', '수', '목', '금', '토', '일'];
+
+  /// `9월 3일 목요일`
+  static String dateLabel(DateTime date) =>
+      '${date.month}월 ${date.day}일 ${_weekdays[date.weekday - 1]}요일';
+
+  /// 카드 한 줄에 적는 이름 — **셋까지다**
+  ///
+  /// 예전에는 다 이어 붙이고 두 줄에서 `…` 로 잘랐다. 그러면 몇 개가 더
+  /// 있는지를 알 수 없고, 줄 길이에 따라 어떤 날은 넷이 보이고 어떤 날은
+  /// 둘이 보여서 **날끼리 견줄 수가 없다.**
+  static String preview(List<String> names) {
+    if (names.length <= _previewMax) return names.join(' · ');
+    final head = names.take(_previewMax).join(' · ');
+    return '$head 등 ${names.length}개';
+  }
+
+  static const _previewMax = 3;
+
+  /// 그날 기록 — 카드를 누르면 뜨는 판. 한 것과 못 한 것을 **다** 적는다
+  static Widget detail(MyTaskHistoryDay row) => _HistoryDayDetail(row: row);
 
   @override
   Widget build(BuildContext context) {
@@ -265,19 +295,108 @@ class _HistoryDayCard extends StatelessWidget {
     // 다 한 날은 한 것을, 못 한 날은 **못 한 것을** 적는다 — 봐야 할 값이 다르다
     final names = done ? row.doneTasks : row.leftTasks;
 
+    return Pressable(
+      onTap: onTap,
+      // 카드 자체가 배경을 들고 있어서 누름 효과만 얹는다
+      padding: EdgeInsets.zero,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+        decoration: AppDecorations.card(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    dateLabel(row.date),
+                    style: AppTextStyles.body2.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                Text(
+                  '${row.done}/${row.total}',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: tone.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    done ? '완료' : '누락',
+                    style: AppTextStyles.caption.copyWith(
+                      fontSize: 12,
+                      color: tone,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (names.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                preview(names),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.caption.copyWith(
+                  fontSize: 12,
+                  height: 1.5,
+                ),
+              ),
+            ] else if (row.total == 0) ...[
+              const SizedBox(height: 8),
+              Text(
+                '할 일을 안 정한 날이에요',
+                style: AppTextStyles.caption.copyWith(fontSize: 12),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 하루 기록 — 한 것과 못 한 것을 **다** 적는다 (2026-09-16 요청)
+///
+/// 카드는 셋까지만 적어서 `등 5개` 로 끝나는데, 그 뒤가 무엇인지 볼 자리가
+/// 여기다. 근태 '오늘 근무' 칸을 눌렀을 때 뜨는 판과 같은 틀이다.
+class _HistoryDayDetail extends StatelessWidget {
+  const _HistoryDayDetail({required this.row});
+
+  final MyTaskHistoryDay row;
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = row.complete ? AppColors.success : AppColors.error;
     return Container(
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-      decoration: AppDecorations.card(),
+      width: dialogWidth(context, 320),
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(24),
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Expanded(
                 child: Text(
-                  '${row.date.month}월 ${row.date.day}일 '
-                  '${_weekdays[row.date.weekday - 1]}요일',
-                  style: AppTextStyles.body2.copyWith(
+                  _HistoryDayCard.dateLabel(row.date),
+                  style: AppTextStyles.body1.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -285,45 +404,71 @@ class _HistoryDayCard extends StatelessWidget {
               Text(
                 '${row.done}/${row.total}',
                 style: AppTextStyles.caption.copyWith(
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                decoration: BoxDecoration(
-                  color: tone.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  done ? '완료' : '누락',
-                  style: AppTextStyles.caption.copyWith(
-                    fontSize: 12,
-                    color: tone,
-                    fontWeight: FontWeight.w800,
-                  ),
+                  color: tone,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ],
           ),
-          if (names.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              names.join(' · '),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: AppTextStyles.caption.copyWith(fontSize: 12, height: 1.5),
+          // **못 한 것을 먼저 세운다** — 보러 들어온 이유가 그쪽이다
+          if (row.leftTasks.isNotEmpty)
+            _group('못 한 일', row.leftTasks, AppColors.error),
+          if (row.doneTasks.isNotEmpty)
+            _group('한 일', row.doneTasks, AppColors.success),
+          if (row.total == 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 14),
+              child: Text(
+                '할 일을 안 정한 날이에요',
+                style: AppTextStyles.body2.copyWith(
+                  color: AppColors.textTertiary,
+                ),
+              ),
             ),
-          ] else if (row.total == 0) ...[
-            const SizedBox(height: 8),
-            Text(
-              '할 일을 안 정한 날이에요',
-              style: AppTextStyles.caption.copyWith(fontSize: 12),
-            ),
-          ],
         ],
       ),
     );
   }
+
+  Widget _group(String label, List<String> names, Color tone) => Padding(
+    padding: const EdgeInsets.only(top: 16),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$label ${names.length}개',
+          style: AppTextStyles.caption.copyWith(
+            fontSize: 11,
+            color: AppColors.textTertiary,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 6),
+        for (final name in names)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 5,
+                  height: 5,
+                  margin: const EdgeInsets.only(top: 7, right: 9),
+                  decoration: BoxDecoration(
+                    color: tone,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    name,
+                    style: AppTextStyles.body2.copyWith(height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    ),
+  );
 }
