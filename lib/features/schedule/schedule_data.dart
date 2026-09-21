@@ -11,6 +11,10 @@ enum Kind {
   lesson('수업', Icons.fitness_center_rounded),
   event('이벤트', Icons.campaign_rounded),
   off('휴무', Icons.bedtime_rounded),
+  // **서버가 지어 내는 줄이다** (2026-09-21) — 저장된 일정이 아니라
+  // 직원 생일에서 해마다 만들어진다 (`events._birthday_rows`).
+  // 사람이 고를 수 있는 종류가 아니라서 [pickable] 에서 빠진다.
+  birthday('생일', Icons.cake_rounded),
   etc('기타', Icons.more_horiz_rounded);
 
   const Kind(this.label, this.icon);
@@ -26,11 +30,25 @@ enum Kind {
   static Kind parse(String? value) =>
       Kind.values.firstWhere((k) => k.label == value, orElse: () => Kind.etc);
 
+  /// 사람이 일정을 만들 때 고를 수 있는 종류 — **생일은 빠진다**
+  ///
+  /// 생일은 서버가 직원 정보에서 지어 내는 줄이라, 손으로 만들면 지울 수
+  /// 없는 가짜 줄이 생긴다.
+  static List<Kind> get pickable =>
+      [for (final k in Kind.values) if (k != Kind.birthday) k];
+
+  /// 손으로 고치거나 지울 수 있는가 — **생일은 안 된다**
+  ///
+  /// 저장된 행이 없어서 서버가 404 를 준다. 편집 단추를 그리면 눌러 보고
+  /// 나서야 알게 된다.
+  bool get editable => this != Kind.birthday;
+
   Color get color => switch (this) {
     Kind.meeting => AppColors.primary,
     Kind.lesson => AppColors.success,
     Kind.event => AppColors.warning,
     Kind.off => AppColors.gray400,
+    Kind.birthday => AppColors.pink,
     Kind.etc => AppColors.violet,
   };
 }

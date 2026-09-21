@@ -17,13 +17,33 @@ enum ContribType {
   final String wire;
   final String label;
 
-  /// 한 건당 고정 점수 — 주는 사람이 고르지 않는다
+  /// 한 건당 점수 — **자발적 목표만 고를 수 있다** (아래 [pickablePoints])
   ///
-  /// 매출 성과만 0이다. 매출액에서 계산되는 값이라 고정값이 없다.
+  /// 나머지는 고정이다. 매출 성과만 0인데, 매출액에서 계산되는 값이라
+  /// 고정값이 없다.
   final int points;
 
   /// 사람이 직접 줄 수 있는 항목인가
   bool get grantable => this != ContribType.sales;
+
+  /// 주는 사람이 점수를 고를 수 있는가 — **자발적 목표뿐이다**
+  ///
+  /// 큰 목표와 작은 목표가 같은 10점을 받아서 무게를 실을 자리가 없었다
+  /// (2026-09-21 대표 요청). 아이디어는 낸 것 자체를 세는 값이고 근무 외
+  /// 출근은 시간이 정하는 값이라 고를 것이 없다.
+  bool get pickablePoints => this == ContribType.goal;
+
+  /// 고를 수 있는 점수 폭 — 서버 `GOAL_POINTS_MIN`·`MAX` 와 **같아야 한다**
+  ///
+  /// 한쪽만 넓히면 앱에서 고른 값이 서버에서 422 로 되돌아온다.
+  static const goalMin = 5;
+  static const goalMax = 20;
+
+  /// 고르개에 세울 값들 — 5부터 20까지 다섯씩
+  ///
+  /// 한 칸씩(5·6·7…) 열면 열여섯 칸이라 눌러 고르기가 어렵다. 다섯씩이면
+  /// 네 칸이고, 10이 가운데라 여태 쓰던 값이 그대로 기본이 된다.
+  static const goalSteps = [5, 10, 15, 20];
 
   static ContribType parse(String? value) => ContribType.values.firstWhere(
     (t) => t.wire == value,
@@ -111,13 +131,17 @@ class ContributionApi {
 
   /// 기여 점수 주기 — 대표·관리자·점장만 (직원은 403)
   ///
-  /// 점수는 항목마다 정해져 있어 주는 쪽이 고르지 않는다.
+  /// 점수는 항목마다 정해져 있다. **자발적 목표만 [points] 로 고른다**
+  /// (5~20, 2026-09-21). 다른 항목에 실어 보내면 400 `POINTS_FIXED` 다 —
+  /// 조용히 버리면 20점을 줬다고 생각한 사람이 3점이 들어간 걸 모른다.
+  ///
   /// 매출 성과를 넣으면 400 `SALES_AUTO`.
   static Future<ContributionGrant> create({
     required String employeeId,
     required ContribType type,
     required String reason,
     int? hours,
+    int? points,
   }) async {
     final data = await _client.post(
       '/contributions',
@@ -126,6 +150,7 @@ class ContributionApi {
         'type': type.wire,
         'reason': reason,
         'hours': ?hours,
+        'points': ?points,
       },
     );
     return ContributionGrant.fromJson(data!);

@@ -67,23 +67,73 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
   /// 서버도 이름으로 한 줄로 합친다
   final _fields = <String, List<MyTaskField>>{};
 
+  /// 월 단위로 담는 중인가 (2026-09-21 대표 요청)
+  ///
+  /// 주 단위는 **요일을 하나씩 훑는** 여태 쓰던 흐름이고, 월 단위는
+  /// **날짜를 한 번 고르고** 업무를 쌓는 한 장짜리다. 매달 1일에 하는
+  /// 재고 조사 같은 것을 요일로는 만들 수가 없었다.
+  bool _monthly = false;
+
+  /// 월 단위일 때 고른 **달의 며칠** — 담은 업무 **전부에** 같이 걸린다
+  ///
+  /// 업무마다 다른 날짜를 주지 않는다. 주 단위가 요일을 훑는 이유는 요일이
+  /// 이레뿐이라서인데, 날짜는 서른한 칸이라 같은 흐름이면 서른한 번을
+  /// 넘겨야 한다. 날짜가 다른 업무는 한 번 더 추가하면 된다.
+  final _monthdays = <int>{};
+
+  /// 갈래를 바꾼다 — **담아 둔 이름은 그대로 들고 간다**
+  ///
+  /// 이름을 적는 것이 이 화면에서 제일 품이 드는 일이라, 갈래를 잘못 골랐다고
+  /// 처음부터 다시 적게 하지 않는다. 날짜·요일만 갈래에 맞게 다시 깐다.
+  void _setMonthly(bool value) {
+    if (_monthly == value) return;
+    setState(() {
+      _flush();
+      _monthly = value;
+      _step = 0;
+      // 주 단위로 돌아가면 첫 근무 요일에 몰아 둔다 — 거기서 다시 훑는다
+      final days = value ? {...everyWeekday} : {_stepDays.first};
+      for (final key in _plan.keys) {
+        _plan[key] = {...days};
+      }
+    });
+  }
+
   int get _day => _stepDays[_step];
-  bool get _last => _step == _stepDays.length - 1;
+
+  /// 마지막 칸인가 — **월 단위는 칸이 하나뿐**이라 늘 마지막이다
+  /// (요일을 훑지 않으므로 `다음` 이 없고 바로 `추가` 다)
+  bool get _last => _monthly || _step == _stepDays.length - 1;
 
   static const _dayNames = ['월', '화', '수', '목', '금', '토', '일'];
   String get _dayName => _dayNames[_day - 1];
 
-  /// 이 요일에 걸린 업무들 (담은 차례대로)
-  List<String> get _todays => [
-    for (final e in _plan.entries)
-      if (e.value.contains(_day)) e.key,
-  ];
+  /// 새로 담을 때 걸어 둘 요일 — **월 단위는 요일을 안 본다**
+  ///
+  /// 월 단위 업무도 `weekdays` 칸이 `NOT NULL` 이라 값을 채워 보내야 한다.
+  /// 서버는 `monthdays` 가 있으면 요일을 안 보므로 매일로 둔다
+  /// (`services/my_tasks.stands_on`).
+  Set<int> get _stageDays => _monthly ? {...everyWeekday} : {_day};
+
+  /// 이 칸에 걸린 업무들 (담은 차례대로)
+  ///
+  /// 월 단위는 요일로 안 가르므로 **담은 것이 전부** 여기 선다.
+  List<String> get _todays => _monthly
+      ? _plan.keys.toList()
+      : [
+          for (final e in _plan.entries)
+            if (e.value.contains(_day)) e.key,
+        ];
 
   /// 앞 요일에서 담았는데 **이 요일에는 아직 안 건** 것들 — 체크로 고른다
-  List<String> get _others => [
-    for (final e in _plan.entries)
-      if (!e.value.contains(_day)) e.key,
-  ];
+  ///
+  /// 월 단위에는 없는 개념이다 (요일을 훑지 않는다).
+  List<String> get _others => _monthly
+      ? const []
+      : [
+          for (final e in _plan.entries)
+            if (!e.value.contains(_day)) e.key,
+        ];
 
   @override
   void initState() {
@@ -105,17 +155,23 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
   void _stage() {
     if (_value.isEmpty) return;
     setState(() {
-      _plan.putIfAbsent(_value, () => <int>{}).add(_day);
+      _plan.putIfAbsent(_value, () => <int>{}).addAll(_stageDays);
       _text.clear();
     });
     _focus.requestFocus();
   }
 
-  /// 앞 요일 것을 이 요일에도 걸거나 뺀다
+  /// 앞 요일 것을 이 요일에도 걸거나 뺀다 — **월 단위는 그냥 뺀다**
   void _toggle(String content) {
     setState(() {
       final days = _plan[content];
       if (days == null) return;
+      if (_monthly) {
+        // 요일로 가르는 자리가 아니라 목록에서 통째로 빼는 것이 전부다
+        _plan.remove(content);
+        _fields.remove(content);
+        return;
+      }
       if (!days.remove(_day)) days.add(_day);
       // 어느 요일에도 안 걸리면 목록에서 뺀다 — 영영 안 뜨는 업무가 된다
       if (days.isEmpty) {
@@ -128,7 +184,7 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
   /// 적다 만 글도 같이 담는다 — 엔터를 안 누르고 바로 넘기는 사람이 많다
   void _flush() {
     if (_value.isEmpty) return;
-    _plan.putIfAbsent(_value, () => <int>{}).add(_day);
+    _plan.putIfAbsent(_value, () => <int>{}).addAll(_stageDays);
     _text.clear();
   }
 
@@ -150,11 +206,19 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
   void _submit() {
     _flush();
     if (_plan.isEmpty) return;
+    // 월 단위인데 날짜를 하나도 안 골랐으면 **영영 안 뜨는 업무**가 된다
+    if (_monthly && _monthdays.isEmpty) {
+      return AppToast.show(context, '도는 날짜를 하나 이상 골라주세요');
+    }
+    final month = _monthdays.toList()..sort();
     Navigator.pop(
       context,
-      _AddResult({
-        for (final e in _plan.entries) e.key: e.value.toList()..sort(),
-      }, _fields),
+      _AddResult(
+        {for (final e in _plan.entries) e.key: e.value.toList()..sort()},
+        _fields,
+        // 주 단위면 빈 map — 그때는 서버가 요일만 본다
+        monthdays: _monthly ? {for (final key in _plan.keys) key: month} : const {},
+      ),
     );
   }
 
@@ -184,8 +248,23 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
     final body = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // 주냐 월이냐 — **제일 위에서 먼저 고른다.** 아래 화면이 통째로 갈린다
+        _CyclePicker(
+          monthly: _monthly,
+          onChanged: _setMonthly,
+        ),
+        const SizedBox(height: 18),
+        if (_monthly) ...[
+          Text('도는 날짜', style: AppTextStyles.label),
+          const SizedBox(height: 10),
+          _MonthdayPicker(
+            selected: _monthdays,
+            onChanged: () => setState(() {}),
+          ),
+          const SizedBox(height: 22),
+        ],
         // 지금 어느 요일을 담고 있는지 — 이 화면에서 제일 먼저 읽혀야 한다
-        Row(
+        if (!_monthly) Row(
           crossAxisAlignment: CrossAxisAlignment.baseline,
           textBaseline: TextBaseline.alphabetic,
           children: [
@@ -220,7 +299,8 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
               ),
           ],
         ),
-        const SizedBox(height: 14),
+        if (!_monthly) const SizedBox(height: 14),
+
         // 입력칸 — 카드 없이 큼직하게. 이 화면의 주인공이다
         Container(
           padding: const EdgeInsets.fromLTRB(18, 6, 6, 6),
@@ -382,9 +462,12 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
               children: [
                 Expanded(
                   child: AppButton(
-                    // 첫 요일에서만 취소다 — 그다음부터는 앞 요일로 돌아간다
-                    label: _step == 0 ? '취소' : '이전',
-                    onTap: _step == 0 ? () => Navigator.pop(context) : _back,
+                    // 첫 요일에서만 취소다 — 그다음부터는 앞 요일로 돌아간다.
+                    // 월 단위는 훑을 칸이 없어서 늘 취소다
+                    label: _monthly || _step == 0 ? '취소' : '이전',
+                    onTap: _monthly || _step == 0
+                        ? () => Navigator.pop(context)
+                        : _back,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -400,6 +483,152 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// 주냐 월이냐 — 업무 추가 화면 맨 위의 두 칸 (2026-09-21 대표 요청)
+///
+/// **고른 쪽에 따라 아래가 통째로 갈린다.** 주는 요일을 하나씩 훑는 여태
+/// 쓰던 흐름이고, 월은 날짜를 한 번 고르고 쌓는 한 장짜리다.
+class _CyclePicker extends StatelessWidget {
+  const _CyclePicker({required this.monthly, required this.onChanged});
+
+  final bool monthly;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.gray100,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          _tab(label: '주 단위', hint: '요일마다', on: !monthly, value: false),
+          _tab(label: '월 단위', hint: '매달 며칠', on: monthly, value: true),
+        ],
+      ),
+    );
+  }
+
+  Widget _tab({
+    required String label,
+    required String hint,
+    required bool on,
+    required bool value,
+  }) => Expanded(
+    child: Pressable(
+      onTap: () => onChanged(value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(vertical: 9),
+        decoration: BoxDecoration(
+          color: on ? AppColors.surface : Colors.transparent,
+          borderRadius: BorderRadius.circular(11),
+        ),
+        child: Column(
+          children: [
+            Text(
+              label,
+              style: AppTextStyles.body2.copyWith(
+                fontWeight: FontWeight.w700,
+                color: on ? AppColors.primary : AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 1),
+            Text(
+              hint,
+              style: AppTextStyles.caption.copyWith(
+                color: on ? AppColors.textSecondary : AppColors.gray400,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+/// 달의 며칠 — 1~31 칸을 눌러 고른다 (2026-09-21)
+///
+/// [selected] 를 **직접 고쳐 쓴다** — 요일 고르개(`WeekdayPicker`)와 같은
+/// 방식이다. 값을 복사해 돌려주면 부모가 두 벌을 들게 된다.
+///
+/// **31일까지 다 연다.** 없는 날(2월 31일)은 그 달에 그냥 안 선다 —
+/// 말일로 당기지 않는다 (서버 `stands_on` 과 같은 규칙).
+class _MonthdayPicker extends StatelessWidget {
+  const _MonthdayPicker({required this.selected, required this.onChanged});
+
+  final Set<int> selected;
+  final VoidCallback onChanged;
+
+  void _toggle(int day) {
+    if (!selected.remove(day)) selected.add(day);
+    onChanged();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final picked = selected.toList()..sort();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 한 줄에 일곱 칸 — 달력과 같은 폭이라 눈에 익다
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 7,
+            mainAxisSpacing: 6,
+            crossAxisSpacing: 6,
+            childAspectRatio: 1,
+          ),
+          itemCount: monthdayMax,
+          itemBuilder: (context, index) {
+            final day = index + 1;
+            final on = selected.contains(day);
+            return Pressable(
+              onTap: () => _toggle(day),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 140),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: on ? AppColors.primary : AppColors.surface,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: on ? AppColors.primary : AppColors.gray100,
+                  ),
+                ),
+                child: Text(
+                  '$day',
+                  style: AppTextStyles.body2.copyWith(
+                    fontWeight: on ? FontWeight.w700 : FontWeight.w500,
+                    color: on ? Colors.white : AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.only(left: 6),
+          child: Text(
+            picked.isEmpty
+                ? '도는 날짜를 골라주세요'
+                // 29~31일은 없는 달이 있다 — 고른 뒤에 알면 늦다
+                : '${monthdayLabel(picked)}에 돌아와요'
+                      '${picked.any((d) => d > 28) ? ' · 없는 달은 건너뛰어요' : ''}',
+            style: AppTextStyles.caption.copyWith(
+              color: picked.isEmpty ? AppColors.gray400 : AppColors.textSecondary,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -531,13 +760,19 @@ class _PickRow extends StatelessWidget {
 
 /// 추가 화면이 돌려주는 값 — 업무별 요일과 입력 칸
 class _AddResult {
-  const _AddResult(this.plan, this.fields);
+  const _AddResult(this.plan, this.fields, {this.monthdays = const {}});
 
   /// 업무 이름 → 걸리는 요일
   final Map<String, List<int>> plan;
 
   /// 업무 이름 → 체크할 때 받을 칸 (안 붙인 업무는 없다)
   final Map<String, List<MyTaskField>> fields;
+
+  /// 업무 이름 → 걸리는 **달의 며칠** — 월 단위로 담았을 때만 찬다
+  ///
+  /// 비어 있으면 주 단위다. 서버도 이 칸이 있으면 요일을 안 본다
+  /// (`services/my_tasks.stands_on`).
+  final Map<String, List<int>> monthdays;
 }
 
 /// 업무 하나의 입력 칸을 손보는 창 — 추가 화면에서 줄을 누르면 열린다
@@ -824,6 +1059,7 @@ class _RequestResult {
     this.reason = '',
     this.content,
     this.weekdays,
+    this.monthdays,
     this.fields,
   });
 
@@ -835,6 +1071,10 @@ class _RequestResult {
 
   /// 고치겠다는 요일 — 삭제면 null. **내용과 따로 고칠 수 있다**
   final List<int>? weekdays;
+
+  /// 고치겠다는 **달의 며칠** — 월 단위 업무를 고칠 때만 찬다 (2026-09-21).
+  /// 주 단위 업무에는 null 이라 갈래가 안 바뀐다
+  final List<int>? monthdays;
 
   /// 고치겠다는 입력 칸 — 삭제면 null. **빈 목록은 칸을 없앤다는 뜻**이다
   final List<MyTaskField>? fields;
@@ -963,13 +1203,28 @@ class _RequestCardState extends State<_RequestCard> {
   /// 지금 걸린 요일에서 시작한다 — 안 건드리면 그대로 간다
   late final _days = <int>{...widget.task.weekdays};
 
+  /// 지금 걸린 **달의 며칠** — 월 단위 업무만 찬다 (2026-09-21)
+  late final _monthdays = <int>{...?widget.task.monthdays};
+
+  /// 월 단위 업무인가 — **여기서 갈래를 바꾸지 않는다.**
+  ///
+  /// 만들 때 고른 갈래를 그대로 두고 값만 고친다. 갈래까지 여기서 바꾸면
+  /// 이미 체크한 업무의 지난 날짜 판정이 통째로 다시 계산된다 — 주 단위로
+  /// 만든 업무를 월 단위로 돌리면 안 한 날이 갑자기 누락이 된다.
+  /// 갈래를 바꾸려면 지우고 새로 만든다.
+  bool get _monthly => widget.task.isMonthly;
+
   /// 지금 붙은 입력 칸에서 시작한다 (2026-08-31)
   late var _fields = [...widget.task.fields];
 
   bool get _isEdit => widget.type == MyTaskRequestType.edit;
 
-  /// 요일을 바꿨나 — 차례를 맞춰 견준다 (서버도 정렬해서 준다)
+  /// 도는 차례를 바꿨나 — 차례를 맞춰 견준다 (서버도 정렬해서 준다)
   bool get _daysChanged {
+    if (_monthly) {
+      final now = _monthdays.toList()..sort();
+      return now.join(',') != (widget.task.monthdays ?? const []).join(',');
+    }
     final now = _days.toList()..sort();
     return now.join(',') != widget.task.weekdays.join(',');
   }
@@ -1010,14 +1265,21 @@ class _RequestCardState extends State<_RequestCard> {
 
   void _submit() {
     if (!_ready) return;
+    // 월 단위인데 날짜를 다 빼면 **영영 안 뜨는 업무**가 된다
+    if (_isEdit && _monthly && _monthdays.isEmpty) {
+      return AppToast.show(context, '도는 날짜를 하나 이상 골라주세요');
+    }
     // 하나도 안 고르면 매일 — 추가 화면과 같은 규칙이다
     final days = _days.toList()..sort();
+    final month = _monthdays.toList()..sort();
     Navigator.pop(
       context,
       _RequestResult(
         reason: _reason.text.trim(),
         content: _isEdit ? _content.text.trim() : null,
         weekdays: _isEdit ? (days.isEmpty ? everyWeekday : days) : null,
+        // 월 단위 업무만 싣는다 — 주 단위에 보내면 갈래가 바뀐다
+        monthdays: _isEdit && _monthly ? month : null,
         fields: _isEdit ? _fields : null,
       ),
     );
@@ -1040,12 +1302,21 @@ class _RequestCardState extends State<_RequestCard> {
           maxLength: _contentMax,
         ),
         const SizedBox(height: 14),
-        _Label('돌아오는 요일'),
-        WeekdayPicker(
-          selected: _days,
-          onChanged: () => setState(() {}),
-          note: '고른 요일에만 목록에 떠요',
-        ),
+        // 만들 때 고른 갈래를 그대로 따라간다 — 여기서는 값만 고친다
+        if (_monthly) ...[
+          _Label('돌아오는 날짜'),
+          _MonthdayPicker(
+            selected: _monthdays,
+            onChanged: () => setState(() {}),
+          ),
+        ] else ...[
+          _Label('돌아오는 요일'),
+          WeekdayPicker(
+            selected: _days,
+            onChanged: () => setState(() {}),
+            note: '고른 요일에만 목록에 떠요',
+          ),
+        ],
         const SizedBox(height: 14),
         _Label('입력 칸'),
         _FieldsEditor(

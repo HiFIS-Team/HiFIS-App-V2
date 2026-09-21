@@ -125,6 +125,30 @@ String weekdayLabel(List<int> days) {
   return [for (final d in days) names[d - 1]].join('·');
 }
 
+/// 서버가 준 **달의 며칠**을 추려서 차례대로 담는다 (1~31)
+///
+/// **비어 있으면 null 이다 — 매일이 아니다.** 요일 쪽([parseWeekdays])은
+/// 비면 매일로 보는데 여기서 같은 규칙을 쓰면, 월 단위를 고르고 날짜를
+/// 하나도 안 고른 업무가 매일 도는 업무가 된다.
+/// null 은 '요일로 도는 업무'라는 뜻이다 (서버 `clean_monthdays` 와 같다).
+List<int>? parseMonthdays(Object? raw) {
+  if (raw is! List) return null;
+  final days = {
+    for (final d in raw)
+      if (d is int && d >= 1 && d <= 31) d,
+  }.toList()..sort();
+  return days.isEmpty ? null : days;
+}
+
+/// `매달 1·15일` — 월 단위 업무의 줄 표시. 주 단위면 부를 일이 없다
+String monthdayLabel(List<int> days) => '매달 ${days.join('·')}일';
+
+/// 고를 수 있는 날짜 — **31일까지 다 연다**
+///
+/// 없는 날(2월 31일)은 그 달에 그냥 안 선다. 말일로 당기지 않는다 —
+/// 서버가 `stands_on` 에서 같은 규칙이다.
+const monthdayMax = 31;
+
 /// 체크할 때 받을 칸 하나 (서버 `MyTaskField`)
 ///
 /// **선택이다.** 칸을 안 붙이면 예전처럼 누르기만 하면 되고, 붙이면
@@ -172,6 +196,7 @@ class MyTask {
     required this.employeeId,
     required this.content,
     required this.weekdays,
+    required this.monthdays,
     required this.fields,
     required this.values,
     required this.sort,
@@ -187,6 +212,7 @@ class MyTask {
     employeeId: json['employeeId'] as String,
     content: json['content'] as String,
     weekdays: parseWeekdays(json['weekdays']),
+    monthdays: parseMonthdays(json['monthdays']),
     fields: parseFields(json['fields']),
     values: (json['values'] as Map?)?.cast<String, dynamic>() ?? const {},
     sort: json['sort'] as int? ?? 0,
@@ -212,6 +238,21 @@ class MyTask {
   /// 금요일에만 하는 대청소가 월~목에도 서서 안 누른 나흘이 누락으로 잡히던
   /// 자리다 (2026-08-20). 기존 업무는 전부 매일이다.
   final List<int> weekdays;
+
+  /// 돌아오는 **달의 며칠** — null 이면 요일([weekdays])로 도는 업무다
+  ///
+  /// 월 단위로 만든 업무만 채워진다 (2026-09-21). 값이 있으면 요일은
+  /// 안 본다 — 서버도 `stands_on` 에서 같은 규칙이다.
+  final List<int>? monthdays;
+
+  /// 월 단위로 도는 업무인가 — 목록 줄과 편집 화면이 이걸로 갈린다
+  bool get isMonthly => monthdays != null && monthdays!.isNotEmpty;
+
+  /// 줄에 붙는 차례 표시 — `금` · `매달 1·15일` · (매일이면 빈 문자열)
+  ///
+  /// **한 곳에서 만든다.** 화면마다 따로 만들면 목록과 편집이 다르게 뜬다.
+  String get cycleLabel =>
+      isMonthly ? monthdayLabel(monthdays!) : weekdayLabel(weekdays);
 
   /// 체크할 때 받을 칸 — 비어 있으면 누르기만 하면 된다
   final List<MyTaskField> fields;
@@ -561,9 +602,13 @@ class MyTaskApi {
   /// 합쳐서 **한 줄로** 만든다 (두 줄이면 어느 쪽을 체크했는지 알 수 없다).
   /// [fields] 는 **업무 이름 → 그 업무가 체크할 때 받을 칸**이다 (선택).
   /// 안 넘긴 업무는 예전처럼 누르기만 하면 된다.
+  ///
+  /// [monthdays] 를 주면 **그 업무는 월 단위로 돈다** (2026-09-21) — 그때
+  /// `weekdays` 는 서버가 안 본다. 주 단위로 만든 업무에는 안 넘긴다.
   static Future<List<MyTask>> create(
     Map<String, List<int>> plan, {
     Map<String, List<MyTaskField>> fields = const {},
+    Map<String, List<int>> monthdays = const {},
   }) async {
     final rows = await _client.postList(
       '/my-tasks',
@@ -573,6 +618,8 @@ class MyTaskApi {
             {
               'content': e.key,
               'weekdays': e.value,
+              if (monthdays[e.key]?.isNotEmpty ?? false)
+                'monthdays': monthdays[e.key],
               if (fields[e.key]?.isNotEmpty ?? false)
                 'fields': [for (final f in fields[e.key]!) f.toJson()],
             },
@@ -604,6 +651,7 @@ class MyTaskApi {
     String id, {
     String? content,
     List<int>? weekdays,
+    List<int>? monthdays,
     List<MyTaskField>? fields,
   }) async {
     final data = await _client.patch(
@@ -611,6 +659,9 @@ class MyTaskApi {
       body: {
         'content': ?content,
         'weekdays': ?weekdays,
+        // **빈 배열도 뜻이 있다** — 월 단위를 풀고 요일로 돌아간다.
+        // null 일 때만 안 보낸다 (안 보낸 것 ≠ 비운 것)
+        'monthdays': ?monthdays,
         // **빈 배열도 뜻이 있다** (칸을 없애는 것) — null 일 때만 안 보낸다
         if (fields != null) 'fields': [for (final f in fields) f.toJson()],
       },
@@ -631,6 +682,7 @@ class MyTaskApi {
     required String reason,
     String? content,
     List<int>? weekdays,
+    List<int>? monthdays,
     List<MyTaskField>? fields,
   }) async {
     final data = await _client.post(
@@ -642,6 +694,7 @@ class MyTaskApi {
           'payload': {
             'content': ?content,
             'weekdays': ?weekdays,
+            'monthdays': ?monthdays,
             if (fields != null) 'fields': [for (final f in fields) f.toJson()],
           },
       },

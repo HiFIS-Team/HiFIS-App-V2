@@ -176,11 +176,17 @@ class _InboxCardState extends State<_InboxCard>
 
   /// 종류마다 부르는 곳이 다르다 — id 는 그 테이블의 것이다
   ///
-  /// **컴플레인만 한 번 더 묻는다** (2026-09-16 대표 요청) — 매장 TV 에 걸지다.
+  /// **클레임 둘은 한 번 더 묻는다** — 매장 TV 에 걸지다.
   /// 어느 쪽을 골라도 승인은 되고, 닫으면 아무것도 안 한다.
+  ///
+  /// 설문으로 들어온 컴플레인(2026-09-16)과 **환경정비에서 올린 클레임해결**
+  /// (2026-09-21) 둘 다다. 같은 일을 하는데 한쪽만 고를 수 있으면, 환경정비로
+  /// 올린 것은 사람을 지목하는 내용도 무조건 벽에 걸린다.
+  static const _asksWall = {InboxKind.complaint, InboxKind.envClaim};
+
   Future<void> _approve(InboxItem item) async {
     var onWall = true;
-    if (item.kind == InboxKind.complaint) {
+    if (_asksWall.contains(item.kind)) {
       final picked = await askPutOnWall(context);
       if (picked == null || !mounted) return;
       onWall = picked;
@@ -207,7 +213,7 @@ class _InboxCardState extends State<_InboxCard>
       case InboxKind.complaint:
         await KindnessApi.approve(item.id, onWall: onWall);
       case InboxKind.envClaim:
-        await EnvApi.approve(item.id);
+        await EnvApi.approve(item.id, onWall: onWall);
     }
   }, '승인했어요');
 

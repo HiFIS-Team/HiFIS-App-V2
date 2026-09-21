@@ -182,10 +182,15 @@ class PtSurveyApi {
   /// 결과 목록 (최신순)
   ///
   /// [unanswered] 를 켜면 아직 안 낸 것만 — 누구에게 다시 물어야 하는지 보는 자리.
+  ///
+  /// [period] 는 `2026-09` — **그 달에 만들어진 설문만** (2026-09-21 대표 요청).
+  /// 안 주면 통째로 온다. 서버는 `created_at` 으로 끊는다 (답한 때가 아니라
+  /// 수업한 때라, 안 낸 것도 그 달에 선다).
   static Future<List<PtSurvey>> list({
     String? trainerId,
     String? branchId,
     bool unanswered = false,
+    String? period,
   }) async {
     final rows = await ApiClient.instance.getList(
       '/pt-surveys',
@@ -194,6 +199,7 @@ class PtSurveyApi {
         // 안 주면 볼 수 있는 만큼 다 온다 — MANAGER 는 서버가 본인 지점으로 고정
         'branchId': ?branchId,
         if (unanswered) 'unanswered': 'true',
+        'period': ?period,
       },
     );
     return [

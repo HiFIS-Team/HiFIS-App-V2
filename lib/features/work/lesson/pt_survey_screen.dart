@@ -14,6 +14,8 @@ import '../../../core/widgets/feedback/delayed_spinner.dart';
 import '../../../core/widgets/glass/glass_icon_button.dart';
 import '../../../core/widgets/glass/glass_search_bar.dart';
 import '../../../core/widgets/input/mode_switch.dart';
+import '../../../core/api/client/period.dart';
+import '../../../core/widgets/nav/month_bar.dart';
 import '../../../core/widgets/nav/phone_scaffold.dart';
 import '../../../core/widgets/nav/pick_filter_button.dart';
 import '../../../core/widgets/input/pressable.dart';
@@ -72,6 +74,26 @@ class _PtSurveyScreenState extends State<PtSurveyScreen>
   /// 트레이너를 고를 수 있는가 — 대표·관리자만
   bool get _canFilter => myRole.boss;
 
+  /// 보고 있는 달 — **기본은 이번 달** (2026-09-21 대표 요청)
+  ///
+  /// 예전에는 통째로 내려와서 쌓일수록 이번 달 것을 보려면 한참 내려야 했다.
+  /// 환경정비 내역·세션 기록과 같은 달 이동 줄([MonthBar])을 쓴다.
+  DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
+
+  /// 이번 달인가 — 앞으로는 더 갈 데가 없다
+  bool get _isThisMonth {
+    final now = DateTime.now();
+    return _month.year == now.year && _month.month == now.month;
+  }
+
+  void _moveMonth(int delta) {
+    setState(() {
+      _month = DateTime(_month.year, _month.month + delta);
+      beginLoad();
+    });
+    _load();
+  }
+
   /// 고르개에 세울 사람 — **받아 온 줄에서 뽑는다**
   ///
   /// 명단(`StaffDirectory`) 전체를 세우면 설문이 하나도 없는 사람이 잔뜩
@@ -116,7 +138,11 @@ class _PtSurveyScreenState extends State<PtSurveyScreen>
     try {
       // **한 번만 받아 앱에서 가른다.** `unanswered` 로 두 번 부르면 탭을
       // 옮길 때마다 기다리게 된다 — 어차피 등록권당 한 줄이라 양이 적다
-      final rows = await PtSurveyApi.list(branchId: widget.branchId);
+      final rows = await PtSurveyApi.list(
+        branchId: widget.branchId,
+        // 달로 끊어 받는다 — 서버가 `created_at` 으로 자른다
+        period: periodKey(_month),
+      );
       if (!mounted) return;
       setState(() {
         _rows = rows;
@@ -183,20 +209,20 @@ class _PtSurveyScreenState extends State<PtSurveyScreen>
   /// 같은 범위). 검색어·응답/미응답 탭에는 영향받지 않는다 — 찾는 글자와
   /// 상관없이 이번 지점(트레이너) 전망은 그대로여야 한다.
   ///
-  /// **이번 달에 답한 것만 센다.** 서버는 설문을 기간 없이 다 주므로, 안 자르면
-  /// 반년 전에 '연장할래요' 라고 답한 건까지 계속 얹혀 **'다음달' 예상 매출이
-  /// 달마다 불어나기만 한다** — 이번 달에 연장하겠다고 한 사람이 다음 달에
-  /// 결제한다는 뜻이라 답한 달로 자른다.
-  List<PtSurvey> get _renewedRows {
-    final now = DateTime.now();
-    return [
-      for (final survey in _rows)
-        if (survey.renew == RenewIntent.yes)
-          if (survey.answeredAt case final at?)
-            if (at.year == now.year && at.month == now.month)
-              if (_trainerId == null || survey.trainerId == _trainerId) survey,
-    ];
-  }
+  /// **보고 있는 달에 답한 것만 센다.** 안 자르면 반년 전에 '연장할래요' 라고
+  /// 답한 건까지 계속 얹혀 **'다음달' 예상 매출이 달마다 불어나기만 한다** —
+  /// 그달에 연장하겠다고 한 사람이 다음 달에 결제한다는 뜻이라 답한 달로 자른다.
+  ///
+  /// **`_month` 를 본다 (오늘이 아니라).** 서버는 `created_at` 으로 끊어 주는데
+  /// 답한 때는 그보다 늦을 수 있어서, 여기서 한 번 더 답한 달로 맞춘다 —
+  /// 안 맞추면 지난 달을 보는데 예상 매출만 이번 달 것이 뜬다.
+  List<PtSurvey> get _renewedRows => [
+    for (final survey in _rows)
+      if (survey.renew == RenewIntent.yes)
+        if (survey.answeredAt case final at?)
+          if (at.year == _month.year && at.month == _month.month)
+            if (_trainerId == null || survey.trainerId == _trainerId) survey,
+  ];
 
   int get _revenueTotal =>
       _renewedRows.fold(0, (sum, s) => sum + (s.pricePaid ?? 0));
@@ -346,6 +372,19 @@ class _PtSurveyScreenState extends State<PtSurveyScreen>
             labels: ['답변', '미응답'],
             selected: _tab,
             onSelect: (i) => setState(() => _tab = i),
+          ),
+          SizedBox(height: 10),
+          // 달 이동 — 환경정비 내역·세션 기록과 **같은 줄**이다 (2026-09-21).
+          // 건수는 아래 머리말이 이미 말하고 있어서 여기서는 안 그린다
+          MonthBar(
+            month: _month,
+            count: 0,
+            showCount: false,
+            loading: false,
+            padding: EdgeInsets.zero,
+            onPrev: () => _moveMonth(-1),
+            // 오지 않은 달에는 설문이 없다 — 앞으로는 못 간다
+            onNext: _isThisMonth ? null : () => _moveMonth(1),
           ),
           SizedBox(height: 12),
           if (_revenueTotal > 0) ...[

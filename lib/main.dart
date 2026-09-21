@@ -16,6 +16,7 @@ import 'core/widgets/feedback/app_loading.dart';
 import 'features/auth/auth_screen.dart';
 import 'features/auth/auth_session.dart';
 import 'features/main/main_shell.dart';
+import 'features/onboarding/birthday_setup_screen.dart';
 import 'features/onboarding/schedule_setup_screen.dart';
 
 void main() async {
@@ -145,6 +146,9 @@ class _AuthGateState extends State<_AuthGate> {
   /// 근무 설정을 방금 마쳤는지 — 저장 직후 메인으로 넘어가기 위한 표시
   bool _scheduleDone = false;
 
+  /// 생일을 방금 넣었는지 — 같은 이유다 (2026-09-21)
+  bool _birthdayDone = false;
+
   Widget _signedInScreen() {
     // 근무 시간·요일이 없으면 서버가 지각·결근을 판정하지 못한다.
     // 첫 로그인에 한 번 받고 넘어간다.
@@ -153,6 +157,18 @@ class _AuthGateState extends State<_AuthGate> {
       return ScheduleSetupScreen(
         key: ValueKey('schedule'),
         onDone: () => setState(() => _scheduleDone = true),
+      );
+    }
+    // 생일은 **근무 설정 다음이다** (2026-09-21 대표 요청). 지각·결근 판정이
+    // 먼저 서야 하고, 생일은 그 위에 얹는 휴무라 차례가 그렇다.
+    //
+    // **한 번 넣으면 다시 안 뜬다** — 서버 `birthday` 가 비었는지만 본다.
+    // 앱에 '봤다' 표시를 두면 기기를 바꿨을 때 또 뜬다.
+    final needsBirthday = currentUser?.needsBirthday ?? false;
+    if (needsBirthday && !_birthdayDone) {
+      return BirthdaySetupScreen(
+        key: ValueKey('birthday'),
+        onDone: () => setState(() => _birthdayDone = true),
       );
     }
     return MainShell(key: ValueKey('main'));

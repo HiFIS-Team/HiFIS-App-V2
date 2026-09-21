@@ -230,8 +230,18 @@ class EnvApi {
   }
 
   /// 클레임해결 승인 — **MASTER 만.** 이때 점수가 올린 사람에게 붙는다
-  static Future<EnvTaskLog> approve(String logId) async {
-    final data = await _client.post('/env-logs/$logId/approve');
+  ///
+  /// [onWall] 은 **매장 TV 에만 걸린다** (2026-09-21 대표 요청). 끄면 벽에서만
+  /// 빠지고 승인·점수·앱 기록은 그대로 간다.
+  ///
+  /// **설문으로 들어온 컴플레인과 같은 자리다** (`KindnessApi.approve`).
+  /// 예전에는 이쪽에만 고르개가 없어서, 환경정비에서 올린 클레임해결은
+  /// 사람을 지목하는 내용도 무조건 벽에 걸렸다.
+  static Future<EnvTaskLog> approve(String logId, {bool onWall = true}) async {
+    final data = await _client.post(
+      '/env-logs/$logId/approve',
+      query: {'onWall': onWall.toString()},
+    );
     notifyApprovalChanged();
     return EnvTaskLog.fromJson(data!);
   }

@@ -183,7 +183,7 @@ class _EventDialogState extends State<_EventDialog> {
   /// 남아 있으면 고를 수 있는 것처럼 보인다.
   Widget _kindCards() {
     final kinds = [
-      for (final kind in Kind.values)
+      for (final kind in Kind.pickable)
         if (!_locked || kind == _kind) kind,
     ];
 

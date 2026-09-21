@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import '../../data/current_user.dart';
 import '../../data/employee.dart';
 import '../client/api_client.dart';
+import '../client/period.dart';
 
 /// 지점 (서버 `BranchOut`)
 class Branch {
@@ -107,6 +108,22 @@ class StaffApi {
   static Future<Employee> me() async {
     final data = await _client.get('/employees/me');
     return Employee.fromJson(data);
+  }
+
+  /// 생일 등록 — **딱 한 번이다** (2026-09-21 대표 요청)
+  ///
+  /// 이미 있으면 서버가 409 `BIRTHDAY_SET` 을 준다. 앱은 첫 로그인 게이트
+  /// ([Employee.needsBirthday])에서만 부르므로 보통은 안 걸리지만,
+  /// 두 기기에서 같이 넣으면 뒤엣것이 그 오류를 본다.
+  ///
+  /// 날짜만 보낸다 (`YYYY-MM-DD`) — 시각은 뜻이 없고, 보내면 기기 시간대에
+  /// 따라 하루가 밀린다.
+  static Future<Employee> setBirthday(DateTime birthday) async {
+    final data = await _client.post(
+      '/employees/me/birthday',
+      body: {'birthday': dateKey(birthday)},
+    );
+    return Employee.fromJson(data!);
   }
 
   /// 내가 바꿀 수 있는 것 — 이름·이메일·전화·아바타 색·상태

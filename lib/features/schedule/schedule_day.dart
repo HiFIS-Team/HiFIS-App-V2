@@ -64,6 +64,9 @@ class _DayDialogState extends State<_DayDialog> {
   }
 
   Future<void> _edit(Event event) async {
+    // **생일은 못 고친다** (2026-09-21) — 서버가 직원 정보에서 지어 내는
+    // 줄이라 저장된 행이 없다. 열어 주면 저장할 때 404 가 난다.
+    if (!event.kind.editable) return;
     final edited = await showEventDialog(
       context,
       date: event.date,

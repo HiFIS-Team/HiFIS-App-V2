@@ -19,6 +19,11 @@ class _GrantScreenState extends State<_GrantScreen> {
   Employee? _target;
   final _title = TextEditingController();
 
+  /// 자발적 목표에 줄 점수 — **10에서 시작한다** (2026-09-21 대표 요청)
+  ///
+  /// 여태 고정이던 값이라, 안 건드리면 예전과 똑같이 들어간다.
+  int _goalPoints = 10;
+
   bool _saving = false;
 
   /// 줄 수 있는 사람 — 본인은 뺀다
@@ -79,11 +84,13 @@ class _GrantScreenState extends State<_GrantScreen> {
     setState(() => _saving = true);
     final target = _target!;
     try {
-      // 점수는 항목마다 정해져 있어 주는 사람이 고르지 않는다
       final grant = await ContributionApi.create(
         employeeId: target.id,
         type: _kind,
         reason: _title.text.trim(),
+        // 자발적 목표만 고른 값을 싣는다 — 나머지는 서버가 정한 고정값이고,
+        // 실어 보내면 400 `POINTS_FIXED` 다
+        points: _kind.pickablePoints ? _goalPoints : null,
       );
       if (!mounted) return;
       AppToast.show(context, '${target.name}님에게 ${grant.points}점을 줬어요');
@@ -129,6 +136,28 @@ class _GrantScreenState extends State<_GrantScreen> {
                       ),
                   ],
                 ),
+                // 자발적 목표만 점수를 고른다 (2026-09-21 대표 요청) —
+                // 나머지는 항목 버튼에 적힌 고정값이 그대로 간다
+                if (_kind.pickablePoints) ...[
+                  SizedBox(height: 20),
+                  _label('줄 점수'),
+                  SizedBox(height: 8),
+                  Row(
+                    children: [
+                      for (final value in ContribType.goalSteps)
+                        Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(
+                              right: value == ContribType.goalSteps.last
+                                  ? 0
+                                  : 8,
+                            ),
+                            child: _pointButton(value),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
                 SizedBox(height: 20),
                 _label('받을 사람'),
                 SizedBox(height: 8),
@@ -215,6 +244,32 @@ class _GrantScreenState extends State<_GrantScreen> {
     ),
   );
 
+  /// 줄 점수 한 칸 — 자발적 목표에만 뜬다 (2026-09-21)
+  Widget _pointButton(int value) {
+    final on = value == _goalPoints;
+    return Pressable(
+      onTap: () => setState(() => _goalPoints = value),
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: 13),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: on ? AppColors.primaryLight : AppColors.gray50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: on ? AppColors.primary : Colors.transparent,
+          ),
+        ),
+        child: Text(
+          '$value점',
+          style: AppTextStyles.body2.copyWith(
+            fontWeight: on ? FontWeight.w700 : FontWeight.w500,
+            color: on ? AppColors.primary : AppColors.textSecondary,
+          ),
+        ),
+      ),
+    );
+  }
+
   /// 항목 버튼 — 점수가 항목에 붙어 있으므로 여기에 같이 적는다
   Widget _kindButton(ContribType kind) {
     final on = kind == _kind;
@@ -248,7 +303,11 @@ class _GrantScreenState extends State<_GrantScreen> {
             ),
             SizedBox(height: 2),
             Text(
-              '${kind.points}점',
+              // 고를 수 있는 항목은 **폭**을 적는다 — 고정값처럼 `10점` 이라
+              // 적어 두면 아래 고르개가 왜 있는지가 안 읽힌다
+              kind.pickablePoints
+                  ? '${ContribType.goalMin}~${ContribType.goalMax}점'
+                  : '${kind.points}점',
               style: AppTextStyles.caption.copyWith(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,

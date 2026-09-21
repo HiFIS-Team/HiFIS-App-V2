@@ -194,6 +194,7 @@ class Employee {
     this.shiftStart,
     this.shiftEnd,
     this.workDays = const [],
+    this.birthday,
   });
 
   factory Employee.fromJson(Map<String, dynamic> json) => Employee(
@@ -225,6 +226,7 @@ class Employee {
     ],
     shiftStart: json['shiftStart'] as String?,
     shiftEnd: json['shiftEnd'] as String?,
+    birthday: _date(json['birthday']),
   );
 
   final String id;
@@ -311,6 +313,18 @@ class Employee {
       role != Role.master &&
       role != Role.admin &&
       (shiftStart == null || shiftEnd == null || workDays.isEmpty);
+
+  /// 생일 — 한 번 받고 나면 **다시 안 묻는다** (2026-09-21 대표 요청)
+  ///
+  /// 달력에 `이건주님 생일` 로 서고, 그날은 휴무가 된다.
+  /// null 이면 아직 안 받았다 ([needsBirthday] 가 이걸 본다).
+  final DateTime? birthday;
+
+  /// 첫 로그인에 생일을 받아야 하는가
+  ///
+  /// **권한을 안 가린다.** 근무 설정([needsSchedule])은 출퇴근을 안 찍는
+  /// 대표·관리자를 뺐지만, 생일은 달력에 서는 값이라 모두에게 받는다.
+  bool get needsBirthday => birthday == null;
 
   /// 아바타 색 — 서버가 `#RRGGBB` 로 준다
   ///

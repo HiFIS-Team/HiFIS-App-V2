@@ -71,7 +71,12 @@ Future<bool> addMyTasks(BuildContext context) async {
   try {
     // 여러 줄을 **한 번에** 보낸다 — 줄마다 부르면 중간에 끊겼을 때
     // 반만 들어간 채로 화면이 닫힌다
-    await MyTaskApi.create(plan, fields: made!.fields);
+    await MyTaskApi.create(
+      plan,
+      fields: made!.fields,
+      // 월 단위로 담았으면 날짜가 실린다 — 비어 있으면 주 단위다
+      monthdays: made.monthdays,
+    );
     if (context.mounted) {
       AppToast.show(
         context,
@@ -275,6 +280,7 @@ class _MyTaskSectionState extends State<MyTaskSection>
         task.id,
         content: result.content,
         weekdays: result.weekdays,
+        monthdays: result.monthdays,
         fields: result.fields,
       );
       await _load();
@@ -317,6 +323,7 @@ class _MyTaskSectionState extends State<MyTaskSection>
         reason: result.reason,
         content: result.content,
         weekdays: result.weekdays,
+        monthdays: result.monthdays,
         fields: result.fields,
       );
       await _load();
@@ -740,6 +747,21 @@ class _TaskRow extends StatelessWidget {
                     decorationThickness: 1.6,
                   ),
                 ),
+                // **월 단위 업무만 차례를 적는다** — `매달 1·15일` (2026-09-21).
+                //
+                // 주 단위는 요일 고르개로 그날 것만 보고 있어서 줄마다
+                // `월·수·금` 을 또 적으면 같은 말이 두 번이다. 월 단위는
+                // 요일 칸 어디에도 안 걸려서, 안 적으면 **왜 오늘 섰는지**를
+                // 알 길이 없다.
+                if (task.isMonthly) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    task.cycleLabel,
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                ],
                 // 적어 넣은 값 — `신규 3 · 재등록 5` (2026-08-31).
                 // 체크한 뒤에만 채워지므로 아직 안 한 줄에는 안 붙는다
                 if (task.valueLabel.isNotEmpty) ...[
