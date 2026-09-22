@@ -58,6 +58,12 @@ class ApiException implements Exception {
     return ApiException(
       code: 'UNKNOWN',
       message: switch (status ?? 0) {
+        // 앞단 nginx 가 본문 크기로 자른 것 — 우리 코드까지 오지도 않는다.
+        // 봉투 없는 nginx 기본 HTML 이라 문장을 여기서 만들어야 한다.
+        //
+        // 숫자를 안 적는다 — 한계가 nginx 설정(`ops/nginx-upload.conf`)에 있어서
+        // 여기 적어 두면 그쪽을 올린 날 이 문장만 거짓말로 남는다.
+        413 => '파일이 너무 커요. 더 작게 잘라서 올려 주세요.',
         429 => '요청이 너무 잦아요. 잠시 후 다시 시도해 주세요.',
         // 5xx 는 에러 봉투 없이 Caddy 의 기본 HTML 이 오기도 한다 — 그때
         // "오류 502" 만 띄우면 쓰는 사람은 뭘 해야 할지 모른다
