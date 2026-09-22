@@ -105,6 +105,16 @@ void _goWork(int pane) {
   requestedScreen.value = NotificationTarget.work;
 }
 
+/// 확정되면 깎일 점수 — **서버 `task_miss_points` 와 같은 식이다**
+///
+/// 하루치 기본 20 에 항목이 하나 늘 때마다 10 이 더 붙는다
+/// (`1개 20 · 3개 40 · 9개 100`). 예전에는 `20점` 을 글에 박아 뒀는데,
+/// 빠뜨린 개수로 값이 정해지게 바뀌면서(2026-09-18) **둘 이상이면 틀린
+/// 숫자를 말하게** 됐다.
+///
+/// 값이 갈리면 안 되니 규칙을 고칠 때 서버와 **같이** 고친다.
+int _missPenalty(int count) => 20 + 10 * (count > 1 ? count - 1 : 0);
+
 /// 본인이 남기고 퇴근했다 — **열 때마다** 뜬다
 Future<void> _warnMine(BuildContext context, MyTaskMissAlert alert) async {
   // 마지막 기회면 붉게 — 오늘 안 하면 내일 그대로 깎인다
@@ -117,12 +127,7 @@ Future<void> _warnMine(BuildContext context, MyTaskMissAlert alert) async {
     message:
         '${_summary(alert.mine)}\n\n'
         '${last ? '오늘이 지나면 누락으로 확정돼요' : '다음 근무일까지 하면 돼요'}\n'
-        // **수치를 안 적는다.** 서버 감점이 2026-09-16 에 `-20 고정`에서
-        // 누적(-10 → -20 → -30, `TASK_MISS_PENALTY`)으로 바뀌었는데 이 줄만
-        // 남아서, 처음 빠뜨린 사람에게 20점이라 하고 실제로는 10점을 깎았다.
-        // 몇 번째인지는 확정될 때까지 서버만 아는 값이라(`_miss_nth`) 여기서
-        // 맞출 수가 없다 — 얼마인지는 확정 푸시가 정확히 알려 준다.
-        '확정되면 점수가 깎여요 · 거듭되면 더 크게 깎여요\n'
+        '확정되면 ${_missPenalty(alert.mine.length)}점이 깎여요 · '
         '사유가 있으면 사유서를 낼 수 있어요',
     cancelLabel: '나중에',
     confirmLabel: '하러 가기',
