@@ -46,7 +46,7 @@ class PtTopicAnswer {
 
 /// PT 만족도 폼 한 건 (서버 `PtSurveyOut`)
 ///
-/// 신규 등록권의 **7회차**에 열린다. 회원이 문자로 받은 주소에서 답한다.
+/// 회원 누적 **7회차마다** 열린다 (7·14·21…). 회원이 문자로 받은 주소에서 답한다.
 class PtSurvey {
   PtSurvey({
     required this.id,

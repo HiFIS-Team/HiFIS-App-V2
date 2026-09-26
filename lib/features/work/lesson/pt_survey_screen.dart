@@ -20,7 +20,7 @@ import '../../../core/widgets/nav/phone_scaffold.dart';
 import '../../../core/widgets/nav/pick_filter_button.dart';
 import '../../../core/widgets/input/pressable.dart';
 
-/// PT 만족도 폼 결과 화면 — **신규 회원 7회차에 열리는 설문을 보는 자리**
+/// PT 만족도 폼 결과 화면 — **회원 누적 7회차마다 열리는 설문을 보는 자리**
 ///
 /// 서버는 진작에 `GET /pt-surveys` 를 열어 뒀는데 이걸 보는 화면이 앱에도
 /// 웹에도 없었다 (2026-09-05). 폼은 회차마다 열리고 답도 들어오는데 아무도
@@ -216,13 +216,28 @@ class _PtSurveyScreenState extends State<PtSurveyScreen>
   /// **`_month` 를 본다 (오늘이 아니라).** 서버는 `created_at` 으로 끊어 주는데
   /// 답한 때는 그보다 늦을 수 있어서, 여기서 한 번 더 답한 달로 맞춘다 —
   /// 안 맞추면 지난 달을 보는데 예상 매출만 이번 달 것이 뜬다.
-  List<PtSurvey> get _renewedRows => [
-    for (final survey in _rows)
-      if (survey.renew == RenewIntent.yes)
-        if (survey.answeredAt case final at?)
-          if (at.year == _month.year && at.month == _month.month)
-            if (_trainerId == null || survey.trainerId == _trainerId) survey,
-  ];
+  ///
+  /// **회원당 한 번만 센다** (2026-09-27). 설문이 7회차마다 와서 한 달에
+  /// 7·14회차 둘 다 '연장할래요' 일 수 있다 — 같은 사람의 연장을 두 번 더하면
+  /// 예상 매출이 부푼다. 그 달에 **마지막으로 답한 것**을 남긴다.
+  List<PtSurvey> get _renewedRows {
+    final byMember = <String, PtSurvey>{};
+    for (final survey in _rows) {
+      final at = survey.answeredAt;
+      if (at == null || at.year != _month.year || at.month != _month.month) {
+        continue;
+      }
+      if (_trainerId != null && survey.trainerId != _trainerId) continue;
+      final kept = byMember[survey.memberId];
+      if (kept == null || at.isAfter(kept.answeredAt!)) {
+        byMember[survey.memberId] = survey;
+      }
+    }
+    return [
+      for (final survey in byMember.values)
+        if (survey.renew == RenewIntent.yes) survey,
+    ];
+  }
 
   int get _revenueTotal =>
       _renewedRows.fold(0, (sum, s) => sum + (s.pricePaid ?? 0));

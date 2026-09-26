@@ -182,7 +182,7 @@ class _WorkScreenState extends State<WorkScreen>
     ]);
   }
 
-  /// PT 만족도 폼 결과를 연다 — 신규 회원 7회차에 나간 설문이다
+  /// PT 만족도 폼 결과를 연다 — 회원 누적 7회차마다 나간 설문이다
   ///
   /// 지점 고르개를 그대로 물려준다 — 세션 기록과 같은 범위를 본다.
   void _openPtSurveys() {
