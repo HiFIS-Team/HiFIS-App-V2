@@ -360,6 +360,8 @@ Future<void> _loadAttendance() async {
         (person) =>
             person.role != Role.master &&
             person.role != Role.admin &&
+            // 퇴사자는 뺀다 (2026-09-27) — 안 빼면 매일 미출근·결근으로 선다
+            person.status == EmployeeStatus.active &&
             (branchScopeId == null || person.branchId == branchScopeId),
       ),
     );
