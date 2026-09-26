@@ -488,6 +488,20 @@
     "birthday"
    ]
   },
+  "BirthdayTodayOut": {
+   "properties": {
+    "avatarColor": {},
+    "cheered": {},
+    "id": {},
+    "name": {}
+   },
+   "required": [
+    "id",
+    "name",
+    "avatarColor",
+    "cheered"
+   ]
+  },
   "Body_upload_attachment_chat_rooms__room_id__attachments_post": {
    "properties": {
     "file": {}

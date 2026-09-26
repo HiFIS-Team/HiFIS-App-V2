@@ -33,6 +33,12 @@ enum NotificationKind {
 
   /// 회원이 등록·재등록했다 — 받는 사람은 세션 싸인과 같다 (2026-09-16)
   memberRegister('MEMBER_REGISTER'),
+
+  /// 생일 전날·당일 알림 — 전원 (2026-09-27)
+  birthday('BIRTHDAY'),
+
+  /// 누가 생일 축하 이모지를 보냈다 — 생일자 본인
+  birthdayCheer('BIRTHDAY_CHEER'),
   other('');
 
   const NotificationKind(this.wire);

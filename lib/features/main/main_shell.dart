@@ -35,6 +35,7 @@ import '../notice/notice_screen.dart';
 import '../notifications/notification_screen.dart';
 import '../profile/profile_screen.dart';
 import '../project/project_screen.dart';
+import '../schedule/schedule_birthday_modal.dart';
 import '../work/my_task/my_task_miss_modal.dart';
 import '../work/peer_review/peer_review_modal.dart';
 import '../ranking/ranking_screen.dart';
@@ -75,6 +76,7 @@ class _MainShellState extends State<MainShell> {
     //
     // | 차례 | 왜 |
     // |---|---|
+    // | 생일 축하 | **그날 하루뿐**이고 한 번 닫으면 끝이다 (2026-09-27) |
     // | 동료평가 | 창이 **이틀뿐**이다 — 지나면 못 낸다 (−20) |
     // | 업무 누락 | 다음 근무일까지는 만회할 수 있다 (−20) |
     // | 마감 임박 | 다음에 켤 때 그대로 뜬다 |
@@ -82,6 +84,7 @@ class _MainShellState extends State<MainShell> {
       if (!mounted) return;
       // 꺼져 있던 앱을 푸시로 켜면 셸이 뜨기 **전에** 링크가 도착해 있다
       _onPushTap();
+      if (await showBirthdayModal(context) || !mounted) return;
       if (await showPeerReviewModal(context) || !mounted) return;
       if (await showMyTaskMissModal(context) || !mounted) return;
       await showProjectDueModal(context);

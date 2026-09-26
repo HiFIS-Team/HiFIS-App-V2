@@ -463,6 +463,8 @@ IconData _iconOf(NotificationKind kind) => switch (kind) {
   NotificationKind.ptSurvey => Icons.rate_review_rounded,
   NotificationKind.sessionSign => Icons.draw_rounded,
   NotificationKind.memberRegister => Icons.person_add_alt_1_rounded,
+  NotificationKind.birthday ||
+  NotificationKind.birthdayCheer => Icons.cake_rounded,
   NotificationKind.other => Icons.notifications_rounded,
 };
 
@@ -475,6 +477,8 @@ Color _colorOf(NotificationKind kind) => switch (kind) {
   NotificationKind.notice ||
   NotificationKind.chat ||
   NotificationKind.schedule ||
+  NotificationKind.birthday ||
+  NotificationKind.birthdayCheer ||
   NotificationKind.meeting ||
   NotificationKind.staff => AppColors.primary,
   NotificationKind.leave ||
