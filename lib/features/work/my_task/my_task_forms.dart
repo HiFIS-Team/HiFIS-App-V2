@@ -217,7 +217,9 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
         {for (final e in _plan.entries) e.key: e.value.toList()..sort()},
         _fields,
         // 주 단위면 빈 map — 그때는 서버가 요일만 본다
-        monthdays: _monthly ? {for (final key in _plan.keys) key: month} : const {},
+        monthdays: _monthly
+            ? {for (final key in _plan.keys) key: month}
+            : const {},
       ),
     );
   }
@@ -249,8 +251,11 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // 주냐 월이냐 — **제일 위에서 먼저 고른다.** 아래 화면이 통째로 갈린다
-        _CyclePicker(
-          monthly: _monthly,
+        // 다른 화면의 목록바와 같은 공용 위젯 — 따로 그리면 모양이 갈린다
+        ModeSwitch(
+          left: '주 단위',
+          right: '월 단위',
+          value: _monthly,
           onChanged: _setMonthly,
         ),
         const SizedBox(height: 18),
@@ -264,41 +269,42 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
           const SizedBox(height: 22),
         ],
         // 지금 어느 요일을 담고 있는지 — 이 화면에서 제일 먼저 읽혀야 한다
-        if (!_monthly) Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Text('$_dayName요일', style: AppTextStyles.title2),
-            const SizedBox(width: 8),
-            Text(
-              '${_step + 1} / ${_stepDays.length}',
-              style: AppTextStyles.caption.copyWith(
-                fontWeight: FontWeight.w700,
-                color: AppColors.primary,
+        if (!_monthly)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text('$_dayName요일', style: AppTextStyles.title2),
+              const SizedBox(width: 8),
+              Text(
+                '${_step + 1} / ${_stepDays.length}',
+                style: AppTextStyles.caption.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
               ),
-            ),
-            const Spacer(),
-            // 폰은 헤더 뒤로가기가 **화면을 통째로 닫는다** — 앞 요일로
-            // 돌아갈 길이 여기 없으면 처음부터 다시 해야 한다
-            if (!isDesktop && _step > 0)
-              Pressable(
-                onTap: _back,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  child: Text(
-                    '이전',
-                    style: AppTextStyles.body2.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
+              const Spacer(),
+              // 폰은 헤더 뒤로가기가 **화면을 통째로 닫는다** — 앞 요일로
+              // 돌아갈 길이 여기 없으면 처음부터 다시 해야 한다
+              if (!isDesktop && _step > 0)
+                Pressable(
+                  onTap: _back,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    child: Text(
+                      '이전',
+                      style: AppTextStyles.body2.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ),
                 ),
-              ),
-          ],
-        ),
+            ],
+          ),
         if (!_monthly) const SizedBox(height: 14),
 
         // 입력칸 — 카드 없이 큼직하게. 이 화면의 주인공이다
@@ -487,71 +493,6 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
   }
 }
 
-/// 주냐 월이냐 — 업무 추가 화면 맨 위의 두 칸 (2026-09-21 대표 요청)
-///
-/// **고른 쪽에 따라 아래가 통째로 갈린다.** 주는 요일을 하나씩 훑는 여태
-/// 쓰던 흐름이고, 월은 날짜를 한 번 고르고 쌓는 한 장짜리다.
-class _CyclePicker extends StatelessWidget {
-  const _CyclePicker({required this.monthly, required this.onChanged});
-
-  final bool monthly;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: AppColors.gray100,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          _tab(label: '주 단위', hint: '요일마다', on: !monthly, value: false),
-          _tab(label: '월 단위', hint: '매달 며칠', on: monthly, value: true),
-        ],
-      ),
-    );
-  }
-
-  Widget _tab({
-    required String label,
-    required String hint,
-    required bool on,
-    required bool value,
-  }) => Expanded(
-    child: Pressable(
-      onTap: () => onChanged(value),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(vertical: 9),
-        decoration: BoxDecoration(
-          color: on ? AppColors.surface : Colors.transparent,
-          borderRadius: BorderRadius.circular(11),
-        ),
-        child: Column(
-          children: [
-            Text(
-              label,
-              style: AppTextStyles.body2.copyWith(
-                fontWeight: FontWeight.w700,
-                color: on ? AppColors.primary : AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 1),
-            Text(
-              hint,
-              style: AppTextStyles.caption.copyWith(
-                color: on ? AppColors.textSecondary : AppColors.gray400,
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
 /// 달의 며칠 — 1~31 칸을 눌러 고른다 (2026-09-21)
 ///
 /// [selected] 를 **직접 고쳐 쓴다** — 요일 고르개(`WeekdayPicker`)와 같은
@@ -624,7 +565,9 @@ class _MonthdayPicker extends StatelessWidget {
                 : '${monthdayLabel(picked)}에 돌아와요'
                       '${picked.any((d) => d > 28) ? ' · 없는 달은 건너뛰어요' : ''}',
             style: AppTextStyles.caption.copyWith(
-              color: picked.isEmpty ? AppColors.gray400 : AppColors.textSecondary,
+              color: picked.isEmpty
+                  ? AppColors.gray400
+                  : AppColors.textSecondary,
             ),
           ),
         ),
