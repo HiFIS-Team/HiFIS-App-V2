@@ -111,17 +111,12 @@ class _MemberInfoScreenState extends State<MemberInfoScreen>
       final registrations = await RegistrationApi.list();
       final rows = await members;
       if (!mounted) return;
-      // 한 회원에게 등록권이 여러 장이면 **최근 것**이 지금 상태다
-      final latest = <String, Registration>{};
-      for (final r in registrations) {
-        final kept = latest[r.memberId];
-        if (kept == null || r.purchasedAt.isAfter(kept.purchasedAt)) {
-          latest[r.memberId] = r;
-        }
-      }
+      // 한 회원에게 등록권이 여러 장이면 **남은 것을 합쳐** 본다 ([MemberPass]).
+      // 예전에는 최근 것 한 장만 봐서 미리 재등록하면 남은 회차가 숨었다
       setState(() {
         _rows = [
-          for (final m in rows) _Row(source: m, registration: latest[m.id]),
+          for (final m in rows)
+            _Row(source: m, pass: MemberPass.of(registrations, m.id)),
         ]..sort(_byRecent);
         endLoad();
       });
@@ -255,21 +250,22 @@ String _phoneLabel(String raw) {
 
 /// 회원 한 명 + 지금 등록권
 class _Row {
-  const _Row({required this.source, required this.registration});
+  const _Row({required this.source, required this.pass});
 
   final Member source;
 
-  /// 등록권이 하나도 없으면 null — 아직 끊은 수업이 없다
-  final Registration? registration;
+  /// 합친 등록권 — 남은 등록권을 다 더한 회차다 ([MemberPass])
+  final MemberPass pass;
 
-  int get total => registration?.totalSessions ?? 0;
+  /// 가장 최근 등록 — 없으면 null (아직 끊은 수업이 없다). 최근순 정렬에 쓴다
+  Registration? get registration => pass.latest;
 
-  int get used => registration?.usedSessions ?? 0;
+  int get total => pass.total;
+
+  int get used => pass.used;
 
   /// **등록권이 없으면 만료로 본다** — 남은 회차가 0인 것과 같은 자리다
-  _Bucket get bucket => registration != null && !registration!.exhausted
-      ? _Bucket.active
-      : _Bucket.expired;
+  _Bucket get bucket => pass.active ? _Bucket.active : _Bucket.expired;
 
   String get trainerName =>
       StaffDirectory.instance.byId(source.ownerTrainerId)?.name ?? '';

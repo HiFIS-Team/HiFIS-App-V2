@@ -67,29 +67,8 @@ class _LessonStore {
   List<SessionSign> sorted(List<SessionSign> rows) =>
       [...rows]..sort((a, b) => b.signedAt.compareTo(a.signedAt));
 
-  /// 회원이 지금 쓰는 등록권
-  ///
-  /// 회차가 남은 것 중 **먼저 산 것**. 다 쓰기 전에 재등록하면 등록권이
-  /// 잠깐 둘이 되는데, 남은 회차를 흘리지 않으려면 먼저 산 걸 먼저 써야 한다.
-  /// 남은 게 하나도 없으면 마지막 등록권을 준다 — "20/20회차 사용"까지는
-  /// 보여줘야 재등록하러 갈 수 있다.
-  Registration? currentRegistrationOf(String memberId) {
-    Registration? active;
-    Registration? latest;
-    for (final registration in registrations) {
-      if (registration.memberId != memberId) continue;
-      if (latest == null ||
-          registration.purchasedAt.isAfter(latest.purchasedAt)) {
-        latest = registration;
-      }
-      if (registration.exhausted) continue;
-      if (active == null ||
-          registration.purchasedAt.isBefore(active.purchasedAt)) {
-        active = registration;
-      }
-    }
-    return active ?? latest;
-  }
+  /// 회원의 등록권을 합친 것 — 화면마다 따로 고르지 않는다 ([MemberPass])
+  MemberPass passOf(String memberId) => MemberPass.of(registrations, memberId);
 
   /// 회원이 지금까지 쓴 회차 — **등록권 전부를 더한 값**
   ///
@@ -110,7 +89,7 @@ class _LessonStore {
       if (member.ownerTrainerId == currentUser?.id)
         _LessonMember(
           source: member,
-          registration: currentRegistrationOf(member.id),
+          pass: passOf(member.id),
           lifetimeDone: lifetimeDoneOf(member.id),
         ),
   ];
@@ -121,18 +100,21 @@ class _LessonStore {
   List<SessionSign> get shownSigns => sorted(signs);
 }
 
-/// 화면이 다루는 회원 한 명 — 서버 회원에 지금 쓰는 등록권을 붙인 것
+/// 화면이 다루는 회원 한 명 — 서버 회원에 합친 등록권을 붙인 것
 class _LessonMember {
   _LessonMember({
     required this.source,
-    required this.registration,
+    required this.pass,
     this.lifetimeDone = 0,
   });
 
   final Member source;
 
-  /// 지금 쓰는 등록권 — 등록권이 하나도 없는 회원이면 null
-  final Registration? registration;
+  /// 등록권을 합친 것 — 회차는 여기서, 차감할 등록권은 [registration]
+  final MemberPass pass;
+
+  /// 싸인이 차감될 등록권 — 다 썼으면 마지막 것, 하나도 없으면 null
+  Registration? get registration => pass.current ?? pass.latest;
 
   /// 등록권 전부를 더해 지금까지 쓴 회차 — 운동일지 번호와 짝이다
   final int lifetimeDone;
@@ -144,15 +126,17 @@ class _LessonMember {
   String get name => source.name;
   Color get color => avatarColorFor(source.name);
 
-  int get total => registration?.totalSessions ?? 0;
-  int get done => registration?.usedSessions ?? 0;
-  int get remaining => registration?.remaining ?? 0;
+  /// 남은 등록권을 **합친** 회차 — 8회 남고 10회 재등록이면 18회 남음
+  int get total => pass.total;
+  int get done => pass.used;
+  int get remaining => pass.remaining;
   int get price => registration?.sessionUnitPrice ?? 0;
 
-  bool get isNew => registration?.type == RegistrationType.newMember;
+  /// 가장 최근 등록 기준 — 미리 재등록했으면 바로 [재등록]으로 보인다
+  bool get isNew => pass.latest?.type == RegistrationType.newMember;
 
-  /// 싸인을 더 받을 수 있는가 — 등록권이 없거나 회차를 다 쓰면 못 받는다
-  bool get canSign => registration != null && !registration!.exhausted;
+  /// 싸인을 더 받을 수 있는가 — 남은 등록권이 없으면 못 받는다
+  bool get canSign => pass.active;
 }
 
 /// 기록 한 줄에 쓰는 표시용 값
@@ -163,8 +147,17 @@ extension _SignDisplay on SessionSign {
   String get displayName => memberName ?? '알 수 없음';
 
   /// '12/20회차' — 총 회차를 모르는 옛 기록이면 '12회차'
-  String get roundLabel =>
-      totalSessions == null ? '$sessionNo회차' : '$sessionNo/$totalSessions회차';
+  ///
+  /// 미리 재등록한 회원은 **합친 번호**(`13/30회차`)가 먼저다 — 싸인 화면이
+  /// 그렇게 보여줬다. 합친 번호가 없는 옛 기록은 등록권 안의 번호로 그린다.
+  String get roundLabel {
+    if (combinedNo != null && combinedTotal != null) {
+      return '$combinedNo/$combinedTotal회차';
+    }
+    return totalSessions == null
+        ? '$sessionNo회차'
+        : '$sessionNo/$totalSessions회차';
+  }
 
   bool get isNewRegistration => registrationType == RegistrationType.newMember;
 }

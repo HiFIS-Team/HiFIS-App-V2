@@ -178,6 +178,65 @@ class Registration {
   bool get exhausted => status == RegistrationStatus.expired || remaining <= 0;
 }
 
+/// 회원 한 명의 등록권을 **합쳐 본** 것 (2026-09-27 트레이너 요청)
+///
+/// 미리 재등록하는 회원이 있다 — 8회 남았는데 10회를 끊으면 트레이너는
+/// **18회 남음**으로 보고 싶어 한다. 예전에는 화면마다 한 장만 골라서
+/// 8회만 보이거나(재등록분이 숨음) 10회만 보였다(남은 8회가 숨음).
+///
+/// **서버 등록권은 합치지 않는다.** 결제액·회당 단가·신규/재등록이 장마다
+/// 달라서 급여 커미션과 PT 설문이 등록권 단위로 돈다. 합치는 건 보이는 값뿐이다.
+///
+/// | | 무엇 |
+/// |---|---|
+/// | [used]·[total] | 남은 등록권을 **전부 더한 값** (다 썼으면 마지막 것) |
+/// | [current] | 싸인이 차감될 등록권 — 남은 것 중 **먼저 산 것** |
+/// | [latest] | 가장 최근 등록 — 신규/재등록 표시·최근순 정렬 |
+///
+/// 회원 관리·회원 정보·세션 싸인·기록이 **다 이걸 본다.** 화면마다 따로
+/// 고르면 같은 회원이 화면마다 다른 회차로 보인다 (실제로 그랬다).
+class MemberPass {
+  MemberPass._(this.current, this.latest, this.used, this.total);
+
+  factory MemberPass.of(Iterable<Registration> all, String memberId) {
+    Registration? current;
+    Registration? latest;
+    var used = 0;
+    var total = 0;
+    for (final r in all) {
+      if (r.memberId != memberId) continue;
+      if (latest == null || r.purchasedAt.isAfter(latest.purchasedAt)) {
+        latest = r;
+      }
+      if (r.exhausted) continue;
+      used += r.usedSessions;
+      total += r.totalSessions;
+      if (current == null || r.purchasedAt.isBefore(current.purchasedAt)) {
+        current = r;
+      }
+    }
+    // 다 썼으면 마지막 등록권 그대로 — "20/20회차 사용"은 보여야 재등록하러 간다
+    if (current == null && latest != null) {
+      used = latest.usedSessions;
+      total = latest.totalSessions;
+    }
+    return MemberPass._(current, latest, used, total);
+  }
+
+  final Registration? current;
+  final Registration? latest;
+  final int used;
+  final int total;
+
+  int get remaining => total - used;
+
+  /// 등록권이 한 장이라도 있나
+  bool get exists => latest != null;
+
+  /// 싸인을 더 받을 수 있나 — 남은 등록권이 없으면 재등록이 필요하다
+  bool get active => current != null;
+}
+
 /// 세션 싸인 한 건 (서버 `SessionSignOut`)
 ///
 /// 기록 한 줄에 필요한 회원 이름·총 회차·등록 종류를 서버가 조인해 준다.
@@ -195,6 +254,8 @@ class SessionSign {
     this.signatureSkippedByName,
     this.memberName,
     this.totalSessions,
+    this.combinedNo,
+    this.combinedTotal,
     this.registrationType,
   });
 
@@ -210,6 +271,8 @@ class SessionSign {
     signatureSkippedByName: json['signatureSkippedByName'] as String?,
     memberName: json['memberName'] as String?,
     totalSessions: json['totalSessions'] as int?,
+    combinedNo: json['combinedNo'] as int?,
+    combinedTotal: json['combinedTotal'] as int?,
     registrationType: json['registrationType'] == null
         ? null
         : RegistrationType.parse(json['registrationType'] as String),
@@ -234,6 +297,12 @@ class SessionSign {
   /// 서버가 조인해 준 표시용 값 — 예전 기록이면 비어 있을 수 있다
   final String? memberName;
   final int? totalSessions;
+
+  /// 남은 등록권을 **합친** 번호 — 싸인 화면에 보인 `13/30회차` 그대로
+  /// ([MemberPass]). 2026-09-27 전 기록은 null 이라 [sessionNo] 로 그린다
+  final int? combinedNo;
+  final int? combinedTotal;
+
   final RegistrationType? registrationType;
 
   /// 서명 이미지 — `/files/...?exp=&sig=` 꼴의 상대 경로

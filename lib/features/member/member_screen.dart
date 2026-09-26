@@ -154,7 +154,7 @@ class _MemberScreenState extends State<MemberScreen>
           for (final member in members)
             _MemberRow(
               source: member,
-              registration: _currentOf(registrations, member.id),
+              pass: MemberPass.of(registrations, member.id),
             ),
         ];
         endLoad();
@@ -164,26 +164,6 @@ class _MemberScreenState extends State<MemberScreen>
       setState(endLoad);
       AppToast.show(context, messageOf(error));
     }
-  }
-
-  /// 지금 쓰는 등록권 — 회차가 남은 것 중 먼저 산 것, 없으면 마지막 것
-  ///
-  /// 다 쓰기 전에 재등록하면 등록권이 잠깐 둘이 된다. 남은 회차를 흘리지
-  /// 않으려면 먼저 산 것부터 쓴다 (수업 화면과 같은 규칙).
-  static Registration? _currentOf(List<Registration> rows, String memberId) {
-    Registration? active;
-    Registration? latest;
-    for (final row in rows) {
-      if (row.memberId != memberId) continue;
-      if (latest == null || row.purchasedAt.isAfter(latest.purchasedAt)) {
-        latest = row;
-      }
-      if (row.exhausted) continue;
-      if (active == null || row.purchasedAt.isBefore(active.purchasedAt)) {
-        active = row;
-      }
-    }
-    return active ?? latest;
   }
 
   /// 검색어·필터를 통과한 줄
@@ -481,12 +461,15 @@ class _DesktopList extends StatelessWidget {
 
 /// 목록 한 줄 — 회원에 지금 쓰는 등록권과 담당 트레이너 이름을 붙인 것
 class _MemberRow {
-  _MemberRow({required this.source, required this.registration});
+  _MemberRow({required this.source, required this.pass});
 
   final Member source;
 
+  /// 합친 등록권 — 남은 등록권을 다 더한 회차다 ([MemberPass])
+  final MemberPass pass;
+
   /// 등록권이 하나도 없는 회원이면 null — 아직 끊은 수업이 없다
-  final Registration? registration;
+  Registration? get registration => pass.latest;
 
   String get name => source.name;
 
@@ -497,12 +480,12 @@ class _MemberRow {
 
   String get branchName => StaffDirectory.instance.branchName(source.branchId);
 
-  int get total => registration?.totalSessions ?? 0;
+  int get total => pass.total;
 
-  int get used => registration?.usedSessions ?? 0;
+  int get used => pass.used;
 
   /// 아직 남은 회차가 있나 — 등록권이 없으면 종료로 본다
-  bool get active => registration != null && !registration!.exhausted;
+  bool get active => pass.active;
 
   /// 이름·전화·담당 트레이너 중 하나라도 걸리면 통과
   bool matches(String query) {

@@ -480,6 +480,14 @@
     "ok"
    ]
   },
+  "BirthdaySet": {
+   "properties": {
+    "birthday": {}
+   },
+   "required": [
+    "birthday"
+   ]
+  },
   "Body_upload_attachment_chat_rooms__room_id__attachments_post": {
    "properties": {
     "file": {}
@@ -774,6 +782,9 @@
     "hours": {
      "nullable": true
     },
+    "points": {
+     "nullable": true
+    },
     "reason": {},
     "type": {}
    },
@@ -1025,6 +1036,9 @@
    "properties": {
     "avatarColor": {},
     "avatarUrl": {
+     "nullable": true
+    },
+    "birthday": {
      "nullable": true
     },
     "branchId": {},
@@ -2134,6 +2148,9 @@
     "items": {
      "nullable": true
     },
+    "monthdays": {
+     "nullable": true
+    },
     "weekdays": {
      "nullable": true
     }
@@ -2197,6 +2214,9 @@
    "properties": {
     "content": {},
     "fields": {
+     "nullable": true
+    },
+    "monthdays": {
      "nullable": true
     },
     "weekdays": {
@@ -2279,6 +2299,9 @@
     "everChecked": {},
     "fields": {},
     "id": {},
+    "monthdays": {
+     "nullable": true
+    },
     "pendingRequest": {
      "nullable": true
     },
@@ -2371,6 +2394,9 @@
      "nullable": true
     },
     "fields": {
+     "nullable": true
+    },
+    "monthdays": {
      "nullable": true
     },
     "weekdays": {
@@ -3585,6 +3611,12 @@
   },
   "SessionSignOut": {
    "properties": {
+    "combinedNo": {
+     "nullable": true
+    },
+    "combinedTotal": {
+     "nullable": true
+    },
     "id": {},
     "memberId": {},
     "memberName": {
@@ -4250,5 +4282,5 @@
    ]
   }
  },
- "version": "0.31.0"
+ "version": "0.32.0"
 }

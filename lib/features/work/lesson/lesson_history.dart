@@ -43,11 +43,12 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
         // 회원은 달과 무관한 **지금 상태**라 담당 트레이너로 거른다
         if (_trainerId == null || m.ownerTrainerId == _trainerId)
           if (query.isEmpty || m.name.contains(query))
-            if ((store.currentRegistrationOf(m.id)?.exhausted ?? false) ==
-                wantDone)
-              m,
+            if (_finished(store.passOf(m.id)) == wantDone) m,
     ]..sort((a, b) => a.name.compareTo(b.name));
   }
+
+  /// 마감 갈래인가 — 등록권이 있는데 남은 게 없다 (등록 없는 회원은 유효 쪽)
+  static bool _finished(MemberPass pass) => pass.exists && !pass.active;
 
   /// 고른 트레이너 — null 이면 전체
   ///
@@ -178,7 +179,7 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
       separatorBuilder: (_, _) => Divider(height: 1, color: AppColors.divider),
       itemBuilder: (_, i) => _MemberStateRow(
         member: rows[i],
-        registration: _LessonStore.instance.currentRegistrationOf(rows[i].id),
+        pass: _LessonStore.instance.passOf(rows[i].id),
         showTrainer: _canSeeOthers,
       ),
     );
@@ -360,23 +361,23 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
 class _MemberStateRow extends StatelessWidget {
   _MemberStateRow({
     required this.member,
-    required this.registration,
+    required this.pass,
     required this.showTrainer,
   });
 
   final Member member;
 
-  /// 지금 쓰는 등록권 — 한 번도 등록 안 한 회원이면 null
-  final Registration? registration;
+  /// 합친 등록권 — 남은 등록권을 다 더한 회차다 ([MemberPass])
+  final MemberPass pass;
 
   /// 담당 트레이너를 같이 보여줄지 — 대표·관리자만
   final bool showTrainer;
 
   @override
   Widget build(BuildContext context) {
-    final done = registration?.exhausted ?? false;
-    final total = registration?.totalSessions ?? 0;
-    final used = registration?.usedSessions ?? 0;
+    final done = pass.exists && !pass.active;
+    final total = pass.total;
+    final used = pass.used;
     final trainer =
         StaffDirectory.instance.byId(member.ownerTrainerId)?.name ?? '';
 
@@ -410,7 +411,7 @@ class _MemberStateRow extends StatelessWidget {
           ),
           SizedBox(width: 8),
           Text(
-            registration == null ? '등록 없음' : '$used/$total회차',
+            !pass.exists ? '등록 없음' : '$used/$total회차',
             style: AppTextStyles.body2.copyWith(
               // 마감은 물러나고, 남은 회차가 있는 쪽이 눈에 든다
               color: done ? AppColors.textTertiary : AppColors.primary,
