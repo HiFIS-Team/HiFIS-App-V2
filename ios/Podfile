@@ -1,5 +1,5 @@
-# cupertino_native 플러그인이 iOS 14.0 이상을 요구함
-platform :ios, '14.0'
+# Xcode 27 이 iOS 15.0 미만 배포 타깃을 거부한다 (cupertino_native 는 14.0 이상)
+platform :ios, '15.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -39,5 +39,9 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+    # 플러그인 pod 이 9.0~14.0 을 박아 둬서 Xcode 27 에서 빌드가 막힌다
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+    end
   end
 end
