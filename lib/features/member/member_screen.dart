@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import '../../core/api/client/api_exception.dart';
 import '../../core/api/work/lesson_api.dart';
 import '../../core/data/branch_scope.dart';
-import '../../core/data/employee.dart';
 import '../../core/data/data_signal.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/staff.dart';
@@ -27,8 +26,8 @@ import '../../core/widgets/input/app_button.dart';
 import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/input/pressable.dart';
 import '../../core/widgets/nav/phone_scaffold.dart';
-import '../../core/widgets/nav/pick_filter_button.dart';
 import '../work/lesson/lesson_section.dart' show showMemberRegister;
+import 'member_trainers.dart';
 import 'member_detail.dart';
 
 /// 회원 관리 — 센터 회원 목록
@@ -51,7 +50,11 @@ import 'member_detail.dart';
 /// `members.ownerTrainerId` 하나로 정해진다. 회원 등록 화면이 그 값을 등록한
 /// 트레이너 본인으로 넣으므로 따로 매핑 테이블을 두지 않는다.
 class MemberScreen extends StatefulWidget {
-  const MemberScreen({super.key});
+  const MemberScreen({super.key, this.trainerId});
+
+  /// 대표·관리자가 트레이너 목록에서 고른 사람 — 그 사람의 회원만 뜬다.
+  /// null 이면 대표·관리자에게는 폰에서 **트레이너 목록**부터 뜬다
+  final String? trainerId;
 
   @override
   State<MemberScreen> createState() => _MemberScreenState();
@@ -81,29 +84,10 @@ class _MemberScreenState extends State<MemberScreen>
   /// 남의 회원까지 보는 사람인가 — 대표·관리자
   bool get _seesAll => myRole.boss;
 
-  /// 오른쪽 위 필터로 고른 담당 트레이너 — null 이면 전체
+  /// 트레이너부터 고르는 첫 화면인가 — 대표·관리자의 **폰**만 (2026-09-27 대표 요청)
   ///
-  /// **[_seesAll] 일 때만 뜬다.** 나머지는 서버가 본인 담당으로 줄여 주므로
-  /// 걸 것이 없다. 회원 목록 화면(`MemberInfoScreen`)과 같은 규칙이다.
-  String? _trainerId;
-
-  /// 담당 필터 — **회원을 맡는 직군만** (트레이너·점장)
-  ///
-  /// 회원이 있는 사람만 세우면 칸이 달마다 달라져서 자리를 못 외운다.
-  /// 지점은 [rosterBranchId] 가 가른다. **id 로 거른다** — 동명이인이 안 섞인다.
-  static const _ownerRanks = {Rank.trainer, Rank.storeManager};
-
-  List<FilterOption> get _people {
-    final branch = rosterBranchId;
-    final rows = [
-      for (final employee in StaffDirectory.instance.employees)
-        if (_ownerRanks.contains(employee.rank) &&
-            employee.status == EmployeeStatus.active &&
-            (branch == null || employee.branchId == branch))
-          employee,
-    ]..sort(StaffDirectory.instance.compareStaff);
-    return [for (final e in rows) (id: e.id, name: e.name)];
-  }
+  /// PC 는 왼쪽 목록·오른쪽 상세 2단이라 원래 필터가 없었고 그대로 둔다.
+  bool get _picking => _seesAll && widget.trainerId == null && !isDesktop;
 
   /// 회원을 등록하는 사람인가 — 직원·점장 (대표·관리자는 수업을 안 한다)
   bool get _canRegister => myRole.doesFieldWork;
@@ -136,8 +120,8 @@ class _MemberScreenState extends State<MemberScreen>
   Future<void> _load() async {
     final me = currentUser;
     if (me == null) return;
-    // 대표·관리자만 null — 나머지는 서버가 본인 담당으로 줄여 준다
-    final owner = _seesAll ? null : me.id;
+    // 대표·관리자는 고른 트레이너(첫 화면이면 null=전부) — 나머지는 본인 담당
+    final owner = _seesAll ? widget.trainerId : me.id;
     try {
       // 회차는 회원 응답에 없다 — 등록권을 같이 받아 앱에서 id 로 맞춘다
       final memberRequest = MemberApi.list(
@@ -172,19 +156,21 @@ class _MemberScreenState extends State<MemberScreen>
   /// 찾는다. 목록이 이미 손에 있으니 여기서 같이 거른다.
   List<_MemberRow> get _visible {
     final query = _search.text.trim();
-    // 필터가 안 뜨는 사람에게는 걸린 값을 안 쓴다 — 어딘가에서 값이 남으면
-    // 못 푸는 필터가 걸린 채로 화면이 빈다
-    final owner = _seesAll ? _trainerId : null;
     return [
       for (final row in _rows)
-        if (_filter.matches(row) && row.matches(query))
-          if (owner == null || row.source.ownerTrainerId == owner) row,
+        if (_filter.matches(row) && row.matches(query)) row,
     ];
   }
 
   Future<void> _register() async {
     final added = await showMemberRegister(context);
     if (added == true && mounted) await _load();
+  }
+
+  /// 트레이너 하나를 연다 — 지금 화면이 그 사람 회원만으로 뜬다
+  Future<void> _openTrainer(String id) async {
+    await showFullPage<void>(context, (_) => MemberScreen(trainerId: id));
+    if (mounted) await _load();
   }
 
   Future<void> _open(_MemberRow row) async {
@@ -214,6 +200,10 @@ class _MemberScreenState extends State<MemberScreen>
   String get _scopeLabel {
     final count = _visible.length;
     if (!_seesAll) return '내 담당 회원 $count명';
+    if (widget.trainerId case final id?) {
+      final name = StaffDirectory.instance.byId(id)?.name ?? '알 수 없음';
+      return '$name 담당 회원 $count명';
+    }
     final branch = branchScopeId == null ? '전 지점' : branchScopeName;
     return '$branch 회원 $count명';
   }
@@ -236,7 +226,8 @@ class _MemberScreenState extends State<MemberScreen>
           if (i > 0) const SizedBox(height: 12),
           _MemberCard(
             row: rows[i],
-            showTrainer: _seesAll,
+            // 트레이너를 골라 들어왔으면 줄마다 담당을 적을 필요가 없다
+            showTrainer: _seesAll && widget.trainerId == null,
             onTap: () => _open(rows[i]),
           ),
         ],
@@ -264,6 +255,28 @@ class _MemberScreenState extends State<MemberScreen>
   @override
   Widget build(BuildContext context) {
     if (isDesktop) return _desktop();
+    if (_picking) {
+      return PhoneDetailScaffold(
+        title: '운동 일지',
+        child: ListView(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            PhoneDetailScaffold.topPadding,
+            20,
+            bottomBarInset(context),
+          ),
+          children: [
+            if (showSkeleton)
+              const _MemberSkeleton()
+            else
+              MemberTrainerList(
+                members: [for (final row in _rows) row.source],
+                onPick: _openTrainer,
+              ),
+          ],
+        ),
+      );
+    }
 
     final search = _searchable
         ? GlassSearchBar(
@@ -277,16 +290,6 @@ class _MemberScreenState extends State<MemberScreen>
       // 문이 `운동 일지` 라 제목이 갈리면 다른 데로 온 줄 안다.
       // 인적 사항을 고치는 자리는 따로 있다 (`MemberInfoScreen`).
       title: '운동 일지',
-      // 담당 트레이너 필터 — 회원 목록 화면과 같은 부품·같은 규칙이다
-      actions: [
-        if (_seesAll)
-          PickFilterButton(
-            stableId: 'workout-trainer',
-            options: _people,
-            selected: _trainerId,
-            onSelect: (id) => setState(() => _trainerId = id),
-          ),
-      ],
       // **머리말에 회원 추가를 안 둔다** (2026-08-31 대표 요청) — 수업 개수
       // 칸에 `회원 등록` 버튼이 이미 서 있어서 같은 일이 두 자리에 있었다.
       bottomBar: search,
