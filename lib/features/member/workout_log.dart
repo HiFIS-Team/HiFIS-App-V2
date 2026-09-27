@@ -33,6 +33,7 @@ Future<bool?> showWorkoutLog(
   required bool editable,
   WorkoutLog? log,
   int? nextSessionNo,
+  Widget? header,
 }) => showFullPage<bool>(
   context,
   (_) => WorkoutLogScreen(
@@ -41,6 +42,7 @@ Future<bool?> showWorkoutLog(
     editable: editable,
     log: log,
     nextSessionNo: nextSessionNo,
+    header: header,
   ),
 );
 
@@ -53,6 +55,7 @@ class WorkoutLogScreen extends StatefulWidget {
     this.log,
     this.nextSessionNo,
     this.onExit,
+    this.header,
   });
 
   final Member member;
@@ -70,6 +73,10 @@ class WorkoutLogScreen extends StatefulWidget {
 
   /// 팝업이 아니라 화면 한 칸에 박아 쓸 때 — 닫기·저장·삭제가 이걸 대신 부른다
   final void Function(bool changed)? onExit;
+
+  /// 일지 **위에** 얹는 것 — 세션 기록에서 싸인을 눌러 열 때 그 싸인을
+  /// 보여준다 (2026-09-27). 없으면 예전 화면 그대로다
+  final Widget? header;
 
   @override
   State<WorkoutLogScreen> createState() => _WorkoutLogScreenState();
@@ -582,6 +589,13 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
     );
   }
 
+  List<Widget> _header() => [
+    if (widget.header case final header?) ...[
+      header,
+      const SizedBox(height: 24),
+    ],
+  ];
+
   /// PC 폼의 저장 버튼 — 데스크톱에는 글래스 트레이가 없다
   Widget _saveButton() => AppButton(
     label: widget.log == null ? '저장' : '수정',
@@ -639,7 +653,7 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
             ? GlassBottomButton.inset(context)
             : bottomBarInset(context),
       ),
-      children: _body(),
+      children: [..._header(), ..._body()],
     ),
   );
 
@@ -667,7 +681,7 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
         Expanded(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(28, 0, 28, 12),
-            children: _body(),
+            children: [..._header(), ..._body()],
           ),
         ),
         if (widget.editable)

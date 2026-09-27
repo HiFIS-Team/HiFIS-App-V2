@@ -307,78 +307,136 @@ class _SignImageState extends State<_SignImage> {
       );
 }
 
-/// 기록 줄을 누르면 서명을 크게 보여준다
-void _showSignDetail(BuildContext context, SessionSign sign) {
-  showGeneralDialog(
-    context: context,
-    barrierDismissible: true,
-    barrierLabel: '싸인 크게 보기',
-    barrierColor: Colors.black.withValues(alpha: 0.45),
-    transitionDuration: Duration(milliseconds: 200),
-    pageBuilder: (context, animation, secondaryAnimation) => Center(
-      child: Material(
-        type: MaterialType.transparency,
-        child: Container(
-          width: 300,
-          padding: EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: double.infinity,
-                height: 150,
-                clipBehavior: Clip.antiAlias,
-                decoration: BoxDecoration(
-                  color: AppColors.gray50,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: sign.signatureFullUrl == null
-                    ? _NoSignature(size: 32)
-                    : _SignImage(url: sign.signatureFullUrl!),
-              ),
-              SizedBox(height: 14),
-              Text(
-                '${sign.displayName} · ${sign.roundLabel}',
-                style: AppTextStyles.body1.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              SizedBox(height: 4),
-              Text(_formatStamp(sign.signedAt), style: AppTextStyles.caption),
-              if (sign.signatureSkipped) ...[
-                SizedBox(height: 10),
-                _SkippedBadge(),
-                if (sign.signatureSkippedByName case final who?) ...[
-                  SizedBox(height: 6),
-                  Text(
-                    '$who 님이 싸인 없이 기록했어요',
-                    style: AppTextStyles.caption.copyWith(
-                      color: AppColors.textTertiary,
-                    ),
-                  ),
-                ],
-              ],
-            ],
-          ),
+/// 기록 줄을 누르면 **그 싸인과 그때 쓴 운동일지**를 한 페이지로 연다
+/// (2026-09-27 대표 요청 — 예전에는 싸인만 모달로 떴다)
+///
+/// 일지는 읽기만 한다. 서버에 싸인 ↔ 일지 끈이 없어서 **회차 번호로** 찾는다
+/// ([_workoutNoOf]). 못 찾으면 싸인만 보여주고 일지 자리에 빈 카드를 둔다.
+Future<void> _showSignDetail(BuildContext context, SessionSign sign) async {
+  final store = _LessonStore.instance;
+  Member? member;
+  for (final m in store.members) {
+    if (m.id == sign.memberId) member = m;
+  }
+  WorkoutLog? log;
+  try {
+    final logs = await WorkoutApi.list(sign.memberId, kind: WorkoutKind.pt);
+    final no = _workoutNoOf(sign);
+    final day = DateUtils.dateOnly(sign.signedAt.toLocal());
+    for (final l in logs) {
+      if (no != null ? l.sessionNo == no : l.performedOn == day) log = l;
+    }
+  } catch (error) {
+    if (!context.mounted) return;
+    AppToast.show(context, messageOf(error));
+  }
+  if (!context.mounted) return;
+  final header = _SignSummary(sign: sign);
+  if (member != null && log != null) {
+    await showWorkoutLog(
+      context,
+      member: member,
+      kind: WorkoutKind.pt,
+      editable: false,
+      log: log,
+      header: header,
+    );
+    return;
+  }
+  await showFullPage<void>(
+    context,
+    (_) => PhoneDetailScaffold(
+      title: sign.displayName,
+      background: AppColors.surface,
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          PhoneDetailScaffold.topPadding,
+          20,
+          bottomBarInset(context),
         ),
+        children: [
+          header,
+          const SizedBox(height: 24),
+          EmptyCard(
+            icon: Icons.fitness_center_rounded,
+            text: '이 회차의 운동일지를 찾지 못했어요',
+          ),
+        ],
       ),
     ),
-    transitionBuilder: (context, animation, secondaryAnimation, child) {
-      final curved = CurvedAnimation(
-        parent: animation,
-        curve: Curves.easeOutCubic,
-      );
-      return FadeTransition(
-        opacity: curved,
-        child: ScaleTransition(
-          scale: Tween(begin: 0.92, end: 1.0).animate(curved),
-          child: child,
-        ),
-      );
-    },
   );
+}
+
+/// 이 싸인의 **운동일지 번호** — 회원 누적 회차다
+///
+/// 싸인 번호는 등록권마다 1 부터 다시 센다. 싸인은 늘 **먼저 산 등록권부터**
+/// 차감되므로, 이 등록권보다 먼저 산 등록권에서 쓴 회차를 더하면 누적 번호가
+/// 된다 (서버 `_require_workout` 과 같은 셈). 등록권을 못 찾으면 null.
+int? _workoutNoOf(SessionSign sign) {
+  final regs = [
+    for (final r in _LessonStore.instance.registrations)
+      if (r.memberId == sign.memberId) r,
+  ];
+  Registration? mine;
+  for (final r in regs) {
+    if (r.id == sign.registrationId) mine = r;
+  }
+  if (mine == null) return null;
+  var before = 0;
+  for (final r in regs) {
+    if (r.purchasedAt.isBefore(mine.purchasedAt)) before += r.usedSessions;
+  }
+  return before + sign.sessionNo;
+}
+
+/// 싸인 한 장 — 예전 모달에 있던 것을 그대로 카드로 옮겼다
+class _SignSummary extends StatelessWidget {
+  const _SignSummary({required this.sign});
+
+  final SessionSign sign;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: AppDecorations.card(),
+      child: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            height: 150,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: AppColors.gray50,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: sign.signatureFullUrl == null
+                ? _NoSignature(size: 32)
+                : _SignImage(url: sign.signatureFullUrl!),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            '${sign.displayName} · ${sign.roundLabel}',
+            style: AppTextStyles.body1.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 4),
+          Text(_formatStamp(sign.signedAt), style: AppTextStyles.caption),
+          if (sign.signatureSkipped) ...[
+            const SizedBox(height: 10),
+            _SkippedBadge(),
+            if (sign.signatureSkippedByName case final who?) ...[
+              const SizedBox(height: 6),
+              Text(
+                '$who 님이 싸인 없이 기록했어요',
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.textTertiary,
+                ),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
 }
