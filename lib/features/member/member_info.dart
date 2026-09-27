@@ -92,7 +92,7 @@ class _MemberInfoScreenState extends State<MemberInfoScreen>
         _rows = [
           for (final m in rows)
             _Row(source: m, pass: MemberPass.of(registrations, m.id)),
-        ]..sort(_byRecent);
+        ]..sort(_byName);
         endLoad();
       });
     } catch (error) {
@@ -102,25 +102,12 @@ class _MemberInfoScreenState extends State<MemberInfoScreen>
     }
   }
 
-  /// **최근 등록한 사람이 위다** (2026-09-16 대표 요청)
+  /// **이름 가나다순** (2026-09-27 대표 요청)
   ///
-  /// 예전에는 이름순이었는데, 방금 등록한 회원을 이름으로 찾아 내려가야 했다.
-  /// 이 화면에 오는 일이 대개 **막 등록한 사람을 보려는 것**이다.
-  ///
-  /// 등록권이 없는 회원은 **맨 아래**로 — 날짜가 없어 줄 세울 자리가 없고,
-  /// 그 사람들끼리는 이름순이다.
-  static int _byRecent(_Row a, _Row b) {
-    final left = a.registration?.purchasedAt;
-    final right = b.registration?.purchasedAt;
-    if (left == null && right == null) {
-      return a.source.name.compareTo(b.source.name);
-    }
-    if (left == null) return 1;
-    if (right == null) return -1;
-    final byDate = right.compareTo(left);
-    // 같은 순간에 여럿 넣는 일이 있다 (한 번에 옮겨 담을 때) — 이름으로 가른다
-    return byDate != 0 ? byDate : a.source.name.compareTo(b.source.name);
-  }
+  /// 한동안 최근 등록순이었는데(2026-09-16), 트레이너를 골라 들어오면서
+  /// 한 사람 회원만 보게 되어 이름으로 찾는 쪽이 낫다고 바꿨다.
+  /// 운동 일지 목록과 같은 순서다.
+  static int _byName(_Row a, _Row b) => a.source.name.compareTo(b.source.name);
 
   List<_Row> get _visible => [
     for (final row in _rows)

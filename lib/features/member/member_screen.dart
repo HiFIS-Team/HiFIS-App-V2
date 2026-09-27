@@ -140,7 +140,8 @@ class _MemberScreenState extends State<MemberScreen>
               source: member,
               pass: MemberPass.of(registrations, member.id),
             ),
-        ];
+          // 이름 가나다순 (2026-09-27 대표 요청) — 회원 정보 목록과 같은 순서
+        ]..sort((a, b) => a.source.name.compareTo(b.source.name));
         endLoad();
       });
     } catch (error) {
