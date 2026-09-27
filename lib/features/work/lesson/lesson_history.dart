@@ -236,19 +236,18 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
                       child: SkeletonRows(rows: 5, trailing: 56),
                     )
                   else if (sorted.isEmpty)
+                    // 업무 화면의 '아직 받은 싸인이 없어요' 와 같은 카드
                     Padding(
-                      padding: EdgeInsets.fromLTRB(24, 32, 24, 44),
-                      child: Text(
-                        all.isEmpty
+                      padding: EdgeInsets.fromLTRB(20, 8, 20, 0),
+                      child: EmptyCard(
+                        icon: Icons.draw_rounded,
+                        text: all.isEmpty
                             ? '이 달에 받은 싸인이 없어요'
                             : query.isNotEmpty
                             ? '검색 결과가 없어요'
                             : _tab == 1
                             ? '이 달에 유효 회원의 싸인이 없어요'
                             : '이 달에 마감 회원의 싸인이 없어요',
-                        style: AppTextStyles.body2.copyWith(
-                          color: AppColors.textTertiary,
-                        ),
                       ),
                     )
                   else
