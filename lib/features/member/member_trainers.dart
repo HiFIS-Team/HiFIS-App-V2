@@ -25,11 +25,15 @@ class MemberTrainerList extends StatelessWidget {
   const MemberTrainerList({
     super.key,
     required this.members,
+    required this.isActive,
     required this.onPick,
   });
 
   /// 지점 범위 안의 회원 전부 — 사람마다 몇 명인지 센다
   final List<Member> members;
+
+  /// 회차가 남은 회원의 id 로 묻는다 — 부르는 화면의 기준을 그대로 쓴다 ([MemberPass])
+  final bool Function(String memberId) isActive;
 
   final ValueChanged<String> onPick;
 
@@ -38,10 +42,15 @@ class MemberTrainerList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final directory = StaffDirectory.instance;
-    final counts = <String, int>{};
+    // 담당자마다 (활성, 만료)
+    final counts = <String, ({int active, int expired})>{};
     for (final m in members) {
-      counts[m.ownerTrainerId] = (counts[m.ownerTrainerId] ?? 0) + 1;
+      final c = counts[m.ownerTrainerId] ?? (active: 0, expired: 0);
+      counts[m.ownerTrainerId] = isActive(m.id)
+          ? (active: c.active + 1, expired: c.expired)
+          : (active: c.active, expired: c.expired + 1);
     }
+    const none = (active: 0, expired: 0);
     final branch = rosterBranchId;
     final staff = [
       for (final e in directory.employees)
@@ -69,7 +78,7 @@ class MemberTrainerList extends StatelessWidget {
         _TrainerCard(
           name: e.name,
           subtitle: _subtitle(e.rank.label, directory.branchName(e.branchId)),
-          count: counts[e.id] ?? 0,
+          count: counts[e.id] ?? none,
           onTap: () => onPick(e.id),
         ),
       for (final id in others)
@@ -78,7 +87,7 @@ class MemberTrainerList extends StatelessWidget {
           subtitle: directory.byId(id)?.status == EmployeeStatus.resigned
               ? '퇴사'
               : '담당자 없음',
-          count: counts[id] ?? 0,
+          count: counts[id] ?? none,
           onTap: () => onPick(id),
         ),
     ];
@@ -109,7 +118,9 @@ class _TrainerCard extends StatelessWidget {
 
   final String name;
   final String subtitle;
-  final int count;
+
+  /// 활성(회차 남음) · 만료 회원 수
+  final ({int active, int expired}) count;
   final VoidCallback onTap;
 
   @override
@@ -145,10 +156,20 @@ class _TrainerCard extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Text(
-              '회원 $count명',
+              '활성 ${count.active}명',
               style: AppTextStyles.caption.copyWith(
                 fontWeight: FontWeight.w700,
-                color: count > 0 ? AppColors.primary : AppColors.textTertiary,
+                color: count.active > 0
+                    ? AppColors.primary
+                    : AppColors.textTertiary,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '만료 ${count.expired}명',
+              style: AppTextStyles.caption.copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppColors.textTertiary,
               ),
             ),
             const SizedBox(width: 4),

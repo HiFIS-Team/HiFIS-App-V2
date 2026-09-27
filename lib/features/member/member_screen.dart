@@ -272,6 +272,10 @@ class _MemberScreenState extends State<MemberScreen>
             else
               MemberTrainerList(
                 members: [for (final row in _rows) row.source],
+                isActive: {
+                  for (final row in _rows)
+                    if (row.active) row.source.id,
+                }.contains,
                 onPick: _openTrainer,
               ),
           ],
