@@ -16,7 +16,11 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
   late DateTime _month;
   List<SessionSign> _rows = const [];
 
-  /// 0 기록 · 1 유효회원 · 2 마감회원
+  /// 0 최근 기록 · 1 유효회원 · 2 마감회원
+  ///
+  /// **셋 다 그달 싸인 기록을 보여준다** (2026-09-27 대표 요청). 예전에는 회원
+  /// 갈래가 이름·회차만 세웠는데, 기록처럼 서명 줄로 보여야 한다고 해서 같은
+  /// 줄을 **회원의 지금 상태로 거른다.**
   ///
   /// **회원의 상태는 등록권이 정한다.** 20회차를 등록하고 20번 싸인을 받으면
   /// 그 등록권은 소진(`exhausted`)이고 그 회원은 마감이다. 재등록하면
@@ -31,20 +35,6 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
       for (final m in store.members)
         if (m.ownerTrainerId == currentUser?.id) m,
     ];
-  }
-
-  /// 갈래에 맞는 회원 — 트레이너 필터와 이름 검색까지 걸어서 준다
-  List<Member> get _shownMembers {
-    final store = _LessonStore.instance;
-    final query = _search.text.trim();
-    final wantDone = _tab == 2;
-    return [
-      for (final m in _members)
-        // 회원은 달과 무관한 **지금 상태**라 담당 트레이너로 거른다
-        if (_trainerId == null || m.ownerTrainerId == _trainerId)
-          if (query.isEmpty || m.name.contains(query))
-            if (_finished(store.passOf(m.id)) == wantDone) m,
-    ]..sort((a, b) => a.name.compareTo(b.name));
   }
 
   /// 마감 갈래인가 — 등록권이 있는데 남은 게 없다 (등록 없는 회원은 유효 쪽)
@@ -151,40 +141,6 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
     _fetch();
   }
 
-  /// 유효·마감 회원 목록 — 아바타 · 이름 · 남은 회차
-  Widget _memberList() {
-    final rows = _shownMembers;
-    if (rows.isEmpty) {
-      return Padding(
-        padding: EdgeInsets.fromLTRB(24, 32, 24, 44),
-        child: Text(
-          _search.text.trim().isNotEmpty
-              ? '검색 결과가 없어요'
-              : _tab == 1
-              ? '회차가 남은 회원이 없어요'
-              : '마감된 회원이 없어요',
-          style: AppTextStyles.body2.copyWith(color: AppColors.textTertiary),
-        ),
-      );
-    }
-    return ListView.separated(
-      key: ValueKey('member-$_tab'),
-      padding: EdgeInsets.fromLTRB(
-        20,
-        8,
-        20,
-        MediaQuery.paddingOf(context).bottom + 96,
-      ),
-      itemCount: rows.length,
-      separatorBuilder: (_, _) => Divider(height: 1, color: AppColors.divider),
-      itemBuilder: (_, i) => _MemberStateRow(
-        member: rows[i],
-        pass: _LessonStore.instance.passOf(rows[i].id),
-        showTrainer: _canSeeOthers,
-      ),
-    );
-  }
-
   /// 오늘/어제/그 외 날짜 라벨
   String _dayLabel(DateTime time) => dayLabel(time);
 
@@ -197,6 +153,13 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
           (s) => _trainerId == null || s.performedByTrainerId == _trainerId,
         )
         .where((s) => query.isEmpty || s.displayName.contains(query))
+        // 회원 갈래 — 그 회원의 **지금 상태**로 거른다
+        .where(
+          (s) =>
+              _tab == 0 ||
+              _finished(_LessonStore.instance.passOf(s.memberId)) ==
+                  (_tab == 2),
+        )
         .toList();
 
     // 날짜가 바뀌는 지점마다 그룹 헤더를 끼워 넣는다
@@ -249,7 +212,7 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
                     month: _month,
                     // 지금 아래에 서 있는 것을 센다 — 회원 갈래에서 싸인
                     // 건수를 세면 목록과 숫자가 어긋난다
-                    count: _tab == 0 ? sorted.length : _shownMembers.length,
+                    count: sorted.length,
                     loading: showSkeleton,
                     onPrev: () => _shiftMonth(-1),
                     // 아직 오지 않은 달은 볼 게 없으니 막는다
@@ -262,14 +225,12 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
                   Padding(
                     padding: EdgeInsets.fromLTRB(20, 12, 20, 4),
                     child: SegmentedTabs(
-                      labels: const ['기록', '유효회원', '마감회원'],
+                      labels: const ['최근 기록', '유효회원', '마감회원'],
                       selected: _tab,
                       onSelect: (i) => setState(() => _tab = i),
                     ),
                   ),
-                  if (_tab != 0)
-                    Expanded(child: _memberList())
-                  else if (showSkeleton)
+                  if (showSkeleton)
                     Padding(
                       padding: EdgeInsets.fromLTRB(24, 24, 24, 24),
                       child: SkeletonRows(rows: 5, trailing: 56),
@@ -278,7 +239,13 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
                     Padding(
                       padding: EdgeInsets.fromLTRB(24, 32, 24, 44),
                       child: Text(
-                        all.isEmpty ? '이 달에 받은 싸인이 없어요' : '검색 결과가 없어요',
+                        all.isEmpty
+                            ? '이 달에 받은 싸인이 없어요'
+                            : query.isNotEmpty
+                            ? '검색 결과가 없어요'
+                            : _tab == 1
+                            ? '이 달에 유효 회원의 싸인이 없어요'
+                            : '이 달에 마감 회원의 싸인이 없어요',
                         style: AppTextStyles.body2.copyWith(
                           color: AppColors.textTertiary,
                         ),
@@ -288,7 +255,7 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
                     Expanded(
                       child: ListView(
                         // 달이 바뀌면 맨 위부터 다시 본다
-                        key: ValueKey(_month),
+                        key: ValueKey('$_month-$_tab'),
                         padding: EdgeInsets.fromLTRB(
                           20,
                           8,
@@ -347,77 +314,6 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
             ),
           // 하단 고정: 플로팅 글래스 검색 바 (키보드와 함께 상승)
           GlassSearchBar(controller: _search, hint: '회원 이름 검색'),
-        ],
-      ),
-    );
-  }
-}
-
-/// 회원 한 줄 — 유효·마감 목록에 선다
-///
-/// 세션 기록 줄([_SignRow])과 **같은 결**이다 (아바타 36 · 이름 · 오른쪽 회차).
-/// 다른 것은 왼쪽이 기록이 아니라 사람이고, 오른쪽이 `12/20회차` 로 지금
-/// 상태를 말한다는 것뿐이다.
-class _MemberStateRow extends StatelessWidget {
-  _MemberStateRow({
-    required this.member,
-    required this.pass,
-    required this.showTrainer,
-  });
-
-  final Member member;
-
-  /// 합친 등록권 — 남은 등록권을 다 더한 회차다 ([MemberPass])
-  final MemberPass pass;
-
-  /// 담당 트레이너를 같이 보여줄지 — 대표·관리자만
-  final bool showTrainer;
-
-  @override
-  Widget build(BuildContext context) {
-    final done = pass.exists && !pass.active;
-    final total = pass.total;
-    final used = pass.used;
-    final trainer =
-        StaffDirectory.instance.byId(member.ownerTrainerId)?.name ?? '';
-
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 13),
-      child: Row(
-        children: [
-          Avatar(name: member.name, size: 36),
-          SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  member.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.body2.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                if (showTrainer && trainer.isNotEmpty) ...[
-                  SizedBox(height: 2),
-                  Text(
-                    trainer,
-                    style: AppTextStyles.caption.copyWith(fontSize: 12),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          SizedBox(width: 8),
-          Text(
-            !pass.exists ? '등록 없음' : '$used/$total회차',
-            style: AppTextStyles.body2.copyWith(
-              // 마감은 물러나고, 남은 회차가 있는 쪽이 눈에 든다
-              color: done ? AppColors.textTertiary : AppColors.primary,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
         ],
       ),
     );

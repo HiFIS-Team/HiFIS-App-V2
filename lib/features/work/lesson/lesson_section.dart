@@ -1,6 +1,5 @@
 import '../work_screen.dart' show requestedOpenSessionHistory;
 import '../../../core/util/native_picker.dart';
-import '../../../core/widgets/display/avatar.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' as ui;
