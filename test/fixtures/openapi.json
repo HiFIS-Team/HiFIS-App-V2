@@ -125,16 +125,24 @@
   },
   "AccruedOut": {
    "properties": {
+    "baseBefore": {},
+    "baseSalary": {},
     "canAdjust": {},
     "incentiveNew": {},
     "incentiveRenewal": {},
+    "newRate": {},
+    "newSales": {},
     "newSessions": {},
     "payday": {},
     "periodEnd": {},
     "periodStart": {},
     "renewalDowngraded": {},
+    "renewalRate": {},
+    "renewalSales": {},
     "renewalSessions": {},
+    "renewalThreshold": {},
     "sessionSigns": {},
+    "taskMissDays": {},
     "total": {},
     "yearMonth": {}
    },
@@ -2585,7 +2593,14 @@
     "hourly": {
      "nullable": true
     },
+    "newRate": {
+     "nullable": true
+    },
     "newSales": {},
+    "renewalDowngraded": {},
+    "renewalRate": {
+     "nullable": true
+    },
     "renewalSales": {},
     "sessionSigns": {}
    },
@@ -2624,8 +2639,14 @@
     "incentiveNewAuto": {
      "nullable": true
     },
+    "incentiveNewReason": {
+     "nullable": true
+    },
     "incentiveRenewal": {},
     "incentiveRenewalAuto": {
+     "nullable": true
+    },
+    "incentiveRenewalReason": {
      "nullable": true
     },
     "net": {},
@@ -2684,7 +2705,13 @@
     "incentiveNew": {
      "nullable": true
     },
+    "incentiveNewReason": {
+     "nullable": true
+    },
     "incentiveRenewal": {
+     "nullable": true
+    },
+    "incentiveRenewalReason": {
      "nullable": true
     },
     "note": {
@@ -4296,5 +4323,5 @@
    ]
   }
  },
- "version": "0.32.0"
+ "version": "0.33.0"
 }

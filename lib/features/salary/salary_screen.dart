@@ -14,7 +14,6 @@ import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
 import '../../core/widgets/display/avatar.dart';
 import '../../core/widgets/display/person_card.dart';
@@ -212,6 +211,8 @@ class _SalaryScreenState extends State<SalaryScreen>
         // 안 고쳤으면 null 이라 안 실린다 — 서버 계산값 그대로 쓴다
         incentiveNew: payslip.adjustNew,
         incentiveRenewal: payslip.adjustRenewal,
+        incentiveNewReason: payslip.adjustNewReason,
+        incentiveRenewalReason: payslip.adjustRenewalReason,
       );
       if (!mounted) return;
       setState(() {

@@ -819,9 +819,28 @@ class _AdjustedNotice extends StatelessWidget {
         color: AppColors.gray50,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Text(
-        'PT 커미션을 고쳐서 신청했어요 · 자동 계산 ${_won(_auto)} → 신청 ${_won(_asked)}',
-        style: AppTextStyles.caption,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'PT 커미션을 고쳐서 신청했어요 · 자동 계산 ${_won(_auto)} → 신청 ${_won(_asked)}',
+            style: AppTextStyles.caption,
+          ),
+          // 고친 이유 — 신청할 때 필수로 받는다 (2026-09-27)
+          for (final (label, reason) in [
+            ('신규', payslip.incentiveNewReason),
+            ('재등록', payslip.incentiveRenewalReason),
+          ])
+            if (reason != null && reason.isNotEmpty) ...[
+              SizedBox(height: 4),
+              Text(
+                '$label 사유 · $reason',
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+        ],
       ),
     );
   }

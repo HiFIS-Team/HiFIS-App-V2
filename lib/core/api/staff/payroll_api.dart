@@ -57,6 +57,8 @@ class PayslipBasis {
     required this.sessionSigns,
     this.renewalDowngraded = false,
     this.hourly = false,
+    this.newRate,
+    this.renewalRate,
   });
 
   factory PayslipBasis.fromJson(Map<String, dynamic> json) => PayslipBasis(
@@ -71,6 +73,8 @@ class PayslipBasis {
     renewalDowngraded: json['renewalDowngraded'] as bool? ?? false,
     sessionSigns: json['sessionSigns'] as int? ?? 0,
     hourly: json['hourly'] != null,
+    newRate: (json['newRate'] as num?)?.toDouble(),
+    renewalRate: (json['renewalRate'] as num?)?.toDouble(),
   );
 
   final List<SaleItem> newSales;
@@ -85,6 +89,10 @@ class PayslipBasis {
   /// 사람의 지금 고용 형태가 아니라 **그 명세서를 뽑을 때** 무엇이었는지다.
   /// 알바로 일하다 정규직이 돼도 지난 달 명세서는 시급 그대로 남아야 한다.
   final bool hourly;
+
+  /// 적용된 요율 (0.4 = 40%) — 이 칸이 생기기 전 명세서는 null
+  final double? newRate;
+  final double? renewalRate;
 }
 
 /// 한 달치 급여 명세서 (서버 `PayslipOut`)
@@ -110,6 +118,8 @@ class Payslip {
     required this.status,
     required this.payday,
     this.note,
+    this.incentiveNewReason,
+    this.incentiveRenewalReason,
     this.rejectReason,
     this.submittedAt,
     this.decidedAt,
@@ -139,6 +149,8 @@ class Payslip {
     status: PayslipStatus.parse(json['status'] as String?),
     payday: DateTime.parse(json['payday'] as String),
     note: json['note'] as String?,
+    incentiveNewReason: json['incentiveNewReason'] as String?,
+    incentiveRenewalReason: json['incentiveRenewalReason'] as String?,
     rejectReason: json['rejectReason'] as String?,
     submittedAt: _localTime(json['submittedAt'] as String?),
     decidedAt: _localTime(json['decidedAt'] as String?),
@@ -188,6 +200,10 @@ class Payslip {
 
   /// 본인이 신청할 때 남긴 특이사항 — 대표가 결재할 때 참고한다
   final String? note;
+
+  /// 커미션을 고쳐 낸 이유 — 고쳤을 때만 차 있다 (2026-09-27)
+  final String? incentiveNewReason;
+  final String? incentiveRenewalReason;
 
   final String? rejectReason;
   final DateTime? submittedAt;
@@ -248,6 +264,14 @@ class Accrued {
     required this.renewalSessions,
     this.renewalDowngraded = false,
     required this.canAdjust,
+    this.baseSalary = 0,
+    this.baseBefore = 0,
+    this.taskMissDays = 0,
+    this.newRate = 0,
+    this.renewalRate = 0,
+    this.renewalThreshold = 0,
+    this.newSales = const [],
+    this.renewalSales = const [],
   });
 
   factory Accrued.fromJson(Map<String, dynamic> json) => Accrued(
@@ -263,6 +287,20 @@ class Accrued {
     renewalSessions: json['renewalSessions'] as int,
     renewalDowngraded: json['renewalDowngraded'] as bool? ?? false,
     canAdjust: json['canAdjust'] as bool? ?? false,
+    baseSalary: json['baseSalary'] as int? ?? 0,
+    baseBefore: json['baseBefore'] as int? ?? 0,
+    taskMissDays: json['taskMissDays'] as int? ?? 0,
+    newRate: (json['newRate'] as num?)?.toDouble() ?? 0,
+    renewalRate: (json['renewalRate'] as num?)?.toDouble() ?? 0,
+    renewalThreshold: json['renewalThreshold'] as int? ?? 0,
+    newSales: [
+      for (final row in (json['newSales'] as List<dynamic>? ?? const []))
+        SaleItem.fromJson((row as Map).cast<String, dynamic>()),
+    ],
+    renewalSales: [
+      for (final row in (json['renewalSales'] as List<dynamic>? ?? const []))
+        SaleItem.fromJson((row as Map).cast<String, dynamic>()),
+    ],
   );
 
   /// 이 주기가 만들 명세서의 달 (`2026-09`)
@@ -292,6 +330,24 @@ class Accrued {
   /// **서버가 정한다.** 앱이 직군으로 따로 판정하면 요율이 바뀔 때 어긋나서,
   /// 못 고치는 사람에게 입력칸이 열리고 제출에서 400 이 난다.
   final bool canAdjust;
+
+  // ── 신청서 근거 (2026-09-27) — 왜 이 금액인지 ──
+
+  /// 기본급 (업무 누락 차감 뒤) · 차감 전 · 누락 일수
+  final int baseSalary;
+  final int baseBefore;
+  final int taskMissDays;
+
+  /// 적용된 요율 (0.4 = 40%) — 재등록이 내려갔으면 내려간 값이다
+  final double newRate;
+  final double renewalRate;
+
+  /// 재등록이 이 금액 이하면 워크인 요율로 내려간다 (트레이너만, 아니면 0)
+  final int renewalThreshold;
+
+  /// 커미션이 붙은 수업 한 건씩
+  final List<SaleItem> newSales;
+  final List<SaleItem> renewalSales;
 }
 
 DateTime? _localTime(String? value) =>
@@ -365,6 +421,8 @@ class PayrollApi {
     String? note,
     int? incentiveNew,
     int? incentiveRenewal,
+    String? incentiveNewReason,
+    String? incentiveRenewalReason,
   }) async {
     final data = await _client.post(
       '/payslips/me/submit',
@@ -373,6 +431,8 @@ class PayrollApi {
         'note': ?note,
         'incentiveNew': ?incentiveNew,
         'incentiveRenewal': ?incentiveRenewal,
+        'incentiveNewReason': ?incentiveNewReason,
+        'incentiveRenewalReason': ?incentiveRenewalReason,
       },
     );
     notifyApprovalChanged();

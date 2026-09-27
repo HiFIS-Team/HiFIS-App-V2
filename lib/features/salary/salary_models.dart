@@ -107,6 +107,39 @@ class _Payslip {
   int? adjustNew;
   int? adjustRenewal;
 
+  /// 고친 이유 — 서버 계산값과 다르게 낼 때 필수다 (2026-09-27)
+  String? adjustNewReason;
+  String? adjustRenewalReason;
+
+  // ── 신청서 근거 (2026-09-27) — 확정 명세서가 있으면 그 값, 없으면 진행 중 누계 ──
+
+  /// 신청서의 기본급 — 진행 중 주기도 직급 정책대로 채운다
+  ///
+  /// [baseSalary] 는 요약 카드용이라 확정 전에는 0 이다 (미리 약속하지 않으려고).
+  /// 신청서는 지급일 당일에 여는 것이라 그날은 기본급이 정해져 있다.
+  int get formBase => source?.baseSalary ?? _live?.baseSalary ?? 0;
+
+  /// 업무 누락으로 기본급이 깎인 날 수와 깎이기 전 기본급
+  int get taskMissDays => _live?.taskMissDays ?? 0;
+  int get baseBefore => _live?.baseBefore ?? formBase;
+
+  /// 커미션이 붙은 수업 한 건씩
+  List<SaleItem> get newSaleItems =>
+      source?.basis.newSales ?? _live?.newSales ?? const [];
+  List<SaleItem> get renewalSaleItems =>
+      source?.basis.renewalSales ?? _live?.renewalSales ?? const [];
+
+  /// 적용된 요율 — 모르면 null (이 칸이 생기기 전 명세서)
+  double? get newRate => source?.basis.newRate ?? _live?.newRate;
+  double? get renewalRate => source?.basis.renewalRate ?? _live?.renewalRate;
+
+  /// 재등록 하향 기준액 — 트레이너만 (모르면 0)
+  int get renewalThreshold => _live?.renewalThreshold ?? 0;
+
+  /// 근무 기간 `[start, end)` — 진행 중 주기만 안다
+  DateTime? get periodStart => _live?.periodStart;
+  DateTime? get periodEnd => _live?.periodEnd;
+
   /// 서버가 계산한 원래 커미션 — 신청서 입력칸의 시작값이자 비교 기준
   ///
   /// 확정 명세서는 `incentiveNewAuto`(고치기 전 값), 아직 없는 달은 진행 중
