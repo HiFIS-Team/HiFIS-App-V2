@@ -367,10 +367,33 @@ class _PayslipReviewState extends State<_PayslipReview> {
     if (current == null) return const [];
     return [
       _SummaryCard(payslip: current),
-      if (_payslip.adjusted) ...[
-        SizedBox(height: 12),
-        _AdjustedNotice(payslip: _payslip),
-      ],
+      // 지급 근거 — 신청서와 **같은 카드**다 (2026-09-27). 고쳐서 낸 항목은
+      // 그 카드 안에 원래 값과 사유가 뜬다
+      SizedBox(height: 20),
+      _FormLabel('지급 근거'),
+      SizedBox(height: 10),
+      _BaseCard(payslip: current),
+      SizedBox(height: 12),
+      _CommissionCard(
+        title: 'PT 커미션 · 신규',
+        auto: current.autoNew,
+        items: current.newSaleItems,
+        rate: current.newRate,
+        submitted: _payslip.incentiveNew,
+        reason: _payslip.incentiveNewReason,
+      ),
+      SizedBox(height: 12),
+      _CommissionCard(
+        title: 'PT 커미션 · 재등록',
+        auto: current.autoRenewal,
+        items: current.renewalSaleItems,
+        rate: current.renewalRate,
+        submitted: _payslip.incentiveRenewal,
+        reason: _payslip.incentiveRenewalReason,
+        notice: current.downgraded
+            ? '재등록·소개 합이 기준액 이하라 신규와 같은 요율이 적용됐어요'
+            : null,
+      ),
       if ((_payslip.note ?? '').isNotEmpty) ...[
         SizedBox(height: 12),
         Container(

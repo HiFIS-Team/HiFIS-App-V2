@@ -122,8 +122,8 @@ class _PayslipFormState extends State<_PayslipForm> {
         const SizedBox(height: 12),
         _CommissionCard(
           title: 'PT 커미션 · 신규',
-          input: _new,
-          editable: _canAdjust,
+          auto: _new.auto,
+          input: _canAdjust ? _new : null,
           items: payslip.newSaleItems,
           rate: payslip.newRate,
           onChanged: () => setState(() {}),
@@ -131,8 +131,8 @@ class _PayslipFormState extends State<_PayslipForm> {
         const SizedBox(height: 12),
         _CommissionCard(
           title: 'PT 커미션 · 재등록',
-          input: _renewal,
-          editable: _canAdjust,
+          auto: _renewal.auto,
+          input: _canAdjust ? _renewal : null,
           items: payslip.renewalSaleItems,
           rate: payslip.renewalRate,
           // 재등록 합이 기준액 이하라 신규 요율로 내려갔으면 이유를 적는다
@@ -373,20 +373,33 @@ class _BaseCard extends StatelessWidget {
 }
 
 /// PT 커미션 한 줄 — 금액 · 근거 · 수업 목록 · (고쳤으면) 되돌리기와 사유
+///
+/// **신청서와 대표 결재 화면이 같이 쓴다** (2026-09-27). [input] 이 있으면
+/// 신청서라 금액을 고치고, 없으면 읽기 전용이라 [submitted]·[reason] 을 보여준다.
 class _CommissionCard extends StatefulWidget {
   const _CommissionCard({
     required this.title,
-    required this.input,
-    required this.editable,
+    required this.auto,
     required this.items,
     required this.rate,
-    required this.onChanged,
+    this.input,
+    this.submitted,
+    this.reason,
+    this.onChanged,
     this.notice,
   });
 
   final String title;
-  final _CommissionInput input;
-  final bool editable;
+
+  /// 서버가 계산한 값
+  final int auto;
+
+  /// 신청서의 입력 상태 — null 이면 읽기 전용
+  final _CommissionInput? input;
+
+  /// 읽기 전용일 때 — 신청한 금액과 고친 이유
+  final int? submitted;
+  final String? reason;
   final List<SaleItem> items;
 
   /// 적용된 요율 — 모르면 근거식 대신 건수만 적는다
@@ -394,7 +407,7 @@ class _CommissionCard extends StatefulWidget {
 
   /// 요율이 내려간 이유 같은 한 줄
   final String? notice;
-  final VoidCallback onChanged;
+  final VoidCallback? onChanged;
 
   @override
   State<_CommissionCard> createState() => _CommissionCardState();
@@ -409,21 +422,25 @@ class _CommissionCardState extends State<_CommissionCard> {
     final items = widget.items;
     final base = items.fold<int>(0, (sum, item) => sum + item.amount);
     final rate = widget.rate;
-    final changed = widget.editable && input.changed;
+    final auto = widget.auto;
+    final changed = input?.changed ?? false;
+    // 읽기 전용 — 신청 금액이 계산값과 다르면 고쳐서 낸 것이다
+    final submitted = widget.submitted;
+    final adjusted = input == null && submitted != null && submitted != auto;
 
     return _Card(
-      highlighted: changed,
+      highlighted: changed || adjusted,
       children: [
         Row(
           children: [
             Expanded(child: Text(widget.title, style: _strong)),
-            if (widget.editable)
+            if (input != null)
               _AmountField(
                 controller: input.amount,
-                onChanged: widget.onChanged,
+                onChanged: widget.onChanged ?? () {},
               )
             else
-              Text(_won(input.auto), style: _strong),
+              Text(_won(submitted ?? auto), style: _strong),
           ],
         ),
         const SizedBox(height: 10),
@@ -434,7 +451,7 @@ class _CommissionCardState extends State<_CommissionCard> {
               : rate == null
               ? '수업 ${items.length}회 · 회당 금액 합 ${_won(base)}'
               : '수업 ${items.length}회 · 회당 금액 합 ${_won(base)} '
-                    '× ${(rate * 100).round()}% = ${_won(input.auto)}',
+                    '× ${(rate * 100).round()}% = ${_won(auto)}',
         ),
         if (widget.notice case final notice?) ...[
           const SizedBox(height: 8),
@@ -514,8 +531,25 @@ class _CommissionCardState extends State<_CommissionCard> {
               ),
           ],
         ],
-        // 고쳤으면 — 원래 값 · 되돌리기 · 사유(필수)
-        if (changed) ...[
+        // 대표 화면 — 고쳐서 낸 것이면 원래 값과 사유
+        if (adjusted) ...[
+          const SizedBox(height: 12),
+          Container(height: 1, color: AppColors.gray100),
+          const SizedBox(height: 12),
+          Text(
+            '자동 계산 ${_won(auto)}',
+            style: AppTextStyles.caption.copyWith(
+              decoration: TextDecoration.lineThrough,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '바꾼 이유 · ${(widget.reason ?? '').isEmpty ? '적지 않았어요' : widget.reason}',
+            style: AppTextStyles.body2.copyWith(color: AppColors.textPrimary),
+          ),
+        ],
+        // 신청서 — 고쳤으면 원래 값 · 되돌리기 · 사유(필수)
+        if (input != null && changed) ...[
           const SizedBox(height: 12),
           Container(height: 1, color: AppColors.gray100),
           const SizedBox(height: 12),
@@ -523,7 +557,7 @@ class _CommissionCardState extends State<_CommissionCard> {
             children: [
               Expanded(
                 child: Text(
-                  '자동 계산 ${_won(input.auto)}',
+                  '자동 계산 ${_won(auto)}',
                   style: AppTextStyles.caption.copyWith(
                     decoration: TextDecoration.lineThrough,
                   ),
@@ -532,7 +566,7 @@ class _CommissionCardState extends State<_CommissionCard> {
               Pressable(
                 onTap: () {
                   input.reset();
-                  widget.onChanged();
+                  widget.onChanged?.call();
                 },
                 child: Row(
                   children: [
