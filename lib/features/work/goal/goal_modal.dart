@@ -5,7 +5,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/feedback/app_dialog.dart';
 import '../../notifications/notification_screen.dart'
     show NotificationTarget, requestedScreen;
-import '../work_screen.dart' show requestedWorkTab, workGoalTab;
+import '../work_screen.dart'
+    show requestedWorkSubTab, requestedWorkTab, workGoalSubTab;
 
 // ---------------------------------------------------------------------------
 // 이달의 목표 재촉 모달 (2026-09-28 대표 요청)
@@ -47,7 +48,9 @@ Future<bool> showGoalModal(BuildContext context) async {
     confirmLabel: '적으러 가기',
   );
   if (!go) return true;
-  requestedWorkTab.value = workGoalTab;
+  // 환경정비 탭의 **내 목표** 칸 — 목록바를 탭 요청보다 먼저 넣는다
+  requestedWorkSubTab.value = workGoalSubTab;
+  requestedWorkTab.value = 0;
   requestedScreen.value = NotificationTarget.work;
   return true;
 }

@@ -16,7 +16,8 @@ import '../work/work_screen.dart'
     show
         requestedWorkTab,
         workKindnessTab,
-        workGoalTab,
+        requestedWorkSubTab,
+        workGoalSubTab,
         workLessonTab,
         requestedOpenPtSurveys,
         requestedOpenSessionHistory;
@@ -369,9 +370,10 @@ bool goToNotificationLink(String? link) {
   }
   // 세션 싸인 — 수업 개수 탭의 **세션 기록**까지 연다. 탭까지만 옮기면
   // 첫 칸(환경정비)이 열려서 볼 자리를 다시 찾아야 한다
-  // 이달의 목표 — 목표 탭까지 연다
+  // 이달의 목표 — 환경정비 탭의 내 목표 칸까지 연다
   if (link == '/work/goals') {
-    requestedWorkTab.value = workGoalTab;
+    requestedWorkSubTab.value = workGoalSubTab;
+    requestedWorkTab.value = 0;
   }
   if (link == '/work/session-signs') {
     requestedOpenSessionHistory.value = true;

@@ -86,10 +86,11 @@ const workKindnessTab = 2;
 /// 세션 싸인 알림이 이리로 보낸다 — 세션 기록이 이 탭 안에 있다.
 const workLessonTab = 3;
 
-/// 업무 화면의 **목표** 탭 번호 — `_items` 순서와 같아야 한다
+/// 환경정비 목록바의 **내 목표** 칸 번호 — 맨 끝 칸이다 (2026-09-28)
 ///
-/// 이달의 목표 모달·알림이 이리로 보낸다 (2026-09-28)
-const workGoalTab = 5;
+/// 점장만 칸이 하나 더 있어서(`직원 업무`) 권한마다 다르다. 이달의 목표
+/// 모달·알림이 [requestedWorkSubTab] 에 넣는다 (탭은 0, 환경정비).
+int get workGoalSubTab => myRole == Role.manager ? 3 : 2;
 
 /// 업무 화면을 **어느 탭으로** 열지 — 넣고 나서 화면을 요청한다
 ///
@@ -111,6 +112,7 @@ final requestedWorkTab = ValueNotifier<int?>(null);
 /// | 0 | 공통 업무 (대표·관리자는 `지점 업무`) |
 /// | 1 | **내 업무** — 대표·관리자에게는 직원 목록 |
 /// | 2 | 직원 업무 — **점장만 있다** |
+/// | 끝 | 내 목표 — 대표·관리자에게는 `직원 목표` ([workGoalSubTab]) |
 ///
 /// 업무 누락 모달이 쓴다. 탭만 요청하면 첫 칸(공통 업무)이 열려서 정작 봐야
 /// 할 목록을 한 번 더 찾아야 한다. **[requestedWorkTab] 보다 먼저 넣는다** —
@@ -330,7 +332,7 @@ class _WorkScreenState extends State<WorkScreen>
   }
 
   /// 환경정비 목록바가 몇 칸인가 — 점장만 세 칸이다 (`SegmentedTabs` 와 같다)
-  int get _envTabCount => myRole == Role.manager ? 3 : 2;
+  int get _envTabCount => workGoalSubTab + 1;
 
   /// 들어온 목록바 요청 — **꺼내면서 비운다.** 없는 칸이면 버린다
   int? _pickSubTab() {
@@ -558,7 +560,6 @@ class _WorkScreenState extends State<WorkScreen>
     _WorkItem(label: '회원 친절도', draw: true, ptSurvey: true),
     _WorkItem(label: '수업 개수', members: true),
     _WorkItem(label: '센터 기여도'),
-    _WorkItem(label: '목표'),
   ];
 
   /// 항목 탭 — 데스크톱은 알약 토글, 폰은 밑줄 스타일
@@ -718,10 +719,10 @@ class _WorkScreenState extends State<WorkScreen>
                         // 자기 것이 아니라 **직원들 것**이라 말이 안 맞는다.
                         SegmentedTabs(
                           labels: myRole == Role.manager
-                              ? const ['공통 업무', '내 업무', '직원 업무']
+                              ? const ['공통 업무', '내 업무', '직원 업무', '내 목표']
                               : _canDoEnv
-                              ? const ['공통 업무', '내 업무']
-                              : const ['지점 업무', '개인 업무'],
+                              ? const ['공통 업무', '내 업무', '내 목표']
+                              : const ['지점 업무', '개인 업무', '직원 목표'],
                           selected: _envTab,
                           onSelect: (i) => setState(() => _envTab = i),
                         ),
@@ -756,10 +757,14 @@ class _WorkScreenState extends State<WorkScreen>
                                   offstage: _envTab != 2,
                                   child: MyTaskRoster(),
                                 ),
+                              // 이달의 목표 — 맨 끝 칸 (2026-09-28 대표 요청).
+                              // 대표·관리자에게는 직원별 목표 모아보기다
                               Offstage(
-                                offstage: myRole == Role.manager
-                                    ? _envTab != 0
-                                    : _envTab == 1,
+                                offstage: _envTab != workGoalSubTab,
+                                child: GoalSection(branchId: _branch),
+                              ),
+                              Offstage(
+                                offstage: _envTab != 0,
                                 child: Column(
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
@@ -825,11 +830,6 @@ class _WorkScreenState extends State<WorkScreen>
             Padding(
               padding: EdgeInsets.symmetric(horizontal: _pad),
               child: PraiseSection(branchId: _branch),
-            )
-          else if (item.label == '목표')
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: _pad),
-              child: GoalSection(branchId: _branch),
             )
           else
             Padding(
