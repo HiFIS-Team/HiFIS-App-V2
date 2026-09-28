@@ -13,6 +13,7 @@ import '../../core/util/layout.dart';
 import '../../core/util/native_picker.dart';
 import '../../core/util/skeleton_delay.dart';
 import '../../core/widgets/display/avatar.dart';
+import '../../core/widgets/display/progress_bar.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/feedback/empty_card.dart';
@@ -193,14 +194,16 @@ class _OtScreenState extends State<OtScreen> with SkeletonDelay<OtScreen> {
         ),
         children: [
           SegmentedTabs(
-            labels: [
-              for (final s in tabs)
-                '${s.label} ${_rows.where((r) => r.status == s).length}',
-            ],
+            labels: [for (final s in tabs) s.label],
             selected: tab,
             onSelect: (i) => setState(() => _tab = i),
           ),
           const SizedBox(height: 16),
+          // 전환률은 대표·관리자만 (2026-09-28 대표 요청)
+          if (myRole.boss && !showSkeleton) ...[
+            _ConvertCard(rows: _rows),
+            const SizedBox(height: 12),
+          ],
           if (showSkeleton)
             Container(
               padding: const EdgeInsets.all(20),
@@ -627,6 +630,156 @@ class _PickRow extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 직원별 OT → PT 전환률 — 펼쳤다 접는 카드 (대표·관리자만)
+///
+/// **확정된 OT 만 센다.** 미배정·수락 대기는 아직 상담을 안 했으니
+/// 분모에 넣으면 전환률이 괜히 낮아진다. 전환은 이름·연락처가 같은
+/// 신규 등록이 들어온 것이다 (서버 `convert_on_registration`).
+class _ConvertCard extends StatefulWidget {
+  const _ConvertCard({required this.rows});
+
+  final List<OtRequest> rows;
+
+  @override
+  State<_ConvertCard> createState() => _ConvertCardState();
+}
+
+class _ConvertCardState extends State<_ConvertCard> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    // 담당자마다 (확정, 전환)
+    final by = <String, ({int done, int converted})>{};
+    for (final r in widget.rows) {
+      if (r.status != OtStatus.accepted) continue;
+      final name = r.assigneeName ?? '알 수 없음';
+      final c = by[name] ?? (done: 0, converted: 0);
+      by[name] = (
+        done: c.done + 1,
+        converted: c.converted + (r.convertedAt != null ? 1 : 0),
+      );
+    }
+    final people = by.entries.toList()
+      ..sort((a, b) {
+        final ra = a.value.converted / a.value.done;
+        final rb = b.value.converted / b.value.done;
+        return ra != rb ? rb.compareTo(ra) : a.key.compareTo(b.key);
+      });
+    final done = by.values.fold(0, (s, v) => s + v.done);
+    final converted = by.values.fold(0, (s, v) => s + v.converted);
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 16, 16, 16),
+      decoration: AppDecorations.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Pressable(
+            onTap: () => setState(() => _open = !_open),
+            child: Row(
+              children: [
+                Text('OT → PT 전환률', style: AppTextStyles.label),
+                const SizedBox(width: 8),
+                Text(
+                  done == 0 ? '-' : _pct(converted / done),
+                  style: AppTextStyles.label.copyWith(color: AppColors.primary),
+                ),
+                const Spacer(),
+                Text(
+                  '확정 $done · 전환 $converted',
+                  style: AppTextStyles.caption.copyWith(fontSize: 12),
+                ),
+                const SizedBox(width: 4),
+                AnimatedRotation(
+                  turns: _open ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(
+                    Icons.expand_more_rounded,
+                    size: 22,
+                    color: AppColors.gray400,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: !_open
+                ? const SizedBox(width: double.infinity)
+                : Padding(
+                    padding: const EdgeInsets.only(top: 16, right: 4),
+                    child: people.isEmpty
+                        ? Text('아직 확정된 OT 가 없어요', style: AppTextStyles.caption)
+                        : Column(
+                            children: [
+                              for (var i = 0; i < people.length; i++) ...[
+                                if (i > 0) const SizedBox(height: 12),
+                                _RateBar(
+                                  name: people[i].key,
+                                  done: people[i].value.done,
+                                  converted: people[i].value.converted,
+                                ),
+                              ],
+                            ],
+                          ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _pct(double rate) => '${(rate * 100).round()}%';
+
+/// 한 사람 — 이름 · 막대 · `2/5 · 40%`
+class _RateBar extends StatelessWidget {
+  const _RateBar({
+    required this.name,
+    required this.done,
+    required this.converted,
+  });
+
+  final String name;
+  final int done;
+  final int converted;
+
+  @override
+  Widget build(BuildContext context) {
+    final rate = converted / done;
+    return Row(
+      children: [
+        SizedBox(
+          width: 64,
+          child: Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w600),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(child: ProgressBar(ratio: rate, height: 10)),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 76,
+          child: Text(
+            '$converted/$done · ${_pct(rate)}',
+            textAlign: TextAlign.right,
+            style: AppTextStyles.caption.copyWith(
+              fontWeight: FontWeight.w700,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
