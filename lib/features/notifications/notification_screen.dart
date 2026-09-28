@@ -319,6 +319,9 @@ enum NotificationTarget {
 
   /// 회원 정보 — 등록 알림이 여기로 온다 (2026-09-16)
   members,
+
+  /// OT 신청 — 신청·배정·수락·거절 알림이 여기로 온다 (2026-09-28)
+  ot,
 }
 
 /// 알림에서 열어달라고 요청한 사내톡 방 — [requestedScreen] 보다 **먼저** 세운다
@@ -429,6 +432,8 @@ NotificationTarget? _targetOf(String? link) {
     'work' => NotificationTarget.work,
     // 회원 등록 알림 — 회원 정보 화면을 연다 (2026-09-16)
     'members' => NotificationTarget.members,
+    // OT 신청 — 배정·수락 화면을 연다 (2026-09-28)
+    'ot' => NotificationTarget.ot,
     _ => null,
   };
 }
@@ -473,6 +478,7 @@ IconData _iconOf(NotificationKind kind) => switch (kind) {
   NotificationKind.birthday ||
   NotificationKind.birthdayCheer => Icons.cake_rounded,
   NotificationKind.monthlyGoal => Icons.flag_rounded,
+  NotificationKind.ot => Icons.event_available_rounded,
   NotificationKind.other => Icons.notifications_rounded,
 };
 
@@ -488,6 +494,7 @@ Color _colorOf(NotificationKind kind) => switch (kind) {
   NotificationKind.birthday ||
   NotificationKind.birthdayCheer ||
   NotificationKind.monthlyGoal ||
+  NotificationKind.ot ||
   NotificationKind.meeting ||
   NotificationKind.staff => AppColors.primary,
   NotificationKind.leave ||

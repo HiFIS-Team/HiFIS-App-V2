@@ -41,6 +41,7 @@ import '../member/member_info.dart';
 import '../member/member_screen.dart';
 import 'contribution/contribution_section.dart';
 import 'goal/goal_section.dart';
+import '../ot/ot_screen.dart';
 import 'lesson/lesson_section.dart';
 import 'lesson/pt_survey_screen.dart';
 import 'my_task/my_task_section.dart';
@@ -180,6 +181,10 @@ class _WorkScreenState extends State<WorkScreen>
       // 준다. 예전에는 트레이너가 403 이라 버튼을 감췄던 자리다.
       if (item.ptSurvey)
         HeaderAction(symbol: 'star.bubble', onPressed: _openPtSurveys),
+      // OT 신청 — **전원에게 선다.** 서버가 권한대로 거른다 (트레이너는
+      // 자기가 맡은 것만, FC 는 미배정도, 점장 이상은 지점 전부)
+      if (item.ot)
+        HeaderAction(symbol: 'person.badge.plus', onPressed: _openOt),
       if (item.members) ...[
         // **`person` 을 쓰면 안 된다** — 헤더 오른쪽 프로필 버튼과 같은
         // 아이콘이라 한 줄에 똑같은 사람이 둘 선다. 여럿(`person.2`) 이
@@ -218,6 +223,11 @@ class _WorkScreenState extends State<WorkScreen>
   /// **운동일지 화면이 아니다.** 저기(`운동 일지` 버튼)는 회원을 고르면 일지가
   /// 열리는 수업 흐름이고, 여기는 활성·만료로 갈라 보고 인적 사항을 고치거나
   /// 지우는 자리다.
+  /// OT 신청을 연다 — 지점 고르개를 그대로 물려준다
+  void _openOt() {
+    showFullPage<void>(context, (_) => OtScreen(branchId: _branch));
+  }
+
   void _openMembers() {
     showFullPage<void>(context, (_) => MemberInfoScreen());
   }
@@ -559,7 +569,7 @@ class _WorkScreenState extends State<WorkScreen>
     _WorkItem(label: '동료 평가'),
     _WorkItem(label: '회원 친절도', draw: true, ptSurvey: true),
     _WorkItem(label: '수업 개수', members: true),
-    _WorkItem(label: '센터 기여도'),
+    _WorkItem(label: '센터 기여도', ot: true),
   ];
 
   /// 항목 탭 — 데스크톱은 알약 토글, 폰은 밑줄 스타일

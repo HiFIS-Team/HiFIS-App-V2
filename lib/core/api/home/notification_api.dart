@@ -42,6 +42,9 @@ enum NotificationKind {
 
   /// 이달의 목표를 아직 안 적었다 — 매달 첫 월요일, 안 적은 MANAGER·MEMBER
   monthlyGoal('MONTHLY_GOAL'),
+
+  /// OT 신청·배정·수락·거절 — 새 신청은 그 지점 전원과 MASTER·ADMIN
+  ot('OT'),
   other('');
 
   const NotificationKind(this.wire);

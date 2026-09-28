@@ -1501,6 +1501,10 @@
    },
    "required": []
   },
+  "Gender": {
+   "properties": {},
+   "required": []
+  },
   "GoalCheck": {
    "properties": {
     "done": {},
@@ -2580,6 +2584,110 @@
     "read",
     "createdAt"
    ]
+  },
+  "OtAccept": {
+   "properties": {
+    "endTime": {},
+    "startTime": {},
+    "visitDate": {}
+   },
+   "required": [
+    "visitDate",
+    "startTime",
+    "endTime"
+   ]
+  },
+  "OtApply": {
+   "properties": {
+    "age": {},
+    "consent": {},
+    "endTime": {},
+    "gender": {},
+    "name": {},
+    "phone": {},
+    "purpose": {},
+    "startTime": {},
+    "visitDate": {}
+   },
+   "required": [
+    "name",
+    "gender",
+    "age",
+    "phone",
+    "purpose",
+    "visitDate",
+    "startTime",
+    "endTime",
+    "consent"
+   ]
+  },
+  "OtAssign": {
+   "properties": {
+    "assigneeId": {}
+   },
+   "required": [
+    "assigneeId"
+   ]
+  },
+  "OtBranchOut": {
+   "properties": {
+    "branchName": {}
+   },
+   "required": [
+    "branchName"
+   ]
+  },
+  "OtRequestOut": {
+   "properties": {
+    "acceptedAt": {
+     "nullable": true
+    },
+    "age": {},
+    "assignedById": {
+     "nullable": true
+    },
+    "assigneeId": {
+     "nullable": true
+    },
+    "assigneeName": {
+     "nullable": true
+    },
+    "branchId": {},
+    "branchName": {
+     "nullable": true
+    },
+    "convertedAt": {
+     "nullable": true
+    },
+    "createdAt": {},
+    "endTime": {},
+    "gender": {},
+    "id": {},
+    "name": {},
+    "phone": {},
+    "purpose": {},
+    "startTime": {},
+    "status": {},
+    "visitDate": {}
+   },
+   "required": [
+    "id",
+    "branchId",
+    "name",
+    "gender",
+    "age",
+    "phone",
+    "purpose",
+    "visitDate",
+    "startTime",
+    "endTime",
+    "status",
+    "createdAt"
+   ]
+  },
+  "OtStatus": {
+   "properties": {},
+   "required": []
   },
   "PasswordChange": {
    "properties": {

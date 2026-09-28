@@ -8,6 +8,7 @@ class _WorkItem {
     this.members = false,
     this.draw = false,
     this.ptSurvey = false,
+    this.ot = false,
   });
 
   final String label;
@@ -36,6 +37,10 @@ class _WorkItem {
   /// 회원이 남긴 만족도라 **회원 친절도 옆이 맞다** — 매장 설문(칭찬·불편)과
   /// PT 설문(수업 만족도)이 둘 다 회원이 답한 것이다.
   final bool ptSurvey;
+
+  /// 헤더 **왼쪽 끝**에 **OT 신청으로 가는 버튼**을 세우는 항목인지
+  /// (센터 기여도만 — 2026-09-28 대표 요청)
+  final bool ot;
 }
 
 // 밑줄 탭 위젯(`_WorkTab`)은 [UnderlineTabs] 로 옮겼다 (2026-08-21).

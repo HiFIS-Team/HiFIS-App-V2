@@ -13,6 +13,7 @@ import '../../core/api/staff/payroll_api.dart';
 import '../../core/api/work/env_api.dart';
 import '../../core/api/work/kindness_api.dart';
 import '../../core/api/work/my_task_api.dart';
+import '../../core/api/work/ot_api.dart';
 import '../../core/data/data_signal.dart';
 import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
@@ -39,6 +40,7 @@ import '../../core/widgets/input/see_all_button.dart';
 import '../approval/approval_screen.dart';
 import '../notice/notice_screen.dart';
 import '../notifications/notification_screen.dart';
+import '../ot/ot_screen.dart';
 import '../project/project_screen.dart';
 import '../schedule/schedule_screen.dart';
 import '../../core/widgets/feedback/skeleton.dart';
@@ -46,6 +48,7 @@ part 'home_inbox.dart';
 part 'home_staff.dart';
 part 'home_status.dart';
 part 'home_cards.dart';
+part 'home_ot.dart';
 
 /// 폰 홈 카드 본문의 **최소** 높이 — 내용이 없다고 카드가 줄지 않게 한다
 ///
@@ -244,8 +247,12 @@ class _HomeScreenState extends State<HomeScreen>
                   else ...[
                     _InboxCard(onOpen: widget.onOpen),
                     SizedBox(height: 16),
+                    _OtCard(),
+                    SizedBox(height: 16),
                     _TodayStaffCard(onOpenAll: widget.onOpenAttendance),
                   ],
+                  // PC 는 결재·출근이 한 줄이라 그 **아래** 한 줄을 통째로 쓴다
+                  if (desktop) ...[SizedBox(height: 16), _OtCard()],
                 ] else
                   _HeroStatusCard(attendance: _summary?.attendance),
                 SizedBox(height: 16),
@@ -281,10 +288,17 @@ class _HomeScreenState extends State<HomeScreen>
                     onChanged: _refresh,
                   ),
                   SizedBox(height: 16),
+                  // 직원·점장은 프로젝트와 공지 사이 (2026-09-28 대표 요청)
+                  if (!myRole.boss) ...[_OtCard(), SizedBox(height: 16)],
                   _NoticeCard(
                     onOpenAll: widget.onOpenNotices,
                     onChanged: _refresh,
                   ),
+                ],
+                // 직원·점장 PC — 프로젝트·공지 한 줄 아래에 둔다
+                if (desktop && !myRole.boss) ...[
+                  SizedBox(height: 16),
+                  _OtCard(),
                 ],
               ],
             ),

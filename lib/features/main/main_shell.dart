@@ -33,6 +33,7 @@ import '../messages/message_screen.dart';
 import '../monitoring/monitoring_screen.dart';
 import '../notice/notice_screen.dart';
 import '../notifications/notification_screen.dart';
+import '../ot/ot_screen.dart';
 import '../profile/profile_screen.dart';
 import '../project/project_screen.dart';
 import '../schedule/schedule_birthday_modal.dart';
@@ -177,6 +178,11 @@ class _MainShellState extends State<MainShell> {
       _goMembers();
       return;
     }
+    // OT 신청도 탭이 없다 — 밀어 올려 연다 (2026-09-28)
+    if (target == NotificationTarget.ot) {
+      _goOt();
+      return;
+    }
     if (isDesktop) {
       // 슬라이드인 화면이 열려 있으면 덮고 있어서 먼저 닫는다
       _paneNavKey.currentState?.popUntil((r) => r.isFirst);
@@ -194,6 +200,7 @@ class _MainShellState extends State<MainShell> {
         // 위에서 이미 처리했다
         NotificationTarget.chat => _paneIndex.value,
         NotificationTarget.members => _paneIndex.value,
+        NotificationTarget.ot => _paneIndex.value,
       };
       return;
     }
@@ -227,6 +234,7 @@ class _MainShellState extends State<MainShell> {
           NotificationTarget.staff => _androidTab,
           NotificationTarget.chat => _androidTab, // 위에서 이미 처리했다
           NotificationTarget.members => _androidTab,
+          NotificationTarget.ot => _androidTab,
         },
       );
       return;
@@ -260,6 +268,7 @@ class _MainShellState extends State<MainShell> {
         case NotificationTarget.staff:
         case NotificationTarget.chat:
         case NotificationTarget.members:
+        case NotificationTarget.ot:
           break; // 위에서 걸러진다
       }
     });
@@ -285,6 +294,14 @@ class _MainShellState extends State<MainShell> {
   /// 전자결재 열기 — 폰에는 탭이 없어 사내톡처럼 밀려 들어오는 화면으로 연다.
   /// 화면이 뜨면서 `requestedApprovalId` 를 집어 그 문서까지 연다.
   /// 회원 정보를 밀어 올린다 — 회원 등록 알림이 쓴다 (2026-09-16)
+  void _goOt() {
+    final navigator = isDesktop
+        ? (_paneNavKey.currentState ?? Navigator.of(context))
+        : Navigator.of(context);
+    navigator.popUntil((r) => r.isFirst);
+    navigator.push(CupertinoPageRoute(builder: (_) => OtScreen()));
+  }
+
   void _goMembers() {
     final navigator = isDesktop
         ? (_paneNavKey.currentState ?? Navigator.of(context))
