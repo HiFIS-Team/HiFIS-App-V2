@@ -37,9 +37,11 @@ class _OtCardState extends State<_OtCard> {
     _fetch();
   }
 
-  /// 아직 안 끝난 것 — 확정은 오늘 이후 것만 남긴다
+  /// 할 일만 — **미배정·수락 대기** (확정은 안 세운다, 2026-09-28 대표 요청)
+  ///
+  /// 줄은 할 일 순서다 — 배정하는 사람에게는 미배정이, 맡은 사람에게는
+  /// 수락 대기가 먼저 온다. 같은 단계 안에서는 방문일이 가까운 순.
   List<OtRequest> get _todo {
-    final today = DateUtils.dateOnly(DateTime.now());
     int rank(OtRequest r) => switch (r.status) {
       OtStatus.pending => myRole.strong ? 0 : 1,
       OtStatus.assigned => r.assigneeId == currentUser?.id ? 0 : 1,
@@ -47,9 +49,7 @@ class _OtCardState extends State<_OtCard> {
     };
     return [
       for (final r in _rows)
-        if (r.status != OtStatus.accepted ||
-            (r.convertedAt == null && !r.visitDate.isBefore(today)))
-          r,
+        if (r.status != OtStatus.accepted) r,
     ]..sort((a, b) {
       final gap = rank(a).compareTo(rank(b));
       return gap != 0 ? gap : a.visitDate.compareTo(b.visitDate);
@@ -72,7 +72,7 @@ class _OtCardState extends State<_OtCard> {
               child: Center(
                 child: EmptyCard(
                   icon: Icons.event_available_rounded,
-                  text: '새 OT 신청이 없어요',
+                  text: '처리할 OT 신청이 없어요',
                   framed: false,
                 ),
               ),
@@ -81,11 +81,7 @@ class _OtCardState extends State<_OtCard> {
             _CardBody(
               child: _StackedRows(
                 rows: [
-                  for (final r in rows.take(_max))
-                    Pressable(
-                      onTap: _open,
-                      child: _OtRow(ot: r),
-                    ),
+                  for (final r in rows.take(_max)) _OtRow(ot: r, onTap: _open),
                 ],
               ),
             ),
@@ -95,10 +91,13 @@ class _OtCardState extends State<_OtCard> {
   }
 }
 
+/// 한 줄 — **프로젝트 카드 줄(`_ProjectRow`)과 같은 틀**이다
+/// (세로 색 막대 · 이름 · 한 줄 설명 · 오른쪽 알약)
 class _OtRow extends StatelessWidget {
-  _OtRow({required this.ot});
+  _OtRow({required this.ot, required this.onTap});
 
   final OtRequest ot;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -107,36 +106,60 @@ class _OtRow extends StatelessWidget {
       OtStatus.assigned => AppColors.primary,
       OtStatus.accepted => AppColors.success,
     };
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '${ot.name}님',
-                style: AppTextStyles.body2.copyWith(
-                  fontWeight: FontWeight.w600,
+    return Pressable(
+      onTap: onTap,
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 40,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${ot.name}님 OT',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.body1.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-              SizedBox(height: 2),
-              Text(
-                ot.assigneeName == null
-                    ? ot.when
-                    : '${ot.when} · ${ot.assigneeName}',
-                style: AppTextStyles.caption.copyWith(fontSize: 12),
-              ),
-            ],
+                SizedBox(height: 2),
+                Text(
+                  ot.assigneeName == null
+                      ? ot.when
+                      : '${ot.when} · ${ot.assigneeName}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.caption,
+                ),
+              ],
+            ),
           ),
-        ),
-        Text(
-          ot.status.label,
-          style: AppTextStyles.caption.copyWith(
-            color: color,
-            fontWeight: FontWeight.w700,
+          SizedBox(width: 8),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              ot.status.label,
+              style: AppTextStyles.caption.copyWith(
+                color: color,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
