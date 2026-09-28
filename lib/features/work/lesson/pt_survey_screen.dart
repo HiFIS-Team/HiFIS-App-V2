@@ -197,12 +197,13 @@ class _PtSurveyScreenState extends State<PtSurveyScreen>
         if (survey.renew != null) survey,
     ];
     if (decided.isEmpty) return null;
-    final yes = decided.where((s) => s.renew == RenewIntent.yes).length;
+    final yes = decided.where((s) => s.renew!.counts).length;
     return (yes * 100 / decided.length).round();
   }
 
   /// '연장할래요' 로 답한 건의 등록 금액 — **다음달 예상 PT 매출**의 재료다
-  /// (2026-09-15 대표 요청).
+  /// (2026-09-15 대표 요청). **'연장됐어요'(답 없이 재등록)도 센다** —
+  /// 그때 금액은 서버가 재등록한 등록권 것으로 준다 (2026-09-28).
   ///
   /// '고민 중이에요'·미응답은 안 센다 — 아직 안 정해졌거나 안 온 것을 매출로
   /// 잡으면 부풀려 보인다. **트레이너를 골랐으면 그 사람 것만** 잡는다(고르개와
@@ -235,7 +236,7 @@ class _PtSurveyScreenState extends State<PtSurveyScreen>
     }
     return [
       for (final survey in byMember.values)
-        if (survey.renew == RenewIntent.yes) survey,
+        if (survey.renew?.counts ?? false) survey,
     ];
   }
 
@@ -660,6 +661,7 @@ Color _renewColor(RenewIntent renew) => switch (renew) {
   RenewIntent.yes => AppColors.success,
   RenewIntent.maybe => AppColors.warning,
   RenewIntent.no => AppColors.error,
+  RenewIntent.renewed => AppColors.primary,
 };
 
 class _PtTag extends StatelessWidget {

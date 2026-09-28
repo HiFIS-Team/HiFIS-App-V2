@@ -172,6 +172,9 @@ void main() {
       expect(RenewIntent.parse('YES'), RenewIntent.yes);
       expect(RenewIntent.parse('MAYBE'), RenewIntent.maybe);
       expect(RenewIntent.parse('NO'), RenewIntent.no);
+      expect(RenewIntent.parse('RENEWED'), RenewIntent.renewed);
+      expect(RenewIntent.renewed.counts, isTrue);
+      expect(RenewIntent.maybe.counts, isFalse);
       // 모르는 값·빈 값에 죽지 않는다 — 서버가 항목을 늘려도 화면은 뜬다
       expect(RenewIntent.parse(null), isNull);
       expect(RenewIntent.parse('LATER'), isNull);

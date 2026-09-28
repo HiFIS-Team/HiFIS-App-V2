@@ -4,12 +4,18 @@ import '../client/api_client.dart';
 enum RenewIntent {
   yes('YES', '연장할래요'),
   maybe('MAYBE', '고민 중이에요'),
-  no('NO', '연장 안 해요');
+  no('NO', '연장 안 해요'),
+
+  /// 회원이 고르는 값이 아니다 — 답을 안 낸 채로 재등록하면 서버가 찍는다
+  renewed('RENEWED', '연장됐어요');
 
   const RenewIntent(this.wire, this.label);
 
   final String wire;
   final String label;
+
+  /// 매출에 잡히는 답 — '연장할래요' 와 실제로 재등록한 것
+  bool get counts => this == yes || this == renewed;
 
   static RenewIntent? parse(String? value) {
     if (value == null) return null;
