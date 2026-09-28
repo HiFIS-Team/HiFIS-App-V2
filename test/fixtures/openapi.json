@@ -1501,6 +1501,14 @@
    },
    "required": []
   },
+  "GoalSubmit": {
+   "properties": {
+    "items": {}
+   },
+   "required": [
+    "items"
+   ]
+  },
   "GrafanaAlert": {
    "properties": {
     "message": {},
@@ -2154,6 +2162,37 @@
     "branchName",
     "winners",
     "entryCount"
+   ]
+  },
+  "MonthlyGoalOut": {
+   "properties": {
+    "createdAt": {},
+    "employeeId": {},
+    "id": {},
+    "items": {},
+    "yearMonth": {}
+   },
+   "required": [
+    "id",
+    "employeeId",
+    "yearMonth",
+    "items",
+    "createdAt"
+   ]
+  },
+  "MyGoalOut": {
+   "properties": {
+    "due": {},
+    "goal": {
+     "nullable": true
+    },
+    "writes": {},
+    "yearMonth": {}
+   },
+   "required": [
+    "yearMonth",
+    "writes",
+    "due"
    ]
   },
   "MyTaskCheckCreate": {

@@ -36,6 +36,7 @@ import '../notifications/notification_screen.dart';
 import '../profile/profile_screen.dart';
 import '../project/project_screen.dart';
 import '../schedule/schedule_birthday_modal.dart';
+import '../work/goal/goal_modal.dart';
 import '../work/my_task/my_task_miss_modal.dart';
 import '../work/peer_review/peer_review_modal.dart';
 import '../ranking/ranking_screen.dart';
@@ -87,6 +88,7 @@ class _MainShellState extends State<MainShell> {
       if (await showBirthdayModal(context) || !mounted) return;
       if (await showPeerReviewModal(context) || !mounted) return;
       if (await showMyTaskMissModal(context) || !mounted) return;
+      if (await showGoalModal(context) || !mounted) return;
       await showProjectDueModal(context);
     });
   }

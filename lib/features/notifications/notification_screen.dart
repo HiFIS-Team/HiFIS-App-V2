@@ -16,6 +16,7 @@ import '../work/work_screen.dart'
     show
         requestedWorkTab,
         workKindnessTab,
+        workGoalTab,
         workLessonTab,
         requestedOpenPtSurveys,
         requestedOpenSessionHistory;
@@ -368,6 +369,10 @@ bool goToNotificationLink(String? link) {
   }
   // 세션 싸인 — 수업 개수 탭의 **세션 기록**까지 연다. 탭까지만 옮기면
   // 첫 칸(환경정비)이 열려서 볼 자리를 다시 찾아야 한다
+  // 이달의 목표 — 목표 탭까지 연다
+  if (link == '/work/goals') {
+    requestedWorkTab.value = workGoalTab;
+  }
   if (link == '/work/session-signs') {
     requestedOpenSessionHistory.value = true;
     requestedWorkTab.value = workLessonTab;
@@ -465,6 +470,7 @@ IconData _iconOf(NotificationKind kind) => switch (kind) {
   NotificationKind.memberRegister => Icons.person_add_alt_1_rounded,
   NotificationKind.birthday ||
   NotificationKind.birthdayCheer => Icons.cake_rounded,
+  NotificationKind.monthlyGoal => Icons.flag_rounded,
   NotificationKind.other => Icons.notifications_rounded,
 };
 
@@ -479,6 +485,7 @@ Color _colorOf(NotificationKind kind) => switch (kind) {
   NotificationKind.schedule ||
   NotificationKind.birthday ||
   NotificationKind.birthdayCheer ||
+  NotificationKind.monthlyGoal ||
   NotificationKind.meeting ||
   NotificationKind.staff => AppColors.primary,
   NotificationKind.leave ||

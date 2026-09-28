@@ -40,6 +40,7 @@ import '../../core/widgets/nav/desktop_header.dart';
 import '../member/member_info.dart';
 import '../member/member_screen.dart';
 import 'contribution/contribution_section.dart';
+import 'goal/goal_section.dart';
 import 'lesson/lesson_section.dart';
 import 'lesson/pt_survey_screen.dart';
 import 'my_task/my_task_section.dart';
@@ -84,6 +85,11 @@ const workKindnessTab = 2;
 ///
 /// 세션 싸인 알림이 이리로 보낸다 — 세션 기록이 이 탭 안에 있다.
 const workLessonTab = 3;
+
+/// 업무 화면의 **목표** 탭 번호 — `_items` 순서와 같아야 한다
+///
+/// 이달의 목표 모달·알림이 이리로 보낸다 (2026-09-28)
+const workGoalTab = 5;
 
 /// 업무 화면을 **어느 탭으로** 열지 — 넣고 나서 화면을 요청한다
 ///
@@ -552,6 +558,7 @@ class _WorkScreenState extends State<WorkScreen>
     _WorkItem(label: '회원 친절도', draw: true, ptSurvey: true),
     _WorkItem(label: '수업 개수', members: true),
     _WorkItem(label: '센터 기여도'),
+    _WorkItem(label: '목표'),
   ];
 
   /// 항목 탭 — 데스크톱은 알약 토글, 폰은 밑줄 스타일
@@ -818,6 +825,11 @@ class _WorkScreenState extends State<WorkScreen>
             Padding(
               padding: EdgeInsets.symmetric(horizontal: _pad),
               child: PraiseSection(branchId: _branch),
+            )
+          else if (item.label == '목표')
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: _pad),
+              child: GoalSection(branchId: _branch),
             )
           else
             Padding(

@@ -39,6 +39,9 @@ enum NotificationKind {
 
   /// 누가 생일 축하 이모지를 보냈다 — 생일자 본인
   birthdayCheer('BIRTHDAY_CHEER'),
+
+  /// 이달의 목표를 아직 안 적었다 — 매달 첫 월요일, 안 적은 MANAGER·MEMBER
+  monthlyGoal('MONTHLY_GOAL'),
   other('');
 
   const NotificationKind(this.wire);
