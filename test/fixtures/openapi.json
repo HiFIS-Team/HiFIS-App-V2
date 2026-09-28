@@ -1501,6 +1501,18 @@
    },
    "required": []
   },
+  "GoalCheck": {
+   "properties": {
+    "done": {},
+    "index": {},
+    "yearMonth": {}
+   },
+   "required": [
+    "yearMonth",
+    "index",
+    "done"
+   ]
+  },
   "GoalSubmit": {
    "properties": {
     "items": {}
@@ -2166,6 +2178,7 @@
   },
   "MonthlyGoalOut": {
    "properties": {
+    "achieved": {},
     "createdAt": {},
     "employeeId": {},
     "id": {},
@@ -2177,6 +2190,7 @@
     "employeeId",
     "yearMonth",
     "items",
+    "achieved",
     "createdAt"
    ]
   },

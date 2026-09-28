@@ -10,8 +10,10 @@ import '../../../core/data/staff_directory.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/util/layout.dart';
 import '../../../core/util/skeleton_delay.dart';
 import '../../../core/widgets/display/avatar.dart';
+import '../../../core/widgets/display/progress_bar.dart';
 import '../../../core/widgets/feedback/app_dialog.dart';
 import '../../../core/widgets/feedback/app_toast.dart';
 import '../../../core/widgets/feedback/empty_card.dart';
@@ -19,12 +21,16 @@ import '../../../core/widgets/feedback/skeleton.dart';
 import '../../../core/widgets/input/app_button.dart';
 import '../../../core/widgets/input/pressable.dart';
 import '../../../core/widgets/nav/month_bar.dart';
+import '../../../core/widgets/nav/phone_scaffold.dart';
 
-/// 업무 탭의 **목표** — 이달의 목표 (2026-09-28 대표 요청)
+/// 환경정비 목록바의 **내 목표** — 이달의 목표 (2026-09-28 대표 요청)
 ///
-/// MANAGER·MEMBER 는 이번 달 목표를 **2개 이상** 적어 낸다. 내면 그 달은
-/// 잠긴다 — 못 이뤄도 불이익이 없어서 승인 절차는 없다.
-/// MASTER·ADMIN 은 적지 않고 직원별로 모아 본다 (같은 지점 점장에게도 안 연다).
+/// MANAGER·MEMBER 는 이번 달 목표를 **2개 이상** 적어 낸다. 내면 글은
+/// 잠기고, 이뤘는지만 줄마다 체크한다 (그 달과 다음 달까지). 못 이뤄도
+/// 불이익이 없어서 승인 절차는 없다.
+///
+/// MASTER·ADMIN 은 적지 않고 직원 명단을 본다 — 누르면 그 사람의 목표가
+/// 같은 모양(달 이동 · 달성률 · 그래프)으로 밀려 들어온다.
 class GoalSection extends StatelessWidget {
   const GoalSection({super.key, this.branchId});
 
@@ -37,6 +43,17 @@ class GoalSection extends StatelessWidget {
       : _GoalRoster(key: ValueKey(branchId));
 }
 
+DateTime _thisMonth() => DateTime(DateTime.now().year, DateTime.now().month);
+
+DateTime _monthOf(String yearMonth) {
+  final [year, month] = [
+    for (final part in yearMonth.split('-')) int.parse(part),
+  ];
+  return DateTime(year, month);
+}
+
+String _percent(double rate) => '${(rate * 100).round()}%';
+
 // ── 적는 쪽 ──
 
 class _MyGoal extends StatefulWidget {
@@ -47,10 +64,68 @@ class _MyGoal extends StatefulWidget {
 }
 
 class _MyGoalState extends State<_MyGoal> with SkeletonDelay<_MyGoal> {
-  MyGoal? _mine;
+  /// 이번 달 (`YYYY-MM`) — 서버(KST) 기준
+  String? _yearMonth;
+  List<MonthlyGoal> _goals = const [];
 
-  /// 지난 달까지 낸 목표 — 이번 달 카드 아래에 쌓인다
-  List<MonthlyGoal> _past = const [];
+  @override
+  void initState() {
+    super.initState();
+    _fetch();
+  }
+
+  Future<void> _fetch() async {
+    setState(beginLoad);
+    try {
+      final (mine, all) = await (GoalApi.me(), GoalApi.mine()).wait;
+      if (!mounted) return;
+      setState(() {
+        _yearMonth = mine.yearMonth;
+        _goals = all;
+        endLoad();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(endLoad);
+      AppToast.show(context, messageOf(e));
+    }
+  }
+
+  /// 낸 것·체크한 것을 목록에 갈아끼운다
+  void _put(MonthlyGoal goal) => setState(() {
+    _goals = [
+      goal,
+      for (final g in _goals)
+        if (g.yearMonth != goal.yearMonth) g,
+    ]..sort((a, b) => b.yearMonth.compareTo(a.yearMonth));
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final yearMonth = _yearMonth;
+    if (showSkeleton || yearMonth == null) return const _BoardSkeleton();
+    return _GoalBoard(
+      goals: _goals,
+      current: _monthOf(yearMonth),
+      mine: true,
+      onChanged: _put,
+      form: _GoalForm(yearMonth: yearMonth, onSubmitted: _put),
+    );
+  }
+}
+
+/// 이번 달 목표를 적는 카드 — 아직 안 냈을 때
+class _GoalForm extends StatefulWidget {
+  const _GoalForm({required this.yearMonth, required this.onSubmitted});
+
+  final String yearMonth;
+  final ValueChanged<MonthlyGoal> onSubmitted;
+
+  @override
+  State<_GoalForm> createState() => _GoalFormState();
+}
+
+class _GoalFormState extends State<_GoalForm> {
   final _fields = [TextEditingController(), TextEditingController()];
   bool _busy = false;
 
@@ -60,7 +135,6 @@ class _MyGoalState extends State<_MyGoal> with SkeletonDelay<_MyGoal> {
     for (final field in _fields) {
       field.addListener(_onType);
     }
-    _fetch();
   }
 
   @override
@@ -72,26 +146,6 @@ class _MyGoalState extends State<_MyGoal> with SkeletonDelay<_MyGoal> {
   }
 
   void _onType() => setState(() {});
-
-  Future<void> _fetch() async {
-    setState(beginLoad);
-    try {
-      final (mine, all) = await (GoalApi.me(), GoalApi.mine()).wait;
-      if (!mounted) return;
-      setState(() {
-        _mine = mine;
-        _past = [
-          for (final goal in all)
-            if (goal.yearMonth != mine.yearMonth) goal,
-        ];
-        endLoad();
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(endLoad);
-      AppToast.show(context, messageOf(e));
-    }
-  }
 
   List<String> get _filled => [
     for (final field in _fields)
@@ -117,7 +171,7 @@ class _MyGoalState extends State<_MyGoal> with SkeletonDelay<_MyGoal> {
       context,
       icon: Icons.flag_rounded,
       title: '목표를 낼까요?',
-      message: '내면 이번 달에는 고칠 수 없어요',
+      message: '내면 이번 달에는 목표를 고칠 수 없어요.\n이룬 것은 나중에 체크할 수 있어요',
       confirmLabel: '내기',
     );
     if (!ok || !mounted) return;
@@ -125,15 +179,8 @@ class _MyGoalState extends State<_MyGoal> with SkeletonDelay<_MyGoal> {
     try {
       final goal = await GoalApi.submit(_filled);
       if (!mounted) return;
-      setState(() {
-        _mine = MyGoal(
-          yearMonth: goal.yearMonth,
-          writes: true,
-          due: false,
-          goal: goal,
-        );
-        _busy = false;
-      });
+      setState(() => _busy = false);
+      widget.onSubmitted(goal);
       AppToast.show(context, '이번 달 목표를 냈어요');
     } catch (e) {
       if (!mounted) return;
@@ -144,45 +191,9 @@ class _MyGoalState extends State<_MyGoal> with SkeletonDelay<_MyGoal> {
 
   @override
   Widget build(BuildContext context) {
-    final mine = _mine;
-    if (showSkeleton || mine == null) {
-      return Container(
-        padding: const EdgeInsets.all(20),
-        decoration: AppDecorations.card(),
-        child: SkeletonRows(rows: 3, avatar: 0, trailing: 0),
-      );
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (mine.goal case final goal?)
-          _Submitted(goal: goal, current: true)
-        else
-          _form(mine),
-        const SizedBox(height: 28),
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 12),
-          child: Text(
-            '지난 목표',
-            style: AppTextStyles.body1.copyWith(fontWeight: FontWeight.w700),
-          ),
-        ),
-        if (_past.isEmpty)
-          EmptyCard(icon: Icons.flag_rounded, text: '지난 달 목표가 여기에 쌓여요')
-        else
-          for (var i = 0; i < _past.length; i++) ...[
-            if (i > 0) const SizedBox(height: 12),
-            _Submitted(goal: _past[i], current: false),
-          ],
-      ],
-    );
-  }
-
-  /// 이번 달 목표를 적는 카드 — 아직 안 냈을 때
-  Widget _form(MyGoal mine) {
-    final month = int.parse(mine.yearMonth.split('-').last);
+    final month = _monthOf(widget.yearMonth).month;
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+      padding: const EdgeInsets.all(20),
       decoration: AppDecorations.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -304,74 +315,360 @@ class _GoalField extends StatelessWidget {
   }
 }
 
-/// 낸 목표 — 잠겨 있다
-class _Submitted extends StatelessWidget {
-  const _Submitted({required this.goal, required this.current});
+// ── 한 사람의 목표판 — 본인과 대표 상세가 같이 쓴다 ──
+
+/// `‹ 2026년 9월 ›` · 달성률 · 목표 줄 · 최근 6개월 그래프
+class _GoalBoard extends StatefulWidget {
+  const _GoalBoard({
+    required this.goals,
+    required this.current,
+    required this.mine,
+    this.onChanged,
+    this.form,
+  });
+
+  /// 그 사람이 낸 목표 전부
+  final List<MonthlyGoal> goals;
+
+  /// 이번 달 — 이보다 뒤로는 못 넘긴다
+  final DateTime current;
+
+  /// 본인 것인가 — 본인만 체크한다
+  final bool mine;
+  final ValueChanged<MonthlyGoal>? onChanged;
+
+  /// 이번 달 목표가 없을 때 그 자리에 세울 카드 (본인만)
+  final Widget? form;
+
+  @override
+  State<_GoalBoard> createState() => _GoalBoardState();
+}
+
+class _GoalBoardState extends State<_GoalBoard> {
+  late DateTime _month = widget.current;
+
+  /// 체크를 보내는 중인 줄 — 연달아 누르면 순서가 엉킨다
+  final _busy = <int>{};
+
+  MonthlyGoal? _goalOf(DateTime month) {
+    final key = periodKey(month);
+    for (final goal in widget.goals) {
+      if (goal.yearMonth == key) return goal;
+    }
+    return null;
+  }
+
+  /// 체크할 수 있나 — 본인 · 그 달과 다음 달까지 (서버 `can_check` 와 같다)
+  bool get _checkable {
+    if (!widget.mine) return false;
+    final last = DateTime(widget.current.year, widget.current.month - 1);
+    return _month == widget.current || _month == last;
+  }
+
+  void _move(int delta) =>
+      setState(() => _month = DateTime(_month.year, _month.month + delta));
+
+  Future<void> _toggle(MonthlyGoal goal, int index) async {
+    if (_busy.contains(index)) return;
+    final done = !goal.achieved.contains(index);
+    final next = {...goal.achieved};
+    done ? next.add(index) : next.remove(index);
+    // 누르는 순간 바꾼다 — 실패하면 되돌린다
+    widget.onChanged?.call(goal.copyWith(achieved: next));
+    setState(() => _busy.add(index));
+    try {
+      final saved = await GoalApi.check(goal.yearMonth, index, done: done);
+      widget.onChanged?.call(saved);
+    } catch (e) {
+      widget.onChanged?.call(goal);
+      if (mounted) AppToast.show(context, messageOf(e));
+    } finally {
+      if (mounted) setState(() => _busy.remove(index));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final goal = _goalOf(_month);
+    final atCurrent = _month == widget.current;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        MonthBar(
+          month: _month,
+          count: 0,
+          loading: false,
+          showCount: false,
+          padding: const EdgeInsets.fromLTRB(0, 0, 0, 10),
+          onPrev: () => _move(-1),
+          onNext: atCurrent ? null : () => _move(1),
+        ),
+        if (goal != null) ...[
+          _RateCard(goal: goal),
+          const SizedBox(height: 12),
+          _ItemsCard(
+            goal: goal,
+            checkable: _checkable,
+            onToggle: (i) => _toggle(goal, i),
+          ),
+        ] else if (atCurrent && widget.form != null)
+          widget.form!
+        else
+          EmptyCard(
+            icon: Icons.flag_rounded,
+            text: atCurrent ? '이번 달 목표를 아직 안 적었어요' : '이 달에는 목표가 없어요',
+          ),
+        const SizedBox(height: 12),
+        _TrendCard(
+          goals: widget.goals,
+          current: widget.current,
+          selected: _month,
+          onSelect: (month) => setState(() => _month = month),
+        ),
+      ],
+    );
+  }
+}
+
+/// 그 달 달성률 — 큰 숫자 + 막대
+class _RateCard extends StatelessWidget {
+  const _RateCard({required this.goal});
 
   final MonthlyGoal goal;
-
-  /// 이번 달 것인가 — '고칠 수 없어요' 는 이번 달에만 붙인다
-  final bool current;
 
   @override
   Widget build(BuildContext context) {
     final at = goal.createdAt;
-    final [year, month] = [
-      for (final part in goal.yearMonth.split('-')) int.parse(part),
-    ];
-    // 올해가 아니면 해를 같이 적는다 — 12월과 다음 해 1월이 나란히 선다
-    final title = year == DateTime.now().year
-        ? '$month월 목표'
-        : '$year년 $month월 목표';
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
       decoration: AppDecorations.card(),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: AppTextStyles.title3),
-          const SizedBox(height: 4),
-          Text(
-            current
-                ? '${at.month}월 ${at.day}일에 냈어요 · 이번 달은 고칠 수 없어요'
-                : '${at.month}월 ${at.day}일에 냈어요',
-            style: AppTextStyles.caption,
+          Text('달성률', style: AppTextStyles.label),
+          const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                _percent(goal.rate),
+                style: AppTextStyles.title1.copyWith(color: AppColors.primary),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${goal.items.length}개 중 ${goal.achieved.length}개 이뤘어요',
+                style: AppTextStyles.caption,
+              ),
+            ],
           ),
-          const SizedBox(height: 14),
-          _GoalLines(items: goal.items),
+          const SizedBox(height: 12),
+          ProgressBar(ratio: goal.rate),
+          const SizedBox(height: 10),
+          Text(
+            '${at.month}월 ${at.day}일에 냈어요',
+            style: AppTextStyles.caption.copyWith(fontSize: 12),
+          ),
         ],
       ),
     );
   }
 }
 
-/// 번호 붙은 목표 줄들 — 내 목표와 대표 화면이 같이 쓴다
-class _GoalLines extends StatelessWidget {
-  const _GoalLines({required this.items});
+/// 목표 줄들 — 이룬 것은 체크 · 본인은 눌러서 바꾼다
+class _ItemsCard extends StatelessWidget {
+  const _ItemsCard({
+    required this.goal,
+    required this.checkable,
+    required this.onToggle,
+  });
 
-  final List<String> items;
+  final MonthlyGoal goal;
+  final bool checkable;
+  final ValueChanged<int> onToggle;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (var i = 0; i < items.length; i++) ...[
-          if (i > 0) const SizedBox(height: 10),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+      decoration: AppDecorations.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _Number(i + 1),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  items[i],
-                  style: AppTextStyles.body2.copyWith(height: 1.5),
+              Expanded(child: Text('목표', style: AppTextStyles.label)),
+              if (checkable)
+                Text(
+                  '이룬 목표를 눌러 체크해요',
+                  style: AppTextStyles.caption.copyWith(fontSize: 12),
                 ),
-              ),
             ],
           ),
+          const SizedBox(height: 8),
+          for (var i = 0; i < goal.items.length; i++)
+            _ItemRow(
+              text: goal.items[i],
+              done: goal.achieved.contains(i),
+              onTap: checkable ? () => onToggle(i) : null,
+            ),
         ],
+      ),
+    );
+  }
+}
+
+class _ItemRow extends StatelessWidget {
+  const _ItemRow({required this.text, required this.done, this.onTap});
+
+  final String text;
+  final bool done;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final row = Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            done
+                ? Icons.check_circle_rounded
+                : Icons.radio_button_unchecked_rounded,
+            size: 22,
+            color: done ? AppColors.primary : AppColors.gray300,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: AppTextStyles.body2.copyWith(
+                height: 1.5,
+                color: done ? AppColors.textPrimary : AppColors.textSecondary,
+                fontWeight: done ? FontWeight.w600 : FontWeight.w400,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    return onTap == null ? row : Pressable(onTap: onTap!, child: row);
+  }
+}
+
+/// 최근 6개월 달성률 막대 — 급여 추이 그래프와 같은 틀. 누르면 그 달로 간다
+class _TrendCard extends StatelessWidget {
+  const _TrendCard({
+    required this.goals,
+    required this.current,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final List<MonthlyGoal> goals;
+  final DateTime current;
+  final DateTime selected;
+  final ValueChanged<DateTime> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final byMonth = {for (final g in goals) g.yearMonth: g};
+    final months = [
+      for (var i = 5; i >= 0; i--) DateTime(current.year, current.month - i),
+    ];
+    final written = [for (final m in months) ?byMonth[periodKey(m)]];
+    final average = written.isEmpty
+        ? null
+        : written.fold(0.0, (sum, g) => sum + g.rate) / written.length;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(22, 20, 22, 18),
+      decoration: AppDecorations.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Text('최근 6개월', style: AppTextStyles.label)),
+              if (average != null)
+                Text(
+                  '평균 ${_percent(average)}',
+                  style: AppTextStyles.caption.copyWith(fontSize: 12),
+                ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          SizedBox(
+            // 수치(15) + 6 + 막대(최대 78) + 8 + 월(15)
+            height: 126,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                for (final m in months)
+                  Expanded(
+                    child: Pressable(
+                      onTap: () => onSelect(m),
+                      child: _Bar(
+                        month: m,
+                        goal: byMonth[periodKey(m)],
+                        selected: m == selected,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Bar extends StatelessWidget {
+  const _Bar({required this.month, required this.goal, required this.selected});
+
+  final DateTime month;
+
+  /// 그 달에 목표를 안 냈으면 null — 막대 없이 `-`
+  final MonthlyGoal? goal;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final goal = this.goal;
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        Text(
+          goal == null ? '-' : _percent(goal.rate),
+          style: AppTextStyles.caption.copyWith(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: selected ? AppColors.primary : AppColors.textTertiary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 5),
+          child: Container(
+            // 100% 를 78 로 둔다 — 0% 도 바닥에 얇게 보이게 6 을 깐다
+            height: goal == null ? 4 : 6 + 72 * goal.rate,
+            decoration: BoxDecoration(
+              color: selected ? AppColors.primary : AppColors.gray100,
+              borderRadius: BorderRadius.circular(6),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '${month.month}월',
+          style: AppTextStyles.caption.copyWith(
+            fontSize: 11,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+            color: selected ? AppColors.textPrimary : AppColors.textTertiary,
+          ),
+        ),
       ],
     );
   }
@@ -403,6 +700,19 @@ class _Number extends StatelessWidget {
   }
 }
 
+class _BoardSkeleton extends StatelessWidget {
+  const _BoardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: AppDecorations.card(),
+      child: SkeletonRows(rows: 3, avatar: 0, trailing: 0),
+    );
+  }
+}
+
 // ── 대표·관리자 ──
 
 class _GoalRoster extends StatefulWidget {
@@ -414,7 +724,7 @@ class _GoalRoster extends StatefulWidget {
 
 class _GoalRosterState extends State<_GoalRoster>
     with SkeletonDelay<_GoalRoster> {
-  DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
+  DateTime _month = _thisMonth();
   Map<String, MonthlyGoal> _goals = const {};
 
   @override
@@ -445,6 +755,22 @@ class _GoalRosterState extends State<_GoalRoster>
     _fetch();
   }
 
+  Future<void> _open(Employee employee) => showFullPage<void>(
+    context,
+    (context) => PhoneDetailScaffold(
+      title: '${employee.name} 목표',
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          PhoneDetailScaffold.topPadding,
+          20,
+          bottomBarInset(context),
+        ),
+        children: [_EmployeeGoals(employee: employee)],
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     final directory = StaffDirectory.instance;
@@ -468,7 +794,7 @@ class _GoalRosterState extends State<_GoalRoster>
           loading: showSkeleton,
           padding: const EdgeInsets.fromLTRB(0, 0, 4, 10),
           onPrev: () => _move(-1),
-          onNext: () => _move(1),
+          onNext: _month == _thisMonth() ? null : () => _move(1),
         ),
         if (showSkeleton)
           Container(
@@ -481,18 +807,28 @@ class _GoalRosterState extends State<_GoalRoster>
         else
           for (var i = 0; i < staff.length; i++) ...[
             if (i > 0) const SizedBox(height: 12),
-            _PersonGoal(employee: staff[i], goal: _goals[staff[i].id]),
+            _PersonCard(
+              employee: staff[i],
+              goal: _goals[staff[i].id],
+              onTap: () => _open(staff[i]),
+            ),
           ],
       ],
     );
   }
 }
 
-class _PersonGoal extends StatelessWidget {
-  const _PersonGoal({required this.employee, this.goal});
+/// 명단 한 줄 — 이름 · 직급 · 그 달 달성
+class _PersonCard extends StatelessWidget {
+  const _PersonCard({
+    required this.employee,
+    required this.goal,
+    required this.onTap,
+  });
 
   final Employee employee;
   final MonthlyGoal? goal;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -502,50 +838,97 @@ class _PersonGoal extends StatelessWidget {
         ? '${employee.rank.label} · $branch'
         : employee.rank.label;
     final goal = this.goal;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
-      decoration: AppDecorations.card(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Avatar(name: employee.name, size: 36),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      employee.name,
-                      style: AppTextStyles.body1.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+    return Pressable(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 18, 16, 18),
+        decoration: AppDecorations.card(),
+        child: Row(
+          children: [
+            Avatar(name: employee.name, size: 40),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    employee.name,
+                    style: AppTextStyles.body1.copyWith(
+                      fontWeight: FontWeight.w700,
                     ),
-                    Text(
-                      subtitle,
-                      style: AppTextStyles.caption.copyWith(fontSize: 12),
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: AppTextStyles.caption.copyWith(fontSize: 12),
+                  ),
+                ],
               ),
-              Text(
-                goal == null ? '아직 안 적었어요' : '${goal.items.length}개',
-                style: AppTextStyles.caption.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: goal == null
-                      ? AppColors.textTertiary
-                      : AppColors.primary,
-                ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              goal == null
+                  ? '아직 안 적었어요'
+                  : '${goal.achieved.length}/${goal.items.length} 달성',
+              style: AppTextStyles.caption.copyWith(
+                fontWeight: FontWeight.w700,
+                color: goal == null
+                    ? AppColors.textTertiary
+                    : AppColors.primary,
               ),
-            ],
-          ),
-          if (goal != null) ...[
-            const SizedBox(height: 14),
-            _GoalLines(items: goal.items),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 20,
+              color: AppColors.gray300,
+            ),
           ],
-        ],
+        ),
       ),
     );
+  }
+}
+
+/// 대표가 직원을 눌렀을 때 — 그 사람의 목표판 (읽기만)
+class _EmployeeGoals extends StatefulWidget {
+  const _EmployeeGoals({required this.employee});
+
+  final Employee employee;
+
+  @override
+  State<_EmployeeGoals> createState() => _EmployeeGoalsState();
+}
+
+class _EmployeeGoalsState extends State<_EmployeeGoals>
+    with SkeletonDelay<_EmployeeGoals> {
+  List<MonthlyGoal> _goals = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetch();
+  }
+
+  Future<void> _fetch() async {
+    setState(beginLoad);
+    try {
+      final goals = await GoalApi.ofEmployee(widget.employee.id);
+      if (!mounted) return;
+      setState(() {
+        _goals = goals;
+        endLoad();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(endLoad);
+      AppToast.show(context, messageOf(e));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (showSkeleton) return const _BoardSkeleton();
+    return _GoalBoard(goals: _goals, current: _thisMonth(), mine: false);
   }
 }

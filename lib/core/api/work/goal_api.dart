@@ -6,6 +6,7 @@ class MonthlyGoal {
     required this.employeeId,
     required this.yearMonth,
     required this.items,
+    required this.achieved,
     required this.createdAt,
   });
 
@@ -13,6 +14,7 @@ class MonthlyGoal {
     employeeId: json['employeeId'] as String,
     yearMonth: json['yearMonth'] as String,
     items: [for (final item in json['items'] as List) item as String],
+    achieved: {for (final i in json['achieved'] as List) i as int},
     createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
   );
 
@@ -21,7 +23,21 @@ class MonthlyGoal {
   /// `YYYY-MM`
   final String yearMonth;
   final List<String> items;
+
+  /// 이룬 목표의 번호 (0부터) — 본인이 체크한다
+  final Set<int> achieved;
   final DateTime createdAt;
+
+  /// 달성률 0~1
+  double get rate => items.isEmpty ? 0 : achieved.length / items.length;
+
+  MonthlyGoal copyWith({Set<int>? achieved}) => MonthlyGoal(
+    employeeId: employeeId,
+    yearMonth: yearMonth,
+    items: items,
+    achieved: achieved ?? this.achieved,
+    createdAt: createdAt,
+  );
 }
 
 /// 이번 달 내 목표 (서버 `MyGoalOut`)
@@ -86,6 +102,30 @@ class GoalApi {
       body: {'items': items},
     );
     return MonthlyGoal.fromJson(json!);
+  }
+
+  /// 목표 한 줄을 이뤘다·못 이뤘다로 — 본인만, 그 달과 다음 달까지
+  static Future<MonthlyGoal> check(
+    String yearMonth,
+    int index, {
+    required bool done,
+  }) async {
+    final json = await ApiClient.instance.post(
+      '/goals/me/check',
+      body: {'yearMonth': yearMonth, 'index': index, 'done': done},
+    );
+    return MonthlyGoal.fromJson(json!);
+  }
+
+  /// 한 직원이 낸 목표 전부 — MASTER·ADMIN 만
+  static Future<List<MonthlyGoal>> ofEmployee(String employeeId) async {
+    final rows = await ApiClient.instance.getList(
+      '/goals/employees/$employeeId',
+    );
+    return [
+      for (final row in rows)
+        MonthlyGoal.fromJson((row as Map).cast<String, dynamic>()),
+    ];
   }
 
   /// 그 달 전 직원 목표 — MASTER·ADMIN 만
