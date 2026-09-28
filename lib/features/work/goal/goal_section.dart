@@ -48,6 +48,9 @@ class _MyGoal extends StatefulWidget {
 
 class _MyGoalState extends State<_MyGoal> with SkeletonDelay<_MyGoal> {
   MyGoal? _mine;
+
+  /// 지난 달까지 낸 목표 — 이번 달 카드 아래에 쌓인다
+  List<MonthlyGoal> _past = const [];
   final _fields = [TextEditingController(), TextEditingController()];
   bool _busy = false;
 
@@ -73,10 +76,14 @@ class _MyGoalState extends State<_MyGoal> with SkeletonDelay<_MyGoal> {
   Future<void> _fetch() async {
     setState(beginLoad);
     try {
-      final mine = await GoalApi.me();
+      final (mine, all) = await (GoalApi.me(), GoalApi.mine()).wait;
       if (!mounted) return;
       setState(() {
         _mine = mine;
+        _past = [
+          for (final goal in all)
+            if (goal.yearMonth != mine.yearMonth) goal,
+        ];
         endLoad();
       });
     } catch (e) {
@@ -145,9 +152,35 @@ class _MyGoalState extends State<_MyGoal> with SkeletonDelay<_MyGoal> {
         child: SkeletonRows(rows: 3, avatar: 0, trailing: 0),
       );
     }
-    final month = int.parse(mine.yearMonth.split('-').last);
-    if (mine.goal case final goal?) return _Submitted(month: month, goal: goal);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (mine.goal case final goal?)
+          _Submitted(goal: goal, current: true)
+        else
+          _form(mine),
+        const SizedBox(height: 28),
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 12),
+          child: Text(
+            '지난 목표',
+            style: AppTextStyles.body1.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ),
+        if (_past.isEmpty)
+          EmptyCard(icon: Icons.flag_rounded, text: '지난 달 목표가 여기에 쌓여요')
+        else
+          for (var i = 0; i < _past.length; i++) ...[
+            if (i > 0) const SizedBox(height: 12),
+            _Submitted(goal: _past[i], current: false),
+          ],
+      ],
+    );
+  }
 
+  /// 이번 달 목표를 적는 카드 — 아직 안 냈을 때
+  Widget _form(MyGoal mine) {
+    final month = int.parse(mine.yearMonth.split('-').last);
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
       decoration: AppDecorations.card(),
@@ -273,24 +306,35 @@ class _GoalField extends StatelessWidget {
 
 /// 낸 목표 — 잠겨 있다
 class _Submitted extends StatelessWidget {
-  const _Submitted({required this.month, required this.goal});
+  const _Submitted({required this.goal, required this.current});
 
-  final int month;
   final MonthlyGoal goal;
+
+  /// 이번 달 것인가 — '고칠 수 없어요' 는 이번 달에만 붙인다
+  final bool current;
 
   @override
   Widget build(BuildContext context) {
     final at = goal.createdAt;
+    final [year, month] = [
+      for (final part in goal.yearMonth.split('-')) int.parse(part),
+    ];
+    // 올해가 아니면 해를 같이 적는다 — 12월과 다음 해 1월이 나란히 선다
+    final title = year == DateTime.now().year
+        ? '$month월 목표'
+        : '$year년 $month월 목표';
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: AppDecorations.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('$month월 목표', style: AppTextStyles.title3),
+          Text(title, style: AppTextStyles.title3),
           const SizedBox(height: 4),
           Text(
-            '${at.month}월 ${at.day}일에 냈어요 · 이번 달은 고칠 수 없어요',
+            current
+                ? '${at.month}월 ${at.day}일에 냈어요 · 이번 달은 고칠 수 없어요'
+                : '${at.month}월 ${at.day}일에 냈어요',
             style: AppTextStyles.caption,
           ),
           const SizedBox(height: 14),

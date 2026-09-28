@@ -70,6 +70,15 @@ class GoalApi {
   static Future<MyGoal> me() async =>
       MyGoal.fromJson(await ApiClient.instance.get('/goals/me'));
 
+  /// 내가 낸 목표 전부 — 최신 달이 먼저 (지난 달 것을 다시 본다)
+  static Future<List<MonthlyGoal>> mine() async {
+    final rows = await ApiClient.instance.getList('/goals/me/list');
+    return [
+      for (final row in rows)
+        MonthlyGoal.fromJson((row as Map).cast<String, dynamic>()),
+    ];
+  }
+
   /// 이번 달 목표 내기 — **한 번 내면 못 고친다** (두 번째는 409)
   static Future<MonthlyGoal> submit(List<String> items) async {
     final json = await ApiClient.instance.post(
