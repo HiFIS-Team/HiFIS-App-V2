@@ -4,11 +4,13 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:video_player/video_player.dart';
 
 import '../../core/api/work/workout_api.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/util/sf_symbols.dart';
 import '../../core/util/photo.dart';
 import '../../core/util/photo_cache.dart';
 import '../../core/util/platform.dart';
@@ -288,7 +290,10 @@ class _GroupCard extends StatelessWidget {
   }
 }
 
-/// 자료 한 칸 — 사진은 미리보기, 영상은 재생 표시
+/// 앱 안에서 영상을 틀 수 있나 — `video_player` 는 윈도우를 안 탄다
+bool get _playsInApp => isApple || !isDesktop;
+
+/// 자료 한 칸 — 사진은 미리보기, 영상은 첫 프레임 + 재생 표시
 class _Thumb extends StatefulWidget {
   const _Thumb({required this.item, required this.size, this.onRemove});
 
@@ -304,10 +309,16 @@ class _ThumbState extends State<_Thumb> {
   File? _file;
   bool _failed = false;
 
+  /// 영상 첫 프레임 — 서명 주소라 헤더 없이 받는다. 앞머리(moov)만 읽어서 가볍다
+  VideoPlayerController? _video;
+
   @override
   void initState() {
     super.initState();
-    if (widget.item.isVideo) return;
+    if (widget.item.isVideo) {
+      if (_playsInApp) _loadFrame();
+      return;
+    }
     // 아바타·사내톡 사진과 같은 길 — 한 번 받으면 다음부터 바로 뜬다
     final url = widget.item.url;
     _file = PhotoCache.ready(url);
@@ -319,6 +330,25 @@ class _ThumbState extends State<_Thumb> {
         _failed = file == null;
       });
     });
+  }
+
+  Future<void> _loadFrame() async {
+    final video = VideoPlayerController.networkUrl(
+      Uri.parse(widget.item.fullUrl),
+    );
+    try {
+      await video.initialize();
+      if (!mounted) return video.dispose();
+      setState(() => _video = video);
+    } catch (_) {
+      await video.dispose();
+    }
+  }
+
+  @override
+  void dispose() {
+    _video?.dispose();
+    super.dispose();
   }
 
   @override
@@ -371,12 +401,28 @@ class _ThumbState extends State<_Thumb> {
 
   Widget _inner() {
     if (widget.item.isVideo) {
-      return Center(
-        child: Icon(
-          CupertinoIcons.play_circle_fill,
-          size: 34,
-          color: AppColors.textTertiary,
-        ),
+      final video = _video;
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          if (video != null)
+            FittedBox(
+              fit: BoxFit.cover,
+              clipBehavior: Clip.hardEdge,
+              child: SizedBox(
+                width: video.value.size.width,
+                height: video.value.size.height,
+                child: VideoPlayer(video),
+              ),
+            ),
+          Center(
+            child: Icon(
+              CupertinoIcons.play_circle_fill,
+              size: 34,
+              color: video != null ? Colors.white : AppColors.textTertiary,
+            ),
+          ),
+        ],
       );
     }
     if (_file case final file?) {
@@ -405,12 +451,16 @@ class _ThumbState extends State<_Thumb> {
 
 /// 자료 크게 보기
 ///
-/// **영상은 시스템 재생기로 넘긴다.** `video_player` 는 윈도우를 지원하지 않고
-/// `media_kit` 은 여섯 플랫폼에 네이티브 의존을 더한다. 서버가 영상 확장자를
-/// 내려받기가 아니라 재생으로 내보내 줘서(`INLINE_EXTS`) 브라우저에서 바로 돈다.
+/// **영상은 앱 안에서 튼다.** 아이폰 영상이 .mov(`video/quicktime`)라
+/// 안드로이드 브라우저로 넘기면 재생이 안 되고 파일만 떨어졌다.
+/// 윈도우만 `video_player` 가 없어서 예전처럼 시스템 재생기로 넘긴다.
 Future<void> openWorkoutMedia(BuildContext context, MediaItem item) async {
   if (!item.isVideo) {
     await showFullPage(context, (_) => _PhotoViewer(item: item));
+    return;
+  }
+  if (_playsInApp) {
+    await showFullPage(context, (_) => _VideoViewer(item: item));
     return;
   }
   final opened = await launchUrl(
@@ -419,6 +469,134 @@ Future<void> openWorkoutMedia(BuildContext context, MediaItem item) async {
   ).catchError((_) => false);
   if (!opened && context.mounted) {
     AppToast.show(context, '영상을 열 수 있는 앱이 없어요');
+  }
+}
+
+/// 영상 크게 — 열자마자 틀고, 누르면 멈췄다 다시 튼다
+class _VideoViewer extends StatefulWidget {
+  const _VideoViewer({required this.item});
+
+  final MediaItem item;
+
+  @override
+  State<_VideoViewer> createState() => _VideoViewerState();
+}
+
+class _VideoViewerState extends State<_VideoViewer> {
+  late final VideoPlayerController _video = VideoPlayerController.networkUrl(
+    Uri.parse(widget.item.fullUrl),
+  );
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _video.addListener(_onTick);
+    _video.initialize().then((_) => _video.play()).catchError((_) {
+      if (mounted) setState(() => _failed = true);
+    });
+  }
+
+  void _onTick() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _video.dispose();
+    super.dispose();
+  }
+
+  void _toggle() {
+    if (!_video.value.isInitialized) return;
+    _video.value.isPlaying ? _video.pause() : _video.play();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final value = _video.value;
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: _toggle,
+              child: Container(
+                color: Colors.black,
+                alignment: Alignment.center,
+                child: _failed
+                    ? Text(
+                        '영상을 불러오지 못했어요',
+                        style: AppTextStyles.body2.copyWith(
+                          color: Colors.white70,
+                        ),
+                      )
+                    : !value.isInitialized
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          AspectRatio(
+                            aspectRatio: value.aspectRatio,
+                            child: VideoPlayer(_video),
+                          ),
+                          if (!value.isPlaying)
+                            const Icon(
+                              CupertinoIcons.play_circle_fill,
+                              size: 62,
+                              color: Colors.white70,
+                            ),
+                        ],
+                      ),
+              ),
+            ),
+          ),
+          if (value.isInitialized)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: MediaQuery.paddingOf(context).bottom + 16,
+              child: VideoProgressIndicator(
+                _video,
+                allowScrubbing: true,
+                colors: const VideoProgressColors(
+                  playedColor: Colors.white,
+                  bufferedColor: Colors.white38,
+                  backgroundColor: Colors.white24,
+                ),
+              ),
+            ),
+          Positioned(
+            top: MediaQuery.paddingOf(context).top + 8,
+            right: 12,
+            child: Pressable(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.close_rounded,
+                  size: 20,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

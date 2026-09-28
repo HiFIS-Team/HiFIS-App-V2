@@ -299,14 +299,8 @@ class _PtSurveyScreenState extends State<PtSurveyScreen>
   /// 줄을 세우는 기준값 — 답변은 답한 때, 미응답은 열린 때다
   DateTime _sortKey(PtSurvey survey) => survey.answeredAt ?? survey.createdAt;
 
-  /// 차례를 매긴다 — **두 탭이 반대 방향이다**
-  ///
-  /// 답변은 새것이 위다 (방금 온 것을 읽는 자리다).
-  /// 미응답은 **오래된 것이 위다** — 제일 오래 기다린 사람이 먼저 챙겨야 할
-  /// 사람이라, 새것부터 세우면 정작 잊힌 줄이 맨 아래로 가라앉는다.
-  int _compare(PtSurvey a, PtSurvey b) => _tab == 0
-      ? _sortKey(b).compareTo(_sortKey(a))
-      : _sortKey(a).compareTo(_sortKey(b));
+  /// 차례를 매긴다 — 두 탭 다 **새것이 위다** (2026-09-28 대표 요청)
+  int _compare(PtSurvey a, PtSurvey b) => _sortKey(b).compareTo(_sortKey(a));
 
   @override
   Widget build(BuildContext context) {
