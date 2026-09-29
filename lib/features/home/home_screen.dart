@@ -274,13 +274,12 @@ class _HomeScreenState extends State<HomeScreen>
                               onChanged: _refresh,
                             ),
                           ),
-                          SizedBox(width: 16),
-                          Expanded(
-                            child: _NoticeCard(
-                              onOpenAll: widget.onOpenNotices,
-                              onChanged: _refresh,
-                            ),
-                          ),
+                          // 직원·점장은 공지 자리에 OT 가 선다 — 공지는 맨 위
+                          // 카드로 올라갔다 (2026-09-29 대표 요청)
+                          if (!myRole.boss) ...[
+                            SizedBox(width: 16),
+                            Expanded(child: _OtCard()),
+                          ],
                         ],
                       ),
                     ),
@@ -290,18 +289,9 @@ class _HomeScreenState extends State<HomeScreen>
                     onOpenAll: widget.onOpenProjects,
                     onChanged: _refresh,
                   ),
-                  SizedBox(height: 16),
-                  // 직원·점장은 프로젝트와 공지 사이 (2026-09-28 대표 요청)
-                  if (!myRole.boss) ...[_OtCard(), SizedBox(height: 16)],
-                  _NoticeCard(
-                    onOpenAll: widget.onOpenNotices,
-                    onChanged: _refresh,
-                  ),
-                ],
-                // 직원·점장 PC — 프로젝트·공지 한 줄 아래에 둔다
-                if (desktop && !myRole.boss) ...[
-                  SizedBox(height: 16),
-                  _OtCard(),
+                  // 직원·점장은 프로젝트 아래 OT — 아래 공지 카드는 뺐다.
+                  // 공지는 맨 위 카드가 보여준다 (2026-09-29 대표 요청)
+                  if (!myRole.boss) ...[SizedBox(height: 16), _OtCard()],
                 ],
               ],
             ),

@@ -28,7 +28,6 @@ import '../../core/widgets/feedback/failed_card.dart';
 import '../../core/widgets/feedback/skeleton.dart';
 import '../../core/util/screen_refresh.dart';
 import '../../core/util/skeleton_delay.dart';
-import '../notifications/notification_screen.dart';
 
 part 'notice_phone.dart';
 part 'notice_list.dart';
@@ -323,21 +322,6 @@ class NoticeBrief {
   }
 }
 
-/// 홈 카드용 — 관련 알림 최신순, 없으면 생성순으로 [count]개까지
-List<NoticeBrief> noticeBriefs(int count) {
-  final list = [..._notices]
-    ..sort((a, b) {
-      final aActivity = a.id == null
-          ? null
-          : latestNotificationAt('notices', a.id!);
-      final bActivity = b.id == null
-          ? null
-          : latestNotificationAt('notices', b.id!);
-      return (bActivity ?? b.date).compareTo(aActivity ?? a.date);
-    });
-  return list.take(count).map(NoticeBrief._).toList();
-}
-
 /// 홈 맨 위 카드 — **가장 최근에 올라온** 공지 하나 (없으면 null)
 ///
 /// [noticeBriefs] 는 알림이 온 순이라 댓글·반응이 달린 옛 공지가 앞에 온다.
@@ -347,9 +331,6 @@ NoticeBrief? latestNoticeBrief() {
   final newest = _notices.reduce((a, b) => b.date.isAfter(a.date) ? b : a);
   return NoticeBrief._(newest);
 }
-
-/// 올라온 공지 수 (홈 카드 머리말)
-int get noticeCount => _notices.length;
 
 /// 홈에서 공지 목록을 채운다
 ///

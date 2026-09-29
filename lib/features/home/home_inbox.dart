@@ -2,9 +2,8 @@ part of 'home_screen.dart';
 
 /// 홈 맨 위 — **가장 최근 공지 한 건** (2026-09-29 대표 요청)
 ///
-/// 인사말 카드가 있던 자리다. **크기를 그대로 둔다** — 제목 칸을 인사말과 같은
-/// 두 줄 높이로 잡아서, 제목이 짧든 길든 카드가 커지거나 줄지 않는다.
-/// 안 읽었으면 빨간 점이 붙는다. 누르면 그 공지를 연다.
+/// 인사말 카드가 있던 자리다. 안 읽었으면 빨간 점이 붙는다. 누르면 그 공지를
+/// 연다.
 class _LatestNoticeCard extends StatelessWidget {
   _LatestNoticeCard({this.onOpenAll, required this.onChanged});
 
@@ -28,49 +27,86 @@ class _LatestNoticeCard extends StatelessWidget {
     final brief = latestNoticeBrief();
     final card = Container(
       width: double.infinity,
-      padding: EdgeInsets.all(24),
+      // 위아래를 줄였다 (2026-09-29 대표 요청) — 인사말 높이에 맞추느라
+      // 남던 여백이 컸다. 이제 내용 높이만큼만 선다
+      padding: EdgeInsets.fromLTRB(20, 16, 16, 16),
       decoration: AppDecorations.card(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Text(
-                brief == null ? '공지' : '공지 · ${brief.author} · ${brief.time}',
-                style: AppTextStyles.caption,
-              ),
-              if (brief != null && brief.unread) ...[
-                SizedBox(width: 6),
-                Container(
-                  width: 7,
-                  height: 7,
-                  decoration: BoxDecoration(
-                    color: AppColors.error,
-                    shape: BoxShape.circle,
+          // 확성기 — 공지 탭·빈 상태와 같은 아이콘
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(
+              Icons.campaign_rounded,
+              size: 28,
+              color: AppColors.primary,
+            ),
+          ),
+          SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      '공지',
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (brief != null) ...[
+                      SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          '${brief.author} · ${brief.time}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.caption,
+                        ),
+                      ),
+                    ],
+                    if (brief != null && brief.unread) ...[
+                      SizedBox(width: 6),
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          color: AppColors.error,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                SizedBox(height: 4),
+                Text(
+                  brief?.title ?? '올라온 공지가 없어요',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.title3.copyWith(
+                    height: 1.35,
+                    color: brief == null ? AppColors.textTertiary : null,
                   ),
                 ),
               ],
-            ],
+            ),
           ),
-          SizedBox(height: 4),
-          // 인사말(두 줄)과 **같은 높이**를 잡아 둔다 — 보이지 않는 두 줄을
-          // 깔고 그 위에 제목을 얹는다
-          Stack(
-            children: [
-              Opacity(
-                opacity: 0,
-                child: Text('가\n가', style: AppTextStyles.title1),
-              ),
-              Text(
-                brief?.title ?? '올라온 공지가 없어요',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: AppTextStyles.title1.copyWith(
-                  color: brief == null ? AppColors.textTertiary : null,
-                ),
-              ),
-            ],
-          ),
+          if (brief != null) ...[
+            SizedBox(width: 8),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 22,
+              color: AppColors.gray300,
+            ),
+          ],
         ],
       ),
     );
