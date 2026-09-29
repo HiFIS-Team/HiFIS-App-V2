@@ -173,18 +173,40 @@ Future<void> _loadStaff() async {
 ///
 /// 명단 카드와 상세 화면 둘 다 쓴다. **서버가 기존 DM 을 찾아 주므로**
 /// 같은 사람에게 여러 번 눌러도 방이 새로 생기지 않는다.
+///
+/// **이미 받아 둔 1:1 방이 있으면 기다리지 않고 바로 연다** (2026-09-29 —
+/// 프로젝트 상세와 같은 고침). 없을 때만 서버에 만들고, 그동안 또 누르면
+/// 무시한다 — 예전에는 기다리는 사이 두 번 누르면 대화방이 두 장 쌓였다.
 Future<void> _openChat(BuildContext context, _Member member) async {
+  if (_chatOpening) return;
+  _chatOpening = true;
   try {
-    final room = await ChatStore.instance.createRoom([member.id]);
+    final me = currentUser?.id;
+    String? roomId;
+    for (final room in ChatStore.instance.rooms) {
+      final ids = room.memberIds.toSet();
+      if (!room.isGroup &&
+          ids.length == 2 &&
+          ids.containsAll({me, member.id})) {
+        roomId = room.id;
+        break;
+      }
+    }
+    roomId ??= (await ChatStore.instance.createRoom([member.id])).id;
     if (!context.mounted) return;
-    Navigator.push(
+    await Navigator.push(
       context,
-      CupertinoPageRoute(builder: (_) => ChatScreen(roomId: room.id)),
+      CupertinoPageRoute(builder: (_) => ChatScreen(roomId: roomId!)),
     );
   } catch (error) {
     if (context.mounted) AppToast.show(context, messageOf(error));
+  } finally {
+    _chatOpening = false;
   }
 }
+
+/// 사내톡을 여는 중인가 — 연달아 눌러 방이 두 장 쌓이던 것을 막는다
+bool _chatOpening = false;
 
 /// 서버가 돌려준 사람으로 명단의 그 자리를 갈아끼운다
 ///

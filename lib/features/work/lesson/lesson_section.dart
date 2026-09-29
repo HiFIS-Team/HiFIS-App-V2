@@ -40,7 +40,7 @@ import '../../../core/util/when.dart';
 import '../../../core/api/work/workout_api.dart';
 import '../../../core/util/layout.dart';
 import '../../../core/widgets/nav/phone_scaffold.dart';
-import '../../member/workout_log.dart' show showWorkoutLog;
+import '../../member/workout_log.dart' show WorkoutLogScreen;
 import '../work_skeleton.dart';
 import '../../../core/widgets/feedback/skeleton.dart';
 part 'lesson_data.dart';

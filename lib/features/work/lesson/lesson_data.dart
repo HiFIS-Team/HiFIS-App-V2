@@ -312,40 +312,82 @@ class _SignImageState extends State<_SignImage> {
 ///
 /// 일지는 읽기만 한다. 서버에 싸인 ↔ 일지 끈이 없어서 **회차 번호로** 찾는다
 /// ([_workoutNoOf]). 못 찾으면 싸인만 보여주고 일지 자리에 빈 카드를 둔다.
+///
+/// **누르는 즉시 연다** (2026-09-29 — 프로젝트 상세와 같은 고침). 예전에는
+/// 회원의 운동일지 목록을 다 받은 뒤에 화면을 밀어 넣어서 늦게 열렸고, 기다리는
+/// 동안 또 누르면 두 장이 쌓였다. 이제 화면이 먼저 뜨고 일지는 그 안에서 받는다.
 Future<void> _showSignDetail(BuildContext context, SessionSign sign) async {
-  final store = _LessonStore.instance;
-  Member? member;
-  for (final m in store.members) {
-    if (m.id == sign.memberId) member = m;
-  }
-  WorkoutLog? log;
+  if (_signOpening) return;
+  _signOpening = true;
   try {
-    final logs = await WorkoutApi.list(sign.memberId, kind: WorkoutKind.pt);
-    final no = _workoutNoOf(sign);
-    final day = DateUtils.dateOnly(sign.signedAt.toLocal());
-    for (final l in logs) {
-      if (no != null ? l.sessionNo == no : l.performedOn == day) log = l;
+    await showFullPage<void>(context, (_) => _SignDetailPage(sign: sign));
+  } finally {
+    _signOpening = false;
+  }
+}
+
+/// 싸인 상세를 여는 중인가 — 연달아 누르면 두 장이 쌓이던 것을 막는다
+bool _signOpening = false;
+
+/// 싸인 상세 — 싸인 요약을 먼저 그리고, 그 회차 운동일지를 받아 온다
+class _SignDetailPage extends StatefulWidget {
+  const _SignDetailPage({required this.sign});
+
+  final SessionSign sign;
+
+  @override
+  State<_SignDetailPage> createState() => _SignDetailPageState();
+}
+
+class _SignDetailPageState extends State<_SignDetailPage> {
+  bool _loading = true;
+  WorkoutLog? _log;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final sign = widget.sign;
+    WorkoutLog? log;
+    try {
+      final logs = await WorkoutApi.list(sign.memberId, kind: WorkoutKind.pt);
+      final no = _workoutNoOf(sign);
+      final day = DateUtils.dateOnly(sign.signedAt.toLocal());
+      for (final l in logs) {
+        if (no != null ? l.sessionNo == no : l.performedOn == day) log = l;
+      }
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
     }
-  } catch (error) {
-    if (!context.mounted) return;
-    AppToast.show(context, messageOf(error));
+    if (!mounted) return;
+    setState(() {
+      _log = log;
+      _loading = false;
+    });
   }
-  if (!context.mounted) return;
-  final header = _SignSummary(sign: sign);
-  if (member != null && log != null) {
-    await showWorkoutLog(
-      context,
-      member: member,
-      kind: WorkoutKind.pt,
-      editable: false,
-      log: log,
-      header: header,
-    );
-    return;
-  }
-  await showFullPage<void>(
-    context,
-    (_) => PhoneDetailScaffold(
+
+  @override
+  Widget build(BuildContext context) {
+    final sign = widget.sign;
+    final header = _SignSummary(sign: sign);
+    Member? member;
+    for (final m in _LessonStore.instance.members) {
+      if (m.id == sign.memberId) member = m;
+    }
+    // 일지를 찾았으면 **같은 자리에서** 일지 화면으로 바꿔 그린다
+    if (!_loading && member != null && _log != null) {
+      return WorkoutLogScreen(
+        member: member,
+        kind: WorkoutKind.pt,
+        editable: false,
+        log: _log,
+        header: header,
+      );
+    }
+    return PhoneDetailScaffold(
       title: sign.displayName,
       background: AppColors.surface,
       child: ListView(
@@ -358,14 +400,20 @@ Future<void> _showSignDetail(BuildContext context, SessionSign sign) async {
         children: [
           header,
           const SizedBox(height: 24),
-          EmptyCard(
-            icon: Icons.fitness_center_rounded,
-            text: '이 회차의 운동일지를 찾지 못했어요',
-          ),
+          if (_loading)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 40),
+              child: Center(child: DelayedSpinner.bare()),
+            )
+          else
+            EmptyCard(
+              icon: Icons.fitness_center_rounded,
+              text: '이 회차의 운동일지를 찾지 못했어요',
+            ),
         ],
       ),
-    ),
-  );
+    );
+  }
 }
 
 /// 이 싸인의 **운동일지 번호** — 회원 누적 회차다
