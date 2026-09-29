@@ -208,6 +208,20 @@ class _MyTaskSectionState extends State<MyTaskSection>
     _load();
   }
 
+  /// 오늘이 아닌 요일에서 체크를 눌렀다
+  ///
+  /// 지난 날이면 **오늘 칸으로 옮겨 준다** — 안 한 일은 오늘 목록의 `밀린 일`
+  /// 에 서 있다. 오지 않은 날은 그날이 돼야 체크할 수 있다.
+  void _notToday() {
+    final today = DateTime.now().weekday;
+    if (_viewDay < today) {
+      AppToast.show(context, '밀린 일은 오늘 목록에서 체크해요');
+      _pickDay(today);
+    } else {
+      AppToast.show(context, '그날이 되면 체크할 수 있어요');
+    }
+  }
+
   /// 체크 — **되돌릴 수 없어서 한 번 묻는다** (2026-08-20 요청)
   ///
   /// 체크하는 순간 그 업무는 수정·삭제가 결재를 타게 된다. 해제하는 길이
@@ -432,11 +446,13 @@ class _MyTaskSectionState extends State<MyTaskSection>
                     const _RowDivider(),
                   _TaskRow(
                     task: day.tasks[i],
-                    // **오늘이 아니면 못 체크한다.** 서버는 체크를 늘 오늘로 찍어서
-                    // (`check_my_task` 가 `_today()`), 다른 요일을 보다 누르면
-                    // 엉뚱한 날에 찍힌다
-                    busy: _busy.contains(day.tasks[i].id) || !_isToday,
-                    onCheck: () => _check(day.tasks[i]),
+                    // **오늘이 아니면 체크하지 않는다.** 서버는 체크를 늘 오늘로
+                    // 찍어서(`check_my_task` 가 `_today()`), 다른 요일에서 누르면
+                    // 엉뚱한 날에 찍힌다. 대신 눌렀을 때 **오늘로 데려간다** —
+                    // 조용히 잠가 두면 밀린 날로 가서 누르던 직원이 고장으로
+                    // 알았다 (2026-09-29 대표 결정)
+                    busy: _busy.contains(day.tasks[i].id),
+                    onCheck: _isToday ? () => _check(day.tasks[i]) : _notToday,
                     onEdit: () => _change(day.tasks[i], MyTaskRequestType.edit),
                     onDelete: () =>
                         _change(day.tasks[i], MyTaskRequestType.delete),

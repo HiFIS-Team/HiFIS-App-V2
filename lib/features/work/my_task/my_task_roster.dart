@@ -406,7 +406,16 @@ class _PersonTaskCardBody extends StatelessWidget {
             )
           else
             for (var i = 0; i < tasks.length; i++) ...[
-              if (i > 0) const _RowDivider(),
+              // 밀려 온 것은 **직원 본인 화면과 같은 구분선** 아래에 선다.
+              // 예전에는 여기만 구분선이 없어서 대표가 보면 어느 게 밀린
+              // 일인지 안 보였다 (2026-09-29 대표 지적)
+              if (tasks[i].carriedFrom != null &&
+                  (i == 0 || tasks[i - 1].carriedFrom == null)) ...[
+                if (i > 0) const SizedBox(height: 12),
+                const _CarriedDivider(),
+                const SizedBox(height: 4),
+              ] else if (i > 0)
+                const _RowDivider(),
               _ReadOnlyRow(task: tasks[i]),
             ],
         ],
