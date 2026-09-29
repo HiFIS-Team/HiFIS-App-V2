@@ -361,7 +361,10 @@ class _ThumbState extends State<_Thumb> {
         children: [
           Positioned.fill(
             child: Pressable(
-              onTap: () => openWorkoutMedia(context, widget.item),
+              // 미리보기로 이미 열어 둔 영상을 넘긴다 — 크게 볼 때 처음부터
+              // 다시 받지 않아서 **누르자마자** 돈다
+              onTap: () =>
+                  openWorkoutMedia(context, widget.item, prepared: _video),
               child: Container(
                 clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
@@ -454,13 +457,24 @@ class _ThumbState extends State<_Thumb> {
 /// **영상은 앱 안에서 튼다.** 아이폰 영상이 .mov(`video/quicktime`)라
 /// 안드로이드 브라우저로 넘기면 재생이 안 되고 파일만 떨어졌다.
 /// 윈도우만 `video_player` 가 없어서 예전처럼 시스템 재생기로 넘긴다.
-Future<void> openWorkoutMedia(BuildContext context, MediaItem item) async {
+///
+/// [prepared] 는 목록 칸이 미리보기로 **이미 열어 둔** 영상이다. 있으면 그걸
+/// 그대로 틀어서 기다림이 없다 (2026-09-29 — 새로 열면 수십 MB 영상의 머리를
+/// 다시 받느라 몇 초씩 걸렸다). 빌려 쓰는 것이라 닫을 때 버리지 않는다.
+Future<void> openWorkoutMedia(
+  BuildContext context,
+  MediaItem item, {
+  VideoPlayerController? prepared,
+}) async {
   if (!item.isVideo) {
     await showFullPage(context, (_) => _PhotoViewer(item: item));
     return;
   }
   if (_playsInApp) {
-    await showFullPage(context, (_) => _VideoViewer(item: item));
+    await showFullPage(
+      context,
+      (_) => _VideoViewer(item: item, prepared: prepared),
+    );
     return;
   }
   final opened = await launchUrl(
@@ -474,24 +488,33 @@ Future<void> openWorkoutMedia(BuildContext context, MediaItem item) async {
 
 /// 영상 크게 — 열자마자 틀고, 누르면 멈췄다 다시 튼다
 class _VideoViewer extends StatefulWidget {
-  const _VideoViewer({required this.item});
+  const _VideoViewer({required this.item, this.prepared});
 
   final MediaItem item;
+
+  /// 목록 칸이 열어 둔 것 — 빌려 쓴다 (닫을 때 버리지 않는다)
+  final VideoPlayerController? prepared;
 
   @override
   State<_VideoViewer> createState() => _VideoViewerState();
 }
 
 class _VideoViewerState extends State<_VideoViewer> {
-  late final VideoPlayerController _video = VideoPlayerController.networkUrl(
-    Uri.parse(widget.item.fullUrl),
-  );
+  /// 빌린 것이 이미 열려 있으면 그걸 쓰고, 아니면 새로 연다
+  late final bool _borrowed = widget.prepared?.value.isInitialized ?? false;
+  late final VideoPlayerController _video = _borrowed
+      ? widget.prepared!
+      : VideoPlayerController.networkUrl(Uri.parse(widget.item.fullUrl));
   bool _failed = false;
 
   @override
   void initState() {
     super.initState();
     _video.addListener(_onTick);
+    if (_borrowed) {
+      _video.seekTo(Duration.zero).then((_) => _video.play());
+      return;
+    }
     _video.initialize().then((_) => _video.play()).catchError((_) {
       if (mounted) setState(() => _failed = true);
     });
@@ -503,7 +526,14 @@ class _VideoViewerState extends State<_VideoViewer> {
 
   @override
   void dispose() {
-    _video.dispose();
+    _video.removeListener(_onTick);
+    if (_borrowed) {
+      // 목록 칸으로 돌려준다 — 첫 화면으로 되감아 둬야 미리보기가 맞다
+      _video.pause();
+      _video.seekTo(Duration.zero);
+    } else {
+      _video.dispose();
+    }
     super.dispose();
   }
 
