@@ -167,14 +167,21 @@ class _TodayBoard extends StatelessWidget {
     // 마지막 값은 **스캔이 없을 때 근무 시간을 대신 보여줄지**다.
     // 월차는 원래 안 나오는 날이라 '근무 09:00~18:00' 이 뜨면 안 온 것처럼 읽힌다.
     final cells = <(String, Color, List<Employee>, bool)>[
-      ('출근', AppColors.workIn, _todayWith(AttendanceStatus.inProgress), true),
-      ('퇴근', AppColors.workOut, _todayWith(AttendanceStatus.normal), true),
+      // 야근 중인 사람은 **아직 매장에 있으므로 출근 칸에 선다** — 야근 칸은
+      // 휴무로 바꿨다 (2026-09-29 대표 결정: 야근은 따로 볼 만큼 뜻이 크지
+      // 않고, 오늘 누가 쉬는 날인지가 더 필요하다)
       (
-        '야근',
-        AppColors.workOvertime,
-        _todayWith(AttendanceStatus.overtime),
+        '출근',
+        AppColors.workIn,
+        [
+          ..._todayWith(AttendanceStatus.inProgress),
+          ..._todayWith(AttendanceStatus.overtime),
+        ],
         true,
       ),
+      ('퇴근', AppColors.workOut, _todayWith(AttendanceStatus.normal), true),
+      // 쉬는 날 — 근무 요일이 아니거나 생일·공휴일이다. 근무 시간을 안 띄운다
+      ('휴무', AppColors.gray400, _todayWith(AttendanceStatus.dayOff), false),
       (
         '조기퇴근',
         AppColors.workEarly,
