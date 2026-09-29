@@ -220,7 +220,10 @@ class _HomeScreenState extends State<HomeScreen>
             child: ListView(
               padding: EdgeInsets.fromLTRB(20, 64, 20, bottomBarInset(context)),
               children: [
-                _GreetingCard(),
+                _LatestNoticeCard(
+                  onOpenAll: widget.onOpenNotices,
+                  onChanged: _refresh,
+                ),
                 SizedBox(height: 16),
                 // 대표·관리자는 출근을 안 해서 근무 카드가 늘 비어 있다.
                 // 그 자리에 결재 대기와 오늘 출근을 아래 프로젝트·공지와 같은

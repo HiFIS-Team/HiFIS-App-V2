@@ -338,6 +338,16 @@ List<NoticeBrief> noticeBriefs(int count) {
   return list.take(count).map(NoticeBrief._).toList();
 }
 
+/// 홈 맨 위 카드 — **가장 최근에 올라온** 공지 하나 (없으면 null)
+///
+/// [noticeBriefs] 는 알림이 온 순이라 댓글·반응이 달린 옛 공지가 앞에 온다.
+/// 맨 위 한 칸은 '새로 올라온 것' 이라 올린 날로만 고른다.
+NoticeBrief? latestNoticeBrief() {
+  if (_notices.isEmpty) return null;
+  final newest = _notices.reduce((a, b) => b.date.isAfter(a.date) ? b : a);
+  return NoticeBrief._(newest);
+}
+
 /// 올라온 공지 수 (홈 카드 머리말)
 int get noticeCount => _notices.length;
 

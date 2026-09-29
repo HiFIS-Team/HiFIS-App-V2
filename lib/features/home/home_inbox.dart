@@ -1,54 +1,81 @@
 part of 'home_screen.dart';
 
-class _GreetingCard extends StatelessWidget {
-  _GreetingCard();
+/// 홈 맨 위 — **가장 최근 공지 한 건** (2026-09-29 대표 요청)
+///
+/// 인사말 카드가 있던 자리다. **크기를 그대로 둔다** — 제목 칸을 인사말과 같은
+/// 두 줄 높이로 잡아서, 제목이 짧든 길든 카드가 커지거나 줄지 않는다.
+/// 안 읽었으면 빨간 점이 붙는다. 누르면 그 공지를 연다.
+class _LatestNoticeCard extends StatelessWidget {
+  _LatestNoticeCard({this.onOpenAll, required this.onChanged});
 
-  String get _todayLabel {
-    final now = DateTime.now();
-    const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
-    return '${now.month}월 ${now.day}일 ${weekdays[now.weekday - 1]}요일';
-  }
+  final VoidCallback? onOpenAll;
 
-  /// 지금 시간에 맞는 인사말
-  ///
-  /// **시간만 본다.** 오늘 근태로 가르면 출퇴근을 안 찍는 대표·관리자가
-  /// 늘 '출근 전' 으로 잡혀서 종일 아침 인사가 뜬다.
-  ///
-  /// 화면을 다시 그릴 때마다 새로 셈한다 — 홈에 머무는 동안 시간이 넘어가면
-  /// 다음 그리기에서 저절로 바뀐다.
-  String get _greeting {
-    final hour = DateTime.now().hour;
-    if (hour < 5) return '늦은 시간까지 고생이 많아요 🌙';
-    if (hour < 11) return '좋은 아침이에요 👋';
-    if (hour < 14) return '점심 드셨나요 🍚';
-    if (hour < 18) return '오후도 힘내요 ☀️';
-    if (hour < 22) return '오늘도 고생하셨어요 🌙';
-    return '늦은 시간까지 고생이 많아요 🌙';
+  /// 본문을 보고 돌아왔을 때 홈을 갱신한다 (읽음 표시)
+  final VoidCallback onChanged;
+
+  Future<void> _open(BuildContext context, NoticeBrief brief) async {
+    if (isDesktop) {
+      requestedNotice.value = brief;
+      onOpenAll?.call();
+      return;
+    }
+    await brief.open(context);
+    onChanged();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final brief = latestNoticeBrief();
+    final card = Container(
       width: double.infinity,
       padding: EdgeInsets.all(24),
       decoration: AppDecorations.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(_todayLabel, style: AppTextStyles.caption),
+          Row(
+            children: [
+              Text(
+                brief == null ? '공지' : '공지 · ${brief.author} · ${brief.time}',
+                style: AppTextStyles.caption,
+              ),
+              if (brief != null && brief.unread) ...[
+                SizedBox(width: 6),
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: BoxDecoration(
+                    color: AppColors.error,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ],
+            ],
+          ),
           SizedBox(height: 4),
-          Text(_greeting, style: AppTextStyles.title1),
-          // 이름에만 브랜드 그라데이션 포인트
-          ShaderMask(
-            blendMode: BlendMode.srcIn,
-            shaderCallback: (bounds) => LinearGradient(
-              colors: [AppColors.primary, AppColors.violet],
-            ).createShader(bounds),
-            child: Text('$me님', style: AppTextStyles.title1),
+          // 인사말(두 줄)과 **같은 높이**를 잡아 둔다 — 보이지 않는 두 줄을
+          // 깔고 그 위에 제목을 얹는다
+          Stack(
+            children: [
+              Opacity(
+                opacity: 0,
+                child: Text('가\n가', style: AppTextStyles.title1),
+              ),
+              Text(
+                brief?.title ?? '올라온 공지가 없어요',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.title1.copyWith(
+                  color: brief == null ? AppColors.textTertiary : null,
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
+    if (brief == null) return card;
+    return Pressable(onTap: () => _open(context, brief), child: card);
   }
 }
 
