@@ -9,6 +9,7 @@ class _WorkItem {
     this.draw = false,
     this.ptSurvey = false,
     this.ot = false,
+    this.stats = false,
   });
 
   final String label;
@@ -41,6 +42,10 @@ class _WorkItem {
   /// 헤더 **왼쪽 끝**에 **OT 신청으로 가는 버튼**을 세우는 항목인지
   /// (센터 기여도만 — 2026-09-28 대표 요청)
   final bool ot;
+
+  /// 헤더 **왼쪽 끝**에 **지점 통계로 가는 그래프 버튼**을 세우는 항목인지
+  /// (환경정비만 — 2026-09-30 대표 요청. 점장이 개인 업무로 적는 숫자라 이 탭이다)
+  final bool stats;
 }
 
 // 밑줄 탭 위젯(`_WorkTab`)은 [UnderlineTabs] 로 옮겼다 (2026-08-21).

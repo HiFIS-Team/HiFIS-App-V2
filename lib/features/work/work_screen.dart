@@ -42,6 +42,7 @@ import '../member/member_screen.dart';
 import 'contribution/contribution_section.dart';
 import 'goal/goal_section.dart';
 import '../ot/ot_screen.dart';
+import 'branch_stats/branch_stats_screen.dart';
 import 'lesson/lesson_section.dart';
 import 'lesson/pt_survey_screen.dart';
 import 'my_task/my_task_section.dart';
@@ -170,6 +171,8 @@ class _WorkScreenState extends State<WorkScreen>
   void _syncHeaderAction() {
     final item = _items[_tab];
     _setHeaderAction([
+      // 지점 통계 — **전원에게 선다** (2026-09-30 대표 요청)
+      if (item.stats) HeaderAction(symbol: 'chart.bar', onPressed: _openStats),
       if (item.checklist && _canDoEnv && _envTab != 2)
         HeaderAction(symbol: 'plus', onPressed: _addMyTask),
       // **권한을 안 가린다** (2026-09-01 대표 결정) — 직원이 각자 자기
@@ -223,6 +226,11 @@ class _WorkScreenState extends State<WorkScreen>
   /// **운동일지 화면이 아니다.** 저기(`운동 일지` 버튼)는 회원을 고르면 일지가
   /// 열리는 수업 흐름이고, 여기는 활성·만료로 갈라 보고 인적 사항을 고치거나
   /// 지우는 자리다.
+  /// 지점 통계를 연다 — 점장이 개인 업무로 적는 숫자를 그래프로 본다
+  void _openStats() {
+    showFullPage<void>(context, (_) => BranchStatsScreen(branchId: _branch));
+  }
+
   /// OT 신청을 연다 — 지점 고르개를 그대로 물려준다
   void _openOt() {
     showFullPage<void>(context, (_) => OtScreen(branchId: _branch));
@@ -565,7 +573,7 @@ class _WorkScreenState extends State<WorkScreen>
 
   /// 항목 목록 — 환경정비의 점검 항목은 서버(지점별)에서 받아 온다
   static const _items = [
-    _WorkItem(label: '환경정비', checklist: true),
+    _WorkItem(label: '환경정비', checklist: true, stats: true),
     _WorkItem(label: '동료 평가'),
     _WorkItem(label: '회원 친절도', draw: true, ptSurvey: true),
     _WorkItem(label: '수업 개수', members: true),

@@ -600,6 +600,20 @@
     "createdAt"
    ]
   },
+  "BranchStatsOut": {
+   "properties": {
+    "branchId": {
+     "nullable": true
+    },
+    "days": {},
+    "fields": {}
+   },
+   "required": [
+    "branchId",
+    "fields",
+    "days"
+   ]
+  },
   "BranchUpdate": {
    "properties": {
     "name": {
@@ -3920,6 +3934,16 @@
     "ip"
    ]
   },
+  "StatDayOut": {
+   "properties": {
+    "date": {},
+    "values": {}
+   },
+   "required": [
+    "date",
+    "values"
+   ]
+  },
   "SupplementCreate": {
    "properties": {
     "dose": {},
@@ -4484,5 +4508,5 @@
    ]
   }
  },
- "version": "0.34.0"
+ "version": "0.35.0"
 }

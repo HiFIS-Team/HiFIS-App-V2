@@ -41,6 +41,8 @@ const _icons = <String, IconData>{
   'person.fill': Icons.person_rounded,
   // 회원 관리 — 데스크톱 사이드바의 '회원'과 같은 아이콘이다
   'person.2': Icons.people_alt_rounded,
+  // 지점 통계 — 환경정비 헤더의 그래프 버튼
+  'chart.bar': Icons.bar_chart_rounded,
   // 프로젝트 상세 헤더의 인원 추가 — 본문 `+` 동그라미와 같은 아이콘이다
   'person.badge.plus': Icons.person_add_alt_rounded,
   'plus': Icons.add_rounded,
