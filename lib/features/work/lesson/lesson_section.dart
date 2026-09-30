@@ -40,6 +40,7 @@ import '../../../core/util/when.dart';
 import '../../../core/api/work/workout_api.dart';
 import '../../../core/util/layout.dart';
 import '../../../core/widgets/nav/phone_scaffold.dart';
+import '../../member/member_trainers.dart' show TrainerCard;
 import '../../member/workout_log.dart' show WorkoutLogScreen;
 import '../work_skeleton.dart';
 import '../../../core/widgets/feedback/skeleton.dart';
@@ -159,14 +160,99 @@ class _LessonSectionState extends State<LessonSection>
     if (signed == true && mounted) await _load();
   }
 
-  /// 세션 기록 전체 화면을 연다
-  void _openHistory() {
-    showFullPage<void>(context, (_) => _SignHistoryScreen());
+  /// 세션 기록 전체 화면을 연다 — [trainerId] 를 주면 그 사람 것만 걸러 연다
+  void _openHistory([String? trainerId]) {
+    showFullPage<void>(
+      context,
+      (_) => _SignHistoryScreen(trainerId: trainerId),
+    );
+  }
+
+  /// 대표·관리자 — 섞인 기록 대신 **트레이너부터** 세운다 (2026-09-30 대표 요청)
+  ///
+  /// 회원 정보·운동 일지의 첫 화면([MemberTrainerList])과 같은 카드다.
+  /// 누르면 세션 기록이 그 사람으로 걸러져 열린다.
+  Widget _trainerList() {
+    final directory = StaffDirectory.instance;
+    final counts = <String, int>{};
+    for (final sign in _LessonStore.instance.signs) {
+      counts[sign.performedByTrainerId] =
+          (counts[sign.performedByTrainerId] ?? 0) + 1;
+    }
+    final branch = rosterBranchId;
+    final staff = [
+      for (final e in directory.employees)
+        if (e.role.doesFieldWork &&
+            e.status == EmployeeStatus.active &&
+            (branch == null || e.branchId == branch))
+          e,
+    ]..sort(directory.compareStaff);
+    final shown = {for (final e in staff) e.id};
+    // 명단 밖인데 이달 싸인이 있는 사람 (퇴사·지점 이동) — 안 세우면 못 연다
+    final others = [
+      for (final id in counts.keys)
+        if (!shown.contains(id)) id,
+    ];
+    String subtitle(String rank, String branchName) =>
+        branch == null && branchName.isNotEmpty ? '$rank · $branchName' : rank;
+    List<(String, bool)> label(String id) => [
+      ('이번 달 ${counts[id] ?? 0}회', (counts[id] ?? 0) > 0),
+    ];
+    final cards = [
+      for (final e in staff)
+        TrainerCard(
+          name: e.name,
+          subtitle: subtitle(e.rank.label, directory.branchName(e.branchId)),
+          labels: label(e.id),
+          onTap: () => _openHistory(e.id),
+        ),
+      for (final id in others)
+        TrainerCard(
+          name: directory.byId(id)?.name ?? '알 수 없음',
+          subtitle: '퇴사',
+          labels: label(id),
+          onTap: () => _openHistory(id),
+        ),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 4),
+          child: Row(
+            children: [
+              Text(
+                '세션 기록',
+                style: AppTextStyles.label.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              SizedBox(width: 8),
+              Text(
+                '${_LessonStore.instance.signs.length}',
+                style: AppTextStyles.caption,
+              ),
+              Spacer(),
+              SeeAllButton(onTap: _openHistory),
+            ],
+          ),
+        ),
+        SizedBox(height: 12),
+        if (cards.isEmpty)
+          EmptyCard(icon: Icons.draw_rounded, text: '수업하는 직원이 없어요')
+        else
+          for (var i = 0; i < cards.length; i++) ...[
+            if (i > 0) SizedBox(height: 12),
+            cards[i],
+          ],
+      ],
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     if (showSkeleton) return WorkSectionSkeleton();
+    if (_viewOnly) return _trainerList();
 
     // 상단 액션 버튼 둘 — 폰·PC 공통. 대표·관리자는 수행자가 아니라 안 그린다
     //

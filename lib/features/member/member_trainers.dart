@@ -75,19 +75,19 @@ class MemberTrainerList extends StatelessWidget {
 
     final cards = [
       for (final e in staff)
-        _TrainerCard(
+        TrainerCard(
           name: e.name,
           subtitle: _subtitle(e.rank.label, directory.branchName(e.branchId)),
-          count: counts[e.id] ?? none,
+          labels: _labels(counts[e.id] ?? none),
           onTap: () => onPick(e.id),
         ),
       for (final id in others)
-        _TrainerCard(
+        TrainerCard(
           name: directory.byId(id)?.name ?? '알 수 없음',
           subtitle: directory.byId(id)?.status == EmployeeStatus.resigned
               ? '퇴사'
               : '담당자 없음',
-          count: counts[id] ?? none,
+          labels: _labels(counts[id] ?? none),
           onTap: () => onPick(id),
         ),
     ];
@@ -102,25 +102,34 @@ class MemberTrainerList extends StatelessWidget {
     );
   }
 
+  /// 활성은 있으면 파랗게, 만료는 늘 옅게
+  static List<(String, bool)> _labels(({int active, int expired}) c) => [
+    ('활성 ${c.active}명', c.active > 0),
+    ('만료 ${c.expired}명', false),
+  ];
+
   /// 대표는 전 지점을 보므로 지점을 같이 적는다 — 지점을 골랐으면 직급만
   static String _subtitle(String rank, String branch) =>
       rosterBranchId == null && branch.isNotEmpty ? '$rank · $branch' : rank;
 }
 
 /// 트레이너 한 명 — 동료평가 명단 카드(`_PersonCard`)와 같은 틀
-class _TrainerCard extends StatelessWidget {
-  const _TrainerCard({
+///
+/// 회원 정보·운동 일지·수업 개수가 같이 쓴다 — 오른쪽 숫자만 다르다.
+class TrainerCard extends StatelessWidget {
+  const TrainerCard({
+    super.key,
     required this.name,
     required this.subtitle,
-    required this.count,
+    required this.labels,
     required this.onTap,
   });
 
   final String name;
   final String subtitle;
 
-  /// 활성(회차 남음) · 만료 회원 수
-  final ({int active, int expired}) count;
+  /// 오른쪽 숫자들 — (글자, 파랗게 칠할지)
+  final List<(String, bool)> labels;
   final VoidCallback onTap;
 
   @override
@@ -154,24 +163,18 @@ class _TrainerCard extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            Text(
-              '활성 ${count.active}명',
-              style: AppTextStyles.caption.copyWith(
-                fontWeight: FontWeight.w700,
-                color: count.active > 0
-                    ? AppColors.primary
-                    : AppColors.textTertiary,
+            for (var i = 0; i < labels.length; i++) ...[
+              const SizedBox(width: 8),
+              Text(
+                labels[i].$1,
+                style: AppTextStyles.caption.copyWith(
+                  fontWeight: labels[i].$2 ? FontWeight.w700 : FontWeight.w600,
+                  color: labels[i].$2
+                      ? AppColors.primary
+                      : AppColors.textTertiary,
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              '만료 ${count.expired}명',
-              style: AppTextStyles.caption.copyWith(
-                fontWeight: FontWeight.w600,
-                color: AppColors.textTertiary,
-              ),
-            ),
+            ],
             const SizedBox(width: 4),
             Icon(
               Icons.chevron_right_rounded,

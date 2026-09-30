@@ -5,6 +5,11 @@ part of 'lesson_section.dart';
 /// 싸인은 달마다 따로 받는다. 한 번에 다 받으면 해가 갈수록
 /// 화면 열 때마다 몇 백 건씩 넘어온다.
 class _SignHistoryScreen extends StatefulWidget {
+  _SignHistoryScreen({this.trainerId});
+
+  /// 처음부터 걸러 둘 트레이너 — 대표가 명단에서 사람을 눌러 들어올 때
+  final String? trainerId;
+
   @override
   State<_SignHistoryScreen> createState() => _SignHistoryScreenState();
 }
@@ -47,7 +52,7 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
   ///
   /// 서버에 다시 묻지 않고 **받아 둔 목록에서 거른다** — 달마다 한 번만
   /// 받으면 되고 트레이너를 바꿀 때 기다릴 일이 없다.
-  String? _trainerId;
+  late String? _trainerId = widget.trainerId;
 
   /// 고를 수 있는 트레이너 — **명단을 다 세운다**
   ///
