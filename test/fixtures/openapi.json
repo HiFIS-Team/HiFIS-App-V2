@@ -3717,6 +3717,24 @@
     "amount"
    ]
   },
+  "SalesLineOut": {
+   "properties": {
+    "memberName": {},
+    "pricePaid": {},
+    "purchasedAt": {},
+    "registrationId": {},
+    "totalSessions": {},
+    "type": {}
+   },
+   "required": [
+    "registrationId",
+    "memberName",
+    "type",
+    "totalSessions",
+    "pricePaid",
+    "purchasedAt"
+   ]
+  },
   "SalesSummary": {
    "properties": {
     "count": {},

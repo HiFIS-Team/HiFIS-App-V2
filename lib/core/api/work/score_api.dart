@@ -1,4 +1,5 @@
 import '../client/api_client.dart';
+import 'lesson_api.dart' show RegistrationType;
 
 export '../client/period.dart' show periodKey;
 
@@ -289,6 +290,31 @@ class RankOvertake {
   final DateTime createdAt;
 }
 
+/// 랭킹 매출 한 줄 — 어느 회원에게 얼마를 받았나 (서버 `SalesLineOut`)
+class SalesLine {
+  SalesLine({
+    required this.memberName,
+    required this.type,
+    required this.totalSessions,
+    required this.pricePaid,
+    required this.purchasedAt,
+  });
+
+  factory SalesLine.fromJson(Map<String, dynamic> json) => SalesLine(
+    memberName: json['memberName'] as String,
+    type: RegistrationType.parse(json['type'] as String),
+    totalSessions: json['totalSessions'] as int,
+    pricePaid: json['pricePaid'] as int,
+    purchasedAt: DateTime.parse(json['purchasedAt'] as String).toLocal(),
+  );
+
+  final String memberName;
+  final RegistrationType type;
+  final int totalSessions;
+  final int pricePaid;
+  final DateTime purchasedAt;
+}
+
 class ScoreApi {
   ScoreApi._();
 
@@ -328,6 +354,21 @@ class ScoreApi {
     return [
       for (final row in rows)
         RankingRow.fromJson((row as Map).cast<String, dynamic>()),
+    ];
+  }
+
+  /// 랭킹 매출 내역 — 그 사람의 그 달 등록권 (랭킹과 같은 규칙이라 합이 맞는다)
+  static Future<List<SalesLine>> sales({
+    required String employeeId,
+    String? period,
+  }) async {
+    final rows = await _client.getList(
+      '/scores/ranking/sales',
+      query: {'employeeId': employeeId, 'period': ?period},
+    );
+    return [
+      for (final row in rows)
+        SalesLine.fromJson((row as Map).cast<String, dynamic>()),
     ];
   }
 

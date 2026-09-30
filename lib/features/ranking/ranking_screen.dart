@@ -9,6 +9,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/api/client/api_exception.dart';
+import '../../core/api/work/lesson_api.dart' show RegistrationType;
 import '../../core/api/work/score_api.dart';
 import '../../core/data/branch_scope.dart';
 import '../../core/data/current_user.dart';
@@ -36,6 +37,7 @@ import '../../core/widgets/nav/pane_transition.dart';
 import '../../core/util/screen_refresh.dart';
 
 part 'ranking_models.dart';
+part 'ranking_sales_detail.dart';
 part 'ranking_pickers.dart';
 part 'ranking_overtake.dart';
 part 'ranking_myrank.dart';
@@ -272,10 +274,21 @@ class _RankingScreenState extends State<RankingScreen>
   /// - **종합** — 아래에서 판이 올라와 그 사람 항목별 환산을 보여준다
   /// - **환경정비** — 오른쪽에서 화면이 밀려 들어와 **항목마다 몇 점 땄나**를
   ///   보여준다 (2026-08-14 대표 요청). 랭킹판은 합계뿐이라 왜 위인지 모른다
-  bool get _canPick => _metric == _Metric.overall || _metric == _Metric.care;
+  /// - **매출** — 어느 회원에게 얼마를 받아 그 금액이 됐나 (2026-09-30 대표 요청)
+  bool get _canPick =>
+      _metric == _Metric.overall ||
+      _metric == _Metric.care ||
+      _metric == _Metric.revenue;
 
   void _pick(_Ranker ranker) {
     // 환경정비는 판이 아니라 화면이다 — 항목이 22개라 아래 판에 안 들어간다
+    if (_metric == _Metric.revenue) {
+      showFullPage<void>(
+        context,
+        (_) => _SalesDetailScreen(ranker: ranker, period: _periodKey),
+      );
+      return;
+    }
     if (_metric == _Metric.care) {
       showFullPage<void>(
         context,
