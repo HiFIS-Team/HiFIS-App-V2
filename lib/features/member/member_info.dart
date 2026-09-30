@@ -91,7 +91,14 @@ class _MemberInfoScreenState extends State<MemberInfoScreen>
       setState(() {
         _rows = [
           for (final m in rows)
-            _Row(source: m, pass: MemberPass.of(registrations, m.id)),
+            _Row(
+              source: m,
+              pass: MemberPass.of(registrations, m.id),
+              registrations: [
+                for (final r in registrations)
+                  if (r.memberId == m.id) r,
+              ]..sort((a, b) => b.purchasedAt.compareTo(a.purchasedAt)),
+            ),
         ]..sort(_byName);
         endLoad();
       });
@@ -240,9 +247,16 @@ String _phoneLabel(String raw) {
 
 /// 회원 한 명 + 지금 등록권
 class _Row {
-  const _Row({required this.source, required this.pass});
+  const _Row({
+    required this.source,
+    required this.pass,
+    required this.registrations,
+  });
 
   final Member source;
+
+  /// 이 회원의 등록권 전부 — 최근 것부터 (등록 내역 카드가 그린다)
+  final List<Registration> registrations;
 
   /// 합친 등록권 — 남은 등록권을 다 더한 회차다 ([MemberPass])
   final MemberPass pass;
@@ -367,6 +381,26 @@ class _MemberInfoDetailState extends State<_MemberInfoDetail> {
 
   /// 목록을 다시 받아야 하나 — 고쳤거나 지웠으면 true 로 닫는다
   bool _changed = false;
+
+  /// 소개한 회원 이름 — 담당이 다른 회원일 수 있어 따로 받는다
+  String? _referrer;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReferrer();
+  }
+
+  Future<void> _loadReferrer() async {
+    final id = _member.referrerMemberId;
+    if (id == null) return;
+    try {
+      final m = await MemberApi.detail(id);
+      if (mounted) setState(() => _referrer = m.name);
+    } catch (_) {
+      // 지워졌거나 못 보는 회원 — 줄을 안 그린다
+    }
+  }
 
   /// 고치고 지울 수 있는 사람인가 — **담당 트레이너 본인과 대표·관리자**
   /// (서버 `_ensure_mine` 과 같은 규칙이다)
@@ -510,10 +544,23 @@ class _MemberInfoDetailState extends State<_MemberInfoDetail> {
                   value: _member.visitPath?.label ?? '기록 없음',
                   onCopy: null,
                 ),
+                if (_referrer case final name?)
+                  (label: '소개 회원', value: name, onCopy: null),
+                if (_member.goals.isNotEmpty)
+                  (
+                    label: '운동 목표',
+                    value: _member.goals.join(', '),
+                    onCopy: null,
+                  ),
                 if (_member.memo case final memo? when memo.trim().isNotEmpty)
                   (label: '메모', value: memo, onCopy: null),
               ],
             ),
+            // ── 등록 내역 ── 등록할 때 넣은 결제액·회차·결제일 (2026-09-30 대표 요청)
+            if (row.registrations.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _HistoryCard(registrations: row.registrations),
+            ],
           ],
         ),
       ),
@@ -644,6 +691,107 @@ class _PassCard extends StatelessWidget {
     );
   }
 }
+
+/// 등록 내역 — 등록권 한 장마다 신규/재등록 · 결제일 · 결제액 · 회차 · 회당 단가
+class _HistoryCard extends StatelessWidget {
+  const _HistoryCard({required this.registrations});
+
+  final List<Registration> registrations;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+    decoration: AppDecorations.card(),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          '등록 내역',
+          style: AppTextStyles.caption.copyWith(
+            color: AppColors.textTertiary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 4),
+        for (var i = 0; i < registrations.length; i++) ...[
+          if (i > 0) Divider(height: 1, color: AppColors.divider),
+          _HistoryRow(r: registrations[i]),
+        ],
+      ],
+    ),
+  );
+}
+
+class _HistoryRow extends StatelessWidget {
+  const _HistoryRow({required this.r});
+
+  final Registration r;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = r.type == RegistrationType.renewal
+        ? AppColors.success
+        : AppColors.primary;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        r.type.label,
+                        style: AppTextStyles.caption.copyWith(
+                          fontSize: 11,
+                          color: color,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      fullDateLabel(r.purchasedAt),
+                      style: AppTextStyles.body2.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${r.totalSessions}회 · 회당 ${_won(r.sessionUnitPrice)}'
+                  ' · ${r.usedSessions}회 사용',
+                  style: AppTextStyles.caption.copyWith(fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            _won(r.pricePaid),
+            style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// `600000` → `600,000원`
+String _won(int value) =>
+    '${value.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ',')}원';
 
 class _ListSkeleton extends StatelessWidget {
   const _ListSkeleton();
