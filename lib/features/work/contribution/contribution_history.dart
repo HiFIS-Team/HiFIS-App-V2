@@ -284,10 +284,25 @@ class _GrantedTag extends StatelessWidget {
 }
 
 /// 기여 내역 전체 화면 — 이번 달 내 기록
+///
+/// [personId] 를 주면 **그 사람 한 명의 기록을 여기서 받는다** — 대표·관리자가
+/// 직원 명단에서 누르고 들어온 자리다 (2026-09-30 대표 요청). 받은 부여는
+/// 누가 줬든 다 서고, 그 사람 화면에서 보이는 것과 같다.
 class _ContributionHistoryScreen extends StatefulWidget {
-  _ContributionHistoryScreen({required this.items, this.onRevert});
+  _ContributionHistoryScreen({
+    this.items = const [],
+    this.onRevert,
+    this.personId,
+    this.personName,
+    this.month,
+  });
 
   final List<_Contribution> items;
+
+  /// 한 사람만 볼 때 — 그 사람 id · 이름 · 보고 있던 달
+  final String? personId;
+  final String? personName;
+  final DateTime? month;
 
   /// 깎인 줄을 되돌린다 — null 이면 아이콘이 안 뜬다 (대표가 아니다)
   /// 되돌렸으면 true — **확인창에서 취소하면 false 다.**
@@ -302,8 +317,8 @@ class _ContributionHistoryScreen extends StatefulWidget {
       _ContributionHistoryScreenState();
 }
 
-class _ContributionHistoryScreenState
-    extends State<_ContributionHistoryScreen> {
+class _ContributionHistoryScreenState extends State<_ContributionHistoryScreen>
+    with SkeletonDelay<_ContributionHistoryScreen> {
   /// **넘겨받은 목록을 여기서 들고 있는다.** 되돌리면 이 화면에서도 줄이
   /// 바로 빠져야 하는데, 뒤에 있는 탭이 다시 받아 오는 것을 여기서는 못 본다
   /// (전체 화면으로 덮여 있어서 그 화면은 새로 안 그려진다).
@@ -325,6 +340,46 @@ class _ContributionHistoryScreenState
   void initState() {
     super.initState();
     _search.addListener(() => setState(() {}));
+    if (widget.personId == null) {
+      skipFirstSkeleton();
+    } else {
+      _fetchPerson();
+    }
+  }
+
+  /// 한 사람의 그달 기록 — 그 사람이 자기 화면에서 보는 것과 같은 두 갈래
+  Future<void> _fetchPerson() async {
+    final id = widget.personId!;
+    final period = periodKey(widget.month ?? DateTime.now());
+    try {
+      final grants = ContributionApi.list(employeeId: id, period: period);
+      final events = ScoreApi.events(
+        employeeId: id,
+        period: period,
+        contribBoard: true,
+      );
+      final merged = _ContributionSectionState._merge(
+        await grants,
+        const [],
+        await events,
+      );
+      if (!mounted) return;
+      setState(() {
+        // 명단에서 이미 사람을 골랐다 — 줄마다 그 이름을 또 달 이유가 없다
+        _items = [
+          for (final item in merged)
+            if (item.person == widget.personName && !item.granted)
+              item.withoutPerson()
+            else
+              item,
+        ];
+        endLoad();
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(endLoad);
+      AppToast.show(context, messageOf(error));
+    }
   }
 
   @override
@@ -438,7 +493,7 @@ class _ContributionHistoryScreenState
     final key = _search.text.trim();
     // 버튼이 안 뜨는 사람에게는 사람 필터를 안 건다 — 안 그러면 어딘가에서
     // 값이 남았을 때 못 푸는 필터가 걸린 채로 화면이 빈다
-    final person = _canPickPerson ? _person : null;
+    final person = _canPickPerson && widget.personId == null ? _person : null;
     if (key.isEmpty && _kind == null && person == null) return _items;
     return [
       for (final item in _items)
@@ -489,7 +544,11 @@ class _ContributionHistoryScreenState
                 MediaQuery.paddingOf(context).bottom + 92,
               ),
               children: [
-                if (mine.isEmpty)
+                if (showSkeleton)
+                  SkeletonGroup(
+                    child: SkeletonRows(rows: 6, avatar: 0, gap: 22),
+                  )
+                else if (mine.isEmpty)
                   Padding(
                     padding: EdgeInsets.fromLTRB(0, 32, 0, 32),
                     child: Text(
@@ -520,7 +579,10 @@ class _ContributionHistoryScreenState
               child: SizedBox(
                 height: 56,
                 child: Center(
-                  child: Text('기여 내역', style: AppTextStyles.title3),
+                  child: Text(
+                    widget.personName ?? '기여 내역',
+                    style: AppTextStyles.title3,
+                  ),
                 ),
               ),
             ),
@@ -562,7 +624,7 @@ class _ContributionHistoryScreenState
                       symbol: 'tag',
                       onSelect: (name) => setState(() => _kind = name),
                     ),
-                    if (_canPickPerson) ...[
+                    if (_canPickPerson && widget.personId == null) ...[
                       // PhoneDetailScaffold 의 actions 와 같은 간격
                       SizedBox(width: 10),
                       // **사람 버튼이 늘 오른쪽 끝**이다 (환경정비와 같은 자리)

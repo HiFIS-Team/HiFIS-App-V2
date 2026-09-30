@@ -18,6 +18,8 @@ import '../../../core/util/platform.dart';
 import '../../../core/widgets/feedback/app_dialog.dart';
 import '../../../core/widgets/feedback/app_toast.dart';
 import '../../../core/widgets/feedback/empty_card.dart';
+import '../../../core/widgets/feedback/skeleton.dart';
+import '../../member/member_trainers.dart' show TrainerCard;
 import '../../../core/widgets/glass/glass_bottom_button.dart';
 import '../../../core/widgets/glass/glass_icon_button.dart';
 import '../../../core/widgets/glass/glass_search_bar.dart';
@@ -335,6 +337,87 @@ class _ContributionSectionState extends State<ContributionSection>
     );
   }
 
+  /// 한 사람의 기여 내역을 연다 — 그 화면이 그 사람 것을 따로 받는다
+  void _openPerson(String id, String name) {
+    showFullPage<void>(
+      context,
+      (_) => _ContributionHistoryScreen(
+        personId: id,
+        personName: name,
+        month: _month,
+        onRevert: _canRevert ? _revert : null,
+      ),
+    );
+  }
+
+  /// 대표·관리자 — 섞인 내역 대신 **직원부터** 세운다 (2026-09-30 대표 요청)
+  ///
+  /// 회원 정보·수업 개수의 직원 목록과 같은 카드다. 점수는 원장 합이라
+  /// 누가 준 부여든 다 든다 (내가 준 것만 세지 않는다).
+  Widget _staffList() {
+    final directory = StaffDirectory.instance;
+    final branch = rosterBranchId;
+    final points = <String, int>{};
+    for (final event in _events) {
+      if (branchScopeId != null && event.branchId != branchScopeId) continue;
+      points[event.employeeId] = (points[event.employeeId] ?? 0) + event.points;
+    }
+    final staff = [
+      for (final e in directory.employees)
+        if (e.role.doesFieldWork &&
+            e.status == EmployeeStatus.active &&
+            (branch == null || e.branchId == branch))
+          e,
+    ]..sort(directory.compareStaff);
+    String subtitle(Employee e) {
+      final name = directory.branchName(e.branchId);
+      return branch == null && name.isNotEmpty
+          ? '${e.rank.label} · $name'
+          : e.rank.label;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 4),
+          child: Row(
+            children: [
+              Text(
+                '기여 내역',
+                style: AppTextStyles.label.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              SizedBox(width: 8),
+              Text('${_items.length}', style: AppTextStyles.caption),
+              Spacer(),
+              SeeAllButton(onTap: _openHistory),
+            ],
+          ),
+        ),
+        SizedBox(height: 12),
+        if (staff.isEmpty)
+          EmptyCard(icon: Icons.workspace_premium_rounded, text: '직원이 없어요')
+        else
+          for (var i = 0; i < staff.length; i++) ...[
+            if (i > 0) SizedBox(height: 12),
+            TrainerCard(
+              name: staff[i].name,
+              subtitle: subtitle(staff[i]),
+              labels: [
+                (
+                  '${_month.month}월 ${points[staff[i].id] ?? 0}점',
+                  (points[staff[i].id] ?? 0) != 0,
+                ),
+              ],
+              onTap: () => _openPerson(staff[i].id, staff[i].name),
+            ),
+          ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (showSkeleton) return WorkSectionSkeleton();
@@ -357,37 +440,41 @@ class _ContributionSectionState extends State<ContributionSection>
             _GrantBanner(onTap: _grant),
           ],
           SizedBox(height: 20),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 4),
-            child: Row(
-              children: [
-                Text(
-                  '기여 내역',
-                  style: AppTextStyles.label.copyWith(
-                    fontWeight: FontWeight.w700,
+          if (_givenOnly)
+            _staffList()
+          else ...[
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4),
+              child: Row(
+                children: [
+                  Text(
+                    '기여 내역',
+                    style: AppTextStyles.label.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
-                SizedBox(width: 8),
-                Text('${_items.length}', style: AppTextStyles.caption),
-                Spacer(),
-                SeeAllButton(onTap: _openHistory),
-              ],
-            ),
-          ),
-          SizedBox(height: 12),
-          if (recent.isEmpty)
-            EmptyCard(
-              icon: Icons.workspace_premium_rounded,
-              text: '${_month.month}월 기여 기록이 없어요',
-            )
-          else
-            for (var i = 0; i < recent.length; i++) ...[
-              if (i > 0) SizedBox(height: 12),
-              _ContributionCard(
-                item: recent[i],
-                onRevert: _canRevert ? () => _revert(recent[i]) : null,
+                  SizedBox(width: 8),
+                  Text('${_items.length}', style: AppTextStyles.caption),
+                  Spacer(),
+                  SeeAllButton(onTap: _openHistory),
+                ],
               ),
-            ],
+            ),
+            SizedBox(height: 12),
+            if (recent.isEmpty)
+              EmptyCard(
+                icon: Icons.workspace_premium_rounded,
+                text: '${_month.month}월 기여 기록이 없어요',
+              )
+            else
+              for (var i = 0; i < recent.length; i++) ...[
+                if (i > 0) SizedBox(height: 12),
+                _ContributionCard(
+                  item: recent[i],
+                  onRevert: _canRevert ? () => _revert(recent[i]) : null,
+                ),
+              ],
+          ],
         ],
       );
     }
@@ -403,12 +490,15 @@ class _ContributionSectionState extends State<ContributionSection>
           _GrantBanner(onTap: _grant),
         ],
         SizedBox(height: 16),
-        _HistoryCard(
-          items: _items.take(5).toList(),
-          total: _items.length,
-          onOpenAll: _openHistory,
-          onRevert: _canRevert ? _revert : null,
-        ),
+        if (_givenOnly)
+          _staffList()
+        else
+          _HistoryCard(
+            items: _items.take(5).toList(),
+            total: _items.length,
+            onOpenAll: _openHistory,
+            onRevert: _canRevert ? _revert : null,
+          ),
       ],
     );
   }
@@ -558,6 +648,19 @@ class _Contribution {
 
   /// 컴플레인 해결 — 서버 `CLAIM_ITEM_NAME` 이 붙여 주는 항목 이름의 화면 표기
   static const claimLabel = '컴플레인 해결';
+
+  /// 이름을 뗀 사본 — 한 사람만 보는 화면에서 줄마다 그 이름이 반복되지 않게
+  _Contribution withoutPerson() => _Contribution(
+    kind: kind,
+    title: title,
+    points: points,
+    date: date,
+    eventId: eventId,
+    grantId: grantId,
+    category: category,
+    given: given,
+    granted: granted,
+  );
 
   /// `+3` · `-20` — 부호를 붙여 준다
   String get pointsLabel => points < 0 ? '$points' : '+$points';
