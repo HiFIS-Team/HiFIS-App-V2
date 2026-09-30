@@ -1,9 +1,11 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../theme/app_shadows.dart';
+import '../../util/platform.dart';
 import 'glass_surface.dart';
 
 /// 화면 아래 떠 있는 글래스 입력바 — 사내톡과 프로젝트 댓글이 같이 쓴다
@@ -90,6 +92,29 @@ class _GlassInputBarState extends State<GlassInputBar> {
     widget.focusNode?.requestFocus();
   }
 
+  /// PC 의 **Shift+엔터** — 그 자리에 줄바꿈을 넣는다
+  ///
+  /// 엔터만 누르면 보내고(카톡 PC 와 같다), 줄을 바꾸려면 Shift 를 같이 누른다.
+  /// 폰은 키보드 엔터가 곧 줄바꿈이라 여기를 안 탄다.
+  KeyEventResult _onKey(FocusNode _, KeyEvent event) {
+    if (!isDesktop ||
+        event is KeyUpEvent ||
+        event.logicalKey != LogicalKeyboardKey.enter ||
+        !HardwareKeyboard.instance.isShiftPressed) {
+      return KeyEventResult.ignored;
+    }
+    final value = _controller.value;
+    final sel = value.selection.isValid
+        ? value.selection
+        : TextSelection.collapsed(offset: value.text.length);
+    _controller.value = value.copyWith(
+      text: value.text.replaceRange(sel.start, sel.end, '\n'),
+      selection: TextSelection.collapsed(offset: sel.start + 1),
+      composing: TextRange.empty,
+    );
+    return KeyEventResult.handled;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -141,72 +166,97 @@ class _GlassInputBarState extends State<GlassInputBar> {
                     ],
                   ),
                 ),
-              SizedBox(
-                height: 52,
+              // **여러 줄을 쓴다** (2026-09-30 대표 요청) — 한 줄로 박혀 있어서
+              // 줄을 못 바꿨다. 다섯 줄까지 늘고 그 뒤로는 안에서 스크롤된다.
+              // 한 줄일 때 높이는 예전과 같은 52 다
+              ConstrainedBox(
+                constraints: BoxConstraints(minHeight: 52),
                 child: Row(
+                  // 늘어나도 전송 버튼은 아래 줄에 붙어 있다
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Expanded(
-                      child: TextField(
-                        controller: _controller,
-                        focusNode: widget.focusNode,
-                        autofocus: widget.autofocus,
-                        style: AppTextStyles.body2,
-                        cursorColor: AppColors.primary,
-                        textInputAction: TextInputAction.send,
-                        onSubmitted: (_) => _submit(),
-                        decoration: InputDecoration(
-                          hintText: widget.hint,
-                          hintStyle: AppTextStyles.body2.copyWith(
-                            color: AppColors.gray400,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 14.75),
+                        child: Focus(
+                          onKeyEvent: _onKey,
+                          child: TextField(
+                            controller: _controller,
+                            focusNode: widget.focusNode,
+                            autofocus: widget.autofocus,
+                            style: AppTextStyles.body2,
+                            cursorColor: AppColors.primary,
+                            minLines: 1,
+                            maxLines: 5,
+                            keyboardType: TextInputType.multiline,
+                            // 폰은 키보드 엔터가 줄바꿈, 보내기는 버튼이다.
+                            // PC 는 엔터가 보내기 (줄바꿈은 Shift+엔터 — [_onKey])
+                            textInputAction: isDesktop
+                                ? TextInputAction.send
+                                : TextInputAction.newline,
+                            onSubmitted: isDesktop ? (_) => _submit() : null,
+                            decoration: InputDecoration(
+                              hintText: widget.hint,
+                              hintStyle: AppTextStyles.body2.copyWith(
+                                color: AppColors.gray400,
+                              ),
+                              border: InputBorder.none,
+                              isCollapsed: true,
+                            ),
                           ),
-                          border: InputBorder.none,
-                          isCollapsed: true,
                         ),
                       ),
                     ),
                     SizedBox(width: 8),
                     // 입력 전에는 링크 아이콘, 입력 중에는 파란 전송(비행기) 버튼
-                    AnimatedSwitcher(
-                      duration: Duration(milliseconds: 220),
-                      switchInCurve: Curves.easeOutBack,
-                      switchOutCurve: Curves.easeIn,
-                      transitionBuilder: (child, animation) => ScaleTransition(
-                        scale: animation,
-                        child: FadeTransition(opacity: animation, child: child),
-                      ),
-                      child: _hasText
-                          ? GestureDetector(
-                              key: ValueKey('send'),
-                              onTap: _submit,
-                              child: Container(
-                                width: 38,
-                                height: 38,
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  CupertinoIcons.paperplane_fill,
-                                  color: Colors.white,
-                                  size: 18,
-                                ),
-                              ),
-                            )
-                          : GestureDetector(
-                              key: ValueKey('link'),
-                              onTap: widget.onAttach ?? () {},
-                              child: Container(
-                                width: 38,
-                                height: 38,
-                                alignment: Alignment.center,
-                                color: Colors.transparent,
-                                child: Icon(
-                                  CupertinoIcons.link,
-                                  color: AppColors.gray600,
-                                  size: 22,
-                                ),
+                    Padding(
+                      padding: EdgeInsets.only(bottom: 7),
+                      child: AnimatedSwitcher(
+                        duration: Duration(milliseconds: 220),
+                        switchInCurve: Curves.easeOutBack,
+                        switchOutCurve: Curves.easeIn,
+                        transitionBuilder: (child, animation) =>
+                            ScaleTransition(
+                              scale: animation,
+                              child: FadeTransition(
+                                opacity: animation,
+                                child: child,
                               ),
                             ),
+                        child: _hasText
+                            ? GestureDetector(
+                                key: ValueKey('send'),
+                                onTap: _submit,
+                                child: Container(
+                                  width: 38,
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    CupertinoIcons.paperplane_fill,
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
+                                ),
+                              )
+                            : GestureDetector(
+                                key: ValueKey('link'),
+                                onTap: widget.onAttach ?? () {},
+                                child: Container(
+                                  width: 38,
+                                  height: 38,
+                                  alignment: Alignment.center,
+                                  color: Colors.transparent,
+                                  child: Icon(
+                                    CupertinoIcons.link,
+                                    color: AppColors.gray600,
+                                    size: 22,
+                                  ),
+                                ),
+                              ),
+                      ),
                     ),
                   ],
                 ),
