@@ -25,6 +25,7 @@ import '../project/project_screen.dart'
 import '../schedule/schedule_birthday_modal.dart' show resetBirthdayModal;
 import '../work/my_task/my_task_miss_modal.dart' show resetMyTaskMissModal;
 import '../work/goal/goal_modal.dart' show resetGoalModal;
+import '../ranking/ranking_screen.dart' show resetRankingCelebration;
 import '../work/peer_review/peer_review_modal.dart' show resetPeerReviewModal;
 import '../notice/notice_screen.dart' show resetNoticeCache;
 import '../meeting/meeting_screen.dart' show resetMeetingCache;
@@ -184,6 +185,7 @@ class AuthSession extends ValueNotifier<bool> {
     resetPeerReviewModal();
     resetBirthdayModal();
     resetGoalModal();
+    resetRankingCelebration();
     resetMyTaskMissModal();
     // 앞사람이 보던 지점이 다음 사람 화면에 걸려 있으면 안 된다
     resetBranchScope();

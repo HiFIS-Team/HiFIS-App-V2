@@ -2,11 +2,15 @@ import '../../core/api/work/env_api.dart';
 import '../../core/util/layout.dart';
 import '../../core/util/skeleton_delay.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
+import '../../core/widgets/input/app_button.dart';
 import '../../core/widgets/feedback/skeleton.dart';
 import '../../core/widgets/display/progress_bar.dart';
+import 'dart:math' as math;
+
 import 'package:cupertino_native/cupertino_native.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/api/client/api_exception.dart';
 import '../../core/api/work/lesson_api.dart' show RegistrationType;
@@ -37,6 +41,7 @@ import '../../core/widgets/nav/pane_transition.dart';
 import '../../core/util/screen_refresh.dart';
 
 part 'ranking_models.dart';
+part 'ranking_celebrate.dart';
 part 'ranking_sales_detail.dart';
 part 'ranking_pickers.dart';
 part 'ranking_overtake.dart';
@@ -351,7 +356,18 @@ class _RankingScreenState extends State<RankingScreen>
             total: entries.length,
           );
 
+    // 지난달을 보고 있으면 맨 위에 그 분야 1등 축하 (2026-09-30 대표 요청)
+    final champion =
+        !_isThisMonth && entries.isNotEmpty && entries.first.value > 0
+        ? _ChampionCard(
+            month: _viewMonth.month,
+            metric: _metric,
+            entry: entries.first,
+          )
+        : null;
+
     return [
+      if (champion != null) ...[champion, SizedBox(height: 12)],
       // 데스크톱은 폭이 남아 내 순위와 시상대를 나란히 놓는다.
       if (isDesktop) ...[
         if (myCard == null)

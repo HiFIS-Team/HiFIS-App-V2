@@ -79,6 +79,7 @@ class _MainShellState extends State<MainShell> {
     // | 차례 | 왜 |
     // |---|---|
     // | 생일 축하 | **그날 하루뿐**이고 한 번 닫으면 끝이다 (2026-09-27) |
+    // | 랭킹 1위 축하 | 그달 **한 번뿐**이다 (2026-09-30) |
     // | 동료평가 | 창이 **이틀뿐**이다 — 지나면 못 낸다 (−20) |
     // | 업무 누락 | 다음 근무일까지는 만회할 수 있다 (−20) |
     // | 마감 임박 | 다음에 켤 때 그대로 뜬다 |
@@ -87,6 +88,10 @@ class _MainShellState extends State<MainShell> {
       // 꺼져 있던 앱을 푸시로 켜면 셸이 뜨기 **전에** 링크가 도착해 있다
       _onPushTap();
       if (await showBirthdayModal(context) || !mounted) return;
+      // 지난달 랭킹 1위 축하 — 그달 첫 접속에 한 번 (2026-09-30 대표 요청).
+      // **동료평가보다 앞이다** — 굳는 날(1일)이 동료평가 창과 겹쳐서, 뒤에
+      // 두면 평가를 안 낸 사람은 그날 축하를 못 본다. 동료평가는 다음에 또 뜬다
+      if (await showRankingCelebration(context) || !mounted) return;
       if (await showPeerReviewModal(context) || !mounted) return;
       if (await showMyTaskMissModal(context) || !mounted) return;
       if (await showGoalModal(context) || !mounted) return;
