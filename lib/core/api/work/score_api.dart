@@ -372,6 +372,24 @@ class ScoreApi {
     ];
   }
 
+  /// 그달 1위들 중 내가 이미 축하를 보낸 사람 — 축하 페이지가 이모지를 잠근다
+  static Future<Set<String>> rankingCheers(String period) async {
+    final json = await _client.get(
+      '/scores/ranking/cheers',
+      query: {'period': period},
+    );
+    return {for (final id in json['cheered'] as List) id as String};
+  }
+
+  /// 지난달 1위에게 축하 이모지 — 그 사람에게 푸시가 간다 (한 사람에게 그달 한 번)
+  static Future<void> rankingCheer({
+    required String employeeId,
+    required String period,
+  }) => _client.post(
+    '/scores/ranking/cheer',
+    body: {'employeeId': employeeId, 'period': period},
+  );
+
   /// 원장 조회 (최신순)
   static Future<List<ScoreEvent>> events({
     String? employeeId,

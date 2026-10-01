@@ -10,6 +10,7 @@ import 'dart:math' as math;
 import 'package:cupertino_native/cupertino_native.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart' show Ticker;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/api/client/api_exception.dart';
