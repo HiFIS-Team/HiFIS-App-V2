@@ -63,8 +63,8 @@ class MonthDraw {
 
   bool get hasVideo => (videoUrl ?? '').isNotEmpty;
 
-  /// `2026-09` → `9월`
-  String get monthLabel => '${int.parse(period.substring(5))}월';
+  /// **설문을 받은 달** — `2026-10` 추첨 → `9월` (10월에 뽑아도 9월 설문 이벤트다)
+  String get monthLabel => '${(int.parse(period.substring(5)) + 10) % 12 + 1}월';
 
   /// 그달 게임 이름 — 화면에 그대로 쓴다
   String get gameLabel => switch (game) {
