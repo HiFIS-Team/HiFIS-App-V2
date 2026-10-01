@@ -312,10 +312,20 @@ class _ThumbState extends State<_Thumb> {
   /// 영상 첫 프레임 — 서명 주소라 헤더 없이 받는다. 앞머리(moov)만 읽어서 가볍다
   VideoPlayerController? _video;
 
+  /// 영상 첫 장면 사진 — 한 번 뽑으면 기기에 남아서 **들어가자마자** 뜬다
+  File? _poster;
+
   @override
   void initState() {
     super.initState();
     if (widget.item.isVideo) {
+      _poster = PhotoCache.readyThumb(widget.item.url);
+      if (_poster == null) {
+        PhotoCache.fetchThumb(widget.item.fullUrl).then((file) {
+          if (mounted && file != null) setState(() => _poster = file);
+        });
+      }
+      // 재생기는 그대로 열어 둔다 — 누르자마자 돌게 (사진 위에 같은 장면이 얹힌다)
       if (_playsInApp) _loadFrame();
       return;
     }
@@ -405,9 +415,17 @@ class _ThumbState extends State<_Thumb> {
   Widget _inner() {
     if (widget.item.isVideo) {
       final video = _video;
+      final poster = _poster;
       return Stack(
         fit: StackFit.expand,
         children: [
+          if (poster != null)
+            Image.file(
+              poster,
+              fit: BoxFit.cover,
+              gaplessPlayback: true,
+              errorBuilder: (_, _, _) => const SizedBox.shrink(),
+            ),
           if (video != null)
             FittedBox(
               fit: BoxFit.cover,
@@ -422,7 +440,9 @@ class _ThumbState extends State<_Thumb> {
             child: Icon(
               CupertinoIcons.play_circle_fill,
               size: 34,
-              color: video != null ? Colors.white : AppColors.textTertiary,
+              color: video != null || poster != null
+                  ? Colors.white
+                  : AppColors.textTertiary,
             ),
           ),
         ],

@@ -5,6 +5,8 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.media.MediaMetadataRetriever
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
@@ -12,6 +14,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import java.io.File
+import java.io.FileOutputStream
 import com.google.firebase.messaging.FirebaseMessaging
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -29,6 +32,7 @@ class MainActivity : FlutterActivity() {
         wireCapture(flutterEngine)
         wirePush(flutterEngine)
         wireReels(flutterEngine)
+        wireThumb(flutterEngine)
     }
 
     /**
@@ -48,6 +52,50 @@ class MainActivity : FlutterActivity() {
      * `file://` 을 인텐트에 실으면 안드로이드 7 부터 터진다
      * (`FileUriExposedException`) — 둘 다 FileProvider 로 `content://` 를 준다.
      */
+    /**
+     * 운동일지 영상 칸에 띄울 **첫 장면**을 jpg 로 뽑는다 (2026-10-01 대표 요청).
+     *
+     * 앱이 이걸 기기에 남겨 두고 다음부터 바로 띄운다 (`PhotoCache.fetchThumb`).
+     * 네트워크를 타서 메인 스레드에서 돌리면 안 된다.
+     */
+    private fun wireThumb(flutterEngine: FlutterEngine) {
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.hifis/thumb")
+            .setMethodCallHandler { call, result ->
+                val url = call.argument<String>("url")
+                val path = call.argument<String>("path")
+                if (call.method != "frame" || url.isNullOrEmpty() || path.isNullOrEmpty()) {
+                    result.notImplemented()
+                    return@setMethodCallHandler
+                }
+                Thread {
+                    val ok = try {
+                        val retriever = MediaMetadataRetriever()
+                        val frame = try {
+                            retriever.setDataSource(url, HashMap())
+                            retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                        } finally {
+                            retriever.release()
+                        }
+                        if (frame == null) {
+                            false
+                        } else {
+                            val scale = 480f / maxOf(frame.width, frame.height)
+                            val small = if (scale < 1f) {
+                                Bitmap.createScaledBitmap(
+                                    frame, (frame.width * scale).toInt(), (frame.height * scale).toInt(), true
+                                )
+                            } else frame
+                            FileOutputStream(path).use { small.compress(Bitmap.CompressFormat.JPEG, 80, it) }
+                            true
+                        }
+                    } catch (e: Exception) {
+                        false
+                    }
+                    runOnUiThread { result.success(ok) }
+                }.start()
+            }
+    }
+
     private fun wireReels(flutterEngine: FlutterEngine) {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.hifis/reels")
             .setMethodCallHandler { call, result ->

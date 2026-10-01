@@ -1,3 +1,4 @@
+import AVFoundation
 import Flutter
 import UIKit
 import UserNotifications
@@ -105,6 +106,8 @@ import UserNotifications
 
     wirePush(messenger: registrar.messenger())
     ReelsShare.wire(messenger: registrar.messenger())
+    // 운동일지 영상 칸의 첫 장면 ([VideoThumb])
+    VideoThumb.wire(messenger: registrar.messenger())
     // 날짜·시각 고르개를 아래에서 올라오는 시트로 ([NativePicker.swift])
     NativePicker.wire(messenger: registrar.messenger())
 
@@ -269,5 +272,38 @@ import UserNotifications
       return false
     }
     return environment == "development"
+  }
+}
+
+/// 운동일지 영상 칸에 띄울 **첫 장면**을 jpg 로 뽑는다 (2026-10-01 대표 요청).
+///
+/// 앱이 이걸 기기에 남겨 두고 다음부터 바로 띄운다 (`PhotoCache.fetchThumb`).
+/// 서명 주소라 헤더 없이 받고, 앞머리만 읽어서 가볍다.
+enum VideoThumb {
+  static func wire(messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(name: "com.hifis/thumb", binaryMessenger: messenger)
+    channel.setMethodCallHandler { call, result in
+      guard call.method == "frame",
+            let args = call.arguments as? [String: Any],
+            let link = args["url"] as? String,
+            let url = URL(string: link),
+            let path = args["path"] as? String
+      else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      DispatchQueue.global(qos: .userInitiated).async {
+        let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
+        // 세로로 찍은 영상이 눕혀 나오지 않게
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 480, height: 480)
+        var ok = false
+        if let image = try? generator.copyCGImage(at: .zero, actualTime: nil),
+           let data = UIImage(cgImage: image).jpegData(compressionQuality: 0.8) {
+          ok = (try? data.write(to: URL(fileURLWithPath: path), options: .atomic)) != nil
+        }
+        DispatchQueue.main.async { result(ok) }
+      }
+    }
   }
 }

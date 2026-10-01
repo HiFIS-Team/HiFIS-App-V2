@@ -12,6 +12,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
+
 import '../api/client/api_client.dart';
 
 abstract final class PhotoCache {
@@ -96,6 +98,53 @@ abstract final class PhotoCache {
     } catch (_) {
       return null;
     }
+  }
+
+  // ── 영상 첫 장면 — 운동일지 영상 칸 (2026-10-01 대표 요청) ──
+  //
+  // 예전에는 칸이 그려질 때마다 영상 앞머리를 받아 첫 프레임을 띄워서,
+  // 들어갈 때도 **안 보이다 보이고** 스크롤로 벗어났다 돌아와도 또 그랬다.
+  // 첫 장면을 **한 번 jpg 로 뽑아** 사진과 같은 자리에 남긴다 — 다음부터는
+  // 사내톡 사진처럼 바로 뜬다. 뽑는 것은 OS 가 한다 (iOS `AVAssetImageGenerator`
+  // · 안드로이드 `MediaMetadataRetriever`, 채널 `com.hifis/thumb`).
+
+  static const _thumbChannel = MethodChannel('com.hifis/thumb');
+
+  static File _thumbOf(String url) =>
+      File('${_folder().path}/thumb_${keyOf(url)}.jpg');
+
+  /// 뽑아 둔 첫 장면 — 없으면 null (기다리지 않는다)
+  static File? readyThumb(String url) {
+    final key = 'thumb:${keyOf(url)}';
+    final file = _thumbOf(url);
+    if (_have.contains(key)) return file;
+    if (!file.existsSync()) return null;
+    _have.add(key);
+    return file;
+  }
+
+  /// 첫 장면을 뽑아 남긴다 — 못 뽑는 플랫폼(맥·윈도우)·영상이면 null
+  static Future<File?> fetchThumb(String url) {
+    final done = readyThumb(url);
+    if (done != null) return Future.value(done);
+    final key = 'thumb:${keyOf(url)}';
+    return _busy[key] ??=
+        () async {
+          try {
+            final file = _thumbOf(url);
+            final ok = await _thumbChannel.invokeMethod<bool>('frame', {
+              'url': url,
+              'path': file.path,
+            });
+            if (ok != true || !file.existsSync()) return null;
+            _have.add(key);
+            return file;
+          } catch (_) {
+            return null;
+          }
+        }().whenComplete(() {
+          _busy.remove(key);
+        });
   }
 
   // ── 사진 비율 — 받기 전에 자리를 잡으려고 기억해 둔다 ──
