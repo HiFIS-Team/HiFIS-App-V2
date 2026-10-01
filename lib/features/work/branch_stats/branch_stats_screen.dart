@@ -1,13 +1,19 @@
+import 'dart:math' as math;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/api/client/api_exception.dart';
+import '../../../core/api/staff/staff_api.dart' show Branch;
 import '../../../core/api/work/branch_stats_api.dart';
+import '../../../core/data/current_user.dart';
+import '../../../core/data/staff_directory.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/util/layout.dart';
 import '../../../core/util/skeleton_delay.dart';
+import '../../../core/widgets/feedback/app_dialog.dart';
 import '../../../core/widgets/feedback/app_toast.dart';
 import '../../../core/widgets/feedback/empty_card.dart';
 import '../../../core/widgets/feedback/skeleton.dart';
@@ -25,9 +31,11 @@ import '../../../core/widgets/nav/phone_scaffold.dart';
 /// | 일 | 그날 늘어난 수 — 전날 누적과의 차이 (그달 첫 기록은 그 값 그대로) |
 /// | 주 | 그 주에 늘어난 수의 합 |
 /// | 월 | 그달 마지막 누적 |
+/// | 년 | 그해 달마다 마지막 누적의 합 |
 /// | 같은 날 비교 | 이번 달 D일까지의 누적 ↔ 지난달 D일까지의 누적 |
 ///
-/// **전 직원이 본다.** 대표·관리자는 고른 지점, 나머지는 자기 지점이다 (서버가 고정).
+/// **전 직원이 본다.** 대표·관리자는 **지점 카드부터** 고르고, 나머지는 자기
+/// 지점으로 바로 들어간다 (서버가 고정).
 class BranchStatsScreen extends StatefulWidget {
   const BranchStatsScreen({super.key, this.branchId});
 
@@ -37,18 +45,49 @@ class BranchStatsScreen extends StatefulWidget {
   State<BranchStatsScreen> createState() => _BranchStatsScreenState();
 }
 
-enum _Unit { day, week, month }
+enum _Unit {
+  day('일'),
+  week('주'),
+  month('월'),
+  year('년');
+
+  const _Unit(this.label);
+  final String label;
+}
+
+/// 칸마다 선 색 — 서버가 주는 칸 차례(기존·신규·일권)대로 붙는다
+List<Color> get _lineColors => [
+  AppColors.primary,
+  AppColors.success,
+  AppColors.warning,
+  AppColors.violet,
+  AppColors.pink,
+  AppColors.teal,
+];
+
+Color _colorOf(int i) => _lineColors[i % _lineColors.length];
+
+/// 지점 카드에 붙는 이름 — `화순` → `피트니스스타 화순점`
+String _branchTitle(String name) =>
+    '피트니스스타 ${name.endsWith('점') ? name : '$name점'}';
 
 class _BranchStatsScreenState extends State<BranchStatsScreen>
     with SkeletonDelay<BranchStatsScreen> {
+  /// 대표·관리자가 지점을 안 고르고 들어왔다 — 지점 카드부터 (2026-10-01 대표 요청)
+  bool get _picking =>
+      (currentUser?.role.boss ?? false) && widget.branchId == null;
+
   BranchStats? _stats;
-  int _field = 0;
+
+  /// 지점 카드마다 받아 둔 통계 — 오른쪽 숫자에 쓴다
+  List<(Branch, BranchStats?)> _branches = const [];
+
   _Unit _unit = _Unit.day;
 
   /// 같은 날 비교의 기준일 — 기본은 오늘
   DateTime _compareDay = DateUtils.dateOnly(DateTime.now());
 
-  /// 그래프가 보는 달 (일·주) — 월 단위는 이 달의 **해**를 본다
+  /// 그래프가 보는 달 (일·주) — 월 단위는 이 달의 **해**를 본다. 년은 안 쓴다
   DateTime _period = DateTime(DateTime.now().year, DateTime.now().month);
 
   /// 기간을 옮긴다 — 일·주는 한 달씩, 월은 한 해씩
@@ -67,6 +106,30 @@ class _BranchStatsScreenState extends State<BranchStatsScreen>
   Future<void> _fetch() async {
     setState(beginLoad);
     try {
+      if (_picking) {
+        final directory = StaffDirectory.instance;
+        final branches =
+            [
+              for (final b in directory.branches)
+                if (!b.isHq) b,
+            ]..sort(
+              (a, b) => directory.branchRank(a.id) - directory.branchRank(b.id),
+            );
+        final stats = await Future.wait([
+          for (final b in branches)
+            BranchStatsApi.get(
+              branchId: b.id,
+            ).then<BranchStats?>((s) => s, onError: (_) => null),
+        ]);
+        if (!mounted) return;
+        setState(() {
+          _branches = [
+            for (var i = 0; i < branches.length; i++) (branches[i], stats[i]),
+          ];
+          endLoad();
+        });
+        return;
+      }
       final stats = await BranchStatsApi.get(branchId: widget.branchId);
       if (!mounted) return;
       setState(() {
@@ -82,16 +145,51 @@ class _BranchStatsScreenState extends State<BranchStatsScreen>
 
   @override
   Widget build(BuildContext context) {
-    final stats = _stats;
-    return PhoneDetailScaffold(
-      title: '지점 통계',
-      child: ListView(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          PhoneDetailScaffold.topPadding,
-          20,
-          bottomBarInset(context),
+    final padding = EdgeInsets.fromLTRB(
+      20,
+      PhoneDetailScaffold.topPadding,
+      20,
+      bottomBarInset(context),
+    );
+    if (_picking) {
+      return PhoneDetailScaffold(
+        title: '지점 통계',
+        child: ListView(
+          padding: padding,
+          children: [
+            if (showSkeleton)
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: AppDecorations.card(),
+                child: SkeletonRows(rows: 2, avatar: 0),
+              )
+            else if (_branches.isEmpty)
+              EmptyCard(icon: Icons.store_rounded, text: '지점이 없어요')
+            else
+              for (var i = 0; i < _branches.length; i++) ...[
+                if (i > 0) const SizedBox(height: 12),
+                _BranchCard(
+                  branch: _branches[i].$1,
+                  stats: _branches[i].$2,
+                  onTap: () => showFullPage<void>(
+                    context,
+                    (_) => BranchStatsScreen(branchId: _branches[i].$1.id),
+                  ),
+                ),
+              ],
+          ],
         ),
+      );
+    }
+
+    final stats = _stats;
+    final branchName = StaffDirectory.instance.branchName(
+      widget.branchId ?? currentUser?.branchId,
+    );
+    return PhoneDetailScaffold(
+      title: branchName.isEmpty ? '지점 통계' : _branchTitle(branchName),
+      child: ListView(
+        padding: padding,
         children: [
           if (showSkeleton || stats == null)
             Container(
@@ -114,33 +212,15 @@ class _BranchStatsScreenState extends State<BranchStatsScreen>
             ),
             const SizedBox(height: 16),
             SegmentedTabs(
-              labels: stats.fields,
-              selected: _field.clamp(0, stats.fields.length - 1),
-              onSelect: (i) => setState(() => _field = i),
-            ),
-            const SizedBox(height: 12),
-            SegmentedTabs(
-              labels: const ['일', '주', '월'],
+              labels: [for (final u in _Unit.values) u.label],
               selected: _unit.index,
               onSelect: (i) => setState(() => _unit = _Unit.values[i]),
             ),
             const SizedBox(height: 12),
             // 그래프를 보지 않아도 되게 **숫자로** 먼저 (2026-09-30 대표 요청)
-            _SummaryCard(
-              series: _series(
-                stats,
-                stats.fields[_field.clamp(0, stats.fields.length - 1)],
-                _unit,
-                _period,
-              ),
-              stats: stats,
-              field: stats.fields[_field.clamp(0, stats.fields.length - 1)],
-              unit: _unit,
-              period: _period,
-            ),
+            _SummaryCard(stats: stats, unit: _unit, period: _period),
             const SizedBox(height: 12),
             _ChartCard(
-              field: stats.fields[_field.clamp(0, stats.fields.length - 1)],
               unit: _unit,
               stats: stats,
               period: _period,
@@ -148,6 +228,107 @@ class _BranchStatsScreenState extends State<BranchStatsScreen>
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// 지점 카드 — 이름과 **점장이 마지막으로 적은 숫자** (2026-10-01 대표 요청)
+class _BranchCard extends StatelessWidget {
+  const _BranchCard({
+    required this.branch,
+    required this.stats,
+    required this.onTap,
+  });
+
+  final Branch branch;
+  final BranchStats? stats;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final last = stats?.days.lastOrNull;
+    final fields = stats?.fields ?? const <String>[];
+    return Pressable(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 18, 16, 18),
+        decoration: AppDecorations.card(),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.storefront_rounded,
+                size: 22,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _branchTitle(branch.name),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.body1.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    last == null
+                        ? '아직 적은 숫자가 없어요'
+                        : '${last.date.month}월 ${last.date.day}일까지 누적',
+                    style: AppTextStyles.caption.copyWith(fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            if (last != null) ...[
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  for (var i = 0; i < fields.length; i++)
+                    if (last.values[fields[i]] case final v?)
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: '${fields[i]} ',
+                              style: AppTextStyles.caption.copyWith(
+                                fontSize: 12,
+                              ),
+                            ),
+                            TextSpan(
+                              text: _num(v),
+                              style: AppTextStyles.body2.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: _colorOf(i),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                ],
+              ),
+            ],
+            const SizedBox(width: 4),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 20,
+              color: AppColors.gray300,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -186,111 +367,13 @@ List<(DateTime, double)> _daily(BranchStats stats, String field) {
   return out;
 }
 
-/// 그래프 한 벌 — 칸마다 이름과 값 (기록이 없는 칸은 null)
-class _Series {
-  const _Series({
-    required this.labels,
-    required this.values,
-    required this.titles,
-    required this.written,
-    this.compare,
-  });
-
-  /// 아래 축 글자 — `1` · `1주` · `1월`
-  final List<String> labels;
-  final List<double?> values;
-
-  /// 고른 점을 크게 보일 때 붙이는 이름 — `9월 29일` · `9월 3주` · `2026년 9월`
-  final List<String> titles;
-
-  /// 겹쳐 그릴 지난달 선 (일 단위만)
-  final List<double?>? compare;
-
-  /// 그때 **점장이 적은 숫자** (누적) — 말풍선이 보여준다.
-  /// 일은 그날 적은 값, 주는 그 주 마지막 값, 월은 그 달 마지막 값
-  final List<double?> written;
-}
-
-/// 날짜 → 그날 적은 누적 값
-Map<DateTime, double> _writtenMap(BranchStats stats, String field) => {
-  for (final d in stats.days) DateUtils.dateOnly(d.date): ?d.values[field],
-};
-
 /// 날짜 → 그날 늘어난 수 (같은 달 안에서 전 기록과의 차이)
 Map<DateTime, double> _dailyMap(BranchStats stats, String field) => {
   for (final (d, v) in _daily(stats, field)) DateUtils.dateOnly(d): v,
 };
 
-/// 달력 기준으로 칸을 만든다 (2026-09-30 대표 요청)
-///
-/// | 단위 | 칸 |
-/// |---|---|
-/// | 일 | 그 달 1일 ~ 말일 — 날마다 늘어난 수. 지난달 같은 날 선을 겹친다 |
-/// | 주 | 그 달의 월~일 주 — 그 주에 늘어난 수 (달 밖의 날은 안 센다) |
-/// | 월 | 그 해 1월 ~ 12월 — 달마다 마지막 누적 |
-_Series _series(BranchStats stats, String field, _Unit unit, DateTime period) {
-  final daily = _dailyMap(stats, field);
-  final written = _writtenMap(stats, field);
-  final y = period.year;
-  final m = period.month;
-  final days = DateTime(y, m + 1, 0).day;
-  switch (unit) {
-    case _Unit.day:
-      final prevDays = DateTime(y, m, 0).day;
-      return _Series(
-        labels: [for (var d = 1; d <= days; d++) '$d'],
-        values: [for (var d = 1; d <= days; d++) daily[DateTime(y, m, d)]],
-        titles: [for (var d = 1; d <= days; d++) '$m월 $d일'],
-        written: [for (var d = 1; d <= days; d++) written[DateTime(y, m, d)]],
-        compare: [
-          for (var d = 1; d <= days; d++)
-            d <= prevDays ? daily[DateTime(y, m - 1, d)] : null,
-        ],
-      );
-    case _Unit.week:
-      // 1일이 든 주부터 월요일 단위로 끊는다 — 달 밖의 날은 안 센다
-      final weeks = <List<DateTime>>[];
-      for (var d = 1; d <= days; d++) {
-        final day = DateTime(y, m, d);
-        if (weeks.isEmpty || day.weekday == DateTime.monday) weeks.add([]);
-        weeks.last.add(day);
-      }
-      return _Series(
-        labels: [for (var i = 0; i < weeks.length; i++) '${i + 1}주'],
-        values: [
-          for (final w in weeks)
-            w.any(daily.containsKey)
-                ? w.fold<double>(0, (sum, d) => sum + (daily[d] ?? 0))
-                : null,
-        ],
-        titles: [
-          for (var i = 0; i < weeks.length; i++)
-            '$m월 ${i + 1}주 (${weeks[i].first.day}~${weeks[i].last.day}일)',
-        ],
-        written: [
-          for (final w in weeks)
-            [for (final d in w) written[d]].whereType<double>().lastOrNull,
-        ],
-      );
-    case _Unit.month:
-      final last = <int, double>{};
-      for (final d in stats.days) {
-        final v = d.values[field];
-        if (v != null && d.date.year == y) last[d.date.month] = v;
-      }
-      return _Series(
-        labels: [for (var i = 1; i <= 12; i++) '$i월'],
-        values: [for (var i = 1; i <= 12; i++) last[i]],
-        titles: [for (var i = 1; i <= 12; i++) '$y년 $i월'],
-        written: [for (var i = 1; i <= 12; i++) last[i]],
-      );
-  }
-}
-
 String _num(double v) =>
     v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(1);
-
-// ── 조각 ──
 
 /// 같은 날 비교 — 이번 달 D일까지 ↔ 지난달 D일까지 (칸마다)
 class _CompareCard extends StatelessWidget {
@@ -443,179 +526,273 @@ class _Arrow extends StatelessWidget {
   );
 }
 
-/// 그래프 위 숫자 카드 — 고른 기간을 숫자 넷으로
+/// 그래프 한 벌 — 칸마다 이름과 **칸(기존·신규·일권)별** 값 (기록이 없으면 null)
+class _Series {
+  const _Series({
+    required this.labels,
+    required this.titles,
+    required this.values,
+  });
+
+  /// 아래 축 글자 — `1` · `1주` · `1월` · `2026`
+  final List<String> labels;
+
+  /// 말풍선 머리 — `9월 29일` · `9월 3주 (15~21일)` · `2026년 9월` · `2026년`
+  final List<String> titles;
+
+  /// `values[칸 차례][자리]`
+  final List<List<double?>> values;
+}
+
+/// 달마다 마지막 누적 — `{(해, 달): 값}`
+Map<(int, int), double> _monthTotals(BranchStats stats, String field) {
+  final last = <(int, int), double>{};
+  for (final d in stats.days) {
+    final v = d.values[field];
+    if (v != null) last[(d.date.year, d.date.month)] = v;
+  }
+  return last;
+}
+
+/// 달력 기준으로 칸을 만든다 (2026-09-30·10-01 대표 요청)
 ///
-/// | 일·주 (한 달) | 월 (한 해) |
+/// | 단위 | 칸 |
 /// |---|---|
-/// | 이번 달 누적 (마지막으로 적은 값) | 올해 합계 |
-/// | 지난달 같은 날까지 · 차이 | 이번 해 월 평균 |
-/// | 하루(주) 평균 늘어난 수 | 가장 많은 달 |
-/// | 가장 많이 늘어난 날(주) | 기록한 달 수 |
+/// | 일 | 그 달 1일 ~ 말일 — 날마다 늘어난 수 |
+/// | 주 | 그 달의 월~일 주 — 그 주에 늘어난 수 (달 밖의 날은 안 센다) |
+/// | 월 | 그 해 1월 ~ 12월 — 달마다 마지막 누적 |
+/// | 년 | 기록이 있는 첫 해 ~ 올해 — 달마다 마지막 누적을 더한 것 |
+_Series _series(BranchStats stats, _Unit unit, DateTime period) {
+  final y = period.year;
+  final m = period.month;
+  final days = DateTime(y, m + 1, 0).day;
+  final fields = stats.fields;
+  switch (unit) {
+    case _Unit.day:
+      return _Series(
+        labels: [for (var d = 1; d <= days; d++) '$d'],
+        titles: [for (var d = 1; d <= days; d++) '$m월 $d일'],
+        values: [
+          for (final f in fields)
+            () {
+              final daily = _dailyMap(stats, f);
+              return [for (var d = 1; d <= days; d++) daily[DateTime(y, m, d)]];
+            }(),
+        ],
+      );
+    case _Unit.week:
+      // 1일이 든 주부터 월요일 단위로 끊는다 — 달 밖의 날은 안 센다
+      final weeks = <List<DateTime>>[];
+      for (var d = 1; d <= days; d++) {
+        final day = DateTime(y, m, d);
+        if (weeks.isEmpty || day.weekday == DateTime.monday) weeks.add([]);
+        weeks.last.add(day);
+      }
+      return _Series(
+        labels: [for (var i = 0; i < weeks.length; i++) '${i + 1}주'],
+        titles: [
+          for (var i = 0; i < weeks.length; i++)
+            '$m월 ${i + 1}주 (${weeks[i].first.day}~${weeks[i].last.day}일)',
+        ],
+        values: [
+          for (final f in fields)
+            () {
+              final daily = _dailyMap(stats, f);
+              return [
+                for (final w in weeks)
+                  w.any(daily.containsKey)
+                      ? w.fold<double>(0, (sum, d) => sum + (daily[d] ?? 0))
+                      : null,
+              ];
+            }(),
+        ],
+      );
+    case _Unit.month:
+      return _Series(
+        labels: [for (var i = 1; i <= 12; i++) '$i월'],
+        titles: [for (var i = 1; i <= 12; i++) '$y년 $i월'],
+        values: [
+          for (final f in fields)
+            () {
+              final totals = _monthTotals(stats, f);
+              return [for (var i = 1; i <= 12; i++) totals[(y, i)]];
+            }(),
+        ],
+      );
+    case _Unit.year:
+      final now = DateTime.now().year;
+      final first = stats.days.isEmpty ? now : stats.days.first.date.year;
+      final years = [for (var yy = first; yy <= now; yy++) yy];
+      return _Series(
+        labels: [for (final yy in years) '$yy'],
+        titles: [for (final yy in years) '$yy년'],
+        values: [
+          for (final f in fields)
+            () {
+              final totals = _monthTotals(stats, f);
+              return [
+                for (final yy in years)
+                  totals.keys.any((k) => k.$1 == yy)
+                      ? totals.entries
+                            .where((e) => e.key.$1 == yy)
+                            .fold<double>(0, (sum, e) => sum + e.value)
+                      : null,
+              ];
+            }(),
+        ],
+      );
+  }
+}
+
+/// 그래프 위 숫자 카드 — 칸마다 한 줄 (합계 · 평균 · 최고)
+///
+/// | 단위 | 합계 칸 |
+/// |---|---|
+/// | 일·주 | 그 달 마지막 누적 (점장이 적은 숫자 그대로) |
+/// | 월 | 그해 달마다 누적의 합 |
+/// | 년 | 기록 전체의 합 |
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard({
-    required this.series,
     required this.stats,
-    required this.field,
     required this.unit,
     required this.period,
   });
 
-  final _Series series;
   final BranchStats stats;
-  final String field;
   final _Unit unit;
   final DateTime period;
 
   @override
   Widget build(BuildContext context) {
-    final vals = series.values;
-    final filled = [
-      for (var i = 0; i < vals.length; i++)
-        if (vals[i] != null) (i, vals[i]!),
-    ];
-    final avg = filled.isEmpty
-        ? null
-        : filled.fold(0.0, (s, e) => s + e.$2) / filled.length;
-    final best = filled.isEmpty
-        ? null
-        : filled.reduce((a, b) => b.$2 > a.$2 ? b : a);
+    final series = _series(stats, unit, period);
+    final (totalLabel, avgLabel, bestLabel) = switch (unit) {
+      _Unit.day => ('${period.month}월 누적', '하루 평균', '가장 많이 는 날'),
+      _Unit.week => ('${period.month}월 누적', '주 평균', '가장 많이 는 주'),
+      _Unit.month => ('${period.year}년 합계', '월 평균', '가장 많은 달'),
+      _Unit.year => ('전체 합계', '해 평균', '가장 많은 해'),
+    };
+    final header = AppTextStyles.caption.copyWith(fontSize: 11);
 
-    final List<(String, String, String?, Color?)> cells;
-    if (unit == _Unit.month) {
-      final total = filled.fold(0.0, (s, e) => s + e.$2);
-      cells = [
-        ('${period.year}년 합계', filled.isEmpty ? '-' : _num(total), null, null),
-        ('월 평균', avg == null ? '-' : _num(avg), null, null),
-        (
-          '가장 많은 달',
-          best == null ? '-' : _num(best.$2),
-          best == null ? null : series.labels[best.$1],
-          null,
-        ),
-        ('기록한 달', '${filled.length}달', null, null),
+    List<Widget> row(int i) {
+      final field = stats.fields[i];
+      final vals = series.values[i];
+      final filled = [
+        for (var k = 0; k < vals.length; k++)
+          if (vals[k] != null) (k, vals[k]!),
       ];
-    } else {
-      // 이번 달에 마지막으로 적은 날과 그 값
-      int? lastIdx;
-      final written = unit == _Unit.day
-          ? series.written
-          : [
-              for (
-                var d = 1;
-                d <= DateTime(period.year, period.month + 1, 0).day;
-                d++
-              )
-                _cumulativeAt(
-                  stats,
-                  field,
-                  DateTime(period.year, period.month, d),
-                ),
-            ];
-      for (var i = 0; i < written.length; i++) {
-        if (written[i] != null) lastIdx = i;
-      }
-      final now = lastIdx == null ? null : written[lastIdx];
-      final day = lastIdx == null
+      final sum = filled.fold(0.0, (s, e) => s + e.$2);
+      final avg = filled.isEmpty ? null : sum / filled.length;
+      final best = filled.isEmpty
           ? null
-          : DateTime(period.year, period.month, lastIdx + 1);
-      final prevEnd = DateTime(period.year, period.month, 0).day;
-      final before = day == null
-          ? null
-          : _cumulativeAt(
+          : filled.reduce((a, b) => b.$2 > a.$2 ? b : a);
+      // 일·주는 '늘어난 수' 를 더하지 않고 점장이 적은 누적을 그대로 쓴다
+      final total = switch (unit) {
+        _Unit.day || _Unit.week => () {
+          double? last;
+          for (
+            var d = DateTime(period.year, period.month + 1, 0).day;
+            d >= 1;
+            d--
+          ) {
+            last = _cumulativeAt(
               stats,
               field,
-              DateTime(
-                period.year,
-                period.month - 1,
-                day.day > prevEnd ? prevEnd : day.day,
-              ),
+              DateTime(period.year, period.month, d),
             );
-      final diff = (now != null && before != null) ? now - before : null;
-      cells = [
-        (
-          '${period.month}월 누적',
-          now == null ? '-' : _num(now),
-          day == null ? null : '${day.month}월 ${day.day}일까지',
-          null,
-        ),
-        (
-          '지난달 같은 날',
-          before == null ? '-' : _num(before),
-          diff == null ? null : '${diff > 0 ? '+' : ''}${_num(diff)}',
-          diff == null || diff == 0
-              ? null
-              : diff > 0
-              ? AppColors.success
-              : AppColors.error,
-        ),
-        (
-          unit == _Unit.day ? '하루 평균' : '주 평균',
-          avg == null ? '-' : '+${_num(avg)}',
-          null,
-          null,
-        ),
-        (
-          unit == _Unit.day ? '가장 많이 는 날' : '가장 많이 는 주',
-          best == null ? '-' : '+${_num(best.$2)}',
-          best == null ? null : series.titles[best.$1].split(' (').first,
-          null,
-        ),
-      ];
-    }
-
-    Widget cell((String, String, String?, Color?) c) {
-      final (label, value, sub, subColor) = c;
-      return Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+            if (last != null) break;
+          }
+          return last;
+        }(),
+        _ => filled.isEmpty ? null : sum,
+      };
+      final plus = unit == _Unit.day || unit == _Unit.week ? '+' : '';
+      return [
+        Row(
           children: [
-            Text(label, style: AppTextStyles.caption.copyWith(fontSize: 12)),
-            const SizedBox(height: 4),
-            Text(value, style: AppTextStyles.title3),
-            const SizedBox(height: 2),
-            Text(
-              sub ?? ' ',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppTextStyles.caption.copyWith(
-                fontSize: 12,
-                color: subColor,
-                fontWeight: subColor == null ? null : FontWeight.w700,
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: _colorOf(i),
+                shape: BoxShape.circle,
               ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              field,
+              style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w700),
             ),
           ],
         ),
-      );
+        Text(
+          total == null ? '-' : _num(total),
+          textAlign: TextAlign.right,
+          style: AppTextStyles.body1.copyWith(
+            fontWeight: FontWeight.w800,
+            color: _colorOf(i),
+          ),
+        ),
+        Text(
+          avg == null
+              ? '-'
+              : '$plus${_num(double.parse(avg.toStringAsFixed(1)))}',
+          textAlign: TextAlign.right,
+          style: AppTextStyles.body2,
+        ),
+        Text(
+          best == null ? '-' : '$plus${_num(best.$2)}',
+          textAlign: TextAlign.right,
+          style: AppTextStyles.body2,
+        ),
+      ];
     }
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
       decoration: AppDecorations.card(),
-      child: Column(
+      child: Table(
+        columnWidths: const {
+          0: FlexColumnWidth(1.1),
+          1: FlexColumnWidth(1),
+          2: FlexColumnWidth(1),
+          3: FlexColumnWidth(1.2),
+        },
+        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
         children: [
-          Row(children: [cell(cells[0]), cell(cells[1])]),
-          const SizedBox(height: 14),
-          Row(children: [cell(cells[2]), cell(cells[3])]),
+          TableRow(
+            children: [
+              const SizedBox.shrink(),
+              Text(totalLabel, textAlign: TextAlign.right, style: header),
+              Text(avgLabel, textAlign: TextAlign.right, style: header),
+              Text(bestLabel, textAlign: TextAlign.right, style: header),
+            ],
+          ),
+          for (var i = 0; i < stats.fields.length; i++)
+            TableRow(
+              children: [
+                for (final cell in row(i))
+                  Padding(padding: const EdgeInsets.only(top: 10), child: cell),
+              ],
+            ),
         ],
       ),
     );
   }
 }
 
-/// 선 그래프 — 달력 칸 위에 점을 잇는다 (2026-09-30 대표 요청)
+/// 선 그래프 — 칸(기존·신규·일권)마다 **색이 다른 선**, 왼쪽에 눈금
+/// (2026-10-01 대표 요청)
 ///
-/// 기록이 없는 칸(일요일 등)은 **점을 안 찍고 건너뛴다.** 누르거나 끌면 그 칸의
-/// 값이 위에 크게 뜬다. 일 단위는 지난달 같은 날을 회색 선으로 겹친다.
+/// 기록이 없는 자리(일요일 등)는 **점을 안 찍고 건너뛴다.** 누르거나 끌면
+/// 그 자리의 칸별 값이 말풍선으로 뜬다.
 class _ChartCard extends StatefulWidget {
   const _ChartCard({
-    required this.field,
     required this.unit,
     required this.stats,
     required this.period,
     required this.onMove,
   });
 
-  final String field;
   final _Unit unit;
   final BranchStats stats;
   final DateTime period;
@@ -626,46 +803,34 @@ class _ChartCard extends StatefulWidget {
 }
 
 class _ChartCardState extends State<_ChartCard> {
-  /// 누르고 있는 칸 — 없으면 값이 있는 마지막 칸
+  /// 누르고 있는 자리 — 없으면 말풍선을 안 띄운다
   int? _picked;
 
   @override
   void didUpdateWidget(covariant _ChartCard old) {
     super.didUpdateWidget(old);
-    if (old.field != widget.field ||
-        old.unit != widget.unit ||
-        old.period != widget.period) {
-      _picked = null;
-    }
+    if (old.unit != widget.unit || old.period != widget.period) _picked = null;
   }
 
   void _pick(Offset local, double width, int count) {
-    final step = count <= 1 ? 0.0 : (width - _LineChart.padX * 2) / (count - 1);
+    final inner = width - _LineChart.padLeft - _LineChart.padRight;
+    final step = count <= 1 ? 0.0 : inner / (count - 1);
     final i = step == 0
         ? 0
-        : ((local.dx - _LineChart.padX) / step).round().clamp(0, count - 1);
+        : ((local.dx - _LineChart.padLeft) / step).round().clamp(0, count - 1);
     if (i != _picked) setState(() => _picked = i);
   }
 
   @override
   Widget build(BuildContext context) {
-    final series = _series(
-      widget.stats,
-      widget.field,
-      widget.unit,
-      widget.period,
-    );
-    final values = series.values;
-    int? lastWithValue;
-    for (var i = 0; i < values.length; i++) {
-      if (values[i] != null) lastWithValue = i;
-    }
-    final picked = _picked ?? lastWithValue ?? 0;
-    final pickedValue = values[picked];
+    final series = _series(widget.stats, widget.unit, widget.period);
+    final count = series.labels.length;
+    final hasAny = series.values.any((v) => v.any((x) => x != null));
     final title = switch (widget.unit) {
-      _Unit.day => '날마다 늘어난 ${widget.field}',
-      _Unit.week => '주마다 늘어난 ${widget.field}',
-      _Unit.month => '달마다 ${widget.field} 합계',
+      _Unit.day => '날마다 늘어난 수',
+      _Unit.week => '주마다 늘어난 수',
+      _Unit.month => '달마다 합계',
+      _Unit.year => '해마다 합계',
     };
     final now = DateTime.now();
     final atLatest = widget.unit == _Unit.month
@@ -674,57 +839,48 @@ class _ChartCardState extends State<_ChartCard> {
             widget.period.year,
             widget.period.month,
           ).isBefore(DateTime(now.year, now.month));
-    final periodLabel = widget.unit == _Unit.month
-        ? '${widget.period.year}년'
-        : '${widget.period.year}년 ${widget.period.month}월';
+    final periodLabel = switch (widget.unit) {
+      _Unit.month => '${widget.period.year}년',
+      _Unit.year => '',
+      _ => '${widget.period.year}년 ${widget.period.month}월',
+    };
+    final picked = _picked;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
       decoration: AppDecorations.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Expanded(child: Text(title, style: AppTextStyles.label)),
-              _Arrow(
-                icon: CupertinoIcons.chevron_left,
-                onTap: () => widget.onMove(-1),
-              ),
-              Text(
-                periodLabel,
-                style: AppTextStyles.body2.copyWith(
-                  fontWeight: FontWeight.w700,
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: Text(title, style: AppTextStyles.label),
                 ),
               ),
-              _Arrow(
-                icon: CupertinoIcons.chevron_right,
-                onTap: atLatest ? null : () => widget.onMove(1),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                pickedValue == null ? '-' : _num(pickedValue),
-                style: AppTextStyles.title1.copyWith(color: AppColors.primary),
-              ),
-              const SizedBox(width: 8),
-              Text(series.titles[picked], style: AppTextStyles.caption),
-              if (series.compare?[picked] case final prev?) ...[
-                const Spacer(),
+              // 년은 한 화면에 다 보여서 옮길 것이 없다
+              if (widget.unit != _Unit.year) ...[
+                _Arrow(
+                  icon: CupertinoIcons.chevron_left,
+                  onTap: () => widget.onMove(-1),
+                ),
                 Text(
-                  '지난달 ${_num(prev)}',
-                  style: AppTextStyles.caption.copyWith(fontSize: 12),
+                  periodLabel,
+                  style: AppTextStyles.body2.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                _Arrow(
+                  icon: CupertinoIcons.chevron_right,
+                  onTap: atLatest ? null : () => widget.onMove(1),
                 ),
               ],
             ],
           ),
-          const SizedBox(height: 12),
-          if (lastWithValue == null)
+          const SizedBox(height: 10),
+          if (!hasAny)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 60),
               child: Center(
@@ -735,63 +891,48 @@ class _ChartCardState extends State<_ChartCard> {
             LayoutBuilder(
               builder: (context, box) => GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTapDown: (d) =>
-                    _pick(d.localPosition, box.maxWidth, values.length),
+                onTapDown: (d) => _pick(d.localPosition, box.maxWidth, count),
                 onHorizontalDragUpdate: (d) =>
-                    _pick(d.localPosition, box.maxWidth, values.length),
+                    _pick(d.localPosition, box.maxWidth, count),
                 child: SizedBox(
                   width: box.maxWidth,
-                  height: 220,
+                  height: 240,
                   child: CustomPaint(
                     painter: _LineChart(
-                      bubbleTitle: series.titles[picked],
-                      // 그 칸의 칸별 숫자 — 일·주는 늘어난 수, 월은 그달 누적
-                      bubbleRows: [
-                        for (final f in widget.stats.fields)
-                          (
-                            f,
-                            _series(
-                              widget.stats,
-                              f,
-                              widget.unit,
-                              widget.period,
-                            ).values[picked],
-                            f == widget.field,
-                          ),
+                      series: series,
+                      colors: [
+                        for (var i = 0; i < series.values.length; i++)
+                          _colorOf(i),
                       ],
-                      showBubble: _picked != null,
-                      values: values,
-                      compare: series.compare,
-                      labels: series.labels,
+                      fields: widget.stats.fields,
                       picked: picked,
-                      labelEvery: widget.unit == _Unit.day
-                          ? 7
-                          : widget.unit == _Unit.month
-                          ? 2
-                          : 1,
-                      line: AppColors.primary,
-                      compareLine: AppColors.gray300,
+                      labelEvery: switch (widget.unit) {
+                        _Unit.day => 7,
+                        _Unit.month => 2,
+                        _ => 1,
+                      },
                       grid: AppColors.gray100,
+                      guide: AppColors.gray300,
                       text: AppTextStyles.caption.copyWith(
                         fontSize: 11,
                         color: AppColors.textTertiary,
                       ),
+                      bubble: AppColors.gray900,
                       surface: AppColors.surface,
                     ),
                   ),
                 ),
               ),
             ),
-          if (series.compare != null) ...[
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                _Legend(color: AppColors.primary, label: '이번 달'),
-                const SizedBox(width: 14),
-                _Legend(color: AppColors.gray300, label: '지난달'),
-              ],
-            ),
-          ],
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 14,
+            runSpacing: 6,
+            children: [
+              for (var i = 0; i < widget.stats.fields.length; i++)
+                _Legend(color: _colorOf(i), label: widget.stats.fields[i]),
+            ],
+          ),
         ],
       ),
     );
@@ -822,75 +963,90 @@ class _Legend extends StatelessWidget {
   );
 }
 
-/// 선 그래프 그리기 — 칸 자리는 고정, 값이 있는 칸만 잇는다
+/// 눈금 간격 — 1·2·5 × 10ⁿ 중에서 [max] 를 네 칸 남짓으로 나누는 값
+double _niceStep(double max) {
+  if (max <= 0) return 1;
+  final raw = max / 4;
+  final mag = math.pow(10, (math.log(raw) / math.ln10).floor()).toDouble();
+  for (final m in [1, 2, 5, 10]) {
+    if (raw <= m * mag) return m * mag;
+  }
+  return 10 * mag;
+}
+
+/// 선 그래프 그리기 — 칸 자리는 고정, 값이 있는 자리만 잇는다
 class _LineChart extends CustomPainter {
   _LineChart({
-    required this.bubbleTitle,
-    required this.bubbleRows,
-    required this.showBubble,
-    required this.values,
-    required this.compare,
-    required this.labels,
+    required this.series,
+    required this.colors,
+    required this.fields,
     required this.picked,
     required this.labelEvery,
-    required this.line,
-    required this.compareLine,
     required this.grid,
+    required this.guide,
     required this.text,
+    required this.bubble,
     required this.surface,
   });
 
-  /// 말풍선 — 누른 칸의 이름 · 칸별 숫자 (이름 · 값 · 지금 보는 칸인가)
-  final String bubbleTitle;
-  final List<(String, double?, bool)> bubbleRows;
-
-  /// 직접 눌렀을 때만 띄운다 — 처음 열었을 때 말풍선이 떠 있으면 선을 가린다
-  final bool showBubble;
-
-  final List<double?> values;
-  final List<double?>? compare;
-  final List<String> labels;
-  final int picked;
+  final _Series series;
+  final List<Color> colors;
+  final List<String> fields;
+  final int? picked;
 
   /// 아래 글자를 몇 칸마다 적나 — 마지막 칸은 늘 적는다
   final int labelEvery;
-  final Color line;
-  final Color compareLine;
   final Color grid;
+  final Color guide;
   final TextStyle text;
+  final Color bubble;
   final Color surface;
 
-  /// 좌우 여백 — 첫·마지막 점이 카드 끝에 붙지 않게
-  static const padX = 10.0;
-
+  /// 왼쪽 눈금 글자 자리 · 오른쪽 여백
+  static const padLeft = 34.0;
+  static const padRight = 8.0;
   static const _labelH = 22.0;
+  static const _top = 8.0;
 
   @override
   void paint(Canvas canvas, Size size) {
     final chartH = size.height - _labelH;
-    final all = [
-      ...values.whereType<double>(),
-      ...?compare?.whereType<double>(),
-    ];
-    final top = all.fold(0.0, (m, v) => v > m ? v : m);
-    final bottom = all.fold(0.0, (m, v) => v < m ? v : m);
-    final span = (top - bottom) == 0 ? 1.0 : (top - bottom);
-    final n = values.length;
-    final step = n <= 1 ? 0.0 : (size.width - padX * 2) / (n - 1);
+    final all = [for (final v in series.values) ...v.whereType<double>()];
+    final maxV = all.fold(0.0, (m, v) => v > m ? v : m);
+    final minV = all.fold(0.0, (m, v) => v < m ? v : m);
+    final step = _niceStep(math.max(maxV, -minV));
+    final top = (maxV / step).ceil() * step;
+    final bottom = (minV / step).floor() * step;
+    final span = (top - bottom) == 0 ? step : (top - bottom);
+    final n = series.labels.length;
+    final inner = size.width - padLeft - padRight;
+    final dx = n <= 1 ? 0.0 : inner / (n - 1);
 
-    double x(int i) => n <= 1 ? size.width / 2 : padX + step * i;
-    double y(double v) => 10 + (chartH - 20) * (1 - (v - bottom) / span);
+    double x(int i) => n <= 1 ? padLeft + inner / 2 : padLeft + dx * i;
+    double y(double v) =>
+        _top + (chartH - _top - 6) * (1 - (v - bottom) / span);
 
-    // 눈금선 — 위·가운데·아래
+    TextPainter label(String s, [TextStyle? st]) => TextPainter(
+      text: TextSpan(text: s, style: st ?? text),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    // ── 왼쪽 눈금과 가로선 ──
     final gridPaint = Paint()
       ..color = grid
       ..strokeWidth = 1;
-    for (final f in [0.0, 0.5, 1.0]) {
-      final gy = 10 + (chartH - 20) * f;
-      canvas.drawLine(Offset(0, gy), Offset(size.width, gy), gridPaint);
+    for (var v = bottom; v <= top + step / 2; v += step) {
+      final gy = y(v);
+      canvas.drawLine(
+        Offset(padLeft, gy),
+        Offset(size.width - padRight, gy),
+        gridPaint,
+      );
+      final tp = label(_num(v));
+      tp.paint(canvas, Offset(padLeft - 6 - tp.width, gy - tp.height / 2));
     }
 
-    /// 값이 있는 점만 부드럽게 잇는다 (빈 칸은 건너뛴다)
+    /// 값이 있는 점만 부드럽게 잇는다 (빈 자리는 건너뛴다)
     Path? curve(List<double?> vs) {
       Offset? prev;
       Path? path;
@@ -909,147 +1065,118 @@ class _LineChart extends CustomPainter {
       return path;
     }
 
-    final stroke = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    // 지난달 — 회색 가는 선을 먼저 (아래에 깔린다)
-    if (compare != null) {
-      final c = curve(compare!);
-      if (c != null) {
-        canvas.drawPath(
-          c,
-          stroke
-            ..color = compareLine
-            ..strokeWidth = 1.8,
-        );
-      }
+    // 고른 자리 — 세로 안내선 (선보다 먼저 깔린다)
+    final pickedAt = picked?.clamp(0, n - 1);
+    if (pickedAt != null) {
+      canvas.drawLine(
+        Offset(x(pickedAt), _top),
+        Offset(x(pickedAt), chartH - 6),
+        Paint()
+          ..color = guide
+          ..strokeWidth = 1,
+      );
     }
 
-    final path = curve(values);
-    if (path != null) {
-      final first = values.indexWhere((v) => v != null);
-      final last = values.lastIndexWhere((v) => v != null);
-      if (last > first) {
-        final fill = Path.from(path)
-          ..lineTo(x(last), chartH - 10)
-          ..lineTo(x(first), chartH - 10)
-          ..close();
-        canvas.drawPath(
-          fill,
-          Paint()
-            ..shader = LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [line.withValues(alpha: 0.18), line.withValues(alpha: 0)],
-            ).createShader(Rect.fromLTWH(0, 0, size.width, chartH)),
-        );
-      }
+    // ── 칸마다 선 ──
+    for (var f = 0; f < series.values.length; f++) {
+      final vs = series.values[f];
+      final color = colors[f];
+      final path = curve(vs);
+      if (path == null) continue;
       canvas.drawPath(
         path,
         Paint()
-          ..color = line
+          ..color = color
           ..strokeWidth = 2.6
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round,
       );
-      // 값이 있는 점은 작게 찍어 둔다 — 빈 칸과 갈리게
       for (var i = 0; i < n; i++) {
-        final v = values[i];
+        final v = vs[i];
         if (v == null) continue;
-        canvas.drawCircle(Offset(x(i), y(v)), 2.4, Paint()..color = line);
+        final big = i == pickedAt;
+        if (big) {
+          canvas.drawCircle(Offset(x(i), y(v)), 6.5, Paint()..color = surface);
+        }
+        canvas.drawCircle(
+          Offset(x(i), y(v)),
+          big ? 4.5 : 2.4,
+          Paint()..color = color,
+        );
       }
     }
 
-    // 고른 칸 — 세로 안내선, 값이 있으면 흰 테두리 점
-    final px = x(picked.clamp(0, n - 1));
-    canvas.drawLine(
-      Offset(px, 10),
-      Offset(px, chartH - 10),
-      Paint()
-        ..color = line.withValues(alpha: 0.25)
-        ..strokeWidth = 1,
-    );
-    final pv = values[picked.clamp(0, n - 1)];
-    if (pv != null) {
-      canvas.drawCircle(Offset(px, y(pv)), 7, Paint()..color = surface);
-      canvas.drawCircle(Offset(px, y(pv)), 5, Paint()..color = line);
-    }
+    if (pickedAt != null) _bubble(canvas, size, x(pickedAt), pickedAt);
 
-    if (showBubble) _bubble(canvas, size, px, pv == null ? 10 : y(pv));
-
-    // 아래 글자 — [labelEvery] 칸마다 + 마지막 칸 (몰리지 않게)
+    // ── 아래 글자 — [labelEvery] 칸마다 + 마지막 칸 (몰리지 않게) ──
     for (var i = 0; i < n; i++) {
       final last = i == n - 1;
       if (i % labelEvery != 0 && !last) continue;
       if (!last && n - 1 - i < labelEvery / 2) continue;
-      final tp = TextPainter(
-        text: TextSpan(text: labels[i], style: text),
-        textDirection: TextDirection.ltr,
-      )..layout();
+      final tp = label(series.labels[i]);
       final lx = (x(i) - tp.width / 2).clamp(0.0, size.width - tp.width);
       tp.paint(canvas, Offset(lx, chartH + 4));
     }
   }
 
-  /// 누른 점 위에 말풍선 — 위가 모자라면 아래로 내린다
-  void _bubble(Canvas canvas, Size size, double px, double py) {
+  /// 누른 자리 위에 말풍선 — 그 자리의 칸별 값
+  void _bubble(Canvas canvas, Size size, double px, int at) {
     TextPainter tp(String t, TextStyle st) => TextPainter(
       text: TextSpan(text: t, style: st),
       textDirection: TextDirection.ltr,
     )..layout();
-    final lines = [
-      tp(bubbleTitle, text.copyWith(color: surface.withValues(alpha: 0.8))),
-      for (final (name, v, current) in bubbleRows)
-        tp(
-          '$name ${v == null ? '-' : _num(v)}',
-          text.copyWith(
-            color: current ? surface : surface.withValues(alpha: 0.85),
-            fontSize: current ? 14 : 12,
-            fontWeight: current ? FontWeight.w700 : FontWeight.w500,
+    final head = tp(
+      series.titles[at],
+      text.copyWith(color: surface.withValues(alpha: 0.8)),
+    );
+    final rows = [
+      for (var f = 0; f < fields.length; f++)
+        (
+          colors[f],
+          tp(
+            '${fields[f]} ${series.values[f][at] == null ? '-' : _num(series.values[f][at]!)}',
+            text.copyWith(
+              color: surface,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
     ];
-    const padH = 10.0, padV = 8.0, gap = 2.0, arrow = 6.0;
-    final w = lines.fold(0.0, (m, l) => l.width > m ? l.width : m) + padH * 2;
+    const padH = 12.0, padV = 9.0, gap = 3.0, dot = 8.0;
+    final w =
+        [
+          head.width,
+          for (final r in rows) r.$2.width + dot + 6,
+        ].fold(0.0, (m, v) => v > m ? v : m) +
+        padH * 2;
     final h =
-        lines.fold(0.0, (s, l) => s + l.height) +
-        gap * (lines.length - 1) +
+        head.height +
+        rows.fold(0.0, (s, r) => s + r.$2.height + gap) +
         padV * 2;
-    final above = py - h - arrow - 8 >= 0;
-    final top = above ? py - h - arrow - 8 : py + arrow + 8;
-    final left = (px - w / 2).clamp(0.0, size.width - w);
+    // 손가락에 안 가리게 위쪽에 띄우고, 오른쪽 끝이면 왼쪽으로 붙인다
+    final left = (px + 10 + w > size.width) ? px - 10 - w : px + 10;
     final rect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(left, top, w, h),
-      const Radius.circular(10),
+      Rect.fromLTWH(left.clamp(0.0, size.width - w), _top, w, h),
+      const Radius.circular(12),
     );
-    final paint = Paint()..color = line;
-    canvas.drawRRect(rect, paint);
-    // 꼬리 — 점을 가리킨다
-    final tipY = above ? top + h + arrow : top - arrow;
-    final baseY = above ? top + h : top;
-    canvas.drawPath(
-      Path()
-        ..moveTo(px - arrow, baseY)
-        ..lineTo(px + arrow, baseY)
-        ..lineTo(px, tipY)
-        ..close(),
-      paint,
-    );
-    var ty = top + padV;
-    for (final l in lines) {
-      l.paint(canvas, Offset(left + padH, ty));
-      ty += l.height + gap;
+    canvas.drawRRect(rect, Paint()..color = bubble);
+    var ty = rect.top + padV;
+    head.paint(canvas, Offset(rect.left + padH, ty));
+    ty += head.height + gap;
+    for (final (color, line) in rows) {
+      canvas.drawCircle(
+        Offset(rect.left + padH + dot / 2, ty + line.height / 2),
+        dot / 2,
+        Paint()..color = color,
+      );
+      line.paint(canvas, Offset(rect.left + padH + dot + 6, ty));
+      ty += line.height + gap;
     }
   }
 
   @override
   bool shouldRepaint(covariant _LineChart old) =>
-      old.values != values ||
-      old.compare != compare ||
-      old.picked != picked ||
-      old.showBubble != showBubble ||
-      old.labels != labels;
+      old.series != series || old.picked != picked;
 }
