@@ -434,9 +434,11 @@ class _WinnerRow extends StatelessWidget {
   }
 }
 
-/// 랭킹 화면에서 **지난달**을 볼 때 맨 위 — 그 분야 1위 축하 (2026-09-30 대표 요청)
+/// 랭킹 화면에서 **굳은 달**을 볼 때 — 내 순위(대표·관리자는 추월 기록) 자리에
+/// 그 분야 1등 축하 (2026-09-30 대표 요청)
 ///
-/// 이번 달은 아직 움직이는 판이라 안 띄운다. 전 권한이 본다.
+/// **내 순위 카드와 같은 틀**이다 — 아바타 · 머리말 · 큰 글씨 · 오른쪽 값.
+/// 테두리만 파랑 대신 금색이다. 이번 달은 아직 움직이는 판이라 안 띄운다.
 class _ChampionCard extends StatelessWidget {
   const _ChampionCard({
     required this.month,
@@ -450,61 +452,87 @@ class _ChampionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (top, bottom) = _medal(1);
+    final (gold, deep) = _medal(1);
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
       decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: gold.withValues(alpha: 0.85), width: 1.5),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [top, bottom],
+          colors: [
+            Color.alphaBlend(gold.withValues(alpha: 0.18), AppColors.surface),
+            AppColors.surface,
+          ],
         ),
-        borderRadius: BorderRadius.circular(20),
       ),
-      child: Row(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.28),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.emoji_events_rounded,
-              size: 28,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$month월 ${metric.label} 1등',
-                  style: AppTextStyles.caption.copyWith(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    fontWeight: FontWeight.w700,
+          Row(
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: deep, width: 2.5),
+                    ),
+                    child: Avatar(name: entry.ranker.name, size: 46),
                   ),
+                  Positioned(
+                    right: -4,
+                    top: -6,
+                    child: Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(colors: [gold, deep]),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.emoji_events_rounded,
+                        size: 14,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$month월 ${metric.label} 1등',
+                      style: AppTextStyles.caption.copyWith(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: deep,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${entry.ranker.name}님 축하해요!',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.title2,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '${entry.ranker.name}님 축하해요!',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.title3.copyWith(color: Colors.white),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                _format(metric, entry.value),
+                style: AppTextStyles.body1.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: deep,
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          Text(
-            _format(metric, entry.value),
-            style: AppTextStyles.body2.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-            ),
+              ),
+            ],
           ),
         ],
       ),

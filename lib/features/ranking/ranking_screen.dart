@@ -344,20 +344,9 @@ class _RankingScreenState extends State<RankingScreen>
     // 그 자리에 누가 누구를 앞질렀는지를 대신 놓는다.
     // 다른 지점을 보고 있으면 내 순위가 없다 — 그때는 시상대만 넓게 쓴다
     final at = entries.indexWhere((e) => e.ranker.isMe);
-    final myCard = _isRankBoss
-        ? _OvertakeCard(metric: _metric, branch: _branch)
-        : at < 0
-        ? null
-        : _MyRankCard(
-            entry: entries[at],
-            // 따라잡을 앞사람 — 1위면 뒤에서 쫓아오는 사람을 대신 보여준다
-            above: at > 0 ? entries[at - 1] : null,
-            below: at < entries.length - 1 ? entries[at + 1] : null,
-            metric: _metric,
-            total: entries.length,
-          );
-
-    // 지난달을 보고 있으면 맨 위에 그 분야 1등 축하 (2026-09-30 대표 요청)
+    // **굳은 달이면 그 자리에 1등 축하** (2026-09-30 대표 요청) — 끝난 달에
+    // 추월 기록·상위 몇 % 는 뜻이 없다. 대표·관리자의 큰 추월 기록 칸도
+    // 이때는 내 순위 카드 크기로 줄어든다
     final champion =
         !_isThisMonth && entries.isNotEmpty && entries.first.value > 0
         ? _ChampionCard(
@@ -366,9 +355,22 @@ class _RankingScreenState extends State<RankingScreen>
             entry: entries.first,
           )
         : null;
+    final myCard =
+        champion ??
+        (_isRankBoss
+            ? _OvertakeCard(metric: _metric, branch: _branch)
+            : at < 0
+            ? null
+            : _MyRankCard(
+                entry: entries[at],
+                // 따라잡을 앞사람 — 1위면 뒤에서 쫓아오는 사람을 대신 보여준다
+                above: at > 0 ? entries[at - 1] : null,
+                below: at < entries.length - 1 ? entries[at + 1] : null,
+                metric: _metric,
+                total: entries.length,
+              ));
 
     return [
-      if (champion != null) ...[champion, SizedBox(height: 12)],
       // 데스크톱은 폭이 남아 내 순위와 시상대를 나란히 놓는다.
       if (isDesktop) ...[
         if (myCard == null)
