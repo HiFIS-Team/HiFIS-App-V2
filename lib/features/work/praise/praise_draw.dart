@@ -5,6 +5,7 @@ import 'package:cupertino_native/cupertino_native.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:gal/gal.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -209,6 +210,32 @@ class _DrawScreenState extends State<DrawScreen>
     if (mounted) setState(() => _saving = null);
   }
 
+  /// 영상을 갤러리에 저장한다 — 폰 전용 (2026-10-01 대표 요청)
+  ///
+  /// 사내톡 사진 저장과 같은 패키지(`gal`)다. 인스타 말고 다른 데 올리거나
+  /// 나중에 쓰려고 받아 두는 자리다.
+  Future<void> _saveToGallery(MonthDraw draw) async {
+    if (_saving != null || !draw.hasVideo) return;
+    setState(() => _saving = _keyOf(draw));
+    try {
+      final bytes = Uint8List.fromList(await DrawApi.video(draw.videoUrl!));
+      final file = await _writeTemp(
+        bytes,
+        '피트니스스타_${draw.branchName}_${draw.period}',
+      );
+      await Gal.putVideo(file.path);
+      if (mounted) AppToast.show(context, '갤러리에 저장했어요');
+    } catch (error) {
+      if (mounted) {
+        AppToast.show(
+          context,
+          error is GalException ? '갤러리에 저장하지 못했어요' : messageOf(error),
+        );
+      }
+    }
+    if (mounted) setState(() => _saving = null);
+  }
+
   /// 넘겨줄 파일을 임시 자리에 쓴다 — **지난 것들을 먼저 치운다**
   ///
   /// 공유 시트가 읽어 가는 동안 지우면 안 돼서 넘긴 뒤 바로 못 지운다. 그래서
@@ -313,10 +340,30 @@ class _DrawScreenState extends State<DrawScreen>
       // 리퀴드 글래스 하단 버튼 — 영상이 화면을 꽉 채우고 버튼이 그 위에 뜬다
       bottomBar: draw == null || !draw.hasVideo
           ? null
-          : GlassBottomButton(
-              label: '릴스 올리기',
-              onPressed: _saving == null ? () => _send(draw) : () {},
-              active: _saving == null,
+          // 저장하기 · 릴스 올리기 (2026-10-01 대표 요청 — 갤러리에 받아 두기)
+          : BottomActionBar(
+              children: [
+                Expanded(
+                  child: BottomActionButton(
+                    id: 'draw-save',
+                    label: '저장하기',
+                    filled: false,
+                    tinted: false,
+                    onPressed: _saving == null
+                        ? () => _saveToGallery(draw)
+                        : () {},
+                  ),
+                ),
+                SizedBox(width: 10),
+                Expanded(
+                  child: BottomActionButton(
+                    id: 'draw-reels',
+                    label: '릴스 올리기',
+                    filled: _saving == null,
+                    onPressed: _saving == null ? () => _send(draw) : () {},
+                  ),
+                ),
+              ],
             ),
       child: ListView(
         padding: EdgeInsets.fromLTRB(
@@ -476,6 +523,7 @@ class _DrawScreenState extends State<DrawScreen>
             // 하나를 받는 동안 다른 카드도 잠근다 — 두 개를 같이 보내면
             // 어느 것이 인스타로 갔는지 알기 어렵다
             onSend: _saving == null ? () => _send(_draws[i]) : null,
+            onSave: _saving == null ? () => _saveToGallery(_draws[i]) : null,
           ),
         ],
       ],
@@ -620,11 +668,19 @@ class _HeroState extends State<_Hero> {
 
 /// 추첨 한 판 — 지점·게임·당첨자 셋과 영상 버튼
 class _DrawCard extends StatelessWidget {
-  _DrawCard({required this.draw, required this.busy, required this.onSend});
+  _DrawCard({
+    required this.draw,
+    required this.busy,
+    required this.onSend,
+    required this.onSave,
+  });
 
   final MonthDraw draw;
   final bool busy;
   final VoidCallback? onSend;
+
+  /// 갤러리에 저장 — 폰에서만 선다 (PC 는 [onSend] 가 이미 파일 저장이다)
+  final VoidCallback? onSave;
 
   /// 등수별 색 — 매장 TV 시상대(금·은·동)와 같은 결이다
   static const _medals = [
@@ -709,12 +765,29 @@ class _DrawCard extends StatelessWidget {
                 color: AppColors.textTertiary,
               ),
             )
-          else
+          else if (isDesktop)
             AppButton(
-              label: isDesktop ? '영상 저장' : '릴스 올리기',
+              label: '영상 저장',
               filled: true,
               busy: busy,
               onTap: onSend ?? () {},
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: AppButton(label: '저장하기', onTap: onSave ?? () {}),
+                ),
+                SizedBox(width: 10),
+                Expanded(
+                  child: AppButton(
+                    label: '릴스 올리기',
+                    filled: true,
+                    busy: busy,
+                    onTap: onSend ?? () {},
+                  ),
+                ),
+              ],
             ),
         ],
       ),
