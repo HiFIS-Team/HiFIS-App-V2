@@ -69,7 +69,18 @@ class MainActivity : FlutterActivity() {
 
     private fun shareVideo(path: String, appId: String): Boolean {
         return try {
-            val uri = FileProvider.getUriForFile(this, "$packageName.reels", File(path))
+            // **공유용 칸(`cache/reels/`)으로 옮겨서 넘긴다.** 앱이 쓰는 임시 폴더
+            // (`Directory.systemTemp`)는 안드로이드에서 `code_cache` 라 FileProvider
+            // 가 내줄 수 없는 자리다 — 그대로 넘기면 주소를 못 만들어 실패했다
+            // (2026-10-01, iOS 는 되는데 안드로이드만 `공유 화면을 열지 못했어요`)
+            val shared = File(cacheDir, "reels").apply {
+                mkdirs()
+                listFiles()?.forEach { it.delete() }  // 지난달 것은 치운다
+            }
+            val src = File(path)
+            val dst = File(shared, src.name)
+            src.copyTo(dst, overwrite = true)
+            val uri = FileProvider.getUriForFile(this, "$packageName.reels", dst)
 
             // ① 앱 ID 가 있으면 릴스 작성 화면으로 바로 — 시트를 한 번 덜 거친다
             if (appId.isNotEmpty()) {
