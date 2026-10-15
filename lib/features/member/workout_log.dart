@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/util/auto_draft.dart';
 import '../../core/util/native_picker.dart';
 import '../../core/api/client/api_exception.dart';
 import '../../core/api/work/lesson_api.dart';
@@ -82,7 +83,8 @@ class WorkoutLogScreen extends StatefulWidget {
   State<WorkoutLogScreen> createState() => _WorkoutLogScreenState();
 }
 
-class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
+class _WorkoutLogScreenState extends State<WorkoutLogScreen>
+    with AutoDraft<WorkoutLogScreen> {
   late final _title = TextEditingController(text: widget.log?.title ?? '');
 
   /// 새 일지를 열자마자 커서를 올리고, 제목에서 `다음` 을 받는다
@@ -134,6 +136,76 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
         if (mounted) _titleFocus.requestFocus();
       });
     }
+    // 튕겼을 때 적던 것을 되살린다 — 묻는 창이 context 를 써서 첫 프레임 뒤에
+    if (widget.editable) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) startDraft();
+      });
+    }
+  }
+
+  @override
+  String get draftKey =>
+      'workout.${widget.log?.id ?? '${widget.member.id}.${widget.kind.wire}.new'}';
+
+  /// 표는 빈 줄까지 그대로 담는다 — 되살렸을 때 줄 수가 같아야 한다
+  @override
+  Map<String, dynamic> draftSnapshot() => {
+    'title': _title.text,
+    'at': _at.toIso8601String(),
+    'feedback': _trainer.text,
+    'weights': [for (final row in _weights) row.toRow().toJson()],
+    'cardio': [for (final row in _cardio) row.toRow().toJson()],
+    'media': [for (final group in _groups) group.toGroup().toJson()],
+  };
+
+  @override
+  void applyDraft(Map<String, dynamic> data) {
+    List<Map<String, dynamic>> rows(String key) => [
+      for (final row in data[key] as List? ?? const [])
+        (row as Map).cast<String, dynamic>(),
+    ];
+    _title.text = data['title'] as String? ?? '';
+    _trainer.text = data['feedback'] as String? ?? '';
+    // 옛 칸은 새 칸이 그려진 뒤에 치운다 — 그 전 프레임까지 TextField 가 붙들고 있다
+    final old = (List.of(_weights), List.of(_cardio), List.of(_groups));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      for (final row in old.$1) {
+        row.dispose();
+      }
+      for (final row in old.$2) {
+        row.dispose();
+      }
+      for (final group in old.$3) {
+        group.dispose();
+      }
+    });
+    setState(() {
+      _at = DateTime.tryParse(data['at'] as String? ?? '') ?? _at;
+      _weights
+        ..clear()
+        ..addAll(
+          _seed(
+            rows('weights').map(WeightRow.fromJson).toList(),
+            (row) => _WeightEditor(row),
+            () => _WeightEditor(null),
+          ),
+        );
+      _cardio
+        ..clear()
+        ..addAll(
+          _seed(
+            rows('cardio').map(CardioRow.fromJson).toList(),
+            (row) => _CardioEditor(row),
+            () => _CardioEditor(null),
+          ),
+        );
+      _groups
+        ..clear()
+        ..addAll(
+          rows('media').map((g) => MediaGroupEditor(MediaGroup.fromJson(g))),
+        );
+    });
   }
 
   void _onPen() {
@@ -142,6 +214,7 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
 
   @override
   void dispose() {
+    stopDraft();
     PenMode.on.removeListener(_onPen);
     _title.dispose();
     _titleFocus.dispose();
@@ -163,6 +236,8 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
   }
 
   void _exit(bool changed) {
+    // 저장·삭제·닫기 다 스스로 나가는 것이라 맡긴 것을 지운다
+    stopDraft();
     final exit = widget.onExit;
     if (exit == null) {
       Navigator.pop(context, changed);

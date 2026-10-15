@@ -12,6 +12,7 @@ import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/util/auto_draft.dart';
 import '../../core/util/layout.dart';
 import '../../core/util/platform.dart';
 import '../../core/util/rich_blocks.dart';
@@ -522,9 +523,12 @@ class _NoteView extends StatefulWidget {
   State<_NoteView> createState() => _NoteViewState();
 }
 
-class _NoteViewState extends State<_NoteView> {
+class _NoteViewState extends State<_NoteView> with AutoDraft<_NoteView> {
   late final _title = TextEditingController(text: widget.note.title);
   final _titleFocus = FocusNode();
+
+  /// 쓰던 내용을 되살리면 올린다 — 본문 편집기는 처음 받은 글만 읽어서 새로 만든다
+  int _bodyGen = 0;
 
   /// 프로젝트 고르개가 뜰 자리 — 그 칩 아래에 붙는다
 
@@ -536,18 +540,46 @@ class _NoteViewState extends State<_NoteView> {
   @override
   void initState() {
     super.initState();
-    if (_editing) _titleFocus.requestFocus();
+    if (_editing) {
+      _titleFocus.requestFocus();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _editing) startDraft();
+      });
+    }
   }
 
   @override
   void didUpdateWidget(_NoteView old) {
     super.didUpdateWidget(old);
     // 헤더 버튼으로 편집을 켰을 때도 제목부터 입력할 수 있게 한다
-    if (_editing && !old.editing) _titleFocus.requestFocus();
+    if (_editing && !old.editing) {
+      _titleFocus.requestFocus();
+      startDraft();
+    }
+    if (!_editing && old.editing) pauseDraft();
+  }
+
+  /// 글자만 맡긴다 — 날짜·참석자·프로젝트는 다시 고르는 데 몇 초면 된다
+  @override
+  String get draftKey => _noteDraftKey(widget.note.id);
+
+  @override
+  Map<String, dynamic> draftSnapshot() => {
+    'title': _title.text,
+    'body': widget.note.body,
+  };
+
+  @override
+  void applyDraft(Map<String, dynamic> data) {
+    _title.text = data['title'] as String? ?? '';
+    widget.note.body = data['body'] as String? ?? '';
+    setState(() => _bodyGen++);
+    _sync();
   }
 
   @override
   void dispose() {
+    stopDraft();
     _title.dispose();
     _titleFocus.dispose();
     super.dispose();
@@ -871,6 +903,7 @@ class _NoteViewState extends State<_NoteView> {
             SizedBox(height: 14),
             if (_editing)
               BlockEditor(
+                key: ValueKey(_bodyGen),
                 source: widget.note.body,
                 onChanged: (markdown) {
                   widget.note
@@ -1120,6 +1153,8 @@ Future<void> _saveNote(_Note note) async {
   ];
 
   final id = note.id;
+  // 올라가면 기기에 맡겨 둔 쓰던 내용을 지운다 — 실패하면 그대로 둔다
+  final draft = _noteDraftKey(id);
   if (id == null) {
     final created = await MeetingApi.create(
       title: note.title,
@@ -1136,6 +1171,7 @@ Future<void> _saveNote(_Note note) async {
     note.authorId = created.authorId;
     note.memberIds = created.attendeeIds;
     note.reactions = created.reactions;
+    await AutoDraft.clearDraft(draft);
     return;
   }
 
@@ -1152,7 +1188,11 @@ Future<void> _saveNote(_Note note) async {
     projectId: note.projectId ?? '',
   );
   note.memberIds = saved.attendeeIds;
+  await AutoDraft.clearDraft(draft);
 }
+
+/// 쓰던 내용을 맡기는 자리 — 아직 안 올린 새 글은 하나로 묶는다
+String _noteDraftKey(String? id) => 'meeting.${id ?? 'new'}';
 
 /// 지우기 — 아직 안 올린 새 글은 서버를 부르지 않는다
 Future<void> _deleteNote(_Note note) async {

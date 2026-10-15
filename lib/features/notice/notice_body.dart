@@ -28,9 +28,12 @@ class _NoticeView extends StatefulWidget {
   State<_NoticeView> createState() => _NoticeViewState();
 }
 
-class _NoticeViewState extends State<_NoticeView> {
+class _NoticeViewState extends State<_NoticeView> with AutoDraft<_NoticeView> {
   late final _title = TextEditingController(text: widget.notice.title);
   final _titleFocus = FocusNode();
+
+  /// 쓰던 내용을 되살리면 올린다 — 본문 편집기는 처음 받은 글만 읽어서 새로 만든다
+  int _bodyGen = 0;
 
   bool get _editing => widget.editing;
   bool _help = false;
@@ -41,18 +44,45 @@ class _NoticeViewState extends State<_NoticeView> {
   @override
   void initState() {
     super.initState();
-    if (_editing) _titleFocus.requestFocus();
+    if (_editing) {
+      _titleFocus.requestFocus();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _editing) startDraft();
+      });
+    }
   }
 
   @override
   void didUpdateWidget(_NoticeView old) {
     super.didUpdateWidget(old);
     // 헤더 버튼으로 편집을 켰을 때도 제목부터 입력할 수 있게 한다
-    if (_editing && !old.editing) _titleFocus.requestFocus();
+    if (_editing && !old.editing) {
+      _titleFocus.requestFocus();
+      startDraft();
+    }
+    if (!_editing && old.editing) pauseDraft();
+  }
+
+  @override
+  String get draftKey => _noticeDraftKey(widget.notice.id);
+
+  @override
+  Map<String, dynamic> draftSnapshot() => {
+    'title': _title.text,
+    'body': widget.notice.body,
+  };
+
+  @override
+  void applyDraft(Map<String, dynamic> data) {
+    _title.text = data['title'] as String? ?? '';
+    widget.notice.body = data['body'] as String? ?? '';
+    setState(() => _bodyGen++);
+    _sync();
   }
 
   @override
   void dispose() {
+    stopDraft();
     _title.dispose();
     _titleFocus.dispose();
     super.dispose();
@@ -317,6 +347,7 @@ class _NoticeViewState extends State<_NoticeView> {
             SizedBox(height: 14),
             if (_editing)
               BlockEditor(
+                key: ValueKey(_bodyGen),
                 source: notice.body,
                 onChanged: (markdown) {
                   notice.body = markdown;

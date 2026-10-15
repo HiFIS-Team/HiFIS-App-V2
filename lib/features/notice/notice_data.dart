@@ -114,6 +114,8 @@ Future<void> _saveNotice(_Notice notice) async {
   if (notice.title.trim().isEmpty && notice.body.trim().isEmpty) return;
 
   final id = notice.id;
+  // 올라가면 기기에 맡겨 둔 쓰던 내용을 지운다 — 실패하면 그대로 둔다
+  final draft = _noticeDraftKey(id);
   if (id == null) {
     final created = await NoticeApi.create(
       title: notice.title,
@@ -125,6 +127,7 @@ Future<void> _saveNotice(_Notice notice) async {
     // 내가 쓴 글은 이미 본 것이다 — 서버도 작성자를 읽음으로 잡아 준다
     notice.read = created.readByMe;
     notice.readCount = created.readCount;
+    await AutoDraft.clearDraft(draft);
     return;
   }
 
@@ -134,7 +137,11 @@ Future<void> _saveNotice(_Notice notice) async {
     body: notice.body,
     pinned: notice.pinned,
   );
+  await AutoDraft.clearDraft(draft);
 }
+
+/// 쓰던 내용을 맡기는 자리 — 아직 안 올린 새 글은 하나로 묶는다
+String _noticeDraftKey(String? id) => 'notice.${id ?? 'new'}';
 
 /// 지우기 — 아직 안 올린 새 글은 서버를 부르지 않는다
 Future<void> _deleteNotice(_Notice notice) async {
