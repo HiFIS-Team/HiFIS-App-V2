@@ -205,6 +205,14 @@ class EnvApi {
   }
 
   /// 수행 기록 남기기 — 항목 배점만큼 환경정비 점수가 쌓인다
+  /// 대표·관리자 `업무 올리기` — 늘 **본사의 `기타`** 로 남는다 (2026-10-15)
+  ///
+  /// 칩이 없어서 항목을 고를 일이 없다. 서버가 본사 `기타` 를 찾아 붙인다.
+  static Future<EnvTaskLog> createBossLog(String note) async {
+    final data = await _client.post('/env-logs/boss', body: {'note': note});
+    return EnvTaskLog.fromJson(data!);
+  }
+
   static Future<EnvTaskLog> createLog(
     String envItemId, {
     String? note,

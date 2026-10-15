@@ -700,6 +700,27 @@ class _WorkScreenState extends State<WorkScreen>
   /// 대표·관리자에게 칩을 보여줘 봐야 누르면 '권한이 없습니다' 만 뜬다.
   bool get _canDoEnv => myRole.doesFieldWork;
 
+  /// 대표·관리자 — 본인이 한 일을 `기타` 로 올린다 (2026-10-15 요청)
+  ///
+  /// 칩이 없으니 무엇을 했는지만 받는다. 서버가 **본사 `기타`** 로 남겨서
+  /// 지점 내역에는 안 섞이고, '전 지점' 을 볼 때만 목록에 선다.
+  Future<void> _bossUpload() async {
+    final note = await showAppDialog<String>(context, (_) => _WriteInCard());
+    if (note == null || !mounted) return;
+    try {
+      final log = await EnvApi.createBossLog(note);
+      if (!mounted) return;
+      // 지점을 골라 보는 중이면 그 목록에 끼우지 않는다 — 본사 기록이다
+      if (_branch == null) setState(() => _logs = [log, ..._logs]);
+      AppToast.show(
+        context,
+        _branch == null ? '"$note" 기록했습니다' : '"$note" 기록했습니다 · 전 지점에서 볼 수 있어요',
+      );
+    } catch (error) {
+      if (mounted) AppToast.show(context, messageOf(error));
+    }
+  }
+
   Widget get _myHistoryCard => _HistoryCard(
     title: '내 내역',
     logs: _myLogs,
@@ -813,6 +834,15 @@ class _WorkScreenState extends State<WorkScreen>
                                     // 대표·관리자는 '내 내역'이 **늘 비어 있다** — 서버가
                                     // 그들에게는 기록을 안 받는다(`_canDoEnv`). 빈 카드가
                                     // 절반을 차지하고 있었으므로 빼고 전체 내역을 넓힌다.
+                                    // 대표·관리자 — 목록바와 내역 사이의 긴 버튼
+                                    if (!_canDoEnv) ...[
+                                      AppButton(
+                                        label: '업무 올리기',
+                                        filled: true,
+                                        onTap: _bossUpload,
+                                      ),
+                                      SizedBox(height: 16),
+                                    ],
                                     if (isDesktop)
                                       if (_canDoEnv)
                                         Row(
@@ -868,9 +898,10 @@ class _WorkScreenState extends State<WorkScreen>
 /// 비워 두면 완료할 수 없다. 적은 내용이 그대로 기록에 남는 자리라
 /// 빈 '기타' 는 남겨 봐야 나중에 아무 의미가 없다.
 class _WriteInCard extends StatefulWidget {
-  _WriteInCard({required this.item});
+  _WriteInCard({this.item});
 
-  final EnvItem item;
+  /// 없으면 대표·관리자 `업무 올리기` 다 (늘 `기타`)
+  final EnvItem? item;
 
   @override
   State<_WriteInCard> createState() => _WriteInCardState();
@@ -901,7 +932,8 @@ class _WriteInCardState extends State<_WriteInCard> {
 
   @override
   Widget build(BuildContext context) {
-    final claim = _needsNote(widget.item);
+    final item = widget.item;
+    final claim = item != null && _needsNote(item);
     return Container(
       width: dialogWidth(context, 320),
       padding: EdgeInsets.fromLTRB(24, 24, 24, 20),
