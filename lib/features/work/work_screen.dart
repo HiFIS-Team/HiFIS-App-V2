@@ -1662,25 +1662,30 @@ class _BlogLogCardState extends State<_BlogLogCard> {
                 ),
               ),
             ),
-          SizedBox(height: 12),
           // 기본 배점과 가산점을 갈라서 적는다 — 합만 보이면 대표가 얼마를
-          // 얹었는지 알 수 없어서 다시 매길 때 기준이 없다
-          Row(
-            children: [
-              Text(
-                '${log.totalPoints}점',
-                style: AppTextStyles.title3.copyWith(color: AppColors.primary),
-              ),
-              SizedBox(width: 8),
-              if (log.bonusPoints != 0)
+          // 얹었는지 알 수 없어서 다시 매길 때 기준이 없다.
+          // **0점이면 줄째 안 그린다** — 대표·관리자 `업무 올리기` 기록이다
+          if (log.totalPoints != 0) ...[
+            SizedBox(height: 12),
+            Row(
+              children: [
                 Text(
-                  '기본 ${log.points} '
-                  '${log.bonusPoints > 0 ? '+' : '−'} '
-                  '${log.bonusPoints.abs()}',
-                  style: AppTextStyles.caption.copyWith(fontSize: 12),
+                  '${log.totalPoints}점',
+                  style: AppTextStyles.title3.copyWith(
+                    color: AppColors.primary,
+                  ),
                 ),
-            ],
-          ),
+                SizedBox(width: 8),
+                if (log.bonusPoints != 0)
+                  Text(
+                    '기본 ${log.points} '
+                    '${log.bonusPoints > 0 ? '+' : '−'} '
+                    '${log.bonusPoints.abs()}',
+                    style: AppTextStyles.caption.copyWith(fontSize: 12),
+                  ),
+              ],
+            ),
+          ],
           if (log.bonusReason case final reason? when reason.isNotEmpty) ...[
             SizedBox(height: 6),
             Text(
@@ -1700,7 +1705,8 @@ class _BlogLogCardState extends State<_BlogLogCard> {
                   onTap: () => Navigator.pop(context),
                 ),
               ),
-              if (_canAwardEnv) ...[
+              // 0점 기록(대표·관리자 `업무 올리기`)은 점수를 안 받아서 매길 것이 없다
+              if (_canAwardEnv && log.points != 0) ...[
                 SizedBox(width: 8),
                 Expanded(
                   child: AppButton(

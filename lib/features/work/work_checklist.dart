@@ -416,16 +416,21 @@ class _LogRowState extends State<_LogRow> {
               //
               // **대기 중이면 아직 안 들어간 값이라 흐리게 둔다.** 파랗게 두면
               // 이미 받은 것으로 읽힌다
-              Text(
-                '+${_log.totalPoints}',
-                style: AppTextStyles.caption.copyWith(
-                  color: _log.awaiting
-                      ? AppColors.textTertiary
-                      : AppColors.primary,
-                  fontWeight: FontWeight.w700,
+              //
+              // **0점이면 안 그린다** — 대표·관리자 `업무 올리기` 줄이다
+              // (점수를 안 받는다). `+0` 이 서 있으면 깎인 것처럼 읽힌다
+              if (_log.totalPoints != 0) ...[
+                Text(
+                  '+${_log.totalPoints}',
+                  style: AppTextStyles.caption.copyWith(
+                    color: _log.awaiting
+                        ? AppColors.textTertiary
+                        : AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
-              SizedBox(width: 6),
+                SizedBox(width: 6),
+              ],
               Icon(
                 CupertinoIcons.checkmark_circle_fill,
                 size: 16,
