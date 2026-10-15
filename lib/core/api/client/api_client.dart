@@ -128,9 +128,12 @@ class ApiClient {
     Object? body,
     Map<String, dynamic>? query,
   }) async {
+    // 파일 올리기(FormData)는 **한 번 보내면 다시 못 쓴다** — 401 뒤 재시도가
+    // 같은 것을 또 보내면 Dio 가 거절해서 업로드가 그대로 실패했다 (2026-10-15
+    // 운동일지 영상 401 23건). 보낼 때마다 새로 복사한다
     Future<Response<dynamic>> once() => dio.request<dynamic>(
       path,
-      data: body,
+      data: body is FormData ? body.clone() : body,
       queryParameters: query,
       options: Options(method: method),
     );

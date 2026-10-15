@@ -283,6 +283,10 @@ enum VideoThumb {
   static func wire(messenger: FlutterBinaryMessenger) {
     let channel = FlutterMethodChannel(name: "com.hifis/thumb", binaryMessenger: messenger)
     channel.setMethodCallHandler { call, result in
+      if call.method == "shrink" {
+        shrink(call.arguments as? [String: Any], result: result)
+        return
+      }
       guard call.method == "frame",
             let args = call.arguments as? [String: Any],
             let link = args["url"] as? String,
@@ -304,6 +308,27 @@ enum VideoThumb {
         }
         DispatchQueue.main.async { result(ok) }
       }
+    }
+  }
+
+  /// 올리기 전에 **720p 로 줄인다** (2026-10-15 — 10초 영상이 25~45MB 라
+  /// 업로드가 1~2분 걸리고 13초쯤부터는 아예 안 올라갔다).
+  /// 원래 720p 이하면 키우지 않는다. 실패하면 false — 앱이 원본을 올린다
+  private static func shrink(_ args: [String: Any]?, result: @escaping FlutterResult) {
+    guard let path = args?["path"] as? String,
+          let out = args?["out"] as? String,
+          let export = AVAssetExportSession(
+            asset: AVURLAsset(url: URL(fileURLWithPath: path)),
+            presetName: AVAssetExportPreset1280x720)
+    else {
+      result(false)
+      return
+    }
+    export.outputURL = URL(fileURLWithPath: out)
+    export.outputFileType = .mp4
+    export.shouldOptimizeForNetworkUse = true
+    export.exportAsynchronously {
+      DispatchQueue.main.async { result(export.status == .completed) }
     }
   }
 }

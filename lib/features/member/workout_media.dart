@@ -38,7 +38,7 @@ class MediaGroupEditor {
   void dispose() => feedback.dispose();
 }
 
-/// 영상 확장자 — 이건 줄이지 않고 그대로 올린다
+/// 영상 확장자 — 사진 줄이는 길 대신 영상 줄이는 길(`shrinkVideo`)로 간다
 ///
 /// 종류를 정하는 건 서버지만, 앱도 알아야 한다. 영상을 사진 줄이는 길로 보내면
 /// 디코딩에 실패해 원본이 그대로 나가는데 그 사이 몇 초를 그냥 버린다.
@@ -66,7 +66,8 @@ Future<List<MediaItem>> pickWorkoutMedia(BuildContext context) async {
     if (path == null) continue;
     final ext = file.name.split('.').last.toLowerCase();
     if (_videoExts.contains(ext)) {
-      ready.add((path, file.name, false));
+      final (small, name) = await shrinkVideo(path, file.name);
+      ready.add((small, name, small != path));
       continue;
     }
     final (small, name) = await shrinkPhoto(path, file.name);

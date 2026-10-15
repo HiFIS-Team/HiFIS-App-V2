@@ -11,9 +11,9 @@
 library;
 
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
 
 /// 긴 변을 이 길이로 맞춘다 (이보다 작은 사진은 그대로 둔다)
@@ -52,6 +52,32 @@ Future<(String path, String name)> shrinkPhoto(String path, String name) async {
   } catch (_) {
     return (path, name);
   }
+}
+
+/// 영상을 720p 로 줄인다 — iOS 만 (`AVAssetExportSession`, 채널 `com.hifis/thumb`)
+///
+/// 원본 그대로면 10초에 25~45MB 라 업로드가 1~2분 걸리고 길면 아예 끊겼다
+/// (2026-10-15). 못 줄이는 플랫폼·실패·**오히려 커지면** 원본을 그대로 쓴다.
+Future<(String path, String name)> shrinkVideo(String path, String name) async {
+  if (!Platform.isIOS) return (path, name);
+  final out =
+      '${Directory.systemTemp.path}/up_${DateTime.now().microsecondsSinceEpoch}.mp4';
+  try {
+    final ok = await const MethodChannel(
+      'com.hifis/thumb',
+    ).invokeMethod<bool>('shrink', {'path': path, 'out': out});
+    final small = File(out);
+    if (ok == true &&
+        small.existsSync() &&
+        small.lengthSync() < File(path).lengthSync()) {
+      final dot = name.lastIndexOf('.');
+      return (out, '${dot < 0 ? name : name.substring(0, dot)}.mp4');
+    }
+  } catch (_) {}
+  try {
+    File(out).deleteSync();
+  } catch (_) {}
+  return (path, name);
 }
 
 /// 여러 장 — 한꺼번에 줄인다
