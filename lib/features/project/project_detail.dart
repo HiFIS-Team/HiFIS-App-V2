@@ -284,6 +284,16 @@ class _ProjectDetail extends StatelessWidget {
   }
 
   Future<void> _remove(BuildContext context, _Todo todo) async {
+    // 담당자 모두가 보는 목록이라 한 번 더 묻는다
+    final ok = await showConfirmDialog(
+      context,
+      icon: Icons.delete_outline_rounded,
+      title: '이 할 일을 지울까요?',
+      message: '지우면 되돌릴 수 없어요.',
+      confirmLabel: '삭제',
+      destructive: true,
+    );
+    if (!ok || !context.mounted) return;
     final projectId = project.id;
     final todoId = todo.id;
     if (projectId != null && todoId != null) {

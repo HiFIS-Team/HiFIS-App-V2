@@ -219,6 +219,20 @@ class _NoticePageState extends State<_NoticePage> {
     }
   }
 
+  /// 지우기 전에 한 번 더 묻는다 — PC 와 같은 확인 창이다.
+  /// 편집 중에는 휴지통이 완료 버튼 바로 옆에 떠서 잘못 누르기 쉽다
+  Future<void> _confirmDelete() async {
+    final ok = await showConfirmDialog(
+      context,
+      icon: Icons.delete_outline_rounded,
+      title: '이 공지를 지울까요?',
+      message: '지우면 되돌릴 수 없어요.',
+      confirmLabel: '삭제',
+      destructive: true,
+    );
+    if (ok && mounted) Navigator.pop(context, 'delete');
+  }
+
   @override
   Widget build(BuildContext context) {
     final canEdit = _canEdit(widget.notice);
@@ -231,7 +245,7 @@ class _NoticePageState extends State<_NoticePage> {
           GlassIconButton(
             symbol: 'trash',
             symbolColor: AppColors.error,
-            onPressed: () => Navigator.pop(context, 'delete'),
+            onPressed: _confirmDelete,
           ),
         if (canEdit)
           GlassIconButton(
@@ -246,7 +260,7 @@ class _NoticePageState extends State<_NoticePage> {
         notice: widget.notice,
         editing: _editing,
         onChanged: () => setState(() {}),
-        onDelete: () => Navigator.pop(context, 'delete'),
+        onDelete: _confirmDelete,
         onToggleEdit: _toggleEdit,
         phone: true,
       ),

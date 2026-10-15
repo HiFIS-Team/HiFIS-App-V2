@@ -23,6 +23,7 @@ import '../../core/util/platform.dart';
 import '../../core/util/sf_symbols.dart' show isApple;
 import '../../core/util/when.dart';
 import '../../core/widgets/editor/reaction_row.dart';
+import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/widgets/feedback/app_toast.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/glass/glass_input_bar.dart';
@@ -521,6 +522,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   /// 전송 취소 — 줄어드는 애니메이션을 먼저 보여주고 서버에 알린다
   Future<void> _unsend(ChatMessage message) async {
+    // 모두의 대화방에서 사라지는 일이라 한 번 더 묻는다
+    final ok = await showConfirmDialog(
+      context,
+      icon: Icons.delete_outline_rounded,
+      title: '전송을 취소할까요?',
+      message: '모든 사람의 대화방에서 이 메시지가 사라져요.',
+      confirmLabel: '전송 취소',
+      destructive: true,
+    );
+    if (!ok || !mounted) return;
     setState(() => _removingIds.add(message.id));
     try {
       await _store.deleteMessage(_roomId, message.id);

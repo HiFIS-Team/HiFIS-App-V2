@@ -166,6 +166,20 @@ class _NoteScreenState extends State<_NoteScreen> {
     }
   }
 
+  /// 지우기 전에 한 번 더 묻는다 — PC 와 같은 확인 창이다.
+  /// 편집 중에는 휴지통이 완료 버튼 바로 옆에 떠서 잘못 누르기 쉽다
+  Future<void> _confirmDelete() async {
+    final ok = await showConfirmDialog(
+      context,
+      icon: Icons.delete_outline_rounded,
+      title: '이 회의록을 지울까요?',
+      message: '지우면 되돌릴 수 없어요.',
+      confirmLabel: '삭제',
+      destructive: true,
+    );
+    if (ok && mounted) Navigator.pop(context, 'delete');
+  }
+
   /// 프로젝트로 옮기기 — 걸리고 나면 버튼이 사라져야 해서 다시 그린다
   Future<void> _toProject() async {
     await _moveNoteToProject(context, widget.note);
@@ -191,7 +205,7 @@ class _NoteScreenState extends State<_NoteScreen> {
           GlassIconButton(
             symbol: 'trash',
             symbolColor: AppColors.error,
-            onPressed: () => Navigator.pop(context, 'delete'),
+            onPressed: _confirmDelete,
           ),
         if (canEdit)
           GlassIconButton(
@@ -206,7 +220,7 @@ class _NoteScreenState extends State<_NoteScreen> {
         note: widget.note,
         editing: _editing,
         onChanged: () => setState(() {}),
-        onDelete: () => Navigator.pop(context, 'delete'),
+        onDelete: _confirmDelete,
         onToggleEdit: _toggleEdit,
         phone: true,
       ),
