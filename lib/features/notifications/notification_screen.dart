@@ -378,8 +378,11 @@ bool goToNotificationLink(String? link) {
     requestedWorkSubTab.value = workGoalSubTab;
     requestedWorkTab.value = 0;
   }
-  if (link == '/work/session-signs') {
-    requestedOpenSessionHistory.value = true;
+  // `/work/session-signs/{트레이너 id}` — 그 사람 기록으로 연다
+  if (link == '/work/session-signs' ||
+      (link?.startsWith('/work/session-signs/') ?? false)) {
+    requestedOpenSessionHistory.value =
+        link!.split('/').elementAtOrNull(3) ?? '';
     requestedWorkTab.value = workLessonTab;
   }
   // 싸인 재촉 — 받으러 가는 것이라 기록 말고 수업 개수 탭 자체를 연다

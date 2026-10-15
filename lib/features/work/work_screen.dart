@@ -132,7 +132,10 @@ final requestedOpenPtSurveys = ValueNotifier<bool?>(null);
 ///
 /// [requestedOpenPtSurveys] 와 같은 방식이다. 탭까지만 옮기면 수업 개수 칸이
 /// 열릴 뿐이라, 기록을 보려면 `전체보기` 를 한 번 더 눌러야 한다.
-final requestedOpenSessionHistory = ValueNotifier<bool?>(null);
+///
+/// 값은 **트레이너 id** 다 — 그 사람 기록만 걸러 연다 (2026-10-15). 빈
+/// 문자열이면 전체다 (트레이너를 안 싣는 옛 서버 알림).
+final requestedOpenSessionHistory = ValueNotifier<String?>(null);
 
 class WorkScreen extends StatefulWidget {
   WorkScreen({super.key});

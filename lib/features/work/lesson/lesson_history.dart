@@ -1,9 +1,12 @@
 part of 'lesson_section.dart';
 
-/// 세션 기록 전체 화면 — 달을 넘겨 가며 날짜별로 묶어 보여준다
+/// 세션 기록 전체 화면 — **하루씩** 넘겨 본다 (2026-10-15 점장 요청)
 ///
-/// 싸인은 달마다 따로 받는다. 한 번에 다 받으면 해가 갈수록
-/// 화면 열 때마다 몇 백 건씩 넘어온다.
+/// 예전에는 한 달을 통째로 나열해서 오늘 한 수업을 보려면 한참 내려가야 했다.
+/// 가운데 날짜를 누르면 달력에서 골라 바로 간다.
+///
+/// 받는 것은 여전히 **달 단위다** — 날을 넘길 때마다 서버를 부르지 않고,
+/// 받아 둔 그달 기록에서 그날 것만 거른다. 달이 바뀔 때만 다시 받는다.
 class _SignHistoryScreen extends StatefulWidget {
   _SignHistoryScreen({this.trainerId});
 
@@ -18,8 +21,12 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
     with SkeletonDelay<_SignHistoryScreen> {
   final _search = TextEditingController();
 
-  late DateTime _month;
+  /// 보고 있는 날 (자정)
+  late DateTime _day;
   List<SessionSign> _rows = const [];
+
+  /// 받아 둔 기록의 달 — [_day] 가 이 달을 벗어나면 다시 받는다
+  DateTime get _month => DateTime(_day.year, _day.month);
 
   /// 0 최근 기록 · 1 유효회원 · 2 마감회원
   ///
@@ -96,8 +103,7 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    _month = DateTime(now.year, now.month);
+    _day = _today;
     _search.addListener(() => setState(() {}));
     _fetch();
   }
@@ -108,11 +114,13 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
     super.dispose(); // 뼈대 타이머는 SkeletonDelay 가 걷는다
   }
 
-  /// 다음 달로 못 넘어간다 — 아직 오지 않은 달이라 볼 게 없다
-  bool get _atLatest {
+  static DateTime get _today {
     final now = DateTime.now();
-    return _month.year == now.year && _month.month == now.month;
+    return DateTime(now.year, now.month, now.day);
   }
+
+  /// 다음 날로 못 넘어간다 — 아직 오지 않은 날이라 볼 게 없다
+  bool get _atLatest => !_day.isBefore(_today);
 
   Future<void> _fetch() async {
     final asked = _month;
@@ -141,19 +149,41 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
     }
   }
 
-  void _shiftMonth(int delta) {
-    setState(() => _month = DateTime(_month.year, _month.month + delta));
-    _fetch();
+  /// 날을 옮긴다 — 달이 바뀔 때만 다시 받는다
+  void _goTo(DateTime day) {
+    final monthBefore = _month;
+    setState(() => _day = DateTime(day.year, day.month, day.day));
+    if (_month != monthBefore) _fetch();
   }
 
-  /// 오늘/어제/그 외 날짜 라벨
-  String _dayLabel(DateTime time) => dayLabel(time);
+  Future<void> _pickDay() async {
+    final picked = await pickDate(
+      context,
+      initial: _day,
+      first: DateTime(_today.year - 3),
+      last: _today,
+      title: '날짜',
+    );
+    if (picked != null && mounted) _goTo(picked);
+  }
+
+  static const _weekdays = ['월', '화', '수', '목', '금', '토', '일'];
+
+  /// `2026년 10월 11일 (토)`
+  String get _dayTitle =>
+      '${_day.year}년 ${_day.month}월 ${_day.day}일 (${_weekdays[_day.weekday - 1]})';
 
   @override
   Widget build(BuildContext context) {
     final all = _rows;
     final query = _search.text.trim();
     final sorted = all
+        .where(
+          (s) =>
+              s.signedAt.year == _day.year &&
+              s.signedAt.month == _day.month &&
+              s.signedAt.day == _day.day,
+        )
         .where(
           (s) => _trainerId == null || s.performedByTrainerId == _trainerId,
         )
@@ -167,26 +197,10 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
         )
         .toList();
 
-    // 날짜가 바뀌는 지점마다 그룹 헤더를 끼워 넣는다
+    // 하루치라 날짜 머리말은 없다 — 위 날짜 줄이 그 일을 한다
     final children = <Widget>[];
-    String? label;
     for (final sign in sorted) {
-      final dayLabel = _dayLabel(sign.signedAt);
-      if (dayLabel != label) {
-        children.add(
-          Padding(
-            padding: EdgeInsets.fromLTRB(4, label == null ? 4 : 22, 4, 4),
-            child: Text(
-              dayLabel,
-              style: AppTextStyles.caption.copyWith(
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        );
-        label = dayLabel;
-      } else {
+      if (children.isNotEmpty) {
         children.add(Divider(height: 1, color: AppColors.divider));
       }
       children.add(
@@ -219,9 +233,16 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
                     // 건수를 세면 목록과 숫자가 어긋난다
                     count: sorted.length,
                     loading: showSkeleton,
-                    onPrev: () => _shiftMonth(-1),
-                    // 아직 오지 않은 달은 볼 게 없으니 막는다
-                    onNext: _atLatest ? null : () => _shiftMonth(1),
+                    label: _dayTitle,
+                    onTapLabel: _pickDay,
+                    onPrev: () =>
+                        _goTo(DateTime(_day.year, _day.month, _day.day - 1)),
+                    // 아직 오지 않은 날은 볼 게 없으니 막는다
+                    onNext: _atLatest
+                        ? null
+                        : () => _goTo(
+                            DateTime(_day.year, _day.month, _day.day + 1),
+                          ),
                   ),
                   Container(height: 1, color: AppColors.gray100),
                   // 기록 / 유효회원 / 마감회원 — 같은 달을 세 갈래로 본다.
@@ -246,20 +267,20 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
                       padding: EdgeInsets.fromLTRB(20, 8, 20, 0),
                       child: EmptyCard(
                         icon: Icons.draw_rounded,
-                        text: all.isEmpty
-                            ? '이 달에 받은 싸인이 없어요'
-                            : query.isNotEmpty
+                        text: query.isNotEmpty
                             ? '검색 결과가 없어요'
                             : _tab == 1
-                            ? '이 달에 유효 회원의 싸인이 없어요'
-                            : '이 달에 마감 회원의 싸인이 없어요',
+                            ? '이 날 유효 회원의 싸인이 없어요'
+                            : _tab == 2
+                            ? '이 날 마감 회원의 싸인이 없어요'
+                            : '이 날 받은 싸인이 없어요',
                       ),
                     )
                   else
                     Expanded(
                       child: ListView(
-                        // 달이 바뀌면 맨 위부터 다시 본다
-                        key: ValueKey('$_month-$_tab'),
+                        // 날이 바뀌면 맨 위부터 다시 본다
+                        key: ValueKey('$_day-$_tab'),
                         padding: EdgeInsets.fromLTRB(
                           20,
                           8,

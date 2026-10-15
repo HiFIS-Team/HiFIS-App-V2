@@ -36,7 +36,6 @@ import '../../../core/widgets/nav/pick_filter_button.dart';
 import '../../../core/widgets/input/mode_switch.dart';
 import '../../../core/widgets/input/pressable.dart';
 import '../../../core/widgets/input/see_all_button.dart';
-import '../../../core/util/when.dart';
 import '../../../core/api/work/workout_api.dart';
 import '../../../core/util/layout.dart';
 import '../../../core/widgets/nav/phone_scaffold.dart';
@@ -104,9 +103,9 @@ class _LessonSectionState extends State<LessonSection>
     // 보고 있었으면(`LazyIndexedStack` 이라 `initState` 가 안 온다) 리스너가
     // 집는다. 한쪽만 두면 보던 쪽이 조용히 안 움직인다
     requestedOpenSessionHistory.addListener(_onHistoryRequested);
-    if (_pickHistoryRequest()) {
+    if (_pickHistoryRequest() case final trainerId?) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _openHistory();
+        if (mounted) _openHistory(trainerId);
       });
     }
   }
@@ -117,16 +116,17 @@ class _LessonSectionState extends State<LessonSection>
     super.dispose();
   }
 
-  /// 들어온 요청을 꺼내 온다 — **꺼내면서 비운다** (한 번만 듣는다)
-  bool _pickHistoryRequest() {
-    final open = requestedOpenSessionHistory.value ?? false;
+  /// 들어온 요청을 꺼내 온다 — **꺼내면서 비운다** (한 번만 듣는다).
+  /// 열 것이 없으면 null
+  String? _pickHistoryRequest() {
+    final trainerId = requestedOpenSessionHistory.value;
     requestedOpenSessionHistory.value = null;
-    return open;
+    return trainerId;
   }
 
   void _onHistoryRequested() {
     if (!mounted) return;
-    if (_pickHistoryRequest()) _openHistory();
+    if (_pickHistoryRequest() case final trainerId?) _openHistory(trainerId);
   }
 
   @override
@@ -164,7 +164,9 @@ class _LessonSectionState extends State<LessonSection>
   void _openHistory([String? trainerId]) {
     showFullPage<void>(
       context,
-      (_) => _SignHistoryScreen(trainerId: trainerId),
+      (_) => _SignHistoryScreen(
+        trainerId: trainerId == null || trainerId.isEmpty ? null : trainerId,
+      ),
     );
   }
 
