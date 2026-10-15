@@ -49,6 +49,12 @@ class _AppDatePickerState extends State<AppDatePicker> {
   late DateTime _month = DateTime(widget.initial.year, widget.initial.month);
   late DateTime _picked = _dayOf(widget.initial);
 
+  /// 가운데 `2026년 10월` 을 눌러 **연도·월을 고르는 중**인가 (2026-10-15 요청)
+  ///
+  /// 안드로이드는 iOS 처럼 돌리는 바퀴가 없어서, 몇 달 전으로 가려면 화살표를
+  /// 그만큼 눌러야 했다. 여기서는 화살표가 **1년씩** 넘고 달은 12칸에서 고른다.
+  bool _pickingMonth = false;
+
   DateTime? get _floor => widget.min == null ? null : _dayOf(widget.min!);
 
   DateTime? get _ceil => widget.max == null ? null : _dayOf(widget.max!);
@@ -69,8 +75,31 @@ class _AppDatePickerState extends State<AppDatePicker> {
     return high == null || _month.isBefore(DateTime(high.year, high.month));
   }
 
-  void _move(int delta) =>
-      setState(() => _month = DateTime(_month.year, _month.month + delta));
+  /// 달 고르기에서는 1년씩, 날 고르기에서는 한 달씩
+  void _move(int delta) => setState(
+    () => _month = _pickingMonth
+        ? DateTime(_month.year + delta, _month.month)
+        : DateTime(_month.year, _month.month + delta),
+  );
+
+  bool get _canGoBackYear {
+    final low = _floor;
+    return low == null || _month.year > low.year;
+  }
+
+  bool get _canGoNextYear {
+    final high = _ceil;
+    return high == null || _month.year < high.year;
+  }
+
+  /// 그 달에 고를 수 있는 날이 하루라도 있나
+  bool _monthAllowed(int year, int month) {
+    final low = _floor;
+    final high = _ceil;
+    if (low != null && DateTime(year, month + 1, 0).isBefore(low)) return false;
+    if (high != null && DateTime(year, month).isAfter(high)) return false;
+    return true;
+  }
 
   /// 오늘로 — 달을 여러 번 넘기지 않고 한 번에 돌아온다
   void _today() {
@@ -79,6 +108,7 @@ class _AppDatePickerState extends State<AppDatePicker> {
     setState(() {
       _month = DateTime(now.year, now.month);
       _picked = now;
+      _pickingMonth = false;
     });
   }
 
@@ -99,44 +129,80 @@ class _AppDatePickerState extends State<AppDatePicker> {
         children: [
           Row(
             children: [
-              _arrow(CupertinoIcons.chevron_left, _canGoBack, () => _move(-1)),
+              _arrow(
+                CupertinoIcons.chevron_left,
+                _pickingMonth ? _canGoBackYear : _canGoBack,
+                () => _move(-1),
+              ),
               Expanded(
-                child: Text(
-                  '${_month.year}년 ${_month.month}월',
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.title3,
+                // 누르면 연도·월 고르기 ↔ 날 고르기
+                child: Pressable(
+                  onTap: () => setState(() => _pickingMonth = !_pickingMonth),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        _pickingMonth
+                            ? '${_month.year}년'
+                            : '${_month.year}년 ${_month.month}월',
+                        style: AppTextStyles.title3,
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        _pickingMonth
+                            ? CupertinoIcons.chevron_up
+                            : CupertinoIcons.chevron_down,
+                        size: 13,
+                        color: AppColors.textTertiary,
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              _arrow(CupertinoIcons.chevron_right, _canGoNext, () => _move(1)),
+              _arrow(
+                CupertinoIcons.chevron_right,
+                _pickingMonth ? _canGoNextYear : _canGoNext,
+                () => _move(1),
+              ),
             ],
           ),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              for (var i = 0; i < 7; i++)
-                Expanded(
-                  child: Center(
-                    child: Text(
-                      _weekdayLabels[i],
-                      style: AppTextStyles.caption.copyWith(
-                        fontSize: 11,
-                        color: i == 0
-                            ? AppColors.error
-                            : AppColors.textTertiary,
+          if (_pickingMonth)
+            for (var row = 0; row < 4; row++)
+              Row(
+                children: [
+                  for (var col = 0; col < 3; col++)
+                    Expanded(child: _monthCell(row * 3 + col + 1)),
+                ],
+              )
+          else ...[
+            Row(
+              children: [
+                for (var i = 0; i < 7; i++)
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        _weekdayLabels[i],
+                        style: AppTextStyles.caption.copyWith(
+                          fontSize: 11,
+                          color: i == 0
+                              ? AppColors.error
+                              : AppColors.textTertiary,
+                        ),
                       ),
                     ),
                   ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          for (var row = 0; row < rows; row++)
-            Row(
-              children: [
-                for (var col = 0; col < 7; col++)
-                  Expanded(child: _cell(row * 7 + col - lead + 1, lastDay)),
               ],
             ),
+            const SizedBox(height: 6),
+            for (var row = 0; row < rows; row++)
+              Row(
+                children: [
+                  for (var col = 0; col < 7; col++)
+                    Expanded(child: _cell(row * 7 + col - lead + 1, lastDay)),
+                ],
+              ),
+          ],
           const SizedBox(height: 14),
           Row(
             children: [
@@ -174,6 +240,40 @@ class _AppDatePickerState extends State<AppDatePicker> {
       today: _sameDay(date, DateTime.now()),
       enabled: _allowed(date),
       onTap: () => setState(() => _picked = date),
+    );
+  }
+
+  /// 달 한 칸 — 누르면 그 달의 날 고르기로 돌아간다
+  Widget _monthCell(int month) {
+    final enabled = _monthAllowed(_month.year, month);
+    final selected = _month.month == month;
+    return Pressable(
+      onTap: enabled
+          ? () => setState(() {
+              _month = DateTime(_month.year, month);
+              _pickingMonth = false;
+            })
+          : () {},
+      child: Container(
+        height: 48,
+        margin: const EdgeInsets.all(4),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : AppColors.gray50,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          '$month월',
+          style: AppTextStyles.body2.copyWith(
+            fontWeight: FontWeight.w600,
+            color: selected
+                ? AppColors.surface
+                : enabled
+                ? AppColors.textPrimary
+                : AppColors.gray300,
+          ),
+        ),
+      ),
     );
   }
 
