@@ -321,7 +321,11 @@ class _SignHistoryScreenState extends State<_SignHistoryScreen>
           // 우측 상단 트레이너 필터 — **대표·관리자·점장에게만.** 뒤로가기와
           // 마주 보는 자리다. 하단 검색바(블러)와는 Stack 의 다른 자식이라
           // 네이티브 버튼이 묻히지 않는다
-          if (_canSeeOthers)
+          //
+          // **직원 카드를 눌러 들어왔으면 안 띄운다** (2026-10-15 요청) — 이미
+          // 그 사람으로 걸러 들어온 화면이라 다른 사람으로 바꿀 일이 없다.
+          // 사람을 바꿔 보려면 전체보기로 들어온다
+          if (_canSeeOthers && widget.trainerId == null)
             SafeArea(
               bottom: false,
               child: Align(
