@@ -382,6 +382,8 @@ bool goToNotificationLink(String? link) {
     requestedOpenSessionHistory.value = true;
     requestedWorkTab.value = workLessonTab;
   }
+  // 싸인 재촉 — 받으러 가는 것이라 기록 말고 수업 개수 탭 자체를 연다
+  if (link == '/work/lessons') requestedWorkTab.value = workLessonTab;
   requestedScreen.value = target;
   return true;
 }
