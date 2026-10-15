@@ -18,6 +18,7 @@ class _ApprovalPhone extends StatelessWidget {
     required this.loading,
     required this.onPrev,
     required this.onNext,
+    required this.onPickMonth,
     required this.filter,
     required this.onFilter,
     required this.onCreate,
@@ -38,6 +39,9 @@ class _ApprovalPhone extends StatelessWidget {
 
   /// null 이면 다음 달 화살표를 잠근다 (아직 오지 않은 달)
   final VoidCallback? onNext;
+
+  /// 가운데 달을 눌러 고른 달로 간다
+  final ValueChanged<DateTime> onPickMonth;
 
   final _State filter;
   final ValueChanged<_State> onFilter;
@@ -74,6 +78,7 @@ class _ApprovalPhone extends StatelessWidget {
             loading: loading,
             onPrev: onPrev,
             onNext: onNext,
+            onPickMonth: onPickMonth,
             // 목록과 나란히 서는 자리라 좌우를 목록에 맞춘다
             padding: EdgeInsets.fromLTRB(0, 0, 4, 10),
           ),

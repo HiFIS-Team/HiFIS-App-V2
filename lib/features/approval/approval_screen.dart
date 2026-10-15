@@ -360,6 +360,7 @@ class _ApprovalScreenState extends State<ApprovalScreen>
         onPrev: () => _shiftMonth(-1),
         // 아직 오지 않은 달은 볼 게 없으니 막는다
         onNext: _isThisMonth ? null : () => _shiftMonth(1),
+        onPickMonth: (m) => _shiftMonth(monthsBetween(_month, m)),
         filter: _filter,
         onFilter: (v) => setState(() => _filter = v),
         onCreate: _canWrite ? _create : null,
@@ -385,6 +386,7 @@ class _ApprovalScreenState extends State<ApprovalScreen>
                 loading: loading,
                 onPrev: () => _shiftMonth(-1),
                 onNext: _isThisMonth ? null : () => _shiftMonth(1),
+                onPickMonth: (m) => _shiftMonth(monthsBetween(_month, m)),
                 selected: selected,
                 filter: _filter,
                 onFilter: (v) => setState(() {

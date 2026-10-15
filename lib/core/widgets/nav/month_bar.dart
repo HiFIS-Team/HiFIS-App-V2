@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../feedback/skeleton.dart';
+import '../input/date_picker.dart';
 import '../input/pressable.dart';
 
 /// 달 이동 줄 — `‹ 2026년 8월 ›` 과 오른쪽 끝의 건수
@@ -23,6 +24,7 @@ class MonthBar extends StatelessWidget {
     this.padding = const EdgeInsets.fromLTRB(16, 6, 24, 6),
     this.label,
     this.onTapLabel,
+    this.onPickMonth,
   }) : compact = false;
 
   /// 머리말 줄에 얹는 작은 형태 — `‹ 2026년 9월 ›` 만 남기고 줄을 안 차지한다
@@ -38,6 +40,7 @@ class MonthBar extends StatelessWidget {
     required this.month,
     required this.onPrev,
     required this.onNext,
+    this.onPickMonth,
   }) : count = 0,
        loading = false,
        unit = '건',
@@ -60,6 +63,11 @@ class MonthBar extends StatelessWidget {
 
   /// 가운데 글자를 누르면 — 날짜를 골라 바로 간다. 없으면 안 눌린다
   final VoidCallback? onTapLabel;
+
+  /// 가운데 `2026년 10월` 을 누르면 **달 고르기 창**을 띄우고 고른 달을 준다
+  /// (2026-10-15 요청 — 화살표를 여러 번 누르지 않게). [onNext] 가 null 이면
+  /// 지금 달보다 뒤는 막는다 — 화살표가 막힌 데를 창으로 넘어가면 안 된다
+  final ValueChanged<DateTime>? onPickMonth;
 
   /// 오른쪽 끝 건수를 그릴지 — [MonthBar.compact] 가 끈다.
   /// 얹히는 자리는 이미 건수를 말하고 있어서 `총 N건` 이 두 번이 된다.
@@ -109,8 +117,24 @@ class MonthBar extends StatelessWidget {
         color: AppColors.textPrimary,
       ),
     );
-    final tap = onTapLabel;
-    return tap == null ? text : Pressable(onTap: tap, child: text);
+    return Builder(
+      builder: (context) {
+        final pick = onPickMonth;
+        final tap =
+            onTapLabel ??
+            (pick == null
+                ? null
+                : () async {
+                    final picked = await pickAppMonth(
+                      context,
+                      initial: month,
+                      max: onNext == null ? month : null,
+                    );
+                    if (picked != null) pick(picked);
+                  });
+        return tap == null ? text : Pressable(onTap: tap, child: text);
+      },
+    );
   }
 
   @override
@@ -142,3 +166,8 @@ class MonthBar extends StatelessWidget {
     ),
   );
 }
+
+/// [from] 에서 [to] 까지 몇 달인가 — 달 고르기 창에서 고른 달을 화면의
+/// `_shiftMonth(delta)` 에 그대로 넘긴다 (화면마다 받는 길이 달라서 그쪽을 탄다)
+int monthsBetween(DateTime from, DateTime to) =>
+    (to.year - from.year) * 12 + to.month - from.month;

@@ -34,7 +34,9 @@ import '../../core/widgets/feedback/delayed_spinner.dart';
 import '../../core/widgets/feedback/empty_card.dart';
 import '../../core/widgets/feedback/failed_card.dart';
 import '../../core/widgets/input/mode_switch.dart';
+import '../../core/widgets/input/date_picker.dart';
 import '../../core/widgets/input/pressable.dart';
+import '../../core/widgets/nav/month_bar.dart' show monthsBetween;
 import '../../core/widgets/nav/desktop_header.dart';
 import '../../core/widgets/nav/phone_scaffold.dart';
 import '../../core/util/when.dart';
@@ -217,11 +219,23 @@ class _RankingScreenState extends State<RankingScreen>
     children: [
       _arrow(CupertinoIcons.chevron_left, () => _moveMonth(-1), compact),
       SizedBox(width: compact ? 6 : 14),
-      Text(
-        _month,
-        style: compact
-            ? AppTextStyles.body1.copyWith(fontWeight: FontWeight.w700)
-            : AppTextStyles.title3,
+      // 누르면 달 고르기 창 — 이번 달 뒤는 막는다 (화살표와 같다)
+      Pressable(
+        onTap: () async {
+          final now = DateTime.now();
+          final picked = await pickAppMonth(
+            context,
+            initial: _viewMonth,
+            max: DateTime(now.year, now.month),
+          );
+          if (picked != null) _moveMonth(monthsBetween(_viewMonth, picked));
+        },
+        child: Text(
+          _month,
+          style: compact
+              ? AppTextStyles.body1.copyWith(fontWeight: FontWeight.w700)
+              : AppTextStyles.title3,
+        ),
       ),
       SizedBox(width: compact ? 6 : 14),
       // 다음 달은 아직 안 왔으니 늘 비어 있다 — 눌리지 않게 흐려 둔다

@@ -298,6 +298,7 @@ class _PeerReviewSectionState extends State<PeerReviewSection>
     month: _month ?? _thisMonth(),
     onPrev: () => _shiftMonth(-1),
     onNext: _atLatest ? null : () => _shiftMonth(1),
+    onPickMonth: (m) => _shiftMonth(monthsBetween(_month ?? _thisMonth(), m)),
   );
 
   /// 한 줄을 다 쓰는 달 이동 — **폰 화면 둘이 쓴다**
@@ -312,6 +313,8 @@ class _PeerReviewSectionState extends State<PeerReviewSection>
         loading: _switching,
         onPrev: () => _shiftMonth(-1),
         onNext: _atLatest ? null : () => _shiftMonth(1),
+        onPickMonth: (m) =>
+            _shiftMonth(monthsBetween(_month ?? _thisMonth(), m)),
         unit: unit,
         showCount: showCount,
         // 건수를 안 그리면 왼쪽 16 을 둘 이유가 없다 — 화살표가 제 안에 8 을

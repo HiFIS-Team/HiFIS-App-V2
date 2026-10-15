@@ -18,7 +18,10 @@ import '../../../core/widgets/feedback/app_toast.dart';
 import '../../../core/widgets/feedback/empty_card.dart';
 import '../../../core/widgets/feedback/skeleton.dart';
 import '../../../core/widgets/input/mode_switch.dart';
+import '../../../core/util/native_picker.dart';
+import '../../../core/widgets/input/date_picker.dart';
 import '../../../core/widgets/input/pressable.dart';
+import '../../../core/widgets/nav/month_bar.dart' show monthsBetween;
 import '../../../core/widgets/nav/phone_scaffold.dart';
 
 /// 지점 통계 — 점장이 개인 업무로 적어 내는 숫자를 그래프로 (2026-09-30 대표 요청)
@@ -410,10 +413,24 @@ class _CompareCard extends StatelessWidget {
                 icon: CupertinoIcons.chevron_left,
                 onTap: () => onMove(-1),
               ),
-              Text(
-                '${day.month}월 ${day.day}일',
-                style: AppTextStyles.body2.copyWith(
-                  fontWeight: FontWeight.w700,
+              // 누르면 달력 — 오늘 뒤는 막는다 (화살표와 같다)
+              Pressable(
+                onTap: () async {
+                  final picked = await pickDate(
+                    context,
+                    initial: day,
+                    first: DateTime(today.year - 3),
+                    last: today,
+                  );
+                  if (picked != null) {
+                    onMove(DateUtils.dateOnly(picked).difference(day).inDays);
+                  }
+                },
+                child: Text(
+                  '${day.month}월 ${day.day}일',
+                  style: AppTextStyles.body2.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               _Arrow(
@@ -866,10 +883,26 @@ class _ChartCardState extends State<_ChartCard> {
                   icon: CupertinoIcons.chevron_left,
                   onTap: () => widget.onMove(-1),
                 ),
-                Text(
-                  periodLabel,
-                  style: AppTextStyles.body2.copyWith(
-                    fontWeight: FontWeight.w700,
+                // 누르면 달 고르기 창 — 월 단위 그래프는 고른 달의 **해**로 간다
+                Pressable(
+                  onTap: () async {
+                    final picked = await pickAppMonth(
+                      context,
+                      initial: widget.period,
+                      max: DateTime(now.year, now.month),
+                    );
+                    if (picked == null) return;
+                    widget.onMove(
+                      widget.unit == _Unit.month
+                          ? picked.year - widget.period.year
+                          : monthsBetween(widget.period, picked),
+                    );
+                  },
+                  child: Text(
+                    periodLabel,
+                    style: AppTextStyles.body2.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
                 _Arrow(

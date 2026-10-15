@@ -23,6 +23,21 @@ Future<DateTime?> pickAppDate(
   (_) => AppDatePicker(initial: initial, min: min, max: max),
 );
 
+/// 달 하나 고르기 — 취소하면 `null`, 고르면 그 달 1일
+///
+/// `‹ 2026년 10월 ›` 처럼 달을 넘기는 줄의 가운데를 누르면 뜬다 (2026-10-15
+/// 요청). 화살표를 여러 번 누르지 않고 연도는 1년씩, 달은 12칸에서 바로 간다.
+/// **iOS 도 이 창이다** — iOS 기본 고르개에는 달만 고르는 모양이 없다.
+Future<DateTime?> pickAppMonth(
+  BuildContext context, {
+  required DateTime initial,
+  DateTime? min,
+  DateTime? max,
+}) => showAppDialog<DateTime>(
+  context,
+  (_) => AppDatePicker(initial: initial, min: min, max: max, monthOnly: true),
+);
+
 const _weekdayLabels = ['일', '월', '화', '수', '목', '금', '토'];
 
 bool _sameDay(DateTime a, DateTime b) =>
@@ -31,7 +46,16 @@ bool _sameDay(DateTime a, DateTime b) =>
 DateTime _dayOf(DateTime value) => DateTime(value.year, value.month, value.day);
 
 class AppDatePicker extends StatefulWidget {
-  const AppDatePicker({super.key, required this.initial, this.min, this.max});
+  const AppDatePicker({
+    super.key,
+    required this.initial,
+    this.min,
+    this.max,
+    this.monthOnly = false,
+  });
+
+  /// 달만 고른다 — 12칸에서 누르는 순간 닫힌다 ([pickAppMonth])
+  final bool monthOnly;
 
   final DateTime initial;
 
@@ -53,7 +77,7 @@ class _AppDatePickerState extends State<AppDatePicker> {
   ///
   /// 안드로이드는 iOS 처럼 돌리는 바퀴가 없어서, 몇 달 전으로 가려면 화살표를
   /// 그만큼 눌러야 했다. 여기서는 화살표가 **1년씩** 넘고 달은 12칸에서 고른다.
-  bool _pickingMonth = false;
+  late bool _pickingMonth = widget.monthOnly;
 
   DateTime? get _floor => widget.min == null ? null : _dayOf(widget.min!);
 
@@ -101,6 +125,11 @@ class _AppDatePickerState extends State<AppDatePicker> {
     return true;
   }
 
+  void _thisMonth() {
+    final now = DateTime.now();
+    Navigator.pop(context, DateTime(now.year, now.month));
+  }
+
   /// 오늘로 — 달을 여러 번 넘기지 않고 한 번에 돌아온다
   void _today() {
     final now = _dayOf(DateTime.now());
@@ -137,7 +166,9 @@ class _AppDatePickerState extends State<AppDatePicker> {
               Expanded(
                 // 누르면 연도·월 고르기 ↔ 날 고르기
                 child: Pressable(
-                  onTap: () => setState(() => _pickingMonth = !_pickingMonth),
+                  onTap: widget.monthOnly
+                      ? () {}
+                      : () => setState(() => _pickingMonth = !_pickingMonth),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -147,14 +178,16 @@ class _AppDatePickerState extends State<AppDatePicker> {
                             : '${_month.year}년 ${_month.month}월',
                         style: AppTextStyles.title3,
                       ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        _pickingMonth
-                            ? CupertinoIcons.chevron_up
-                            : CupertinoIcons.chevron_down,
-                        size: 13,
-                        color: AppColors.textTertiary,
-                      ),
+                      if (!widget.monthOnly) ...[
+                        const SizedBox(width: 4),
+                        Icon(
+                          _pickingMonth
+                              ? CupertinoIcons.chevron_up
+                              : CupertinoIcons.chevron_down,
+                          size: 13,
+                          color: AppColors.textTertiary,
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -207,7 +240,11 @@ class _AppDatePickerState extends State<AppDatePicker> {
           Row(
             children: [
               if (todayAllowed) ...[
-                AppButton(label: '오늘', shrinkWrap: true, onTap: _today),
+                AppButton(
+                  label: widget.monthOnly ? '이번 달' : '오늘',
+                  shrinkWrap: true,
+                  onTap: widget.monthOnly ? _thisMonth : _today,
+                ),
                 const SizedBox(width: 8),
               ],
               Expanded(
@@ -216,14 +253,17 @@ class _AppDatePickerState extends State<AppDatePicker> {
                   onTap: () => Navigator.pop(context),
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: AppButton(
-                  label: '선택',
-                  filled: true,
-                  onTap: () => Navigator.pop(context, _picked),
+              // 달만 고를 때는 칸을 누르면 바로 닫혀서 '선택' 이 없다
+              if (!widget.monthOnly) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: AppButton(
+                    label: '선택',
+                    filled: true,
+                    onTap: () => Navigator.pop(context, _picked),
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ],
@@ -248,12 +288,14 @@ class _AppDatePickerState extends State<AppDatePicker> {
     final enabled = _monthAllowed(_month.year, month);
     final selected = _month.month == month;
     return Pressable(
-      onTap: enabled
-          ? () => setState(() {
+      onTap: !enabled
+          ? () {}
+          : widget.monthOnly
+          ? () => Navigator.pop(context, DateTime(_month.year, month))
+          : () => setState(() {
               _month = DateTime(_month.year, month);
               _pickingMonth = false;
-            })
-          : () {},
+            }),
       child: Container(
         height: 48,
         margin: const EdgeInsets.all(4),

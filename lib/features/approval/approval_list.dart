@@ -10,6 +10,7 @@ class _DocList extends StatelessWidget {
     required this.loading,
     required this.onPrev,
     required this.onNext,
+    required this.onPickMonth,
     required this.selected,
     required this.filter,
     required this.onFilter,
@@ -31,6 +32,9 @@ class _DocList extends StatelessWidget {
 
   /// null 이면 다음 달 화살표를 잠근다 (아직 오지 않은 달)
   final VoidCallback? onNext;
+
+  /// 가운데 달을 눌러 고른 달로 간다
+  final ValueChanged<DateTime> onPickMonth;
 
   final _Doc? selected;
   final _State filter;
@@ -96,6 +100,7 @@ class _DocList extends StatelessWidget {
           loading: loading,
           onPrev: onPrev,
           onNext: onNext,
+          onPickMonth: onPickMonth,
           padding: EdgeInsets.fromLTRB(16, 0, 24, 8),
         ),
         Padding(

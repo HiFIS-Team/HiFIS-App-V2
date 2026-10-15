@@ -429,6 +429,7 @@ class _HistoryScreenState extends State<_HistoryScreen>
                     onPrev: () => _shiftMonth(-1),
                     // 아직 오지 않은 달은 볼 게 없으니 막는다
                     onNext: _isThisMonth ? null : () => _shiftMonth(1),
+                    onPickMonth: (m) => _shiftMonth(monthsBetween(_month, m)),
                   ),
                   SizedBox(height: widget.tabs ? 8 : 14),
                   // 내 내역 / 전체 내역 전환 탭 (업무 탭과 같은 밑줄 스타일)

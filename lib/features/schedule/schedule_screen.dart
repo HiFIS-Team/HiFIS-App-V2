@@ -20,7 +20,9 @@ import '../../core/widgets/feedback/skeleton.dart';
 import '../../core/widgets/input/mini_button.dart';
 import '../../core/widgets/input/mode_switch.dart';
 import '../../core/widgets/input/person_picker.dart';
+import '../../core/widgets/input/date_picker.dart';
 import '../../core/widgets/input/pressable.dart';
+import '../../core/widgets/nav/month_bar.dart' show monthsBetween;
 import '../../core/widgets/feedback/app_dialog.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../core/util/layout.dart';
@@ -210,9 +212,16 @@ class _ScheduleScreenState extends State<ScheduleScreen>
             padding: EdgeInsets.fromLTRB(28, 0, 28, 14),
             child: Row(
               children: [
-                Text(
-                  '${_month.year}년 ${_month.month}월',
-                  style: AppTextStyles.title1,
+                // 누르면 달 고르기 창 — 화살표를 여러 번 안 눌러도 된다
+                Pressable(
+                  onTap: () async {
+                    final picked = await pickAppMonth(context, initial: _month);
+                    if (picked != null) _move(monthsBetween(_month, picked));
+                  },
+                  child: Text(
+                    '${_month.year}년 ${_month.month}월',
+                    style: AppTextStyles.title1,
+                  ),
                 ),
                 SizedBox(width: 10),
                 // 받아오는 중에는 개수를 감춘다 — 0에서 튀어 오르는 게 보인다

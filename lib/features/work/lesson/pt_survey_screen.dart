@@ -395,6 +395,7 @@ class _PtSurveyScreenState extends State<PtSurveyScreen>
             onPrev: () => _moveMonth(-1),
             // 오지 않은 달에는 설문이 없다 — 앞으로는 못 간다
             onNext: _isThisMonth ? null : () => _moveMonth(1),
+            onPickMonth: (m) => _moveMonth(monthsBetween(_month, m)),
           ),
           SizedBox(height: 12),
           if (_revenueTotal > 0) ...[

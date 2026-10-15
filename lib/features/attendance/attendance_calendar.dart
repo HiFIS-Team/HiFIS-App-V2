@@ -110,9 +110,16 @@ class _MonthCalendar extends StatelessWidget {
               children: [
                 _arrow(CupertinoIcons.chevron_left, () => onMove(-1)),
                 SizedBox(width: 10),
-                Text(
-                  '${month.year}년 ${month.month}월',
-                  style: AppTextStyles.title3,
+                // 누르면 달 고르기 창 — 화살표를 여러 번 안 눌러도 된다
+                Pressable(
+                  onTap: () async {
+                    final picked = await pickAppMonth(context, initial: month);
+                    if (picked != null) onMove(monthsBetween(month, picked));
+                  },
+                  child: Text(
+                    '${month.year}년 ${month.month}월',
+                    style: AppTextStyles.title3,
+                  ),
                 ),
                 SizedBox(width: 10),
                 _arrow(CupertinoIcons.chevron_right, () => onMove(1)),

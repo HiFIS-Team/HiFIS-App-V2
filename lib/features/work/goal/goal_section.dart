@@ -402,6 +402,7 @@ class _GoalBoardState extends State<_GoalBoard> {
           padding: const EdgeInsets.fromLTRB(0, 0, 0, 10),
           onPrev: () => _move(-1),
           onNext: atCurrent ? null : () => _move(1),
+          onPickMonth: (m) => _move(monthsBetween(_month, m)),
         ),
         if (goal != null) ...[
           _RateCard(goal: goal),
@@ -795,6 +796,7 @@ class _GoalRosterState extends State<_GoalRoster>
           padding: const EdgeInsets.fromLTRB(0, 0, 4, 10),
           onPrev: () => _move(-1),
           onNext: _month == _thisMonth() ? null : () => _move(1),
+          onPickMonth: (m) => _move(monthsBetween(_month, m)),
         ),
         if (showSkeleton)
           Container(

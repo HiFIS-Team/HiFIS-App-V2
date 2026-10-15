@@ -161,6 +161,7 @@ class _MyTaskHistoryScreenState extends State<_MyTaskHistoryScreen>
                     onPrev: () => _shiftMonth(-1),
                     // 아직 오지 않은 달은 볼 게 없으니 막는다
                     onNext: _isThisMonth ? null : () => _shiftMonth(1),
+                    onPickMonth: (m) => _shiftMonth(monthsBetween(_month, m)),
                   ),
                   Container(height: 1, color: AppColors.gray100),
                   Padding(

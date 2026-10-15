@@ -510,6 +510,7 @@ class _ContributionSectionState extends State<ContributionSection>
     loading: _turning,
     onPrev: () => _goMonth(-1),
     onNext: _canGoNext ? () => _goMonth(1) : null,
+    onPickMonth: (m) => _goMonth(monthsBetween(_month, m)),
   );
 }
 
