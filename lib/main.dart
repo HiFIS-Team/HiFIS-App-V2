@@ -101,32 +101,47 @@ class _HiFISAppState extends State<HiFISApp> with WidgetsBindingObserver {
       // 비활성 상태에 가림막을 덮는다 (토스식 프라이버시 커버).
       // 화면 녹화·미러링이 도는 동안에도 **같은 가림막**을 쓴다 — iOS 가
       // 스크린샷을 못 막으니 녹화만이라도 빈 화면이 찍히게 한다.
-      builder: (context, child) => Stack(
-        children: [
-          child!,
-          // **토스트만 사는 층** — 화면들(Navigator) 위에 따로 깐다.
-          //
-          // 예전에는 화면과 같은 오버레이에 끼워 넣어서, 토스트가 뜨는
-          // 240ms 와 페이지가 밀려 나가는 전환이 겹치면 **뜨다 말고 끊겨**
-          // 보였다 (알림 전체 읽기를 누르고 바로 나갈 때 실제로 그랬다).
-          //
-          // **가림막보다는 아래다** — 앱 전환·녹화 때는 토스트도 같이 가려야 한다.
-          Positioned.fill(child: Overlay(key: AppToast.overlayKey)),
-          if ((_obscured || CaptureGuard.recording.value) && !isDesktop)
+      builder: (context, child) {
+        final covered =
+            (_obscured || CaptureGuard.recording.value) && !isDesktop;
+        return Stack(
+          children: [
+            // **가리는 동안 아래 화면을 아예 안 그린다** (2026-10-15 아이패드 튕김).
+            // 가림막이 글래스 버튼(네이티브 뷰) **위에** 그려지면 엔진이 덮개 층을
+            // 새로 만들면서 메인 스레드를 기다리는데, 그 순간 앱이 다시 앞으로
+            // 나오면 메인 스레드도 그리기 스레드를 기다려 **서로 멈춘다** → 10초
+            // 뒤 iOS 가 앱을 죽인다 (크래시 로그 0x8BADF00D 두 건 다 이 자리).
+            // 안 그리면 네이티브 뷰 위로 겹칠 것이 없다. 상태는 그대로 남는다
+            Offstage(offstage: covered, child: child!),
+            // **토스트만 사는 층** — 화면들(Navigator) 위에 따로 깐다.
+            //
+            // 예전에는 화면과 같은 오버레이에 끼워 넣어서, 토스트가 뜨는
+            // 240ms 와 페이지가 밀려 나가는 전환이 겹치면 **뜨다 말고 끊겨**
+            // 보였다 (알림 전체 읽기를 누르고 바로 나갈 때 실제로 그랬다).
+            //
+            // **가림막보다는 아래다** — 앱 전환·녹화 때는 토스트도 같이 가려야 한다.
             Positioned.fill(
-              child: Container(
-                color: AppColors.surface,
-                alignment: Alignment.center,
-                child: Image.asset(
-                  'assets/images/hifis_mark.png',
-                  // 런치 스크린 마크와 같은 크기
-                  height: 110,
-                  cacheHeight: 330,
-                ),
+              child: Offstage(
+                offstage: covered,
+                child: Overlay(key: AppToast.overlayKey),
               ),
             ),
-        ],
-      ),
+            if (covered)
+              Positioned.fill(
+                child: Container(
+                  color: AppColors.surface,
+                  alignment: Alignment.center,
+                  child: Image.asset(
+                    'assets/images/hifis_mark.png',
+                    // 런치 스크린 마크와 같은 크기
+                    height: 110,
+                    cacheHeight: 330,
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }
