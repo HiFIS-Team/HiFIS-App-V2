@@ -65,7 +65,8 @@ abstract final class ThemeController {
   static const _channel = MethodChannel('com.hifis/theme');
 
   static void syncNative() {
-    if (!isApple) return; // 안드로이드·윈도우는 해당 없다
+    // iOS 버전과 상관없다 — 키보드·시스템 메뉴도 이 외관을 따른다
+    if (!isApplePlatform) return; // 안드로이드·윈도우는 해당 없다
     _channel.invokeMethod('setDark', AppColors.isDark).catchError((_) {
       // 채널이 없는 빌드(맥 등)에서는 조용히 넘어간다 — 색만 예전 그대로다
       return null;

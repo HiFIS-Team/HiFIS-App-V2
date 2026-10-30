@@ -54,6 +54,26 @@ import UserNotifications
       )
     }
 
+    // 리퀴드 글래스를 그리는 OS 인가 — **iOS 26 부터다** (2026-10-27).
+    // 그 아래(18~25)는 안드로이드와 같은 화면을 쓴다 (`lib/core/util/sf_symbols.dart`)
+    if let osRegistrar = engineBridge.pluginRegistry.registrar(forPlugin: "HiFISOs") {
+      let channel = FlutterMethodChannel(
+        name: "com.hifis/os", binaryMessenger: osRegistrar.messenger())
+      channel.setMethodCallHandler { call, result in
+        guard call.method == "liquidGlass" else {
+          result(FlutterMethodNotImplemented)
+          return
+        }
+        // 유리 면([GlassSurface.swift])이 고르는 것과 **같은 검사**다 — 버전 숫자를
+        // 따로 읽으면 두 군데가 다른 답을 낼 수 있다
+        if #available(iOS 26.0, *) {
+          result(true)
+        } else {
+          result(false)
+        }
+      }
+    }
+
     // 앱 테마 → 창 외관
     //
     // **네이티브 뷰는 앱 안 테마를 모른다.** iOS 시스템 외관만 본다. 앱은
@@ -217,6 +237,13 @@ import UserNotifications
     willPresent notification: UNNotification,
     withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
   ) {
+    // Dart 에도 알린다 — 홈 결재함이 1분 간격을 안 기다리고 다시 받는다 (2026-10-27).
+    // 준비 전이면 버린다 (앱을 막 켜는 중이라 화면이 어차피 새로 받는다)
+    let link = notification.request.content.userInfo["link"] as? String
+    DispatchQueue.main.async { [weak self] in
+      guard let self, self.dartReady, let channel = self.pushChannel else { return }
+      channel.invokeMethod("onMessage", arguments: link)
+    }
     completionHandler([.banner, .list, .sound, .badge])
   }
 

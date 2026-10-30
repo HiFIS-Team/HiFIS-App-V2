@@ -19,14 +19,41 @@ import 'supplement_presets.dart';
 /// 좁은 화면에서는 폭을 줄인다.
 ///
 /// 무언가 바뀌었으면 true (부모가 목록을 다시 받는다)
+///
+/// **표에서는 여러 개를 담아 한 번에 올린다** (2026-10-27 대표 요청). 예전에는
+/// 하나 고르면 폼이 열리고, 저장하고, 다시 `영양제 추가` 를 눌러 또 고르는
+/// 걸음을 영양제마다 되풀이했다. 표의 값이 이미 다 채워져 있어서 폼을 거칠
+/// 일이 없다 — 회원에 맞게 고칠 것만 담긴 줄을 눌러 고친다.
+///
+/// [existing] 은 이미 담긴 영양제 이름 — 표에서 `담겨 있음` 으로 막는다.
 Future<bool> addSupplement(
   BuildContext context, {
   required String memberId,
+  Set<String> existing = const {},
 }) async {
-  final preset = await _pickPreset(context);
-  if (preset == null || !context.mounted) return false;
-  return _openForm(context, memberId: memberId, preset: preset);
+  Future<_Upload>? saving;
+  final picked = await showAppDialog<_Picked>(
+    context,
+    (_) => _PresetPicker(
+      memberId: memberId,
+      existing: existing,
+      onSaving: (run) => saving = run,
+    ),
+  );
+  // **담는 중에 바깥을 눌러 창이 먼저 닫혀도** 다 올라갈 때까지 기다린다 —
+  // 바깥 탭은 바로 닫아 버려서(`showAppDialog`) 못 막는다. 안 기다리면 들어간
+  // 영양제가 회원 화면에 안 보인다
+  if (saving case final run?) {
+    final added = (await run).added;
+    // 하나도 못 올리고 `직접 입력` 으로 넘어간 것은 아래로 간다
+    if (added > 0 || picked != _Picked.manual) return added > 0;
+  }
+  if (picked != _Picked.manual || !context.mounted) return false;
+  return _openForm(context, memberId: memberId, preset: _blank);
 }
+
+/// 담기 결과 — 몇 개 들어갔고, 멈췄다면 왜인가
+typedef _Upload = ({int added, Object? error});
 
 /// 이미 담긴 줄 고치기 — 팝업 안에서 지울 수도 있다
 Future<bool> editSupplement(BuildContext context, Supplement row) =>
@@ -37,10 +64,28 @@ Future<bool> editSupplement(BuildContext context, Supplement row) =>
 /// `직접 입력` 을 고르면 빈 칸으로 연다
 const _blank = (name: '', dose: '', timing: '', reason: '', note: '');
 
-Future<SupplementPreset?> _pickPreset(BuildContext context) =>
-    showAppDialog<SupplementPreset>(context, (_) => _PresetPicker());
+/// 고르기 창이 닫힌 까닭 — 닫기(null)와 셋으로 갈린다
+enum _Picked {
+  /// 담은 것을 올렸다 (하나라도 들어갔다)
+  saved,
+
+  /// `직접 입력` — 빈 폼을 연다
+  manual,
+}
 
 class _PresetPicker extends StatefulWidget {
+  const _PresetPicker({
+    required this.memberId,
+    required this.existing,
+    required this.onSaving,
+  });
+
+  final String memberId;
+  final Set<String> existing;
+
+  /// 올리기 시작했다 — 창이 먼저 닫혀도 부른 쪽이 끝까지 기다리게 넘긴다
+  final ValueChanged<Future<_Upload>> onSaving;
+
   @override
   State<_PresetPicker> createState() => _PresetPickerState();
 }
@@ -48,10 +93,83 @@ class _PresetPicker extends StatefulWidget {
 class _PresetPickerState extends State<_PresetPicker> {
   final _search = TextEditingController();
 
+  /// 담은 것 — **누른 차례대로** 올린다 (회원 화면에도 그 차례로 선다)
+  final _picked = <SupplementPreset>[];
+
+  bool _busy = false;
+
   @override
   void dispose() {
     _search.dispose();
     super.dispose();
+  }
+
+  bool _has(SupplementPreset preset) =>
+      _picked.any((p) => p.name == preset.name);
+
+  bool _already(SupplementPreset preset) =>
+      widget.existing.contains(preset.name);
+
+  void _toggle(SupplementPreset preset) {
+    if (_busy || _already(preset)) return;
+    setState(() {
+      if (_has(preset)) {
+        _picked.removeWhere((p) => p.name == preset.name);
+      } else {
+        _picked.add(preset);
+      }
+    });
+  }
+
+  /// 담은 것을 **하나씩 차례로** 올린다 — 서버가 한 줄씩 받고, 차례가 곧 순서다
+  ///
+  /// 중간에 실패하면 **올라간 것까지는 남는다.** 하나라도 들어갔으면 창을 닫고
+  /// 부모가 목록을 다시 받게 한다 — 남은 것은 다시 담으면 된다 (이미 들어간 것은
+  /// `담겨 있음` 으로 막혀서 두 번 안 들어간다). 하나도 못 올렸으면 창을 둔다.
+  Future<void> _save() async {
+    if (_busy || _picked.isEmpty) return;
+    setState(() => _busy = true);
+    final run = _upload(widget.memberId, [..._picked]);
+    widget.onSaving(run);
+    final (:added, :error) = await run;
+    if (!mounted) return;
+    if (error != null && added == 0) {
+      // 하나도 못 올렸다 — 창을 두고 다시 누르게 한다
+      setState(() => _busy = false);
+      AppToast.show(context, messageOf(error));
+      return;
+    }
+    AppToast.show(
+      context,
+      error == null
+          ? '영양제 $added개를 담았어요'
+          : '$added개만 담았어요 · ${messageOf(error)}',
+    );
+    Navigator.pop(context, _Picked.saved);
+  }
+
+  /// 실제로 올리는 자리 — **창과 상관없이 끝까지 돈다** (실패하면 거기서 멈춘다)
+  static Future<_Upload> _upload(
+    String memberId,
+    List<SupplementPreset> rows,
+  ) async {
+    var added = 0;
+    try {
+      for (final preset in rows) {
+        await SupplementApi.create(
+          memberId: memberId,
+          name: preset.name,
+          dose: preset.dose,
+          timing: preset.timing,
+          reason: preset.reason,
+          note: preset.note,
+        );
+        added++;
+      }
+      return (added: added, error: null);
+    } catch (error) {
+      return (added: added, error: error);
+    }
   }
 
   List<SupplementPreset> get _shown {
@@ -90,7 +208,7 @@ class _PresetPickerState extends State<_PresetPicker> {
           ),
           const SizedBox(height: 4),
           Text(
-            '고르면 얼마나·언제·왜가 함께 채워져요',
+            '여러 개를 골라 한 번에 담아요 · 얼마나·언제·왜가 함께 채워져요',
             style: AppTextStyles.caption.copyWith(
               color: AppColors.textSecondary,
             ),
@@ -147,14 +265,36 @@ class _PresetPickerState extends State<_PresetPicker> {
                         Divider(height: 1, color: AppColors.divider),
                     itemBuilder: (_, i) => _PresetRow(
                       preset: rows[i],
-                      onTap: () => Navigator.pop(context, rows[i]),
+                      picked: _has(rows[i]),
+                      already: _already(rows[i]),
+                      onTap: () => _toggle(rows[i]),
                     ),
                   ),
           ),
           const SizedBox(height: 12),
-          AppButton(
-            label: '직접 입력',
-            onTap: () => Navigator.pop(context, _blank),
+          Row(
+            children: [
+              AppButton(
+                label: '직접 입력',
+                shrinkWrap: true,
+                // 담는 중에 빠지면 반쯤 올라간 채로 폼이 뜬다
+                onTap: () {
+                  if (!_busy) Navigator.pop(context, _Picked.manual);
+                },
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: AppButton(
+                  label: _picked.isEmpty ? '담기' : '${_picked.length}개 담기',
+                  filled: true,
+                  busy: _busy,
+                  // 고른 게 없으면 안 눌린다 — 살아 있는 파란 버튼처럼 두지 않는다
+                  color: _picked.isEmpty ? AppColors.gray100 : null,
+                  textColor: _picked.isEmpty ? AppColors.gray400 : null,
+                  onTap: _save,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -163,44 +303,74 @@ class _PresetPickerState extends State<_PresetPicker> {
 }
 
 class _PresetRow extends StatelessWidget {
-  const _PresetRow({required this.preset, required this.onTap});
+  const _PresetRow({
+    required this.preset,
+    required this.picked,
+    required this.already,
+    required this.onTap,
+  });
 
   final SupplementPreset preset;
+
+  /// 이번에 담았나
+  final bool picked;
+
+  /// 이 회원에게 이미 담겨 있나 — 그러면 못 고른다
+  final bool already;
+
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) => Pressable(
     onTap: onTap,
-    child: Padding(
-      padding: const EdgeInsets.symmetric(vertical: 11),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  preset.name,
-                  style: AppTextStyles.body1.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+    child: Opacity(opacity: already ? 0.45 : 1, child: _body()),
+  );
+
+  Widget _body() => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 11),
+    child: Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                preset.name,
+                style: AppTextStyles.body1.copyWith(
+                  fontWeight: FontWeight.w700,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '${preset.dose} · ${preset.timing}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.caption.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '${preset.dose} · ${preset.timing}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.textSecondary,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Icon(Icons.add_rounded, size: 18, color: AppColors.primary),
-        ],
-      ),
+        ),
+        const SizedBox(width: 8),
+        if (already)
+          Text(
+            '담겨 있음',
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.textTertiary,
+              fontWeight: FontWeight.w600,
+            ),
+          )
+        else
+          // 담으면 채운 체크로 바뀐다 — 장바구니에 든 것이 한눈에 보인다
+          Icon(
+            picked
+                ? Icons.check_circle_rounded
+                : Icons.add_circle_outline_rounded,
+            size: 22,
+            color: picked ? AppColors.primary : AppColors.gray300,
+          ),
+      ],
     ),
   );
 }

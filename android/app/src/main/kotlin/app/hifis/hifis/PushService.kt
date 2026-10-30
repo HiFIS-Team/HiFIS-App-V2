@@ -32,6 +32,11 @@ class PushService : FirebaseMessagingService() {
         val title = notification?.title ?: return
         val body = notification.body.orEmpty()
 
+        // Dart 에도 알린다 — 홈 결재함이 1분 간격을 안 기다리고 다시 받는다
+        // (2026-10-27). 안드로이드는 알림창을 내렸다 올려도 앱이 '다시 앞으로'
+        // 가 안 돼서, 이게 없으면 결재 푸시를 받고도 홈 카드가 비어 있었다
+        MainActivity.onForegroundPush(message.data["link"])
+
         // 누르면 알림함에서 누른 것과 **같은 곳**으로 간다 —
         // `MainActivity.deliver` 가 이 `link` 를 Dart 로 넘긴다
         val intent = Intent(this, MainActivity::class.java).apply {

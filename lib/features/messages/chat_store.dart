@@ -11,6 +11,8 @@ import '../../core/data/employee.dart';
 import '../../core/data/staff_directory.dart';
 import '../../core/util/photo.dart';
 import '../../core/util/photo_cache.dart';
+import '../../core/util/platform.dart' show isDesktop;
+import '../../core/util/screen_refresh.dart' show appResumed;
 
 /// 사내톡 상태 한 곳
 ///
@@ -22,6 +24,19 @@ import '../../core/util/photo_cache.dart';
 class ChatStore extends ChangeNotifier {
   ChatStore._() {
     _sub = ChatSocket.instance.events.listen(_onEvent);
+    // 끊겼다 다시 붙었거나 앱이 다시 앞으로 나왔다 — 그 사이 온 메시지를 맞춘다
+    ChatSocket.instance.connects.addListener(resync);
+    appResumed.addListener(_onResumed);
+  }
+
+  /// 앱이 다시 앞으로 나왔다 — **폰만** 맞춘다
+  ///
+  /// 폰은 뒤로 가면 소켓이 끊겨 그 사이 메시지를 놓친다. PC 는 창 포커스만
+  /// 바뀌어도 이 신호가 와서(`macos.md` 3번) 그때마다 목록을 받게 되는데,
+  /// 소켓은 그대로 붙어 있다 — 끊겼다면 다시 붙을 때([ChatSocket.connects]) 맞춘다.
+  void _onResumed() {
+    if (isDesktop) return;
+    resync();
   }
 
   static final ChatStore instance = ChatStore._();
@@ -71,6 +86,8 @@ class ChatStore extends ChangeNotifier {
   @override
   void dispose() {
     _sub.cancel();
+    ChatSocket.instance.connects.removeListener(resync);
+    appResumed.removeListener(_onResumed);
     super.dispose();
   }
 
@@ -81,6 +98,8 @@ class ChatStore extends ChangeNotifier {
     _typing.clear();
     _hasMore.clear();
     _localCopies.clear();
+    _bumpedAt.clear();
+    _resyncedAt = null;
     loaded = false;
     unreadRooms.value = 0;
     notifyListeners();
@@ -88,14 +107,142 @@ class ChatStore extends ChangeNotifier {
 
   Future<void> loadRooms() async {
     _loadingRooms = true;
+    final asked = DateTime.now();
     try {
-      _rooms = await ChatApi.rooms();
+      _rooms = _keepNewer(await ChatApi.rooms(), since: asked);
       loaded = true;
       _syncUnread();
     } finally {
       _loadingRooms = false;
       notifyListeners();
     }
+  }
+
+  /// 받아 온 목록에 **그 사이 소켓으로 온 메시지**를 살린다 (2026-10-27)
+  ///
+  /// 목록을 부른 뒤 응답이 오기 전에 새 메시지가 오면, 늦게 온 응답이 그걸
+  /// 덮어서 **미리보기가 한 칸 앞 대화로 돌아갔다.** 그 사이([since] 뒤)에
+  /// 들어온 메시지가 더 새것이면 그 방은 내 것을 남긴다.
+  ///
+  /// **그 사이에 온 것만 본다.** 그 전부터 들고 있던 것까지 이기게 두면
+  /// 다른 기기에서 전송 취소한 메시지가 미리보기에 영영 남는다.
+  List<ChatRoom> _keepNewer(List<ChatRoom> fresh, {required DateTime since}) {
+    final mine = {for (final room in _rooms) room.id: room};
+    var changed = false;
+    final merged = <ChatRoom>[];
+    for (final room in fresh) {
+      final local = mine[room.id]?.lastMessage;
+      final server = room.lastMessage;
+      final newer =
+          local != null &&
+          !local.pending &&
+          (_bumpedAt[room.id]?.isAfter(since) ?? false) &&
+          (server == null || local.createdAt.isAfter(server.createdAt));
+      if (!newer) {
+        merged.add(room);
+        continue;
+      }
+      changed = true;
+      final localUnread = mine[room.id]!.unreadCount;
+      merged.add(
+        ChatRoom(
+          id: room.id,
+          name: room.name,
+          isGroup: room.isGroup,
+          ownerId: room.ownerId,
+          memberIds: room.memberIds,
+          lastMessage: local,
+          // 새 글을 이미 세어 뒀다 — 서버 값이 그보다 적으면 그 글이 빠진 것이다
+          unreadCount: localUnread > room.unreadCount
+              ? localUnread
+              : room.unreadCount,
+          muted: room.muted,
+          updatedAt: room.updatedAt,
+        ),
+      );
+    }
+    if (changed) merged.sort((a, b) => b.sortAt.compareTo(a.sortAt));
+    return merged;
+  }
+
+  /// 방마다 마지막으로 새 메시지를 올린 때 — [_keepNewer] 가 본다
+  final Map<String, DateTime> _bumpedAt = {};
+
+  /// 다시 맞추는 중 — 소켓과 앱 복귀가 한꺼번에 오면 두 번 돈다
+  bool _resyncing = false;
+
+  /// 마지막으로 맞춘 때 — 맥은 창 포커스만 바뀌어도 '다시 앞으로' 가 와서 자주 돈다
+  DateTime? _resyncedAt;
+
+  /// 서버와 다시 맞춘다 — **끊겨 있던 사이에 온 메시지**를 채운다 (2026-10-27)
+  ///
+  /// 소켓은 끊긴 동안의 메시지를 다시 보내 주지 않는다. 앱을 뒤에 뒀다 오면
+  /// 목록 미리보기와 열어 둔 방이 **그 전 대화에 멈춰** 있었다.
+  ///
+  /// 목록은 통째로, 메시지는 **받아 둔 방만** 최근 것을 다시 받아 붙인다.
+  /// 로그인 전이거나 목록을 한 번도 안 받았으면 아무것도 안 한다.
+  Future<void> resync() async {
+    if (!loaded || currentUser == null || _resyncing) return;
+    final now = DateTime.now();
+    if (_resyncedAt case final last?
+        when now.difference(last) < const Duration(seconds: 3)) {
+      return;
+    }
+    _resyncing = true;
+    _resyncedAt = now;
+    try {
+      await loadRooms();
+      // **마지막 메시지가 달라진 방만** 다시 받는다 — 연 방이 많으면 앞으로
+      // 나올 때마다 그 수만큼 요청이 나간다
+      for (final roomId in [..._messages.keys]) {
+        if (!_behind(roomId)) continue;
+        try {
+          await _refreshLatest(roomId);
+        } catch (_) {
+          // 한 방이 실패해도(나간 방 등) 나머지는 맞춘다
+        }
+      }
+    } catch (_) {
+      // 목록을 못 받았다 — 다음에 다시 붙거나 방을 열 때 맞춰진다
+    } finally {
+      _resyncing = false;
+    }
+  }
+
+  /// 받아 둔 메시지가 목록의 마지막 메시지보다 뒤처졌나
+  bool _behind(String roomId) {
+    final latest = roomOf(roomId)?.lastMessage;
+    final sent = [
+      for (final m in _messages[roomId] ?? const <ChatMessage>[])
+        if (!m.pending) m,
+    ];
+    if (latest == null) return sent.isNotEmpty; // 다 지워졌다
+    return sent.isEmpty || sent.last.id != latest.id;
+  }
+
+  /// 받아 둔 방의 **최근 메시지**를 다시 받아 붙인다
+  ///
+  /// | 받아 온 것과 겹치나 | 하는 일 |
+  /// |---|---|
+  /// | 겹친다 | 빠진 것을 끼우고, 그 구간에서 사라진 것(전송 취소)은 뺀다 |
+  /// | 안 겹친다 | 그 사이가 30개를 넘었다 — 최근 것으로 **갈아끼운다** |
+  ///
+  /// 보내는 중인 내 말풍선(`pending`)은 그대로 맨 뒤에 둔다 — 응답이 오면 제자리를
+  /// 찾는다. 받아 온 구간보다 **새 메시지**(응답이 온 뒤 소켓으로 들어온 것)도 남긴다 —
+  /// 구간 밖이라 받아 온 목록에 없는 것뿐이지 지워진 게 아니다.
+  Future<void> _refreshLatest(String roomId) async {
+    final asked = DateTime.now();
+    final fresh = await ChatApi.messages(roomId);
+    // **받아 온 뒤에** 읽는다 — 기다리는 동안 소켓으로 들어온 것까지 본다
+    final current = _messages[roomId];
+    if (current == null) return;
+    // 방에 남은 메시지가 없다(다 전송 취소)고 왔는데 **기다리는 사이 새 글이
+    // 왔으면 손대지 않는다** — 그 글이 받아 온 목록에 없을 뿐 지워진 게 아니다
+    if (fresh.isEmpty && (_bumpedAt[roomId]?.isAfter(asked) ?? false)) return;
+    final merged = mergeLatestMessages(current, fresh);
+    if (merged.hasMore case final more?) _hasMore[roomId] = more;
+    _messages[roomId] = merged.messages;
+    notifyListeners();
   }
 
   /// 방을 열 때 — 지난 메시지를 받고 읽음으로 표시한다
@@ -443,6 +590,7 @@ class ChatStore extends ChangeNotifier {
       return;
     }
     final old = _rooms[at];
+    _bumpedAt[roomId] = DateTime.now();
     // 시스템 안내는 안읽음으로 세지 않는다 (서버 기준과 같게 맞춘다)
     final bump = countUnread && !message.isSystem ? 1 : 0;
     final updated = ChatRoom(
@@ -492,6 +640,58 @@ class ChatStore extends ChangeNotifier {
     _syncUnread();
     notifyListeners();
   }
+}
+
+/// 들고 있던 메시지([current])에 서버에서 다시 받은 **최근 구간**([fresh])을 합친다
+///
+/// [ChatStore] 가 앱이 앞으로 나오거나 소켓이 다시 붙을 때 쓴다 (2026-10-27).
+/// 둘 다 오래된 것부터다. 서버는 최근 30개까지 준다 — 다 못 채웠으면 방의
+/// 처음부터 지금까지 전부다.
+///
+/// | 들고 있던 것 | 하는 일 |
+/// |---|---|
+/// | 받아 온 구간에 있다 | 받아 온 것으로 바꾼다 (읽음 수·공감이 바뀌었을 수 있다) |
+/// | 구간 **안**인데 없다 | 뺀다 — 전송 취소됐다 |
+/// | 구간보다 **새것** | 남긴다 — 받아 온 뒤에 소켓으로 들어왔다 |
+/// | 구간보다 **옛것** | 겹치면 남기고, 안 겹치면 버린다 (사이가 30개를 넘어 비어 있다) |
+/// | 보내는 중(`pending`) | 맨 뒤에 그대로 — 응답이 오면 제자리를 찾는다 |
+///
+/// [hasMore] 는 옛 구간을 버렸을 때만 채운다 (위로 더 받을 것이 있다).
+@visibleForTesting
+({List<ChatMessage> messages, bool? hasMore}) mergeLatestMessages(
+  List<ChatMessage> current,
+  List<ChatMessage> fresh,
+) {
+  final drafts = [
+    for (final m in current)
+      if (m.pending) m,
+  ];
+  final sent = [
+    for (final m in current)
+      if (!m.pending) m,
+  ];
+  if (fresh.isEmpty) return (messages: drafts, hasMore: null);
+  final byId = {for (final m in fresh) m.id: m};
+  final known = {for (final m in sent) m.id};
+  final from = fresh.length >= 30 ? fresh.first.createdAt : null;
+  final until = fresh.last.createdAt;
+  final overlaps = sent.any((m) => byId.containsKey(m.id));
+  final dropsOld = !overlaps && sent.any((m) => !m.createdAt.isAfter(until));
+  final kept = [
+    for (final m in sent)
+      if (byId[m.id] case final updated?)
+        updated
+      else if (m.createdAt.isAfter(until))
+        m
+      else if (overlaps && from != null && m.createdAt.isBefore(from))
+        m,
+    for (final m in fresh)
+      if (!known.contains(m.id)) m,
+  ]..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+  return (
+    messages: [...kept, ...drafts],
+    hasMore: dropsOld ? fresh.length >= 30 : null,
+  );
 }
 
 /// 방 이름 — **DM 은 서버가 이름을 안 준다**

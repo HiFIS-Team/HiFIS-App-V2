@@ -54,6 +54,16 @@ Future<void> _openAdd(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+/// 업무 한 줄을 담는다 — 담은 줄 머리에 **걸리는 요일**이 적힌다
+///
+/// 요일을 하나씩 넘기던 화면(2026-08-20)이 요일 칸을 고르는 한 장으로
+/// 바뀌었다 (2026-10-27). 처음 켜진 칸이 곧 이 테스트가 지키는 값이다.
+Future<void> _stage(WidgetTester tester) async {
+  await tester.enterText(find.byType(TextField).first, '청소');
+  await tester.testTextInput.receiveAction(TextInputAction.done);
+  await tester.pumpAndSettle();
+}
+
 void main() {
   setUp(() {
     StaffDirectory.instance
@@ -66,41 +76,50 @@ void main() {
     currentUser = null;
   });
 
-  testWidgets('월~금 근무자는 월요일부터 5칸을 돈다', (tester) async {
+  testWidgets('월~금 근무자는 월~금이 켜진 채로 열린다', (tester) async {
     currentUser = _person('a', '평일이', const [1, 2, 3, 4, 5]);
     await _openAdd(tester);
+    await _stage(tester);
 
-    expect(find.text('월요일'), findsOneWidget);
-    expect(find.text('1 / 5'), findsOneWidget);
+    expect(find.text('월·화·수·목·금'), findsOneWidget);
   });
 
-  testWidgets(
-    '다른 사람으로 바뀌면 그 사람 근무일을 돈다 — 앞사람 것이 남으면 안 된다',
-    (tester) async {
-      // 앞사람이 먼저 열어 본다 (여기서 값이 굳는 것이 버그였다)
-      currentUser = _person('a', '평일이', const [1, 2, 3, 4, 5]);
-      await _openAdd(tester);
-      expect(find.text('월요일'), findsOneWidget);
+  testWidgets('다른 사람으로 바뀌면 그 사람 근무일이 켜진다 — 앞사람 것이 남으면 안 된다', (tester) async {
+    // 앞사람이 먼저 열어 본다 (여기서 값이 굳는 것이 버그였다)
+    currentUser = _person('a', '평일이', const [1, 2, 3, 4, 5]);
+    await _openAdd(tester);
+    await _stage(tester);
+    expect(find.text('월·화·수·목·금'), findsOneWidget);
 
-      // 로그아웃 → 주말 근무자가 로그인 (앱은 안 껐다 — 한 기기를 여럿이 쓴다)
-      currentUser = null;
-      currentUser = _person('b', '주말이', const [6, 7]);
-      await _openAdd(tester);
+    // 로그아웃 → 주말 근무자가 로그인 (앱은 안 껐다 — 한 기기를 여럿이 쓴다)
+    currentUser = null;
+    currentUser = _person('b', '주말이', const [6, 7]);
+    await _openAdd(tester);
+    await _stage(tester);
 
-      expect(
-        find.text('토요일'),
-        findsOneWidget,
-        reason: '앞사람 근무일(월~금)이 남아 있으면 안 뜬다 — 담은 업무가 본인 목록에서 사라진다',
-      );
-      expect(find.text('1 / 2'), findsOneWidget);
-    },
-  );
+    expect(
+      find.text('토·일'),
+      findsOneWidget,
+      reason: '앞사람 근무일(월~금)이 남아 있으면 안 뜬다 — 담은 업무가 본인 목록에서 사라진다',
+    );
+  });
 
-  testWidgets('근무일을 안 정한 사람은 이레를 다 돈다', (tester) async {
+  testWidgets('근무일을 안 정한 사람은 이레가 다 켜진다', (tester) async {
     currentUser = _person('c', '미설정', const []);
     await _openAdd(tester);
+    await _stage(tester);
 
-    expect(find.text('월요일'), findsOneWidget);
-    expect(find.text('1 / 7'), findsOneWidget);
+    expect(find.text('매일'), findsOneWidget);
+  });
+
+  testWidgets('요일 칸을 끄면 담은 업무의 요일도 따라 바뀐다', (tester) async {
+    currentUser = _person('d', '평일이', const [1, 2, 3, 4, 5]);
+    await _openAdd(tester);
+    await _stage(tester);
+    // 월요일 칸을 끈다 (요일 고르개의 첫 칸)
+    await tester.tap(find.text('월').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('화·수·목·금'), findsOneWidget);
   });
 }

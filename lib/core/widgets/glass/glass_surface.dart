@@ -5,6 +5,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../util/sf_symbols.dart' show isApple;
+
 /// 리퀴드 글래스 **면** — 검색바·입력바·상단 블러가 깔고 앉는 판
 ///
 /// 버튼·탭바·메뉴는 `cupertino_native` 가 진작 네이티브로 그리고 있었는데
@@ -13,8 +15,7 @@ import 'package:flutter/services.dart';
 /// | | 무엇이 그리나 |
 /// |---|---|
 /// | iOS 26+ | `UIGlassEffect` — **애플이 그린다** (스위프트 앱과 같은 것) |
-/// | iOS 26 아래 | `UIBlurEffect(.systemThinMaterial)` — 예전 재질 |
-/// | 그 외 (안드로이드·윈도우·**맥**) | [BackdropFilter] — 지금까지 쓰던 그대로 |
+/// | 그 외 (**iOS 26 아래**·안드로이드·윈도우·**맥**) | [BackdropFilter] — 안드로이드와 같은 것 |
 ///
 /// **맥은 아직 안 붙였다.** macOS 26 에 `NSGlassEffectView` 가 따로 있어서
 /// 키 이름부터 다르다 (엔타이틀먼트 때 겪은 것과 같은 사정). iOS 가 도는 걸
@@ -62,7 +63,11 @@ class GlassSurface extends StatelessWidget {
   final BoxBorder? fallbackBorder;
 
   /// 네이티브 면을 쓸 수 있는가 — **지금은 iOS 만이다** (맥은 위 주석 참고)
-  static bool get supported => defaultTargetPlatform == TargetPlatform.iOS;
+  ///
+  /// **iOS 26 아래는 안 쓴다** (2026-10-27) — 버튼·탭바가 안드로이드 화면으로
+  /// 가는데 면만 예전 iOS 재질이면 섞여 보인다. 그 판정이 `isApple` 이다.
+  static bool get supported =>
+      defaultTargetPlatform == TargetPlatform.iOS && isApple;
 
   @override
   Widget build(BuildContext context) {

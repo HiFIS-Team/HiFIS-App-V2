@@ -567,6 +567,20 @@ class MyTaskApi {
     ];
   }
 
+  /// **대표·관리자끼리** 서로의 개인 업무를 보는 명단 — 본인도 선다 (2026-10-27)
+  ///
+  /// [roster] 는 현장 인원만 세운다. MASTER·ADMIN 이 아니면 403 이다.
+  static Future<List<MyTaskRosterRow>> bossRoster({String? date}) async {
+    final rows = await _client.getList(
+      '/my-tasks/roster/bosses',
+      query: {'date': ?date},
+    );
+    return [
+      for (final row in rows)
+        MyTaskRosterRow.fromJson((row as Map).cast<String, dynamic>()),
+    ];
+  }
+
   /// 앱을 열 때 띄울 누락 경고 — **권한을 안 가린다** (서버가 골라 준다)
   ///
   /// 본인 것은 열 때마다, 남의 것은 한 번만 띄운다 (2026-08-31 대표 결정).
@@ -606,13 +620,18 @@ class MyTaskApi {
   ///
   /// [monthdays] 를 주면 **그 업무는 월 단위로 돈다** (2026-09-21) — 그때
   /// `weekdays` 는 서버가 안 본다. 주 단위로 만든 업무에는 안 넘긴다.
+  ///
+  /// [employeeId] 를 주면 **그 사람 목록**에 넣는다 — 대표·관리자끼리만 된다
+  /// (서버 `_boss_target`, 2026-10-27). 안 주면 본인 것이다.
   static Future<List<MyTask>> create(
     Map<String, List<int>> plan, {
     Map<String, List<MyTaskField>> fields = const {},
     Map<String, List<int>> monthdays = const {},
+    String? employeeId,
   }) async {
     final rows = await _client.postList(
       '/my-tasks',
+      query: {'employeeId': ?employeeId},
       body: {
         'items': [
           for (final e in plan.entries)
@@ -638,12 +657,15 @@ class MyTaskApi {
   /// **되돌릴 수 없다.** 해제하는 길이 없어서, 누르기 전에 한 번 묻는다.
   /// 칸이 붙은 업무는 [values] 를 같이 보낸다 — 하나라도 비면 서버가 400.
   /// 글자로 보내고 숫자 칸은 서버가 바꿔 담는다
+  ///
+  /// 체크하면 서버가 **환경정비 기록도 같이** 남긴다 — 그 내역을 그리는 화면이
+  /// 바로 다시 받게 [notifyEnvChanged] 를 쏜다 (2026-10-27)
   static Future<void> check(String id, {Map<String, String>? values}) => _client
       .post(
         '/my-tasks/$id/check',
         body: {'values': values ?? const <String, String>{}},
       )
-      .then((_) {});
+      .then((_) => notifyEnvChanged());
 
   /// 수정 — **한 번도 체크한 적 없을 때만** (그 밖에는 400 `TASK_LOCKED`)
   ///

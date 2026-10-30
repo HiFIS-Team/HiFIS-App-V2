@@ -11,6 +11,8 @@ import '../../../core/util/layout.dart';
 import '../../../core/data/staff_directory.dart';
 import '../../../core/data/branch_scope.dart';
 import '../../../core/data/current_user.dart';
+import '../../../core/data/employee.dart';
+import '../../../core/data/staff.dart' show myRole;
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -58,13 +60,19 @@ void resetMyTaskCache() {
 ///
 /// 카드 안이 아니라 밖에서 부르는 이유: 추가 버튼이 환경정비 머리말로
 /// 올라갔다 (2026-08-14). 만들었으면 true — 부른 쪽이 목록을 다시 받는다.
-Future<bool> addMyTasks(BuildContext context) async {
+///
+/// [owner] 를 주면 **그 사람 목록**에 넣는다 — 대표·관리자끼리 (2026-10-27).
+Future<bool> addMyTasks(BuildContext context, {Employee? owner}) async {
+  final forOther = owner != null && owner.id != currentUser?.id;
   // 폰은 오른쪽에서 밀려 들어오고, 데스크톱은 가운데 모달이다
   // (프로젝트 만들기·내역 전체보기와 같은 `showFullPage`)
-  // 업무 이름 → 걸리는 요일. 요일을 하나씩 훑으며 채운 결과다
+  // 업무 이름 → 걸리는 요일
   final made = await showFullPage<_AddResult>(
     context,
-    (_) => const _AddTaskScreen(),
+    (_) => _AddTaskScreen(
+      ownerName: forOther ? owner.name : null,
+      ownerWorkDays: forOther ? owner.workDays : null,
+    ),
   );
   final plan = made?.plan ?? const <String, List<int>>{};
   if (plan.isEmpty || !context.mounted) return false;
@@ -76,6 +84,7 @@ Future<bool> addMyTasks(BuildContext context) async {
       fields: made!.fields,
       // 월 단위로 담았으면 날짜가 실린다 — 비어 있으면 주 단위다
       monthdays: made.monthdays,
+      employeeId: forOther ? owner.id : null,
     );
     if (context.mounted) {
       AppToast.show(

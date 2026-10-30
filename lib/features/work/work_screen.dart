@@ -10,6 +10,7 @@ import '../../core/api/client/api_exception.dart';
 import '../../core/api/work/env_api.dart';
 import '../../core/data/branch_scope.dart';
 import '../../core/data/current_user.dart';
+import '../../core/data/data_signal.dart' show envChanged;
 import '../../core/data/employee.dart';
 import '../../core/data/header_action.dart';
 import '../../core/data/staff.dart';
@@ -303,6 +304,10 @@ class _WorkScreenState extends State<WorkScreen>
   @override
   Future<void> onScreenRefresh() => _loadEnv();
 
+  /// 개인 업무를 체크하면 환경정비 내역이 는다 — 간격을 안 기다리고 받는다
+  @override
+  List<ValueNotifier<int>> get watchSignals => [envChanged];
+
   /// 다른 탭으로 가면 헤더 `+` 를 치운다
   ///
   /// `LazyIndexedStack` 이라 탭을 옮겨도 이 화면이 안 죽는다 — `dispose` 를
@@ -452,9 +457,13 @@ class _WorkScreenState extends State<WorkScreen>
   ];
 
   /// 항목 id 별 오늘 내 수행 횟수
+  ///
+  /// **개인 업무 체크로 생긴 `개인업무(이름)` 은 안 센다** — 서버가 본인 지점
+  /// `기타` 에 붙여 두는 기록이라, 세면 누르지도 않은 `기타` 칩 숫자가 오른다.
   Map<String, int> get _counts {
     final counts = <String, int>{};
     for (final log in _myLogs) {
+      if (_isMyTaskWriteIn(log)) continue;
       counts[log.envItemId] = (counts[log.envItemId] ?? 0) + 1;
     }
     return counts;
@@ -524,14 +533,27 @@ class _WorkScreenState extends State<WorkScreen>
         );
       } else {
         // 감소는 그 항목의 내 기록 중 가장 최근 것을 지운다 (점수도 같이 회수된다)
+        // **개인 업무 체크로 생긴 기록은 건드리지 않는다** — 지우면 체크는 남은 채
+        // 점수만 사라진다 (개인 업무 체크는 못 되돌린다. 서버도 막는다)
         EnvTaskLog? target;
+        var fromTaskOnly = false;
         for (final log in _myLogs) {
           if (log.envItemId != item.id) continue;
+          if (_fromMyTask(log)) {
+            fromTaskOnly = true;
+            continue;
+          }
           if (target == null || log.createdAt.isAfter(target.createdAt)) {
             target = log;
           }
         }
-        if (target == null) return;
+        if (target == null) {
+          // 남은 것이 개인 업무에서 온 것뿐이다 — 왜 안 줄어드는지 알려준다
+          if (fromTaskOnly) {
+            AppToast.show(context, '개인 업무에서 체크한 기록은 지울 수 없어요');
+          }
+          return;
+        }
         await EnvApi.deleteLog(target.id);
         if (!mounted) return;
         setState(() {
@@ -1428,6 +1450,21 @@ String _logAuthor(EnvTaskLog log) =>
 /// 적은 글마다 다른 항목이 돼서 항목 필터에 하나도 안 걸린다.
 String _logItemKey(EnvTaskLog log) =>
     _WorkScreenState._envKey(log.itemName.split('(').first);
+
+/// 개인 업무를 체크해서 저절로 생긴 기록인가 (2026-10-27)
+///
+/// 서버가 그 체크를 실어 준다 (`sourceMyTaskCheckId`). 이름이 항목과 맞으면
+/// 그 항목(`블로그`)으로, 안 맞으면 본인 지점 `기타` 에 `개인업무(이름)` +2 로
+/// 남는다 (`award_my_task_check`). 옛 서버는 체크를 안 실어 보내서 이름
+/// 앞머리로도 본다 — 손으로 적은 `기타` 는 `기타(…)` 라 안 겹친다.
+bool _fromMyTask(EnvTaskLog log) =>
+    log.sourceMyTaskCheckId != null || _isMyTaskWriteIn(log);
+
+/// `개인업무(이름)` 꼴 — 항목과 안 맞아 `기타` 에 붙은 개인 업무 기록
+///
+/// **칩 숫자에서는 이것만 뺀다.** 이름이 맞아 `블로그` 로 남은 것은 그 칩이
+/// 센다 — 같은 일을 두 화면에서 두 번 누르지 않게 한 것이다 (2026-09-21).
+bool _isMyTaskWriteIn(EnvTaskLog log) => log.itemName.startsWith('개인업무(');
 
 /// 블로그를 누르면 뜨는 창 — 글 주소를 받는다 (2026-08-28 대표 요청)
 ///

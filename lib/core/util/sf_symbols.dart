@@ -1,12 +1,50 @@
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
-/// SF Symbol을 네이티브로 그릴 수 있는 플랫폼인지.
-/// false면(안드로이드·윈도우) Flutter 아이콘으로 대체해야 한다.
-bool get isApple =>
+/// **애플 화면**(네이티브 글래스 버튼·탭바·메뉴·SF Symbol)을 쓸 기기인지.
+/// false면 안드로이드와 같은 화면이다 — Flutter 아이콘·Flutter 블러로 그린다.
+///
+/// **iOS 는 26 부터다** (2026-10-27 대표 요청). iOS 18~25 에는 리퀴드 글래스가
+/// 없어서 네이티브 부품이 예전 납작한 모양으로 떴다 — 그래서 안드로이드와
+/// **똑같은 화면**으로 보낸다. 화면 분기 스무 곳 남짓이 이 값 하나를 보므로
+/// 여기서 가르면 탭바·버튼·메뉴·여백 계산이 한꺼번에 따라간다.
+///
+/// 맥은 그대로 애플 화면이다 (데스크톱 셸이 따로 있다).
+///
+/// ⚠️ **화면 모양이 아닌 것**(애플 컬러 이모지 글꼴, 창 외관 맞추기)은
+/// [isApplePlatform] 을 본다 — 그건 iOS 버전과 상관없다.
+bool get isApple => isApplePlatform && _liquidGlass;
+
+/// OS 가 애플인가 — 버전을 안 따진다 ([isApple] 과 다르다)
+bool get isApplePlatform =>
     defaultTargetPlatform == TargetPlatform.iOS ||
     defaultTargetPlatform == TargetPlatform.macOS;
+
+/// iOS 가 리퀴드 글래스를 그리는가 — [detectLiquidGlass] 가 채운다
+///
+/// **기본은 true** 다. 못 물어보면(채널이 없는 빌드·웹) 예전 그대로 애플
+/// 화면에 둔다 — 잘못 내려서 iOS 26 사용자가 안드로이드 화면을 보는 것보다 낫다.
+bool _liquidGlass = true;
+
+/// 앱을 켤 때 **`runApp` 전에** 한 번 부른다 — 화면이 서는 도중에 값이
+/// 바뀌면 탭바가 통째로 갈아끼워진다
+///
+/// 판정은 네이티브가 한다 (`AppDelegate` 의 `com.hifis/os`) — 유리 면이
+/// 고르는 `#available(iOS 26.0, *)` 와 같은 검사라 둘이 어긋나지 않는다.
+Future<void> detectLiquidGlass() async {
+  if (defaultTargetPlatform != TargetPlatform.iOS) return;
+  try {
+    _liquidGlass =
+        await const MethodChannel(
+          'com.hifis/os',
+        ).invokeMethod<bool>('liquidGlass') ??
+        true;
+  } catch (_) {
+    // 채널이 없다 — 예전처럼 애플 화면에 둔다
+  }
+}
 
 /// SF Symbol 이름 → 가장 닮은 Flutter 아이콘.
 ///

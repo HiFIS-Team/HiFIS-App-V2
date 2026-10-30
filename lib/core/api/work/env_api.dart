@@ -70,6 +70,7 @@ class EnvTaskLog {
     this.bonusAt,
     this.approvalStatus,
     this.rejectReason,
+    this.sourceMyTaskCheckId,
   });
 
   factory EnvTaskLog.fromJson(Map<String, dynamic> json) => EnvTaskLog(
@@ -96,7 +97,14 @@ class EnvTaskLog {
       json['approvalStatus'] as String?,
     ),
     rejectReason: json['rejectReason'] as String?,
+    sourceMyTaskCheckId: json['sourceMyTaskCheckId'] as String?,
   );
+
+  /// 개인 업무 체크에서 저절로 생긴 기록이면 그 체크 (2026-10-27)
+  ///
+  /// 체크는 되돌릴 수 없어서 **이 기록도 칩의 `-` 로 안 지운다** (서버도 본인이
+  /// 지우는 것을 막는다 — `FROM_MY_TASK`). 옛 서버는 안 실어 보내서 null 이다.
+  final String? sourceMyTaskCheckId;
 
   final String id;
   final String employeeId;

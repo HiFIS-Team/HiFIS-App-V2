@@ -20,7 +20,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/util/photo_cache.dart';
 import '../../core/util/platform.dart';
-import '../../core/util/sf_symbols.dart' show isApple;
+import '../../core/util/sf_symbols.dart' show isApplePlatform;
 import '../../core/util/when.dart';
 import '../../core/widgets/editor/reaction_row.dart';
 import '../../core/widgets/feedback/app_dialog.dart';
@@ -62,7 +62,7 @@ class _EmojiText extends StatelessWidget {
       textAlign: TextAlign.center,
       style: TextStyle(fontSize: size, height: 1),
     );
-    if (!isApple) return text;
+    if (!isApplePlatform) return text;
     return Transform.translate(offset: Offset(size * 0.10, 0), child: text);
   }
 }

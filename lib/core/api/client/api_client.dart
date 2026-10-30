@@ -232,8 +232,12 @@ class ApiClient {
   }
 
   /// 목록으로 답하는 POST (예: 폴더 트리 만들기)
-  Future<List<dynamic>> postList(String path, {Object? body}) async {
-    final response = await _send('POST', path, body: body);
+  Future<List<dynamic>> postList(
+    String path, {
+    Object? body,
+    Map<String, dynamic>? query,
+  }) async {
+    final response = await _send('POST', path, body: body, query: query);
     return response.data as List<dynamic>;
   }
 

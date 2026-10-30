@@ -119,15 +119,17 @@ class _TodoRowState extends State<_TodoRow> {
       onExit: (_) => setState(() => _hover = false),
       child: Padding(
         padding: EdgeInsets.symmetric(vertical: 9),
+        // **긴 할 일은 줄을 바꿔 다 보여준다** (2026-10-27 대표 요청) — 한 줄로
+        // 자르면 `…` 뒤가 어디에도 안 보였다. 줄이 늘면 체크·담당은 첫 줄에 붙는다
+        // (글줄 높이 22.5 가 체크 동그라미 22 와 같아서 첫 줄과 나란하다)
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (toggle == null) box else Pressable(onTap: toggle, child: box),
             SizedBox(width: 12),
             Expanded(
               child: Text(
                 todo.text,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
                 style: AppTextStyles.body2.copyWith(
                   color: todo.done
                       ? AppColors.textTertiary

@@ -77,24 +77,35 @@ class _MessageScreenState extends State<MessageScreen>
     // 밀어 올리면 자리가 어긋난다 (폰에서 밀려 들어오는 것과 다르다)
     _pendingRoomId = widget.embedded ? null : requestedRoomId.value;
     if (_pendingRoomId != null) requestedRoomId.value = null;
+    // **아는 방이면 목록을 안 기다리고 바로 연다** (2026-10-27 — "푸시를 타고
+    // 들어가면 채팅방으로 바로 안 들어가진다"). 로그인하면서 목록을 받아 두므로
+    // 거의 늘 여기서 열린다. 화면이 다 서기 전에는 못 밀어서 한 프레임 뒤에 연다
+    if (_pendingRoomId case final id? when _store.roomOf(id) != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _openPending());
+    }
     // [ChatStore] 가 이미 목록을 들고 있으면(다시 들어온 것) 뼈대 없이 시작한다 —
     // 보여줄 옛 방이 있는데 뼈대로 덮으면 그게 깜빡임이다
     if (_store.loaded) skipFirstSkeleton();
     _load();
   }
 
-  /// 알림에서 열어달라고 걸어 둔 방 — 목록을 받은 뒤에 연다
+  /// 알림에서 열어달라고 걸어 둔 방 — 아는 방이면 바로, 모르면 목록을 받은 뒤에 연다
   String? _pendingRoomId;
 
-  /// 목록이 오면 그 방을 밀어 올린다
+  /// 걸어 둔 방을 밀어 올린다
   ///
-  /// **목록을 받기 전에는 못 연다** — 방 정보가 없어서 제목도 못 그린다.
-  /// 없는 id 면(나갔거나 지워진 방) 목록만 보여준다 — 프로젝트와 같은 규칙이다.
-  void _openPending() {
+  /// 목록을 받고도 없는 id 면(나갔거나 지워진 방) 목록만 보여준다 —
+  /// 프로젝트와 같은 규칙이다. **목록을 못 받았으면 그래도 연다** — 모르는
+  /// 것이지 없는 게 아니라서, 막으면 지하에서 푸시를 눌렀을 때 영영 못 들어간다.
+  /// 방 화면이 메시지를 받으면서 제목도 채운다.
+  void _openPending({bool listFailed = false}) {
     final id = _pendingRoomId;
     if (id == null || !mounted) return;
+    if (_store.roomOf(id) == null && !listFailed) {
+      _pendingRoomId = null;
+      return;
+    }
     _pendingRoomId = null;
-    if (!_store.rooms.any((r) => r.id == id)) return;
     Navigator.push(
       context,
       CupertinoPageRoute(builder: (_) => ChatScreen(roomId: id)),
@@ -107,13 +118,15 @@ class _MessageScreenState extends State<MessageScreen>
 
   /// 방 목록 받아오기 — 한 번 받아 뒀으면 조용히 갱신만 한다
   Future<void> _load() async {
+    var failed = false;
     try {
       await _store.loadRooms();
     } catch (error) {
+      failed = true;
       if (mounted && !_store.loaded) AppToast.show(context, messageOf(error));
     }
     if (mounted) setState(endLoad);
-    _openPending();
+    _openPending(listFailed: failed);
   }
 
   void _onScroll() => _collapse.update(_scrollController.offset);

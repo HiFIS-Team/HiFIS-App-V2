@@ -103,11 +103,11 @@ String _requestLabel(ProjectRequestType type) => switch (type) {
 /// |---|---|
 /// | MASTER | 남의 것도 — 단 **완료된 것은 못 고친다** |
 /// | ADMIN | **참여 중일 때** (담당자거나 참여 멤버) |
-/// | MANAGER · MEMBER | 참여 중 + **할 일이 하나도 체크 안 됐을 때** |
+/// | MANAGER · MEMBER | **참여 중일 때** — 마감·삭제만 따로 ([_dueLocked]·[_canDeleteNow]) |
 ///
-/// 아직 아무도 손을 안 댄 프로젝트는 잘못 만든 것일 수 있어서 그냥 고치고
-/// 지운다 — 오타 하나에 대표를 부르지 않는다. 한 칸이라도 체크된 뒤부터는
-/// 남이 한 일이 걸려 있어서 [_canRequestEdit] 쪽(결재)으로 간다.
+/// **MANAGER·MEMBER 도 할 일이 시작된 뒤에 바로 고친다** (2026-10-27 대표 요청).
+/// 예전에는 한 칸이라도 체크되면 이름 하나 고치는 데도 대표 결재를 탔다.
+/// 지금 결재를 타는 것은 **마감 변경(기한 연장)과 삭제**뿐이다.
 ///
 /// **완료된 프로젝트는 MASTER 도 못 고친다 (2026-09-16 대표 결정).** 그 전에는
 /// 대표만 예외라 완료된 프로젝트에도 `수정`·`인원 추가` 가 그대로 떴다 —
@@ -118,10 +118,20 @@ String _requestLabel(ProjectRequestType type) => switch (type) {
 bool _canEditNow(_Project project) {
   if (project.isDone) return false;
   if (myRole == Role.master) return true;
-  if (!_isMember(project)) return false;
-  if (myRole == Role.admin) return true;
-  return !project.anyTodoDone;
+  return _isMember(project);
 }
+
+/// 마감을 수정 화면에서 **못 옮기나** — 할 일이 시작된 뒤의 MANAGER·MEMBER
+///
+/// 그때는 기한 연장 결재로만 옮긴다 (서버 `_due_changes` → `NEEDS_APPROVAL`).
+bool _dueLocked(_Project project) =>
+    project.anyTodoDone && !(myRole == Role.master || myRole == Role.admin);
+
+/// 결재 없이 **바로 지우나** — 예전 수정 기준 그대로다 (서버 `_ensure_can_edit`)
+///
+/// MANAGER·MEMBER 는 할 일이 하나도 체크 안 됐을 때만 — 그 뒤에는 삭제 신청.
+bool _canDeleteNow(_Project project) =>
+    _canEditNow(project) && !(_dueLocked(project));
 
 /// 완료를 **처음으로 되돌릴** 수 있는가 — **MASTER 만** (2026-09-16 대표 결정)
 ///
@@ -356,15 +366,14 @@ class _ProjectDetail extends StatelessWidget {
   /// 하나뿐이라 한 폼에서 같이 올릴 수 없다. 할 일은 결재를 아예 안 타서
   /// 상세 화면의 할 일 카드에서 그대로 고친다.
   Future<void> _requestEdit(BuildContext context) async {
-    final free = _canEditNow(project);
     var removed = false;
 
     final draft = await _showProjectComposer(
       context,
       edit: project,
-      // 삭제는 폼 오른쪽 위 휴지통이 맡는다 — 자유면 바로, 아니면 삭제 신청
+      // 삭제는 폼 오른쪽 위 휴지통이 맡는다 — 바로 지울 수 있으면 바로, 아니면 삭제 신청
       onDelete: () async {
-        if (free) {
+        if (_canDeleteNow(project)) {
           removed = await _applyDelete(context, pop: false);
           return removed;
         }

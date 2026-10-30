@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../api/home/notification_api.dart';
 import '../data/current_user.dart';
+import '../data/data_signal.dart';
 
 /// 푸시 알림 — 앱이 꺼져 있어도 폰에 뜨는 그것
 ///
@@ -21,6 +22,7 @@ import '../data/current_user.dart';
 /// 로그인  →  register()  →  (네이티브) 권한 묻고 토큰 받기
 ///                        →  onToken  →  POST /push/devices
 /// 알림 누름  →  (네이티브) onTap  →  그 화면으로 이동
+/// 앱을 보는 중에 옴  →  (네이티브) onMessage  →  결재함 다시 받기
 /// 로그아웃  →  unregister()  →  DELETE /push/devices/{token}
 /// ```
 class PushGuard {
@@ -84,10 +86,26 @@ class PushGuard {
           await _send(args);
         case 'onTap':
           final link = call.arguments as String?;
+          _refreshFor(link);
           if (link != null && link.isNotEmpty) tappedLink.value = link;
+        // 앱을 보고 있는 동안 온 푸시 — 배너는 네이티브가 띄우고 여기는 알기만 한다
+        case 'onMessage':
+          _refreshFor(call.arguments as String?);
       }
       return null;
     });
+  }
+
+  /// 푸시가 왔다 — **결재함을 간격 없이 다시 받게** 한다 (2026-10-27)
+  ///
+  /// 홈 결재 카드는 1분 간격(`ScreenRefresh`)으로만 다시 받는다. 안드로이드는
+  /// 알림창을 내렸다 올려도 앱이 '다시 앞으로' 가 안 되어서, 결재 푸시를 눌러
+  /// 홈에 오면 `결재할 게 없어요` 가 그대로였다 (전체보기는 새로 받아서 보였다).
+  ///
+  /// 사내톡은 뺀다 — 메시지마다 결재함을 다시 받을 이유가 없다 (소켓이 맡는다).
+  static void _refreshFor(String? link) {
+    if (link != null && link.startsWith('/chat')) return;
+    notifyApprovalChanged();
   }
 
   /// 받은 토큰을 서버에 올린다 — 로그인 전이면 아무것도 안 한다

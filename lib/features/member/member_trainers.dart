@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../core/api/work/lesson_api.dart';
 import '../../core/data/branch_scope.dart';
+import '../../core/data/current_user.dart';
 import '../../core/data/employee.dart';
+import '../../core/data/staff.dart' show myRole;
 import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
@@ -51,7 +53,7 @@ class MemberTrainerList extends StatelessWidget {
           : (active: c.active, expired: c.expired + 1);
     }
     const none = (active: 0, expired: 0);
-    final branch = rosterBranchId;
+    final branch = _branch;
     final staff = [
       for (final e in directory.employees)
         if (_ownerRanks.contains(e.rank) &&
@@ -84,9 +86,16 @@ class MemberTrainerList extends StatelessWidget {
       for (final id in others)
         TrainerCard(
           name: directory.byId(id)?.name ?? '알 수 없음',
-          subtitle: directory.byId(id)?.status == EmployeeStatus.resigned
-              ? '퇴사'
-              : '담당자 없음',
+          // 명단 밖이어도 **재직 중이면 직급을 적는다** (2026-10-27) — 팀장처럼
+          // 위 직급 밖인 사람이 회원을 맡으면 `담당자 없음` 으로 떠서 틀린 말이었다
+          subtitle: switch (directory.byId(id)) {
+            null => '담당자 없음',
+            final e when e.status == EmployeeStatus.resigned => '퇴사',
+            final e => _subtitle(
+              e.rank.label,
+              directory.branchName(e.branchId),
+            ),
+          },
           labels: _labels(counts[id] ?? none),
           onTap: () => onPick(id),
         ),
@@ -110,7 +119,15 @@ class MemberTrainerList extends StatelessWidget {
 
   /// 대표는 전 지점을 보므로 지점을 같이 적는다 — 지점을 골랐으면 직급만
   static String _subtitle(String rank, String branch) =>
-      rosterBranchId == null && branch.isNotEmpty ? '$rank · $branch' : rank;
+      _branch == null && branch.isNotEmpty ? '$rank · $branch' : rank;
+
+  /// 세울 지점 — **점장은 늘 본인 지점이다** (2026-10-27)
+  ///
+  /// 점장도 업무 화면에서 다른 지점을 골라 둘 수 있는데(`branch_pick`), 회원
+  /// 목록은 서버가 본인 지점으로 묶는다(`branch_filter`). 고른 지점을 따르면
+  /// 남의 지점 트레이너가 줄줄이 서고 눌러도 늘 0명이다.
+  static String? get _branch =>
+      myRole.boss ? rosterBranchId : currentUser?.branchId;
 }
 
 /// 트레이너 한 명 — 동료평가 명단 카드(`_PersonCard`)와 같은 틀

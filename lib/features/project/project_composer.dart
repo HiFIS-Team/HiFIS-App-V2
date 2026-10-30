@@ -309,8 +309,12 @@ class _ProjectComposerState extends State<_ProjectComposer> {
             SizedBox(width: 62, child: Text('마감일', style: AppTextStyles.label)),
             Pressable(
               // 결재 모드에서는 마감을 여기서 못 바꾼다 — 기한 연장 결재가
-              // 따로 있고, 프로젝트당 대기 중인 결재는 하나뿐이다
-              onTap: _needsApproval ? _lockedNote : _pickDue,
+              // 따로 있고, 프로젝트당 대기 중인 결재는 하나뿐이다.
+              // **할 일이 시작된 뒤의 직원·점장도 마감만은 못 바꾼다**
+              // (2026-10-27 — 나머지는 바로 고친다)
+              onTap: _needsApproval
+                  ? _lockedNote
+                  : (_dueFixed ? _dueNote : _pickDue),
               padding: EdgeInsets.symmetric(horizontal: 10, vertical: 7),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -468,25 +472,21 @@ class _ProjectComposerState extends State<_ProjectComposer> {
         for (final todo in _todos)
           Padding(
             padding: EdgeInsets.only(top: 8),
+            // 긴 할 일도 다 보이게 줄을 바꾼다 — 상세 화면과 같다 (2026-10-27)
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
                   width: 5,
                   height: 5,
-                  margin: EdgeInsets.symmetric(horizontal: 8),
+                  // 첫 줄 가운데에 점이 오게 (글줄 높이 22.5)
+                  margin: EdgeInsets.fromLTRB(8, 9, 8, 0),
                   decoration: BoxDecoration(
                     color: AppColors.gray300,
                     shape: BoxShape.circle,
                   ),
                 ),
-                Expanded(
-                  child: Text(
-                    todo.text,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.body2,
-                  ),
-                ),
+                Expanded(child: Text(todo.text, style: AppTextStyles.body2)),
                 if (todo.assignee != null) ...[
                   Avatar(name: todo.assignee!, size: 20),
                   SizedBox(width: 6),
@@ -546,10 +546,21 @@ class _ProjectComposerState extends State<_ProjectComposer> {
     AppToast.show(context, '할 일이 시작돼서 이름·설명·색만 고칠 수 있어요');
   }
 
-  /// 이 수정이 대표 결재를 거쳐야 하나 — 할 일이 하나라도 체크됐으면 그렇다
+  /// 이 수정이 대표 결재를 거쳐야 하나 — 바로 고칠 수 없는 사람이면 그렇다
   bool get _needsApproval {
     final project = _edit;
     return project != null && !_canEditNow(project);
+  }
+
+  /// 마감만 잠겼나 — 할 일이 시작된 뒤의 직원·점장 ([_dueLocked])
+  bool get _dueFixed {
+    final project = _edit;
+    return project != null && _dueLocked(project);
+  }
+
+  /// 잠긴 마감을 눌렀을 때 — 어디서 바꾸는지 알려준다
+  void _dueNote() {
+    AppToast.show(context, '할 일이 시작돼서 마감일은 기한 연장 신청으로 바꿀 수 있어요');
   }
 
   /// 만들기 버튼 (데스크톱 팝업 전용 — 폰은 하단 글래스 버튼을 쓴다)

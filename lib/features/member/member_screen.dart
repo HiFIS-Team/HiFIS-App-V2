@@ -6,6 +6,7 @@ import '../../core/api/work/lesson_api.dart';
 import '../../core/data/branch_scope.dart';
 import '../../core/data/data_signal.dart';
 import '../../core/data/current_user.dart';
+import '../../core/data/employee.dart' show Role;
 import '../../core/data/staff.dart';
 import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
@@ -81,8 +82,12 @@ class _MemberScreenState extends State<MemberScreen>
   /// 데스크톱 2단 화면에서 오른쪽에 펼쳐둔 회원 — 폰은 밀어서 여니 안 쓴다
   _MemberRow? _selected;
 
-  /// 남의 회원까지 보는 사람인가 — 대표·관리자
-  bool get _seesAll => myRole.boss;
+  /// 남의 회원까지 보는 사람인가 — 대표·관리자, 그리고 **점장** (2026-10-27 대표 요청)
+  ///
+  /// 점장은 **본인 지점 회원만**이다 — 서버가 지점을 본인 것으로 묶는다
+  /// (`branch_filter`). 보는 것만 열린다: 일지를 쓰는 것은 상세 화면이
+  /// 담당 트레이너 본인으로 막는다 (`MemberDetailScreen._canWrite`, 서버도 같다).
+  bool get _seesAll => myRole.boss || myRole == Role.manager;
 
   /// 트레이너부터 고르는 첫 화면인가 — 대표·관리자의 **폰**만 (2026-09-27 대표 요청)
   ///
@@ -204,6 +209,11 @@ class _MemberScreenState extends State<MemberScreen>
     if (widget.trainerId case final id?) {
       final name = StaffDirectory.instance.byId(id)?.name ?? '알 수 없음';
       return '$name 담당 회원 $count명';
+    }
+    // 점장은 서버가 본인 지점으로 묶는다 — 고른 지점 이름을 적으면 틀린 말이다
+    if (!myRole.boss) {
+      final mine = StaffDirectory.instance.branchName(currentUser?.branchId);
+      return '${mine.isEmpty ? '우리 지점' : mine} 회원 $count명';
     }
     final branch = branchScopeId == null ? '전 지점' : branchScopeName;
     return '$branch 회원 $count명';

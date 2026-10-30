@@ -12,6 +12,7 @@ import 'core/util/capture_guard.dart';
 import 'core/widgets/feedback/app_toast.dart';
 import 'core/util/platform.dart';
 import 'core/util/screen_refresh.dart';
+import 'core/util/sf_symbols.dart' show detectLiquidGlass;
 import 'core/widgets/feedback/app_loading.dart';
 import 'features/auth/auth_screen.dart';
 import 'features/auth/auth_session.dart';
@@ -21,6 +22,9 @@ import 'features/onboarding/schedule_setup_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // iOS 26 아래면 안드로이드와 같은 화면을 쓴다 — 무엇을 그릴지가 갈리므로
+  // 맨 먼저 묻는다 (`isApple`)
+  await detectLiquidGlass();
   // 캡처 방지를 먼저 켠다 — 대표면 아래 restore 가 꺼 준다.
   // 로그인 전에도 켜 둬야 못 막는 순간이 안 생긴다.
   unawaited(CaptureGuard.apply());

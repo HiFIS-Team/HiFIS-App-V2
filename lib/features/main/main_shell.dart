@@ -85,8 +85,12 @@ class _MainShellState extends State<MainShell> {
     // | 마감 임박 | 다음에 켤 때 그대로 뜬다 |
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-      // 꺼져 있던 앱을 푸시로 켜면 셸이 뜨기 **전에** 링크가 도착해 있다
-      _onPushTap();
+      // 꺼져 있던 앱을 푸시로 켜면 셸이 뜨기 **전에** 링크가 도착해 있다.
+      // 그때는 **열어 준 화면을 닫고 돌아올 때까지** 아래 창들을 미룬다
+      // (2026-10-27) — 사내톡 푸시를 눌렀는데 생일·랭킹 창이 방을 덮어서
+      // 방으로 바로 안 들어가는 것처럼 보였다
+      if (_onPushTap()) await _untilShellOnTop();
+      if (!mounted) return;
       if (await showBirthdayModal(context) || !mounted) return;
       // 지난달 랭킹 1위 축하 — 그달 첫 접속에 한 번 (2026-09-30 대표 요청).
       // **동료평가보다 앞이다** — 굳는 날(1일)이 동료평가 창과 겹쳐서, 뒤에
@@ -106,12 +110,26 @@ class _MainShellState extends State<MainShell> {
     super.dispose();
   }
 
-  /// 푸시를 눌러서 들어왔다 — 알림함에서 누른 것과 같은 곳으로 보낸다
-  void _onPushTap() {
+  /// 푸시를 눌러서 들어왔다 — 알림함에서 누른 것과 같은 곳으로 보낸다.
+  /// 처리할 링크가 있었으면 true
+  bool _onPushTap() {
     final link = PushGuard.tappedLink.value;
-    if (link == null) return;
+    if (link == null) return false;
     PushGuard.tappedLink.value = null;
     goToNotificationLink(link);
+    return true;
+  }
+
+  /// 이 셸 위에 덮인 화면(푸시가 연 사내톡·결재 등)이 다 닫힐 때까지 기다린다
+  ///
+  /// 덮인 것이 없으면(탭만 옮긴 링크) 바로 돌아온다. 셸은 앱의 **첫 화면**이라
+  /// 위에 쌓인 것이 있는지는 `canPop` 으로 안다. `ModalRoute.of` 는 쓰지 않는다 —
+  /// 그건 의존을 걸어서 화면을 열고 닫을 때마다 셸 전체가 다시 그려진다.
+  Future<void> _untilShellOnTop() async {
+    final navigator = Navigator.of(context);
+    while (mounted && navigator.canPop()) {
+      await Future<void>.delayed(Duration(milliseconds: 500));
+    }
   }
 
   /// 알림을 눌러 화면을 열어달라고 걸어 둔 요청을 처리한다.

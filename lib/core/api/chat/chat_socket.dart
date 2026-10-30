@@ -84,6 +84,13 @@ class ChatSocket {
 
   bool get connected => _socket != null;
 
+  /// 붙은 횟수 — **다시 붙을 때마다** 오른다 (2026-10-27)
+  ///
+  /// 끊겨 있던 동안 온 메시지는 소켓으로 다시 안 온다. 앱이 뒤에 있다 돌아오면
+  /// 목록 미리보기가 **그 전 대화**에 멈춰 있었다. [ChatStore] 가 이 값을 듣고
+  /// 서버에서 다시 맞춘다.
+  final connects = ValueNotifier<int>(0);
+
   /// 로그인 직후 부른다. 이미 붙어 있으면 아무것도 안 한다.
   Future<void> connect() async {
     _closed = false;
@@ -114,6 +121,7 @@ class ChatSocket {
         onError: (_) => _onDropped(),
         cancelOnError: true,
       );
+      connects.value++;
     } catch (error) {
       debugPrint('사내톡 연결 실패: $error');
       // 서버가 handshake 를 거절한 것은 대개 **access 토큰 만료**다.

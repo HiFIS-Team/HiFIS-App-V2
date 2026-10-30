@@ -15,6 +15,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import java.io.File
 import java.io.FileOutputStream
+import java.lang.ref.WeakReference
 import com.google.firebase.messaging.FirebaseMessaging
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -314,7 +315,34 @@ class MainActivity : FlutterActivity() {
         pushChannel?.invokeMethod("onTap", link)
     }
 
+    override fun onResume() {
+        super.onResume()
+        current = WeakReference(this)
+    }
+
+    override fun onPause() {
+        current?.get()?.takeIf { it === this }?.let { current = null }
+        super.onPause()
+    }
+
     companion object {
         private const val PUSH_PERMISSION_CODE = 1001
+
+        /** 앞에 떠 있는 화면 — [PushService] 가 Dart 에 알릴 때 쓴다 (가려지면 비운다) */
+        @Volatile
+        private var current: WeakReference<MainActivity>? = null
+
+        /**
+         * 앱을 보고 있는 동안 푸시가 왔다 — Dart 로 `onMessage <link>` 를 넘긴다.
+         *
+         * FCM 이 백그라운드 스레드에서 부르므로 메인 스레드로 옮긴다
+         * (채널은 메인 스레드에서만 부를 수 있다). 준비 전이면 버린다.
+         */
+        fun onForegroundPush(link: String?) {
+            val activity = current?.get() ?: return
+            activity.runOnUiThread {
+                if (activity.dartReady) activity.pushChannel?.invokeMethod("onMessage", link)
+            }
+        }
     }
 }

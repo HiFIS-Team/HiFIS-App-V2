@@ -13,6 +13,13 @@ part of 'my_task_section.dart';
 ///
 /// 사람 카드는 **동료 평가 목록과 같은 결**이다 (아바타 40 · 이름 · 직급 ·
 /// 오른쪽 배지). 같은 화면 안에서 사람을 세우는 자리가 둘로 갈리면 안 된다.
+///
+/// ## 대표·관리자끼리 (2026-10-27 대표 요청)
+///
+/// 대표·관리자에게는 위에 `직원 / 대표·관리자` 고르개가 선다. 오른쪽은
+/// **대표·관리자 명단**이다 — 본인을 누르면 내 업무를 체크하는 화면, 남을
+/// 누르면 그 사람 업무를 보고 **업무를 넣어 줄 수 있는** 화면이 뜬다.
+/// 직원 목록에 업무를 넣는 길은 없다 (직원 업무는 본인이 정한다).
 class MyTaskRoster extends StatefulWidget {
   const MyTaskRoster({super.key});
 
@@ -23,6 +30,24 @@ class MyTaskRoster extends StatefulWidget {
 class _MyTaskRosterState extends State<MyTaskRoster>
     with ScreenRefresh<MyTaskRoster>, SkeletonDelay<MyTaskRoster> {
   List<MyTaskRosterRow> _rows = _cachedRoster;
+
+  /// 대표·관리자 명단을 보는 중인가 — 고르개는 대표·관리자에게만 선다
+  bool _bosses = false;
+
+  /// 대표·관리자 명단 — 직원 목록과 따로 든다 (칸을 옮길 때 서로 안 덮게)
+  List<MyTaskRosterRow> _bossRows = const [];
+
+  /// 고르개를 세울까 — 점장도 이 판을 쓰지만 대표·관리자 명단은 못 본다 (서버 403)
+  bool get _canSeeBosses => myRole.boss;
+
+  void _pickBosses(bool value) {
+    if (value == _bosses) return;
+    setState(() {
+      _bosses = value;
+      beginLoad();
+    });
+    _load();
+  }
 
   @override
   void initState() {
@@ -54,35 +79,71 @@ class _MyTaskRosterState extends State<MyTaskRoster>
   List<ValueNotifier<int>> get watchSignals => [approvalChanged];
 
   Future<void> _load() async {
+    final bosses = _bosses;
     try {
-      final rows = await MyTaskApi.roster(branchId: branchScopeId);
-      if (!mounted) return;
-      _cachedRoster = rows;
+      final rows = bosses
+          ? await MyTaskApi.bossRoster()
+          : await MyTaskApi.roster(branchId: branchScopeId);
+      // 받는 동안 칸을 옮겼으면 버린다 — 늦게 온 응답이 지금 칸을 덮는다
+      if (!mounted || bosses != _bosses) return;
+      if (!bosses) _cachedRoster = rows;
       setState(() {
-        _rows = rows;
+        if (bosses) {
+          _bossRows = rows;
+        } else {
+          _rows = rows;
+        }
         endLoad();
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || bosses != _bosses) return;
       setState(endLoad);
       AppToast.show(context, messageOf(error));
     }
   }
 
-  void _open(MyTaskRosterRow row) =>
-      showFullPage<void>(context, (_) => _PersonTaskScreen(row: row));
+  Future<void> _open(MyTaskRosterRow row) async {
+    // 대표·관리자 명단에서 **본인**을 누르면 내 업무를 체크하는 화면이다
+    final mine = _bosses && row.employeeId == currentUser?.id;
+    await showFullPage<void>(
+      context,
+      (_) => mine
+          ? const _MyOwnTaskScreen()
+          : _PersonTaskScreen(row: row, canAdd: _bosses),
+    );
+    // 체크하거나 넣어 주고 왔으면 줄의 `3/5` 가 바뀌었다
+    if (mounted) _load();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final list = _list(_bosses ? _bossRows : _rows);
+    if (!_canSeeBosses) return list;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ModeSwitch(
+          left: '직원',
+          right: '대표·관리자',
+          value: _bosses,
+          onChanged: _pickBosses,
+        ),
+        const SizedBox(height: 16),
+        list,
+      ],
+    );
+  }
+
+  Widget _list(List<MyTaskRosterRow> rows) {
     if (showSkeleton) return const _RosterSkeleton();
-    if (_rows.isEmpty) {
+    if (rows.isEmpty) {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 40),
         decoration: AppDecorations.card(),
         child: Center(
           child: Text(
-            '볼 직원이 없어요',
+            _bosses ? '볼 사람이 없어요' : '볼 직원이 없어요',
             style: AppTextStyles.body2.copyWith(color: AppColors.gray400),
           ),
         ),
@@ -94,10 +155,10 @@ class _MyTaskRosterState extends State<MyTaskRoster>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (var i = 0; i < _rows.length; i += columns) ...[
+        for (var i = 0; i < rows.length; i += columns) ...[
           if (i > 0) const SizedBox(height: 12),
           if (columns == 1)
-            _PersonTaskCard(row: _rows[i], onTap: () => _open(_rows[i]))
+            _PersonTaskCard(row: rows[i], onTap: () => _open(rows[i]))
           else
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -105,10 +166,10 @@ class _MyTaskRosterState extends State<MyTaskRoster>
                 for (var c = 0; c < columns; c++) ...[
                   if (c > 0) const SizedBox(width: 12),
                   Expanded(
-                    child: i + c < _rows.length
+                    child: i + c < rows.length
                         ? _PersonTaskCard(
-                            row: _rows[i + c],
-                            onTap: () => _open(_rows[i + c]),
+                            row: rows[i + c],
+                            onTap: () => _open(rows[i + c]),
                           )
                         : const SizedBox(),
                   ),
@@ -117,6 +178,69 @@ class _MyTaskRosterState extends State<MyTaskRoster>
             ),
         ],
       ],
+    );
+  }
+}
+
+/// 대표·관리자 **본인** 개인 업무 — 체크하고 추가한다 (2026-10-27)
+///
+/// 직원 화면의 [MyTaskSection] 을 그대로 쓴다 — 체크·수정·삭제 규칙이 같다.
+/// 대표·관리자는 업무 화면에 `내 업무` 칸이 따로 없어서 여기로 들어온다.
+class _MyOwnTaskScreen extends StatefulWidget {
+  const _MyOwnTaskScreen();
+
+  @override
+  State<_MyOwnTaskScreen> createState() => _MyOwnTaskScreenState();
+}
+
+class _MyOwnTaskScreenState extends State<_MyOwnTaskScreen> {
+  /// 추가하면 오른다 — [MyTaskSection] 이 다시 받는다
+  int _reload = 0;
+
+  Future<void> _add() async {
+    if (await addMyTasks(context) && mounted) setState(() => _reload++);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final section = MyTaskSection(reloadToken: _reload);
+    if (!isDesktop) {
+      return PhoneDetailScaffold(
+        title: '내 업무',
+        bottomBar: GlassBottomButton(label: '업무 추가', onPressed: _add),
+        child: ListView(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            PhoneDetailScaffold.topPadding,
+            20,
+            GlassBottomButton.inset(context),
+          ),
+          children: [section],
+        ),
+      );
+    }
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(28, 26, 28, 26),
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 18),
+            child: Row(
+              children: [
+                Expanded(child: Text('내 업무', style: AppTextStyles.title3)),
+                AppButton(
+                  label: '업무 추가',
+                  filled: true,
+                  shrinkWrap: true,
+                  onTap: _add,
+                ),
+              ],
+            ),
+          ),
+          section,
+        ],
+      ),
     );
   }
 }
@@ -218,10 +342,14 @@ class _CountBadge extends StatelessWidget {
 ///
 /// 체크·수정·삭제 버튼이 없다. 남의 할 일을 대신 체크하면 그 사람이
 /// 안 했는데 한 것으로 남는다.
+///
+/// [canAdd] 면 아래에 `업무 추가` 가 선다 — 대표·관리자끼리 서로의 목록에
+/// 업무를 넣어 주는 자리다 (2026-10-27). 체크는 여전히 본인만 한다.
 class _PersonTaskScreen extends StatefulWidget {
-  const _PersonTaskScreen({required this.row});
+  const _PersonTaskScreen({required this.row, this.canAdd = false});
 
   final MyTaskRosterRow row;
+  final bool canAdd;
 
   @override
   State<_PersonTaskScreen> createState() => _PersonTaskScreenState();
@@ -281,6 +409,16 @@ class _PersonTaskScreenState extends State<_PersonTaskScreen>
     }
   }
 
+  /// 이 사람 목록에 업무를 넣는다 — 넣었으면 보던 요일을 다시 받는다
+  Future<void> _add() async {
+    final owner = StaffDirectory.instance.byId(widget.row.employeeId);
+    if (owner == null) {
+      AppToast.show(context, '명단에서 이 사람을 못 찾았어요');
+      return;
+    }
+    if (await addMyTasks(context, owner: owner) && mounted) await _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final body = showSkeleton
@@ -295,12 +433,17 @@ class _PersonTaskScreenState extends State<_PersonTaskScreen>
     if (!isDesktop) {
       return PhoneDetailScaffold(
         title: widget.row.name,
+        bottomBar: widget.canAdd
+            ? GlassBottomButton(label: '업무 추가', onPressed: _add)
+            : null,
         child: ListView(
           padding: EdgeInsets.fromLTRB(
             20,
             PhoneDetailScaffold.topPadding,
             20,
-            bottomBarInset(context),
+            widget.canAdd
+                ? GlassBottomButton.inset(context)
+                : bottomBarInset(context),
           ),
           children: [body],
         ),
@@ -313,7 +456,20 @@ class _PersonTaskScreenState extends State<_PersonTaskScreen>
         children: [
           Padding(
             padding: const EdgeInsets.only(left: 4, bottom: 18),
-            child: Text(widget.row.name, style: AppTextStyles.title3),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(widget.row.name, style: AppTextStyles.title3),
+                ),
+                if (widget.canAdd)
+                  AppButton(
+                    label: '업무 추가',
+                    filled: true,
+                    shrinkWrap: true,
+                    onTap: _add,
+                  ),
+              ],
+            ),
           ),
           body,
         ],

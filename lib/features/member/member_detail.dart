@@ -332,7 +332,11 @@ class _MemberDetailScreenState extends State<MemberDetailScreen>
   // ── 영양제 ────────────────────────────────────
 
   Future<void> _addSupplement() async {
-    if (await addSupplement(context, memberId: widget.member.id)) {
+    if (await addSupplement(
+      context,
+      memberId: widget.member.id,
+      existing: {for (final row in _supplements) row.name},
+    )) {
       await _reloadSupplements();
     }
   }

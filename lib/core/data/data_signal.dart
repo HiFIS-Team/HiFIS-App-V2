@@ -80,3 +80,13 @@ void notifySessionSignChanged() => sessionSignChanged.value++;
 final memberChanged = ValueNotifier<int>(0);
 
 void notifyMemberChanged() => memberChanged.value++;
+
+/// 환경정비 내역이 방금 늘었다 — **개인 업무 체크**가 쏜다 (2026-10-27)
+///
+/// 개인 업무를 체크하면 서버가 환경정비 기록을 같이 남긴다 (항목과 이름이
+/// 맞으면 그 배점, 아니면 `개인업무(이름)` +2). 그 기록은 같은 업무 화면의
+/// `공통 업무` 칸 내역에 서는데, 그 칸은 1분 간격으로만 다시 받아서
+/// 체크하고 칸을 옮겨도 **방금 한 것이 안 보였다.**
+final envChanged = ValueNotifier<int>(0);
+
+void notifyEnvChanged() => envChanged.value++;
