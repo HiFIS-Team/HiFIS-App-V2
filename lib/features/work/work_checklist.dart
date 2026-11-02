@@ -10,6 +10,7 @@ class _ChecklistCard extends StatelessWidget {
   _ChecklistCard({
     required this.items,
     required this.counts,
+    required this.total,
     required this.onAdjust,
     required this.onShowHistory,
     required this.onOpenItem,
@@ -19,6 +20,13 @@ class _ChecklistCard extends StatelessWidget {
 
   /// 항목 id 별 오늘 수행 횟수
   final Map<String, int> counts;
+
+  /// 머리말 `총 N회` — **오늘 내 기록 전부**다 (2026-11-02)
+  ///
+  /// 칩 숫자를 더하면 개인 업무 체크로 생긴 줄(`개인업무(…)`)이 빠진다 —
+  /// 칩에는 안 세기 때문이다. 그런데 이 글자를 누르면 그 줄까지 다 선 내역이
+  /// 열려서 `총 3회` 를 눌렀는데 5줄이 떴다. 여는 목록과 같은 수를 적는다.
+  final int total;
 
   /// (항목, 증감량) — +1 또는 -1
   final void Function(EnvItem item, int delta) onAdjust;
@@ -34,8 +42,6 @@ class _ChecklistCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final total = counts.values.fold(0, (sum, c) => sum + c);
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -327,9 +333,19 @@ class _LogRowState extends State<_LogRow> {
   bool get _hasBlog => _isAwardable(_log);
 
   /// 무슨 일이었는지 적어 둔 줄인가 — 클레임해결·기타
+  ///
+  /// 개인 업무 기록은 `note` 가 곧 업무 이름이라 줄 제목([_logTitle])과 같다 —
+  /// 아래에 한 번 더 적으면 같은 말이 두 줄 서고, 눌러도 같은 글만 뜬다.
   String? get _note {
+    if (_isMyTaskWriteIn(_log)) return null;
     final text = (_log.note ?? '').trim();
-    return text.isEmpty ? null : text;
+    if (text.isEmpty) return null;
+    // 제목과 같은 말이면 안 적는다 — 개인 업무 `블로그` 를 체크하면 항목
+    // `블로그` 로 남으면서 note 도 `블로그` 라 같은 글이 두 줄 섰다
+    if (text.replaceAll(' ', '') == _logTitle(_log).replaceAll(' ', '')) {
+      return null;
+    }
+    return text;
   }
 
   @override
@@ -381,7 +397,7 @@ class _LogRowState extends State<_LogRow> {
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    _log.itemName,
+                    _logTitle(_log),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: AppTextStyles.body2.copyWith(
@@ -392,7 +408,7 @@ class _LogRowState extends State<_LogRow> {
               ] else
                 Expanded(
                   child: Text(
-                    _log.itemName,
+                    _logTitle(_log),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: AppTextStyles.body2.copyWith(
@@ -400,6 +416,8 @@ class _LogRowState extends State<_LogRow> {
                     ),
                   ),
                 ),
+              // 이름이 길어 꽉 차도 점수와 붙지 않게 — `확인+2` 처럼 이어 붙어 보였다
+              SizedBox(width: 8),
               // 추가 점수가 얹혀진 줄임을 여기서 알린다 — 예전에는 창을 열어야 보였다.
               // 대표가 보긴 했는데 0 을 준 줄은 붙일 것이 없어 빼다
               if (_log.bonusPoints != 0) ...[
@@ -451,6 +469,16 @@ class _LogRowState extends State<_LogRow> {
                 ),
               ),
             ),
+          // 개인 업무 체크로 저절로 생긴 줄 — 환경정비 칩으로 남긴 것과 가른다.
+          // `블로그` 처럼 항목과 이름이 맞아 그 항목으로 남은 줄에도 붙는다
+          if (_fromMyTask(_log))
+            Padding(
+              padding: EdgeInsets.only(left: 72, top: 5),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: _MyTaskTag(),
+              ),
+            ),
         ],
       ),
     );
@@ -478,6 +506,30 @@ class _WaitTag extends StatelessWidget {
         style: AppTextStyles.caption.copyWith(
           fontSize: 11,
           color: AppColors.warning,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+/// `개인 업무` 꼬리표 — 승인 대기·추가 점수 꼬리표와 같은 틀에 포인트 색
+class _MyTaskTag extends StatelessWidget {
+  _MyTaskTag();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.primaryLight,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        '개인 업무',
+        style: AppTextStyles.caption.copyWith(
+          fontSize: 11,
+          color: AppColors.primary,
           fontWeight: FontWeight.w700,
         ),
       ),

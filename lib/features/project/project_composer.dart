@@ -316,19 +316,28 @@ class _ProjectComposerState extends State<_ProjectComposer> {
                   ? _lockedNote
                   : (_dueFixed ? _dueNote : _pickDue),
               padding: EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              // 잠긴 마감은 **잠겨 보인다** — 예전에는 고칠 수 있는 날짜와 똑같이
+              // 생겨서 눌러 보고 나서야 토스트로 알았다
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    Icons.calendar_today_rounded,
+                    _dueLockedHere
+                        ? CupertinoIcons.lock_fill
+                        : Icons.calendar_today_rounded,
                     size: 14,
-                    color: AppColors.textSecondary,
+                    color: _dueLockedHere
+                        ? AppColors.textTertiary
+                        : AppColors.textSecondary,
                   ),
                   SizedBox(width: 6),
                   Text(
                     '${_due.year}.${_due.month}.${_due.day}',
                     style: AppTextStyles.body2.copyWith(
                       fontWeight: FontWeight.w600,
+                      color: _dueLockedHere
+                          ? AppColors.textSecondary
+                          : AppColors.textPrimary,
                     ),
                   ),
                 ],
@@ -338,6 +347,16 @@ class _ProjectComposerState extends State<_ProjectComposer> {
             _DdayBadge(dday: dday, phase: _Phase.running),
           ],
         ),
+        // 어디서 바꾸는지 — 할 일이 시작된 뒤의 직원·점장 (결재 모드는 폼 전체가
+        // 잠겨 있어 따로 안내한다)
+        if (_dueFixed && !_needsApproval)
+          Padding(
+            padding: EdgeInsets.only(left: 72, top: 2),
+            child: Text(
+              '할 일이 시작돼서 기한 연장 신청으로 바꿔요',
+              style: AppTextStyles.caption,
+            ),
+          ),
         SizedBox(height: 10),
         Row(
           children: [
@@ -486,7 +505,9 @@ class _ProjectComposerState extends State<_ProjectComposer> {
                     shape: BoxShape.circle,
                   ),
                 ),
-                Expanded(child: Text(todo.text, style: AppTextStyles.body2)),
+                Expanded(
+                  child: Text(keepWords(todo.text), style: AppTextStyles.body2),
+                ),
                 if (todo.assignee != null) ...[
                   Avatar(name: todo.assignee!, size: 20),
                   SizedBox(width: 6),
@@ -557,6 +578,9 @@ class _ProjectComposerState extends State<_ProjectComposer> {
     final project = _edit;
     return project != null && _dueLocked(project);
   }
+
+  /// 이 폼에서 마감을 못 고치나 — 결재 모드이거나 마감만 잠겼거나
+  bool get _dueLockedHere => _needsApproval || _dueFixed;
 
   /// 잠긴 마감을 눌렀을 때 — 어디서 바꾸는지 알려준다
   void _dueNote() {

@@ -129,7 +129,7 @@ class _TodoRowState extends State<_TodoRow> {
             SizedBox(width: 12),
             Expanded(
               child: Text(
-                todo.text,
+                keepWords(todo.text),
                 style: AppTextStyles.body2.copyWith(
                   color: todo.done
                       ? AppColors.textTertiary
@@ -142,8 +142,11 @@ class _TodoRowState extends State<_TodoRow> {
             SizedBox(width: 8),
             _AssigneeChip(name: todo.assignee, onTap: widget.onAssign),
             SizedBox(width: 4),
+            // 높이를 글줄(22)에 맞춰 가운데 둔다 — 위에 붙이면 줄이 길어질 때
+            // X 가 첫 줄보다 3px 떠 보였다
             SizedBox(
               width: 28,
+              height: 22,
               child: showRemove
                   ? Pressable(
                       onTap: remove,

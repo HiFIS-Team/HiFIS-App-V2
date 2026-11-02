@@ -81,7 +81,7 @@ void main() {
     await _openAdd(tester);
     await _stage(tester);
 
-    expect(find.text('월·화·수·목·금'), findsOneWidget);
+    expect(find.textContaining('(월·화·수·목·금)'), findsOneWidget);
   });
 
   testWidgets('다른 사람으로 바뀌면 그 사람 근무일이 켜진다 — 앞사람 것이 남으면 안 된다', (tester) async {
@@ -89,7 +89,7 @@ void main() {
     currentUser = _person('a', '평일이', const [1, 2, 3, 4, 5]);
     await _openAdd(tester);
     await _stage(tester);
-    expect(find.text('월·화·수·목·금'), findsOneWidget);
+    expect(find.textContaining('(월·화·수·목·금)'), findsOneWidget);
 
     // 로그아웃 → 주말 근무자가 로그인 (앱은 안 껐다 — 한 기기를 여럿이 쓴다)
     currentUser = null;
@@ -98,7 +98,7 @@ void main() {
     await _stage(tester);
 
     expect(
-      find.text('토·일'),
+      find.textContaining('(토·일)'),
       findsOneWidget,
       reason: '앞사람 근무일(월~금)이 남아 있으면 안 뜬다 — 담은 업무가 본인 목록에서 사라진다',
     );
@@ -109,7 +109,7 @@ void main() {
     await _openAdd(tester);
     await _stage(tester);
 
-    expect(find.text('매일'), findsOneWidget);
+    expect(find.text('매일 뜨는 업무예요'), findsOneWidget);
   });
 
   testWidgets('요일 칸을 끄면 담은 업무의 요일도 따라 바뀐다', (tester) async {
@@ -120,6 +120,6 @@ void main() {
     await tester.tap(find.text('월').first);
     await tester.pumpAndSettle();
 
-    expect(find.text('화·수·목·금'), findsOneWidget);
+    expect(find.textContaining('(화·수·목·금)'), findsOneWidget);
   });
 }

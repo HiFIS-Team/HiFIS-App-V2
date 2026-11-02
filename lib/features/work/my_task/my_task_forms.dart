@@ -137,13 +137,14 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
     if (_monthly && _monthdays.isEmpty) {
       return AppToast.show(context, '도는 날짜를 하나 이상 골라주세요');
     }
-    if (!_monthly && _weekdays.isEmpty) {
-      return AppToast.show(context, '돌아오는 요일을 하나 이상 골라주세요');
-    }
     final month = _monthdays.toList()..sort();
     // 월 단위 업무도 `weekdays` 칸이 `NOT NULL` 이라 값을 채워 보낸다 — 서버는
-    // `monthdays` 가 있으면 요일을 안 보므로 매일로 둔다 (`stands_on`)
-    final days = _monthly ? [...everyWeekday] : (_weekdays.toList()..sort());
+    // `monthdays` 가 있으면 요일을 안 보므로 매일로 둔다 (`stands_on`).
+    // 요일을 다 끄면 **매일**이다 — 수정 폼·`WeekdayPicker` 와 같은 규칙이고,
+    // 칸 아래 `매일 뜨는 업무예요` 가 미리 알려 준다
+    final days = _monthly || _weekdays.isEmpty
+        ? [...everyWeekday]
+        : (_weekdays.toList()..sort());
     Navigator.pop(
       context,
       _AddResult(
@@ -176,60 +177,48 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
   int get _count =>
       _plan.length + (_value.isEmpty || _plan.contains(_value) ? 0 : 1);
 
-  /// 담은 업무가 돌아오는 때 — 담긴 줄 머리에 적는다
-  String get _whenLabel {
-    if (_monthly) {
-      final picked = _monthdays.toList()..sort();
-      return picked.isEmpty ? '날짜를 골라주세요' : monthdayLabel(picked);
-    }
-    if (_weekdays.isEmpty) return '요일을 골라주세요';
-    // 이레 다면 `weekdayLabel` 이 빈 글자를 준다 (목록 줄에서는 안 적는 게 맞다)
-    final days = _weekdays.toList()..sort();
-    return isEveryWeekday(days) ? '매일' : weekdayLabel(days);
-  }
-
   @override
   Widget build(BuildContext context) {
+    // 두 덩어리 — **언제**(주·월 + 요일·날짜) 와 **무엇**(적고 쌓기).
+    // 고른 때는 담은 업무 **전부에** 걸려서 위에 둔다. 목록이 길어져도 밀려
+    // 내려가지 않고, 적는 동안 키보드에 안 가린다.
     final body = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // 주냐 월이냐 — **제일 위에서 먼저 고른다.** 아래 화면이 통째로 갈린다
+        const _SectionTitle('언제 돌아오나요'),
         // 다른 화면의 목록바와 같은 공용 위젯 — 따로 그리면 모양이 갈린다
         ModeSwitch(
-          left: '주 단위',
-          right: '월 단위',
+          left: '요일마다',
+          right: '날짜마다',
           value: _monthly,
           onChanged: _setMonthly,
         ),
-        const SizedBox(height: 18),
-        if (_monthly) ...[
-          Text('도는 날짜', style: AppTextStyles.label),
-          const SizedBox(height: 10),
+        const SizedBox(height: 14),
+        if (_monthly)
           _MonthdayPicker(
             selected: _monthdays,
             onChanged: () => setState(() {}),
-          ),
-          const SizedBox(height: 22),
-        ],
-        // 돌아올 요일 — 칸을 눌러 켜고 끈다. 처음에는 근무일이 켜져 있다
-        if (!_monthly) ...[
-          Text('돌아오는 요일', style: AppTextStyles.label),
-          const SizedBox(height: 10),
+          )
+        else
+          // 칸을 눌러 켜고 끈다. 처음에는 그 사람 근무일이 켜져 있다
           WeekdayPicker(
             selected: _weekdays,
             onChanged: () => setState(() {}),
             note: '담은 업무가 고른 요일마다 목록에 떠요',
           ),
-          const SizedBox(height: 22),
-        ],
+        const SizedBox(height: 32),
 
-        // 입력칸 — 카드 없이 큼직하게. 이 화면의 주인공이다
+        _SectionTitle(
+          '업무',
+          // 쌓인 수를 머리말에 — 내역 카드 `총 N회` 와 같은 자리·같은 색
+          trailing: _plan.isEmpty ? null : '${_plan.length}개',
+        ),
+        // 입력칸 — 이 화면의 주인공이다. 흰 판 위라 회색 면으로 앉힌다
         Container(
-          padding: const EdgeInsets.fromLTRB(18, 6, 6, 6),
+          padding: const EdgeInsets.fromLTRB(16, 4, 6, 4),
           decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: AppColors.gray100),
+            color: AppColors.gray50,
+            borderRadius: BorderRadius.circular(16),
           ),
           child: Row(
             children: [
@@ -244,24 +233,36 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
                   bare: true,
                 ),
               ),
-              // 한 줄 더 — 엔터와 같은 일을 한다
-              Pressable(
-                onTap: _stage,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 160),
-                  width: 40,
-                  height: 40,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: _value.isEmpty
-                        ? AppColors.gray100
-                        : AppColors.primary,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.arrow_upward_rounded,
-                    size: 19,
-                    color: _value.isEmpty ? AppColors.gray400 : Colors.white,
+              // 담기 — 엔터와 같은 일을 한다. 적은 글이 있을 때만 켜진다
+              Semantics(
+                button: true,
+                enabled: _value.isNotEmpty,
+                label: '목록에 담기',
+                child: Pressable(
+                  onTap: _stage,
+                  child: SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: Center(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 160),
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: _value.isEmpty
+                              ? AppColors.gray100
+                              : AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.add_rounded,
+                          size: 20,
+                          color: _value.isEmpty
+                              ? AppColors.gray400
+                              : Colors.white,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -272,65 +273,47 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
         Padding(
           padding: const EdgeInsets.only(left: 6),
           child: Text(
-            '엔터를 누르면 한 줄씩 더 담을 수 있어요',
-            style: AppTextStyles.caption.copyWith(color: AppColors.gray400),
+            '엔터를 누르면 이어서 더 적을 수 있어요',
+            style: AppTextStyles.caption,
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
         if (_plan.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 28),
-            child: Center(
-              child: Column(
-                children: [
-                  Icon(
-                    CupertinoIcons.checkmark_circle,
-                    size: 30,
-                    color: AppColors.gray300,
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    '적은 업무가 여기 쌓여요',
-                    style: AppTextStyles.body2.copyWith(
-                      color: AppColors.gray400,
-                    ),
-                  ),
-                ],
-              ),
+          // 빈 자리 — 점선 판이 "여기 쌓인다" 를 말없이 보여준다
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 26),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.gray100, width: 1.2),
             ),
-          ),
-        if (_plan.isNotEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.only(left: 6, bottom: 10),
-            child: Row(
+            child: Column(
               children: [
-                Text('담은 업무 ${_plan.length}개', style: AppTextStyles.label),
-                const SizedBox(width: 8),
-                // 어느 요일(날짜)에 걸리는지 — 위에서 고친 것이 바로 따라온다
-                Flexible(
-                  child: Text(
-                    _whenLabel,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.caption.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                    ),
+                Icon(
+                  CupertinoIcons.square_list,
+                  size: 26,
+                  color: AppColors.gray300,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '적은 업무가 여기 쌓여요',
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.textTertiary,
                   ),
                 ),
               ],
             ),
-          ),
+          )
+        else
           for (final (i, content) in _plan.indexed) ...[
             if (i > 0) const SizedBox(height: 8),
             _StagedRow(
+              index: i + 1,
               text: content,
               fields: _fields[content] ?? const [],
               onTap: () => _editFields(content),
               onRemove: () => _remove(content),
             ),
           ],
-        ],
       ],
     );
 
@@ -341,6 +324,9 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
     if (!isDesktop) {
       return PhoneDetailScaffold(
         title: title,
+        // 폼 화면은 흰 판이다 (`PhoneDetailScaffold.background`) — 회색 판이면
+        // 꺼진 요일 칸·담은 줄(gray50)이 바탕과 같은 색이라 안 보였다
+        background: AppColors.surface,
         bottomBar: GlassBottomButton(
           label: _count > 1 ? '$_count개 추가' : '추가',
           active: _count > 0,
@@ -360,9 +346,9 @@ class _AddTaskScreenState extends State<_AddTaskScreen> {
 
     // 데스크톱은 가운데 모달 — `showFullPage` 의 틀은 **자기 Scaffold 를 가진
     // 화면**을 기대한다. 맨 Column 을 넣으면 Material 이 없어서 TextField 가
-    // 죽는다 (실제로 겪었다).
+    // 죽는다 (실제로 겪었다). 폰과 같은 까닭으로 흰 판이다
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.surface,
       body: Column(
         children: [
           Expanded(
@@ -487,14 +473,58 @@ class _MonthdayPicker extends StatelessWidget {
   }
 }
 
-/// 아직 안 만든 줄 — **누르면 입력 칸**, 오른쪽 X 로 뺀다
+/// 폼 덩어리 머리말 — 내역 카드 머리말(`전체 내역 총 N회`)과 같은 모양
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.text, {this.trailing});
+
+  final String text;
+
+  /// 옆에 붙는 파란 숫자 — 없으면 안 그린다
+  final String? trailing;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(left: 4, bottom: 12),
+    child: Row(
+      children: [
+        Text(
+          text,
+          style: AppTextStyles.label.copyWith(fontWeight: FontWeight.w700),
+        ),
+        if (trailing case final count?) ...[
+          const SizedBox(width: 6),
+          Text(
+            count,
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ],
+    ),
+  );
+}
+
+/// 아직 안 만든 줄 — 번호 · 이름 · `입력 칸` · 빼기
+///
+/// 예전에는 빈 동그라미를 앞에 세웠는데, 진짜 체크처럼 보여서 누르게 됐다.
+/// 아직 **만들 차례를 기다리는 줄**이라 번호가 맞다.
+///
+/// `입력 칸`(체크할 때 숫자·글을 받는 칸, 2026-08-31)은 예전에 줄마다
+/// `눌러서 입력 칸 추가` 를 한 줄씩 깔아 알렸다 — 세 줄만 담아도 같은 말이
+/// 세 번 섰다. 이제 오른쪽 작은 버튼 하나가 그 일을 한다. 줄을 눌러도 같다.
 class _StagedRow extends StatelessWidget {
   const _StagedRow({
+    required this.index,
     required this.text,
     required this.fields,
     required this.onTap,
     required this.onRemove,
   });
+
+  /// 1부터
+  final int index;
 
   final String text;
 
@@ -505,58 +535,96 @@ class _StagedRow extends StatelessWidget {
   final VoidCallback onRemove;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(14, 12, 9, 12),
-    decoration: BoxDecoration(
-      color: AppColors.gray50,
-      borderRadius: BorderRadius.circular(14),
-    ),
-    child: Row(
-      children: [
-        // 실제 목록의 체크 자리와 같은 크기·색이라 미리보기가 된다
-        Icon(CupertinoIcons.circle, size: 22, color: AppColors.gray300),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Pressable(
-            onTap: onTap,
+  Widget build(BuildContext context) => Pressable(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.fromLTRB(14, 10, 4, 10),
+      decoration: BoxDecoration(
+        color: AppColors.gray50,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              '$index',
+              style: AppTextStyles.caption.copyWith(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  text,
+                  keepWords(text),
                   style: AppTextStyles.body2.copyWith(
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                // 칸을 안 붙였으면 붙이는 길이 있다고 알려 준다 — 줄을 눌러야
-                // 열리는데 아무 표시가 없으면 있는 줄을 모른다
-                Text(
-                  fields.isEmpty
-                      ? '눌러서 입력 칸 추가'
-                      : [for (final f in fields) f.name].join(' · '),
-                  style: AppTextStyles.caption.copyWith(
-                    fontSize: 11,
-                    color: fields.isEmpty
-                        ? AppColors.textTertiary
-                        : AppColors.primary,
+                if (fields.isNotEmpty)
+                  Text(
+                    [for (final f in fields) f.name].join(' · '),
+                    style: AppTextStyles.caption.copyWith(
+                      fontSize: 12,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
               ],
             ),
           ),
-        ),
-        Pressable(
-          onTap: onRemove,
-          child: Padding(
-            padding: const EdgeInsets.all(5),
-            child: Icon(
-              CupertinoIcons.xmark,
-              size: 13,
-              color: AppColors.textTertiary,
+          const SizedBox(width: 8),
+          // 칸을 붙였으면 파랗게 — 붙인 줄과 안 붙인 줄이 한눈에 갈린다
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: fields.isEmpty
+                  ? AppColors.surface
+                  : AppColors.primaryLight,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              fields.isEmpty ? '+ 입력 칸' : '입력 칸 ${fields.length}',
+              style: AppTextStyles.caption.copyWith(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: fields.isEmpty
+                    ? AppColors.textSecondary
+                    : AppColors.primary,
+              ),
             ),
           ),
-        ),
-      ],
+          // 빼기 — 손가락이 닿는 넓이(44)로 잡는다. 예전에는 23 이라 자주 빗나갔다
+          Semantics(
+            button: true,
+            label: '$text 빼기',
+            child: Pressable(
+              onTap: onRemove,
+              child: SizedBox(
+                width: 44,
+                height: 44,
+                child: Icon(
+                  CupertinoIcons.xmark,
+                  size: 14,
+                  color: AppColors.textTertiary,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     ),
   );
 }

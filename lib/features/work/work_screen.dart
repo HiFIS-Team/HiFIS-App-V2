@@ -839,6 +839,7 @@ class _WorkScreenState extends State<WorkScreen>
                                       _ChecklistCard(
                                         items: _envItems,
                                         counts: _counts,
+                                        total: _myLogs.length,
                                         onAdjust: _adjust,
                                         onShowHistory: _showHistory,
                                         onOpenItem: (item) =>
@@ -1465,6 +1466,20 @@ bool _fromMyTask(EnvTaskLog log) =>
 /// **칩 숫자에서는 이것만 뺀다.** 이름이 맞아 `블로그` 로 남은 것은 그 칩이
 /// 센다 — 같은 일을 두 화면에서 두 번 누르지 않게 한 것이다 (2026-09-21).
 bool _isMyTaskWriteIn(EnvTaskLog log) => log.itemName.startsWith('개인업무(');
+
+/// 내역 줄에 적을 이름 — `개인업무(이름)` 은 **업무 이름만** 적는다
+///
+/// 앞머리를 그대로 두면 좁은 줄에서 `개인업무(알바몬 지원…` 으로 잘려 정작
+/// 무슨 일인지가 안 보였다. 개인 업무라는 것은 줄 아래 꼬리표가 알린다.
+/// 서버가 같은 글을 `note` 에 담아 주고(이름은 100자에서 잘린다) 옛 기록에는
+/// 없을 수 있어서, 없으면 괄호 안을 꺼낸다.
+String _logTitle(EnvTaskLog log) {
+  if (!_isMyTaskWriteIn(log)) return log.itemName;
+  final note = (log.note ?? '').trim();
+  if (note.isNotEmpty) return note;
+  final inner = log.itemName.substring('개인업무('.length);
+  return inner.endsWith(')') ? inner.substring(0, inner.length - 1) : inner;
+}
 
 /// 블로그를 누르면 뜨는 창 — 글 주소를 받는다 (2026-08-28 대표 요청)
 ///

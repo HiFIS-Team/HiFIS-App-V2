@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 
 import '../../core/api/client/api_exception.dart';
@@ -207,8 +208,9 @@ class _PresetPickerState extends State<_PresetPicker> {
             style: AppTextStyles.title3.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 4),
+          // 한 줄에 서게 짧게 — 길면 팝업 폭에서 낱말 가운데가 꺾였다
           Text(
-            '여러 개를 골라 한 번에 담아요 · 얼마나·언제·왜가 함께 채워져요',
+            '여러 개 골라 한 번에 담아요',
             style: AppTextStyles.caption.copyWith(
               color: AppColors.textSecondary,
             ),
@@ -257,12 +259,13 @@ class _PresetPickerState extends State<_PresetPicker> {
                       ),
                     ),
                   )
+                // 줄 사이 선을 안 긋는다 — 고른 줄이 면으로 물드는데 선이
+                // 그 면을 가로지르면 칸이 둘로 쪼개져 보인다
                 : ListView.separated(
                     shrinkWrap: true,
                     padding: EdgeInsets.zero,
                     itemCount: rows.length,
-                    separatorBuilder: (_, _) =>
-                        Divider(height: 1, color: AppColors.divider),
+                    separatorBuilder: (_, _) => const SizedBox(height: 4),
                     itemBuilder: (_, i) => _PresetRow(
                       preset: rows[i],
                       picked: _has(rows[i]),
@@ -271,7 +274,11 @@ class _PresetPickerState extends State<_PresetPicker> {
                     ),
                   ),
           ),
-          const SizedBox(height: 12),
+          // 목록이 버튼에 붙어 잘려 보이지 않게 선으로 끊는다
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Divider(height: 1, color: AppColors.divider),
+          ),
           Row(
             children: [
               AppButton(
@@ -320,57 +327,81 @@ class _PresetRow extends StatelessWidget {
 
   final VoidCallback onTap;
 
+  /// 고른 줄은 **면이 물든다** — 오른쪽 체크 하나로는 스크롤하며 훑을 때
+  /// 무엇을 담았는지 안 잡힌다. 이미 있는 줄은 글자만 흐리고 꼬리표는 또렷이 둔다
+  /// (통째로 흐리면 `담겨 있음` 까지 안 읽혔다).
   @override
-  Widget build(BuildContext context) => Pressable(
-    onTap: onTap,
-    child: Opacity(opacity: already ? 0.45 : 1, child: _body()),
-  );
-
-  Widget _body() => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 11),
-    child: Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                preset.name,
-                style: AppTextStyles.body1.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                '${preset.dose} · ${preset.timing}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppTextStyles.caption.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
+  Widget build(BuildContext context) => Semantics(
+    selected: picked,
+    enabled: !already,
+    child: Pressable(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+        decoration: BoxDecoration(
+          color: picked ? AppColors.primaryLight : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
         ),
-        const SizedBox(width: 8),
-        if (already)
-          Text(
-            '담겨 있음',
-            style: AppTextStyles.caption.copyWith(
-              color: AppColors.textTertiary,
-              fontWeight: FontWeight.w600,
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    preset.name,
+                    style: AppTextStyles.body1.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: already
+                          ? AppColors.textTertiary
+                          : AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${preset.dose} · ${preset.timing}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.caption.copyWith(
+                      color: already
+                          ? AppColors.textTertiary
+                          : AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          )
-        else
-          // 담으면 채운 체크로 바뀐다 — 장바구니에 든 것이 한눈에 보인다
-          Icon(
-            picked
-                ? Icons.check_circle_rounded
-                : Icons.add_circle_outline_rounded,
-            size: 22,
-            color: picked ? AppColors.primary : AppColors.gray300,
-          ),
-      ],
+            const SizedBox(width: 12),
+            if (already)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.gray50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '담겨 있음',
+                  style: AppTextStyles.caption.copyWith(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              )
+            else
+              // 앱의 다른 체크(개인 업무·할 일)와 같은 고리 — `+` 는 누르면
+              // 바로 들어가는 것처럼 읽혀서 고르는 칸에 안 맞았다
+              Icon(
+                picked
+                    ? CupertinoIcons.checkmark_circle_fill
+                    : CupertinoIcons.circle,
+                size: 22,
+                color: picked ? AppColors.primary : AppColors.gray300,
+              ),
+          ],
+        ),
+      ),
     ),
   );
 }

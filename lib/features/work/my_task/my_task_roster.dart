@@ -122,13 +122,21 @@ class _MyTaskRosterState extends State<MyTaskRoster>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ModeSwitch(
-          left: '직원',
-          right: '대표·관리자',
-          value: _bosses,
-          onChanged: _pickBosses,
+        // **작게, 왼쪽에** — 바로 위에 `지점 업무 / 개인 업무 / 직원 목표` 가 화면
+        // 폭으로 서 있어서, 같은 크기로 하나 더 깔면 목록바가 두 층으로 보였다.
+        // 이건 그 아래 **거르는 칸**이다 (동료 평가 사람 목록과 같은 작은 바)
+        Align(
+          alignment: Alignment.centerLeft,
+          child: SegmentedTabs(
+            labels: const ['직원', '대표·관리자'],
+            selected: _bosses ? 1 : 0,
+            onSelect: (i) => _pickBosses(i == 1),
+            expand: false,
+            height: 44,
+            dense: true,
+          ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
         list,
       ],
     );
@@ -158,7 +166,11 @@ class _MyTaskRosterState extends State<MyTaskRoster>
         for (var i = 0; i < rows.length; i += columns) ...[
           if (i > 0) const SizedBox(height: 12),
           if (columns == 1)
-            _PersonTaskCard(row: rows[i], onTap: () => _open(rows[i]))
+            _PersonTaskCard(
+              row: rows[i],
+              mine: _bosses && rows[i].employeeId == currentUser?.id,
+              onTap: () => _open(rows[i]),
+            )
           else
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -169,6 +181,9 @@ class _MyTaskRosterState extends State<MyTaskRoster>
                     child: i + c < rows.length
                         ? _PersonTaskCard(
                             row: rows[i + c],
+                            mine:
+                                _bosses &&
+                                rows[i + c].employeeId == currentUser?.id,
                             onTap: () => _open(rows[i + c]),
                           )
                         : const SizedBox(),
@@ -247,10 +262,18 @@ class _MyOwnTaskScreenState extends State<_MyOwnTaskScreen> {
 
 /// 사람 한 명 — 동료 평가 목록 카드와 같은 결
 class _PersonTaskCard extends StatelessWidget {
-  const _PersonTaskCard({required this.row, required this.onTap});
+  const _PersonTaskCard({
+    required this.row,
+    required this.onTap,
+    this.mine = false,
+  });
 
   final MyTaskRosterRow row;
   final VoidCallback onTap;
+
+  /// 대표·관리자 명단의 **본인 줄** — 누르면 남의 것 보기가 아니라 내 업무를
+  /// 체크하는 화면이 열린다. 생김새가 같으면 그 차이를 모른다
+  final bool mine;
 
   @override
   Widget build(BuildContext context) {
@@ -278,13 +301,40 @@ class _PersonTaskCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        row.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTextStyles.body1.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              row.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.body1.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          if (mine) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.primaryLight,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '나',
+                                style: AppTextStyles.caption.copyWith(
+                                  fontSize: 11,
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: 2),
                       Text(

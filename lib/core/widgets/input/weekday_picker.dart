@@ -39,7 +39,9 @@ class WeekdayPicker extends StatelessWidget {
   }
 
   /// 전부 켜져 있으면 **매일**이라 따로 알려 줄 것이 없다
-  bool get _every => selected.length == 7;
+  ///
+  /// **다 꺼도 매일이다** (위 규칙) — 예전에는 여기서 빈 괄호 `()` 가 붙었다
+  bool get _every => selected.isEmpty || selected.length == 7;
 
   @override
   Widget build(BuildContext context) => Column(
