@@ -338,24 +338,109 @@ enum VideoThumb {
     }
   }
 
-  /// 올리기 전에 **720p 로 줄인다** (2026-10-15 — 10초 영상이 25~45MB 라
-  /// 업로드가 1~2분 걸리고 13초쯤부터는 아예 안 올라갔다).
+  /// 올리기 전에 **720p · 2.5Mbps 로 줄인다** (2026-10-15, 2026-11-05 고침)
+  ///
+  /// 처음에는 `AVAssetExportPreset1280x720` 을 썼는데 **해상도만 낮추고 비트레이트는
+  /// 원본에 가깝게 둬서** 10초에 20MB 가 나왔다 (운영 업로드를 재 보니 15.9Mbps).
+  /// 프리셋으로는 비트레이트를 못 정해서 읽고 다시 쓴다 — 10초에 3MB 남짓이다.
   /// 원래 720p 이하면 키우지 않는다. 실패하면 false — 앱이 원본을 올린다
   private static func shrink(_ args: [String: Any]?, result: @escaping FlutterResult) {
-    guard let path = args?["path"] as? String,
-          let out = args?["out"] as? String,
-          let export = AVAssetExportSession(
-            asset: AVURLAsset(url: URL(fileURLWithPath: path)),
-            presetName: AVAssetExportPreset1280x720)
-    else {
+    guard let path = args?["path"] as? String, let out = args?["out"] as? String else {
       result(false)
       return
     }
-    export.outputURL = URL(fileURLWithPath: out)
-    export.outputFileType = .mp4
-    export.shouldOptimizeForNetworkUse = true
-    export.exportAsynchronously {
-      DispatchQueue.main.async { result(export.status == .completed) }
+    DispatchQueue.global(qos: .userInitiated).async {
+      let ok = transcode(URL(fileURLWithPath: path), to: URL(fileURLWithPath: out))
+      DispatchQueue.main.async { result(ok) }
     }
   }
+
+  /// 긴 변 1280 · H.264 2.5Mbps · AAC 128k. 세로 영상은 회전 값을 그대로 옮긴다
+  static func transcode(_ src: URL, to dst: URL) -> Bool {
+    try? FileManager.default.removeItem(at: dst)
+    let asset = AVURLAsset(url: src)
+    guard let video = asset.tracks(withMediaType: .video).first,
+          let reader = try? AVAssetReader(asset: asset),
+          let writer = try? AVAssetWriter(outputURL: dst, fileType: .mp4)
+    else { return false }
+
+    let natural = video.naturalSize
+    let scale = min(1, 1280 / max(natural.width, natural.height))
+    func even(_ v: CGFloat) -> Int { max(2, Int(v * scale / 2) * 2) }
+
+    let videoOut = AVAssetReaderTrackOutput(track: video, outputSettings: [
+      kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
+    ])
+    let videoIn = AVAssetWriterInput(mediaType: .video, outputSettings: [
+      AVVideoCodecKey: AVVideoCodecType.h264,
+      AVVideoWidthKey: even(natural.width),
+      AVVideoHeightKey: even(natural.height),
+      AVVideoScalingModeKey: AVVideoScalingModeResizeAspect,
+      AVVideoCompressionPropertiesKey: [
+        AVVideoAverageBitRateKey: 2_500_000,
+        AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
+      ],
+    ])
+    videoIn.transform = video.preferredTransform
+    videoIn.expectsMediaDataInRealTime = false
+    guard reader.canAdd(videoOut), writer.canAdd(videoIn) else { return false }
+    reader.add(videoOut)
+    writer.add(videoIn)
+
+    var pairs = [(videoOut as AVAssetReaderOutput, videoIn)]
+    if let audio = asset.tracks(withMediaType: .audio).first {
+      let audioOut = AVAssetReaderTrackOutput(track: audio, outputSettings: [
+        AVFormatIDKey: kAudioFormatLinearPCM,
+        AVSampleRateKey: 44_100,
+        AVNumberOfChannelsKey: 2,
+      ])
+      let audioIn = AVAssetWriterInput(mediaType: .audio, outputSettings: [
+        AVFormatIDKey: kAudioFormatMPEG4AAC,
+        AVSampleRateKey: 44_100,
+        AVNumberOfChannelsKey: 2,
+        AVEncoderBitRateKey: 128_000,
+      ])
+      audioIn.expectsMediaDataInRealTime = false
+      // 소리를 못 붙이면 소리 없이라도 간다 — 영상이 본체다
+      if reader.canAdd(audioOut), writer.canAdd(audioIn) {
+        reader.add(audioOut)
+        writer.add(audioIn)
+        pairs.append((audioOut, audioIn))
+      }
+    }
+
+    guard reader.startReading(), writer.startWriting() else { return false }
+    writer.startSession(atSourceTime: .zero)
+    let group = DispatchGroup()
+    for (i, (output, input)) in pairs.enumerated() {
+      group.enter()
+      let queue = DispatchQueue(label: "hifis.shrink.\(i)")
+      input.requestMediaDataWhenReady(on: queue) {
+        while input.isReadyForMoreMediaData {
+          guard let sample = output.copyNextSampleBuffer() else {
+            input.markAsFinished()
+            group.leave()
+            return
+          }
+          if !input.append(sample) {
+            reader.cancelReading()
+            input.markAsFinished()
+            group.leave()
+            return
+          }
+        }
+      }
+    }
+    group.wait()
+    let done = DispatchSemaphore(value: 0)
+    if reader.status == .completed {
+      writer.finishWriting { done.signal() }
+    } else {
+      writer.cancelWriting()
+      done.signal()
+    }
+    done.wait()
+    return writer.status == .completed
+  }
+
 }
