@@ -114,6 +114,14 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen>
 
   bool _busy = false;
 
+  /// 뒤에서 올라가는 중인 사진·영상 (2026-11-05 요청)
+  ///
+  /// 예전에는 올라가는 동안 `_busy` 로 묶어서 저장 버튼이 `저장 중…` 으로
+  /// 잠기고 더 추가도 못 했다. 영상 하나에 몇십 초씩 걸려서 **그동안 손을
+  /// 놓고 기다려야 했다.** 이제 고르는 것만 기다리고 나머지는 뒤에서 돈다.
+  /// 저장을 누르면 남은 것이 끝나길 기다렸다가 저장한다
+  final Set<Future<void>> _uploads = {};
+
   List<T> _seed<S, T>(List<S>? rows, T Function(S) of, T Function() blank) => [
     if (rows != null && rows.isNotEmpty)
       for (final row in rows) of(row)
@@ -349,25 +357,23 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen>
     }
   });
 
-  /// 파일을 골라 새 묶음으로 붙인다 — 고른 즉시 올라간다
-  Future<void> _addMedia() async {
+  /// 파일을 골라 새 묶음으로 붙인다 — 올리는 동안에도 적고 더 붙일 수 있다
+  void _addMedia() {
     if (_busy) return;
-    setState(() => _busy = true);
+    final job = _upload();
+    setState(() => _uploads.add(job));
+    job.whenComplete(() {
+      if (mounted) setState(() => _uploads.remove(job));
+    });
+  }
+
+  Future<void> _upload() async {
     try {
       final items = await pickWorkoutMedia(context);
-      if (!mounted) return;
-      if (items.isEmpty) {
-        setState(() => _busy = false);
-        return;
-      }
-      setState(() {
-        _groups.add(MediaGroupEditor(MediaGroup(items: items)));
-        _busy = false;
-      });
+      if (!mounted || items.isEmpty) return;
+      setState(() => _groups.add(MediaGroupEditor(MediaGroup(items: items))));
     } catch (error) {
-      if (!mounted) return;
-      setState(() => _busy = false);
-      AppToast.show(context, messageOf(error));
+      if (mounted) AppToast.show(context, messageOf(error));
     }
   }
 
@@ -384,6 +390,9 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen>
       return;
     }
     setState(() => _busy = true);
+    // 올라가던 사진·영상이 끝나야 그 주소를 실을 수 있다
+    if (_uploads.isNotEmpty) await Future.wait(_uploads.toList());
+    if (!mounted) return;
     final title = _title.text.trim();
     // **적은 줄만 보낸다.** 부위·세트는 새 줄에 물려받으므로, 그것만 차 있는
     // 마지막 줄은 손도 안 대본 빈 줄이다 (`isBlank`)
@@ -629,7 +638,9 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen>
       if (editable) ...[
         const SizedBox(height: 8),
         _AddRow(
-          label: _busy ? '올리는 중…' : '사진 · 영상 추가',
+          label: _uploads.isEmpty
+              ? '사진 · 영상 추가'
+              : '올리는 중 ${_uploads.length}건 · 더 추가',
           icon: Icons.add_photo_alternate_outlined,
           onTap: _addMedia,
         ),
@@ -711,7 +722,7 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen>
     bottomBar: widget.editable
         ? GlassBottomButton(
             label: _busy
-                ? '저장 중…'
+                ? (_uploads.isNotEmpty ? '사진·영상 올리는 중…' : '저장 중…')
                 : widget.log == null
                 ? '저장'
                 : '수정',

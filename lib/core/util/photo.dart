@@ -11,6 +11,7 @@
 library;
 
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:ui' as ui;
 
 import 'package:flutter/services.dart';
@@ -39,7 +40,11 @@ Future<(String path, String name)> shrinkPhoto(String path, String name) async {
     final resized = await _decodeDown(bytes);
     if (resized == null) return (path, name);
 
-    final jpeg = img.encodeJpg(resized, quality: _quality);
+    // 굽는 것은 **다른 isolate 에서** — 순수 Dart 라 한 장에 수백 ms 화면이
+    // 굳는다. 운동일지에 사진을 여러 장 올리는 동안 글이 안 써졌다 (2026-11-05)
+    final jpeg = await Isolate.run(
+      () => img.encodeJpg(resized, quality: _quality),
+    );
     // 줄인 것이 더 크면(작은 PNG 등) 원본이 낫다
     if (jpeg.length >= bytes.length) return (path, name);
 
