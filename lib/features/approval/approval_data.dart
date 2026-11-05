@@ -89,7 +89,10 @@ bool _needsApproval(int amount) => !myRole.boss && amount >= _approvalLimit;
 Employee? get _defaultApprover {
   final people = StaffDirectory.instance.employees;
   for (final person in people) {
-    if (person.role == Role.master) return person;
+    // 나간 대표에게 올리면 아무도 결재를 못 한다
+    if (person.role == Role.master && person.status == EmployeeStatus.active) {
+      return person;
+    }
   }
   return null;
 }

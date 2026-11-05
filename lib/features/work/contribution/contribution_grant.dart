@@ -43,6 +43,8 @@ class _GrantScreenState extends State<_GrantScreen> {
     return [
       for (final employee in StaffDirectory.instance.employees)
         if (employee.id != me.id &&
+            // 나간 사람에게는 점수를 줄 일이 없다
+            employee.status == EmployeeStatus.active &&
             allowed.contains(employee.role) &&
             (!sameBranchOnly || employee.branchId == me.branchId))
           employee,

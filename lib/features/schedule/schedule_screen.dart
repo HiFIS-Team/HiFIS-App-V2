@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../core/api/client/api_exception.dart';
 import '../../core/api/project/event_api.dart';
 import '../../core/data/current_user.dart';
+import '../../core/data/employee.dart' show EmployeeStatus;
 import '../../core/data/staff.dart';
 import '../../core/data/staff_directory.dart';
 import '../../core/theme/app_colors.dart';
@@ -487,7 +488,8 @@ class _PersonPicker extends StatelessWidget {
     final me = currentUser?.id;
     final people = [
       for (final person in StaffDirectory.instance.employees)
-        if (person.id != me) person,
+        // 나간 사람의 일정은 볼 일이 없다
+        if (person.id != me && person.status == EmployeeStatus.active) person,
     ]..sort(StaffDirectory.instance.compareStaff);
 
     return Container(

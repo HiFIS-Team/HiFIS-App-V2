@@ -4,12 +4,16 @@ part of 'peer_review_section.dart';
 // 제출 현황 (대표·관리자)
 // ---------------------------------------------------------------------------
 
-/// 평가를 내야 하는 사람 전원 (직원·점장)
+/// 평가를 내야 하는 사람 전원 (재직 중인 직원·점장)
 ///
 /// 대표·관리자는 평가를 쓰지 않으므로 분모에서 빠진다.
+/// **퇴사자도 뺀다** (2026-11-05) — 안 빼면 나간 사람이 '안 낸 사람'으로 위에
+/// 서고, 지점 분모에 들어가서 다 낸 사람도 3/5 처럼 보였다. 서버 대상 명단
+/// (`review_targets`)도 재직자만 센다.
 List<Employee> _reviewers() => [
   for (final employee in StaffDirectory.instance.employees)
-    if (employee.role.doesFieldWork) employee,
+    if (employee.role.doesFieldWork && employee.status == EmployeeStatus.active)
+      employee,
 ];
 
 /// 한 사람의 이번 달 제출 현황
@@ -63,8 +67,18 @@ List<_Submission> _submissionsOf(List<PeerReview> reviews, {String? branchId}) {
         entry.key: entry.value.reduce((a, b) => a + b) / entry.value.length,
   };
 
+  // 나가기 전에 낸 사람 — 줄은 남긴다 (지난달 기록이 사라지면 안 된다).
+  // 분모(quota)에는 안 들어간다
+  final left = [
+    for (final employee in StaffDirectory.instance.employees)
+      if (employee.role.doesFieldWork &&
+          employee.status != EmployeeStatus.active &&
+          (counts[employee.id] ?? 0) > 0)
+        employee,
+  ];
+
   return [
-    for (final employee in reviewers)
+    for (final employee in [...reviewers, ...left])
       if (branchId == null || employee.branchId == branchId)
         _Submission(
           person: employee,
