@@ -135,7 +135,13 @@ class ApiClient {
       path,
       data: body is FormData ? body.clone() : body,
       queryParameters: query,
-      options: Options(method: method),
+      // 파일은 응답 대기를 길게 둔다. Dio 는 receiveTimeout 을 **보내기가
+      // 끝나기 전부터** 세서, 느린 매장 와이파이에서 영상이 다 안 올라간 채
+      // 20초에 끊겼다 (2026-11-10 운동일지 499 18건). 5분은 nginx 와 같은 값
+      options: Options(
+        method: method,
+        receiveTimeout: body is FormData ? const Duration(minutes: 5) : null,
+      ),
     );
 
     var response = await once();

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
+import '../../core/api/client/api_exception.dart';
 import '../../core/api/work/workout_api.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_decorations.dart';
@@ -59,7 +60,6 @@ Future<List<MediaItem>> pickWorkoutMedia(BuildContext context) async {
   if (files.isEmpty) return const [];
 
   // 줄이기는 한 장씩 한다 — 여러 장을 한꺼번에 펼치면 메모리가 튄다.
-  // 올리기는 같이 한다 (사내톡 사진과 같은 길이다).
   final ready = <(String path, String name, bool temp)>[];
   for (final file in files) {
     final path = file.path;
@@ -75,11 +75,24 @@ Future<List<MediaItem>> pickWorkoutMedia(BuildContext context) async {
   }
   if (ready.isEmpty) return const [];
 
+  // 올리기도 하나씩 한다. 열 개를 같이 보내면 느린 회선을 나눠 써서 전부
+  // 오래 걸리고, 하나만 실패해도 이미 올라간 것까지 통째로 버려졌다.
+  // 실패한 것만 빼고 나머지는 붙인다.
+  final done = <MediaItem>[];
+  Object? failed;
   try {
-    return await Future.wait([
-      for (final (path, name, _) in ready)
-        WorkoutApi.uploadMedia(path, filename: name),
-    ]);
+    for (final (path, name, _) in ready) {
+      try {
+        done.add(await WorkoutApi.uploadMedia(path, filename: name));
+      } catch (error) {
+        failed ??= error;
+      }
+    }
+    if (failed != null) {
+      if (done.isEmpty) throw failed;
+      if (context.mounted) AppToast.show(context, messageOf(failed));
+    }
+    return done;
   } finally {
     // 줄이면서 만든 임시 파일은 성공하든 말든 치운다
     for (final (path, _, temp) in ready) {
